@@ -8,6 +8,7 @@ struct Config {
 };
 ```
 
+## State Vector Definition
 All compile time state definitions - static polymorphism design principle. Simple `Segment` fundamental utility class template.
 ```
 template<int I, int SZ>
@@ -86,6 +87,8 @@ template<typename StateDef>
 using StateCov = Eigen::Matrix<Scalar_t, StateDef::N, StateDef::N>;
 ```
 
+## Kalman Filter Concepts
+
 GNSS measurement class template with "StateDef". All measurement classes should provide types and definitions for H (observation) and R (covariance) matrices - Static polymorphism.
 ```
 #include "State.h"
@@ -99,6 +102,7 @@ public:
     using H_t = Eigen::Matrix<Scalar_t, M, StateDef::N>;
     using R_t = Eigen::Matrix<Scalar_t, M, M>;
     using O_t = Eigen::Vector<Scalar_t, M>;
+    using K_t = Eigen::Matrix<Scalar_t, StateDef::N, M>;
 
     // returns const reference for performance when can be statically initialized
     static const H_t& compute_h()
@@ -188,7 +192,7 @@ public:
         const typename TSensor::R_t& R,
         const typename TSensor::O_t& innovation,
         typename TSensor::R_t& S,
-        Eigen::Matrix<Scalar_t, StateDef::N, TSensor::M>& K,
+        typename TSensor::K_t& K,
         State_t& dx,
         P_t& P_f)
     {
@@ -221,7 +225,7 @@ public:
 
         // update covariance given observation
         typename TSensor::R_t S;
-        Eigen::Matrix<Scalar_t, StateDef::N, TSensor::M> K;
+        typename TSensor::K_t K;
         State_t dx;
         covariance_update<TSensor>(
             m_P_i,
@@ -236,6 +240,18 @@ public:
 
         // inject error state correction to whole state
         inject_error(dx);
+    }
+
+    // function template to process sensor
+    // TODO: define sensor class
+    template<typename TSensor>
+    void process_sensor(TSensor& sensor)
+    {
+        while (sensor.has_measurement()) {
+            // sensor will provide data that has measurement
+            auto meas = sensor.pop();
+            observation_update(meas.z);
+        }
     }
 
 private:
