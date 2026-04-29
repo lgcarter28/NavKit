@@ -264,4 +264,122 @@ private:
 }
 ```
 
-Need to think through navigator and how it will configure and store its `KalmanFitler`, whatever `Sensor`s, and who owns what. What will require class instances, and what will be built into types?
+## Navigator
+The navigator will own the `KalmanFilter` and all `Sensor`s, and will orchestrate all main logic.
+
+Starting with an example of some concrete `Sensor` types, and how we can use those to create an aliased `Sensors` tuple that's configured at compile time.
+```
+// define state layout
+using StateDef = InsStateDef;
+
+// define sensors to be used
+using Sensors = std::tuple<
+    GnssPosSensor<StateDef>,
+    BaroSensor<StateDef>
+>;
+
+// define navigator type
+using Nav = Navigator<StateDef, Sensors>;
+
+// instantiate navigator
+Nav nav;
+```
+
+Navigator class:
+
+```
+template<typename TStateDef, typename TSensors>
+class Navigator
+{
+public:
+    using KF_t = KalmanFilter<TStateDef>;
+
+    void process_measurements()
+    {
+        process_all_sensors();
+    }
+
+private:
+    /*
+    Compile time generic sensor processing of an `std::tuple<>` of `Sensor`s. Uses `std::apply()` (C++17) to effectively iterate through the tuple container at compile time.
+    */
+    void process_all_sensors()
+    {
+        std::apply(
+            [this](auto&... sensor)
+            {
+                (m_filter.process_sensor(sensor), ...);
+            },
+            m_sensors
+        );
+    }
+
+private:
+    KF_t m_filter{};
+    TSensors m_sensors{};
+};
+```
+
+## Errors and Return Types
+Here are some ideas for some basic return types.
+
+Basic status return type class.
+```
+enum class Status {
+    OK,
+    NoData,
+    Invalid,
+    Overflow
+};
+
+// basic use case
+Status read(ImuData& out);
+```
+
+Slightly more complex status return type option.
+```
+template<typename T>
+struct Result {
+    T value;
+    Status status;
+};
+
+// basic use case
+Result<ImuData> read(InputData& in)
+{
+    ImuData out{};
+    if (in.is_empty()) {
+        return Result<ImuData>{out, Status::NoData};
+    }
+
+    // do processing
+    return Result<ImuData>{out, Status::OK};
+}
+```
+
+Error types more specific to expected errors during filtering math procesing.
+```
+enum class NavStatus {
+    OK,
+    NumericalIssue,
+    CovarianceNotPSD,
+    BadMeasurement
+};
+```
+
+`NavStatus` return type use case.
+```
+NavStatus updateGnss(const GnssMeas& z) {
+    if (!isValid(z)) {
+        return NavStatus::BadMeasurement;
+    }
+
+    // do update
+
+    if (!P.allFinite()) {
+        return NavStatus::NumericalIssue;
+    }
+
+    return NavStatus::OK;
+}
+```
