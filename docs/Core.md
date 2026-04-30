@@ -379,9 +379,7 @@ public:
 
     void reset(State_t& x, State_t& dx, P_t& P)
     {
-        // TODO: do I need to use the template keyword here?
-        // ResetPolicy::template reset_covariance<StateDef, State_t, P_t>(x, dx, P);
-        ResetPolicy::reset_covariance<StateDef, State_t, P_t>(x, dx, P);
+        ResetPolicy::template reset_covariance<StateDef, State_t, P_t>(x, dx, P);
         ResetPolicy::reset_dx(dx);
     }
 
@@ -585,8 +583,6 @@ The client can use C++ header config files that define compile time types, alias
 struct Config {
     using Scalar_t = float;
     static constexpr size_t IMU_BUFF_SIZE = 256;
-    static constexpr size_t GNSS_BUFF_SIZE = 16;
-    static constexpr size_t BARO_BUFF_SIZE = 64;
 
     using StateDef = InsStateDef;
 
@@ -612,10 +608,11 @@ Sensor assembly, which will have dedicated files per sensor tuple configuraiton.
 
 // define individual sensors
 template <typename StateDef>
-using GnssPosSensor = Sensor<GnssPosModel<StateDef>, Config::GNSS_BUFF_SIZE, GnssNoisePolicy>;
+using GnssPosSensor = Sensor
+<GnssPosModel<StateDef>, 256, GnssNoisePolicy>;
 
 template <typename StateDef>
-using BaroSensor = Sensor<BaroModel<StateDef>, Config::BARO_BUFF_SIZE>;
+using BaroSensor = Sensor<BaroModel<StateDef>, 64>;
 
 template <typename StateDef>
 using GnssPosBaroSensors = std::tuple<
