@@ -1,14 +1,6 @@
 # Core NavKit Architecture Design Notes
 
-Use C++ header config files to define compile time types, aliases, and variables
-```
-struct Config {
-    using Scalar_t = float;
-    static constexpr size_t IMU_BUFF_SIZE = 256;
-    static constexpr size_t GNSS_BUFF_SIZE = 16;
-    static constexpr size_t BARO_BUFF_SIZE = 64;
-};
-```
+
 
 ## State Vector Definition
 All compile time state definitions - static polymorphism design principle. Simple `Segment` fundamental utility class template.
@@ -93,7 +85,7 @@ using StateCov = Eigen::Matrix<Scalar_t, StateDef::N, StateDef::N>;
 
 ### Sensor Processing
 
-The `Sensor` class is used to hold all configuraiton, and runtime and persistent state. The `SensorModel` class is used to provide all math functionality relevant to the Kalman filter. It uses the Curiously Recurring Template Pattern (CRTP) via `SensorModelBase` to essentially enforce a compile time static interface.
+The `Sensor` class is used to hold all configuraiton, and runtime and persistent state. The `SensorModel` class is used to provide all math functionality relevant to the Kalman filter. It uses the Curiously Recurring Template Pattern (CRTP) via `SensorModelBase` to effectively enforce a compile time static interface.
 
 This is the basic layout: `Sensor<Model, BufferSize, NoisePolicy>`, which will be shown in detail below.
 
@@ -181,6 +173,12 @@ public:
         NoisePolicy::update(m_noise_ctx, meas);
     }
 
+    // handle arbitrary state update after Navigator processes this Sensor
+    void update()
+    {
+        // default no-op
+    }
+
 private:
     RingBuffer<Measurement_t, BufferSize> m_buffer;
     NoiseContext_t m_noise_ctx;
@@ -222,9 +220,7 @@ public:
         float sigma_v;
     };
 
-    // returns const reference for performance when can be statically initialized
-    // static const H_t& would be great, but I don't know if all cases will be const
-    static H_t& compute_h_impl(const State_t&)
+    static H_t compute_h_impl(const State_t&)
     {
         // simple definition
         // H_t H = H_t::Zero();
@@ -232,6 +228,8 @@ public:
         // return H;
 
         // static local initialization with lambda
+        // if we want to support returning a "static const H_t&" in the future
+        // this would be statically initialized once
         static H_t H = [] {
             H_t tmp = H_t::Zero();
             tmp.block<M, M>(0, StateDef::Pos::i) = 
@@ -289,7 +287,10 @@ Kalman filter class:
 ```
 #include "State.h"
 
-template <typename StateDef>
+template <typename StateDef,
+    typename InjectionPolicy,
+    typename ResetPolicy = DefaultResetPolicy<StateDef>
+    >
 class KalmanFilter {
 public:
     using State_t = State<StateDef>;
@@ -326,12 +327,6 @@ public:
         P_f = (I() - K * H) * P_i * (I() - K * H).transpose() + K * R * K.transpose();
     }
 
-    void inject_error(const State_t& dx)
-    {
-        // TODO: more complicated logic to handle non linear addition, like for attitude
-        m_x += dx;
-    }
-
     // "x" is whole state prior to observation (priori)
     // "z" is measurement observation
     template <typename Model>
@@ -354,8 +349,7 @@ public:
             m_P_f
         );
 
-        // inject error state correction to whole state
-        inject_error(m_dx);
+        m_P_i = m_P_f;
     }
 
     // function template to process sensor
@@ -378,6 +372,19 @@ public:
         }
     }
 
+    void inject(State_t& x, const State_t& dx)
+    {
+        InjectionPolicy::apply(x, dx);
+    }
+
+    void reset(State_t& x, State_t& dx, P_t& P)
+    {
+        // TODO: do I need to use the template keyword here?
+        // ResetPolicy::template reset_covariance<StateDef, State_t, P_t>(x, dx, P);
+        ResetPolicy::reset_covariance<StateDef, State_t, P_t>(x, dx, P);
+        ResetPolicy::reset_dx(dx);
+    }
+
 private:
     State_t m_x;
     State_t m_dx;
@@ -388,41 +395,121 @@ private:
 }
 ```
 
+### EKF Injection Policy
+
+Injection policy building blocks:
+```
+template<typename Seg>
+struct AdditiveInjection
+{
+    template<typename State_t>
+    static void apply(State_t& x, const State_t& dx)
+    {
+        segment<Seg>(x) += segment<Seg>(dx);
+    }
+};
+```
+
+```
+template<typename Seg>
+struct QuaternionInjection
+{
+    template<typename State_t>
+    static void apply(State_t& x, const State_t& dx)
+    {
+        auto dtheta = segment<Seg>(dx);
+        Quaternion dq = small_angle_quat(dtheta);
+        auto& q = segment<Seg>(x);
+
+        q = dq * q;
+        q.normalize();
+    }
+};
+```
+
+Core INS only injection policy as a reference. The user must create an `InjectionPolicy` that directly maps to the full `StateDef`.
+```
+template<typename StateDef>
+struct InsInjectionPolicy
+{
+    template<typename State_t>
+    static void apply(State_t& x, const State_t& dx)
+    {
+        AdditiveInjection<typename StateDef::Pos>::apply(x, dx);
+        AdditiveInjection<typename StateDef::Vel>::apply(x, dx);
+        QuaternionInjection<typename StateDef::Att>::apply(x, dx);
+    }
+};
+```
+
+Example InjectionPolicy for a `StateDef` that contains IMU error states:
+```
+template<typename StateDef>
+struct ImuInsInjectionPolicy
+{
+    template<typename State_t>
+    static void apply(State_t& x, const State_t& dx)
+    {
+        // standard navigation states
+        AdditiveInjection<typename StateDef::Pos>::apply(x, dx);
+        AdditiveInjection<typename StateDef::Vel>::apply(x, dx);
+        QuaternionInjection<typename StateDef::Att>::apply(x, dx);
+
+        // IMU error states
+        AdditiveInjection<typename StateDef::GyroB>::apply(x, dx);
+        AdditiveInjection<typename StateDef::GyroSf>::apply(x, dx);
+        AdditiveInjection<typename StateDef::AccB>::apply(x, dx);
+        AdditiveInjection<typename StateDef::AccSf>::apply(x, dx);
+    }
+};
+```
+
+`ResetPolicy` defines how to reset the error state vector and adjust the covariance for the attitude error state.
+```
+template<typename StateDef>
+struct DefaultResetPolicy
+{
+    template<typename State_t>
+    static void reset_dx(State_t& dx)
+    {
+        dx.setZero();
+    }
+
+    template <typename StateDef, typename State_t, typename P_t>
+    static void reset_covariance(
+        const State_t& x,
+        const State_t& dx,
+        P_t& P)
+    {
+        // assumes error state is right-multiplicative quaternion with small-angle approx
+        // G = I - 0.5 * skew(d_theta)
+        // P = G P G^T
+        Eigen::Matrix3<Scalar_t> G_att =
+            Eigen::Matrix3<Scalar_t>::Identity() - 0.5 * skew(segment<StateDef::Att>(dx));
+
+        P_t G = P_t::Identity();
+        block<StateDef::Att>(G) = G_att;
+
+        P = G * P * G.transpose();
+    }
+};
+```
+
 ## Navigator
+
 The navigator will own the `KalmanFilter` and all `Sensor`s, and will orchestrate all main logic.
-
-Starting with an example of some concrete `Sensor` types, and how we can use those to create an aliased `Sensors` tuple that's configured at compile time.
-```
-// define state layout
-using StateDef = InsStateDef;
-
-// define individual sensors
-template <typename StateDef>
-using GnssPosSensor = Sensor<GnssPosModel<StateDef>, Config::GNSS_BUFF_SIZE, GnssNoisePolicy>;
-
-template <typename StateDef>
-using BaroSensor = Sensor<BaroModel<StateDef>, Config::BARO_BUFF_SIZE>;
-
-// create a tuple of Sensors
-using Sensors = std::tuple<GnssPosSensor<StateDef>, BaroSensor<StateDef>>;
-
-// define navigator type
-using Nav = Navigator<StateDef, Sensors>;
-
-// instantiate navigator
-Nav nav;
-```
 
 Navigator class:
 
 ```
-template <typename StateDef, typename Sensors>
+template <typename StateDef, typename Sensors, typename Filter,
+    typename UpdatePolicy = UpdatePostFilter>
 class Navigator
 {
 public:
     static_assert(StateDef::N > 0, "State size must be positive");
 
-    using Filter_t = KalmanFilter<StateDef>;
+    using Filter_t = Filter<StateDef>;
 
     void process_measurements()
     {
@@ -432,16 +519,130 @@ public:
         std::apply(
             [this](auto&... sensor)
             {
-                (m_filter.process_sensor(sensor), ...);
+                (
+                    m_filter.process_sensor(sensor),
+                    UpdatePolicy::sensor_update(m_filter, sensor),
+                    ...
+                );
             },
             m_sensors
         );
+
+        UpdatePolicy::filter_update(m_filter);
     }
 
 private:
     Filter_t m_filter{};
     Sensors m_sensors{};
 };
+```
+
+### Navigator Update Policy
+
+```
+template<typename Filter>
+struct UpdatePostSensor
+{
+    template<typename Sensor>
+    static void sensor_update(Filter& f, const Sensor& s)
+    {
+        s.update();
+        f.inject();
+        f.reset();
+    }
+
+    static void filter_update(Filter& f)
+    {
+        // no-op
+    }
+};
+```
+
+```
+template<typename Filter>
+struct UpdatePostFilter
+{
+    template<typename Sensor>
+    static void sensor_update(Filter& f, const Sensor& s)
+    {
+        // no-op
+    }
+
+    static void filter_update(Filter& f)
+    {
+        f.inject();
+        f.reset();
+    }
+};
+```
+
+## Client Code
+
+The client can use C++ header config files that define compile time types, aliases, and variables.
+```
+// Config.h
+
+struct Config {
+    using Scalar_t = float;
+    static constexpr size_t IMU_BUFF_SIZE = 256;
+    static constexpr size_t GNSS_BUFF_SIZE = 16;
+    static constexpr size_t BARO_BUFF_SIZE = 64;
+
+    using StateDef = InsStateDef;
+
+    template<typename Filter>
+    using UpdatePolicy = UpdatePostFilter<Filter>;
+
+    template <typename StateDef_t>
+    using InjectionPolicy = InsInjectionPolicy<StateDef_t>;
+
+    template <typename StateDef_t>
+    using ResetPolicy = DefaultResetPolicy<StateDef_t>;
+
+    template <typename StateDef_t>
+    using Sensors = GnssPosBaroSensors<StateDef_t>;
+};
+```
+
+Starting with an example of some concrete `Sensor` types, and how we can use those to create an aliased `Sensors` tuple that's configured at compile time.
+
+Sensor assembly, which will have dedicated files per sensor tuple configuraiton.
+```
+// GnssPosBaroSensors.h
+
+// define individual sensors
+template <typename StateDef>
+using GnssPosSensor = Sensor<GnssPosModel<StateDef>, Config::GNSS_BUFF_SIZE, GnssNoisePolicy>;
+
+template <typename StateDef>
+using BaroSensor = Sensor<BaroModel<StateDef>, Config::BARO_BUFF_SIZE>;
+
+template <typename StateDef>
+using GnssPosBaroSensors = std::tuple<
+    GnssPosSensor<StateDef>,
+    BaroSensor<StateDef>
+>;
+```
+
+Navigation system assembly, which can be used by application (sim or firmware) code. Ideally this should remain unchaged regardless of the Config configuraiton.
+```
+// NavAssembly.h
+
+using Config::StateDef;
+using Config::Sensors;
+
+// define filter
+using Filter = KalmanFilter<
+    StateDef,
+    Config::InjectionPolicy<StateDef>,
+    Config::ResetPolicy<StateDef>
+>;
+
+// define navigator type
+using Nav = Navigator<StateDef, Sensors, Filter, Config::UpdatePolicy<Filter>>;
+
+// instantiate navigator
+Nav nav;
 ```
 
 ## Common Utilities
