@@ -93,6 +93,7 @@ The primary sources are \cite{groves2013}, \cite{titterton2004}, and \cite{simon
 \chapter{Coordinate Systems, Attitude Representation, Kinematics, Earth and Gravity Modeling}
 
 \section{Reference Frame Definitions}
+
 This document uses a compact frame notation inspired by Groves \cite{groves2013}. The reference frames used throughout the document are summarized in \cref{tab:reference_frames}.
 
 \begin{table}[htbp]
@@ -107,7 +108,7 @@ This document uses a compact frame notation inspired by Groves \cite{groves2013}
 $i$ & Earth-Centered Inertial (ECI) & Non-accelerating, non-rotating inertial frame used as the conceptual reference for Newtonian dynamics.\\
 $e$ & Earth-Centered Earth-Fixed (ECEF) & Earth-fixed frame that rotates with the Earth.\\
 $n$ & North-East-Down (NED) & Local geographic frame oriented north, east, and down.\\
-$b$ & Body & Vehicle-fixed frame, conventionally centered at the nominal vehicle center of gravity.\\
+$b$ & Body & Vehicle-fixed geometric frame, conventionally centered at the nominal vehicle center of gravity.\\
 $o$ & Origin (Navigation Reference Point) & Body-fixed navigation origin frame used as the mechanization reference point and to aggregate sensor lever arms.\\
 $u$ & IMU & Sensor frame centered at the inertial measurement unit.\\
 $s$ & Sensor & Generic aiding-sensor frame, such as a GNSS antenna, altimeter, camera, magnetometer, or speed sensor.\\
@@ -115,269 +116,590 @@ $s$ & Sensor & Generic aiding-sensor frame, such as a GNSS antenna, altimeter, c
 \end{tabular}
 \end{table}
 
-\noindent The origin frame $o$ replaces earlier placeholder notation for the Navigation Reference Point. Sensor lever arms are written as $l_{os}^{o}$, meaning the position of sensor frame $s$ with respect to origin frame $o$, resolved in the origin frame $b$.
+The origin frame $o$ is the primary mechanization frame used in Chapters 1--3. Its origin is the navigation reference point, and its axes are fixed in the vehicle. The body frame $b$ may still be useful for aerodynamics, actuator geometry, or legacy vehicle definitions, but the inertial mechanization is written in terms of $o$:
+\[
+r_{eo}^{e}, \qquad
+v_{eo}^{e}, \qquad
+C_o^e, \qquad
+\omega_{io}^{o}, \qquad
+f_{io}^{o}.
+\]
+Sensor lever arms are written as
+\[
+l_{os}^{o},
+\]
+meaning the position of sensor frame $s$ with respect to origin frame $o$, resolved in origin frame $o$.
 
 \section{Kinematic Vector Convention}
+
 All kinematic Cartesian vectors use the convention
 \begin{equation}
 \mathbf{x}_{\beta\alpha}^{\gamma},
 \end{equation}
-where $\alpha$ is the object frame, $\beta$ is the reference frame with respect to which the object is described, and $\gamma$ is the resolving frame. The object frame and reference frame must be distinct for motion quantities. The resolving frame may be any convenient frame. For example,
+where $\alpha$ is the object frame, $\beta$ is the reference frame with respect to which the object is described, and $\gamma$ is the resolving frame. The object frame and reference frame must be distinct for motion quantities. The resolving frame may be any convenient frame.
+
+Examples:
 \begin{align}
-\mathbf{r}_{eo}^{e} &: \text{position of } o \text{ with respect to } e \text{ resolved in } e,\\
-\mathbf{v}_{eo}^{e} &: \text{velocity of } o \text{ with respect to } e \text{ resolved in } e,\\
-\boldsymbol{\omega}_{io}^{o} &: \text{angular rate of } o \text{ with respect to } i \text{ resolved in } o,\\
-\mathbf{f}_{io}^{o} &: \text{specific force of } o \text{ with respect to } i \text{ resolved in } o.
+\mathbf{r}_{eo}^{e} &: \text{position of frame } o \text{ with respect to frame } e \text{ resolved in frame } e,\\
+\mathbf{v}_{eo}^{e} &: \text{velocity of frame } o \text{ with respect to frame } e \text{ resolved in frame } e,\\
+\boldsymbol{\omega}_{io}^{o} &: \text{angular rate of frame } o \text{ with respect to frame } i \text{ resolved in frame } o,\\
+\mathbf{f}_{io}^{o} &: \text{specific force of frame } o \text{ with respect to frame } i \text{ resolved in frame } o.
 \end{align}
+
 This convention is intentionally explicit. For instance, a shorthand such as $\mathbf{r}_{s}^{e}$ should be written as $\mathbf{r}_{es}^{e}$ when the vector denotes the position of sensor frame $s$ with respect to ECEF frame $e$, resolved in ECEF coordinates.
 
 \section{Attitude Representation Overview}
-Attitude represents the orientation of one frame relative to another. This document primarily uses direction cosine matrices and quaternions for propagation and small rotation vectors for error-state perturbations. Euler angles are useful for interpretation, but they are not ideal for propagation because of singularities and order-dependent definitions.
+
+Attitude represents the orientation of one frame relative to another. This document primarily uses direction cosine matrices and quaternions for propagation, and small rotation vectors for error-state perturbations. Euler angles are useful for interpretation, but they are not ideal for propagation because of singularities and order-dependent definitions.
 
 \subsection{Euler Angles}
+
 Euler angles parameterize orientation as an ordered sequence of three rotations. For aerospace applications, yaw, pitch, and roll are commonly used for interpretation. They are intuitive, but they suffer from singularities and should generally not be used as the propagated attitude state in a high-performance inertial navigator.
 
 \subsection{Rotation Vectors and Small-Angle Perturbations}
-A rotation vector represents attitude error as a three-dimensional vector whose direction is the rotation axis and whose magnitude is the rotation angle. For small errors, the skew-symmetric matrix $[\delta\boldsymbol{\theta}]_\times$ provides the first-order perturbation used in error-state filtering.
 
+A rotation vector represents attitude error as a three-dimensional vector whose direction is the rotation axis and whose magnitude is the rotation angle. For small errors, the skew-symmetric matrix $[\delta\boldsymbol{\theta}]_\times$ provides the first-order perturbation used in error-state filtering. To first order,
+\begin{equation}
+C(\delta\boldsymbol{\theta})
+\approx
+I + [\delta\boldsymbol{\theta}]_\times,
+\end{equation}
+or with the opposite perturbation convention,
+\begin{equation}
+C(\delta\boldsymbol{\theta})
+\approx
+I - [\delta\boldsymbol{\theta}]_\times.
+\end{equation}
+The sign depends on whether the attitude error is defined as a left or right multiplicative perturbation.
 
 \section{Notation for Rotating-Frame Derivatives}
-A major source of confusion in inertial-navigation derivations is the distinction between the physical vector, the frame in which its components are resolved, and the frame with respect to which its time derivative is taken. This document uses the following convention. The superscript on a vector denotes the frame in which the vector is resolved. The subscript outside square brackets denotes the frame with respect to which the derivative is taken. Thus
-\begin{equation}
-\left[\dot{\rb}^{e}\right]_i
-\end{equation}
-means the time derivative of the physical vector $\rb$ with respect to inertial frame $i$, resolved in ECEF frame $e$. By contrast,
-\begin{equation}
-\left[\dot{\rb}^{e}\right]_e
-\end{equation}
-means the time derivative of the same vector with respect to the rotating ECEF frame, resolved in ECEF coordinates. When no derivative-frame subscript is shown on a vector that is a time derivative, the resolving frame is the same as the time derivative frame. For example, $\dot{\rb}^e$ is shorthand for $[\dot{\rb}^e]_e$.
 
-\section{Transport Theorem and ECEF Kinematics}
-The transport theorem states that for any vector $\mathbf{a}$, the derivative with respect to inertial frame $i$ is related to the derivative with respect to rotating frame $e$ by
+A major source of confusion in inertial-navigation derivations is the distinction between the physical vector, the frame in which its components are resolved, and the frame with respect to which its time derivative is taken. This document uses square brackets to explicitly identify the derivative frame:
 \begin{equation}
-\left[\dot{\mathbf{a}}^{e}\right]_i
-=
-\left[\dot{\mathbf{a}}^{e}\right]_e
-+
-\boldsymbol\omega_{ie}^e \times \mathbf{a}^e.
-\label{eq:transport_theorem_rev2}
+\left[
+\frac{d\mathbf{x}_{\beta\alpha}^{\gamma}}{dt}
+\right]_{\delta}.
 \end{equation}
-This is often called the transport theorem in mechanics texts. When it is applied twice to position, the resulting acceleration expression contains Coriolis and centrifugal terms. Some navigation texts refer to the resulting velocity-equation correction as the Coriolis equation or Coriolis compensation; both names are referring to the same rotating-frame physics \cite{titterton2004,groves2013}.
+This means the time derivative is taken with respect to frame $\delta$, while the vector components remain resolved in frame $\gamma$.
 
-Apply \cref{eq:transport_theorem_rev2} to the position vector $\rb$. The inertial velocity resolved in ECEF coordinates is
+When no derivative-frame subscript is shown, the derivative is taken with respect to the same frame in which the vector is resolved:
 \begin{equation}
-\left[\dot{\rb}^{e}\right]_i
-=
-\left[\dot{\rb}^{e}\right]_e
-+
-\boldsymbol\omega_{ie}^e \times \rb^e.
-\label{eq:pos_transport_first}
+\dot{\mathbf{x}}_{\beta\alpha}^{\gamma}
+\triangleq
+\left[
+\frac{d\mathbf{x}_{\beta\alpha}^{\gamma}}{dt}
+\right]_{\gamma}.
 \end{equation}
-The ECEF velocity state is defined by
+Thus,
 \begin{equation}
-\vb^e \triangleq \left[\dot{\rb}^{e}\right]_e.
-\label{eq:ecef_velocity_definition}
+\dot{\mathbf{r}}_{eo}^{e}
+=
+\left[
+\frac{d\mathbf{r}_{eo}^{e}}{dt}
+\right]_{e}
+=
+\mathbf{v}_{eo}^{e}.
+\end{equation}
+By contrast,
+\begin{equation}
+\left[
+\frac{d\mathbf{r}_{eo}^{e}}{dt}
+\right]_{i}
+\end{equation}
+is the inertial derivative of the same physical position vector, still resolved in ECEF coordinates.
+
+\section{Transport Theorem}
+
+The transport theorem relates the time derivative of a vector as seen from two different rotating frames. For any vector $\mathbf{x}_{\beta\alpha}^{\gamma}$ resolved in frame $\gamma$, the derivative with respect to frame $\delta$ is
+\begin{equation}
+\boxed{
+\left[
+\frac{d\mathbf{x}_{\beta\alpha}^{\gamma}}{dt}
+\right]_{\delta}
+=
+\left[
+\frac{d\mathbf{x}_{\beta\alpha}^{\gamma}}{dt}
+\right]_{\gamma}
++
+\boldsymbol{\omega}_{\delta\gamma}^{\gamma}
+\times
+\mathbf{x}_{\beta\alpha}^{\gamma}
+}
+\label{eq:transport_theorem_general}
+\end{equation}
+where $\boldsymbol{\omega}_{\delta\gamma}^{\gamma}$ is the angular rate of frame $\gamma$ with respect to frame $\delta$, resolved in frame $\gamma$.
+
+The theorem is independent of the object and reference frames $(\alpha,\beta)$ in the vector subscript. It depends only on the resolving frame $\gamma$ and the derivative frame $\delta$.
+
+For the common case of an ECEF-resolved vector differentiated with respect to inertial frame $i$,
+\begin{equation}
+\left[
+\frac{d\mathbf{x}_{\beta\alpha}^{e}}{dt}
+\right]_i
+=
+\left[
+\frac{d\mathbf{x}_{\beta\alpha}^{e}}{dt}
+\right]_e
++
+\boldsymbol{\omega}_{ie}^{e}
+\times
+\mathbf{x}_{\beta\alpha}^{e}.
+\label{eq:transport_theorem_ecef}
+\end{equation}
+
+\section{ECEF Position, Velocity, and Acceleration Kinematics}
+
+Apply \cref{eq:transport_theorem_ecef} to the ECEF position vector of the origin frame:
+\begin{equation}
+\left[
+\frac{d\mathbf{r}_{eo}^{e}}{dt}
+\right]_{i}
+=
+\left[
+\frac{d\mathbf{r}_{eo}^{e}}{dt}
+\right]_{e}
++
+\boldsymbol{\omega}_{ie}^{e}
+\times
+\mathbf{r}_{eo}^{e}.
+\end{equation}
+Since
+\begin{equation}
+\mathbf{v}_{eo}^{e}
+\triangleq
+\left[
+\frac{d\mathbf{r}_{eo}^{e}}{dt}
+\right]_{e},
+\end{equation}
+the inertial velocity of the origin frame, resolved in ECEF coordinates, is
+\begin{equation}
+\left[
+\frac{d\mathbf{r}_{eo}^{e}}{dt}
+\right]_{i}
+=
+\mathbf{v}_{eo}^{e}
++
+\boldsymbol{\omega}_{ie}^{e}
+\times
+\mathbf{r}_{eo}^{e}.
+\label{eq:inertial_velocity_from_ecef_velocity}
+\end{equation}
+
+Differentiate again with respect to inertial frame $i$:
+\begin{equation}
+\left[
+\frac{d^2\mathbf{r}_{eo}^{e}}{dt^2}
+\right]_i
+=
+\left[
+\frac{d}{dt}
+\left(
+\mathbf{v}_{eo}^{e}
++
+\boldsymbol{\omega}_{ie}^{e}
+\times
+\mathbf{r}_{eo}^{e}
+\right)
+\right]_i.
+\end{equation}
+Using the transport theorem on each term,
+\begin{align}
+\left[
+\frac{d\mathbf{v}_{eo}^{e}}{dt}
+\right]_i
+&=
+\left[
+\frac{d\mathbf{v}_{eo}^{e}}{dt}
+\right]_e
++
+\boldsymbol{\omega}_{ie}^{e}
+\times
+\mathbf{v}_{eo}^{e},\\
+\left[
+\frac{d}{dt}
+\left(
+\boldsymbol{\omega}_{ie}^{e}
+\times
+\mathbf{r}_{eo}^{e}
+\right)
+\right]_i
+&=
+\left[
+\frac{d}{dt}
+\left(
+\boldsymbol{\omega}_{ie}^{e}
+\times
+\mathbf{r}_{eo}^{e}
+\right)
+\right]_e
++
+\boldsymbol{\omega}_{ie}^{e}
+\times
+\left(
+\boldsymbol{\omega}_{ie}^{e}
+\times
+\mathbf{r}_{eo}^{e}
+\right).
+\end{align}
+Assuming Earth rate is constant in ECEF coordinates,
+\begin{equation}
+\left[
+\frac{d}{dt}
+\left(
+\boldsymbol{\omega}_{ie}^{e}
+\times
+\mathbf{r}_{eo}^{e}
+\right)
+\right]_e
+=
+\boldsymbol{\omega}_{ie}^{e}
+\times
+\mathbf{v}_{eo}^{e}.
 \end{equation}
 Therefore,
 \begin{equation}
-\left[\dot{\rb}^{e}\right]_i = \vb^e + \boldsymbol\omega_{ie}^e \times \rb^e.
-\label{eq:inertial_velocity_resolved_ecef_rev2}
-\end{equation}
-Now differentiate again with respect to the inertial frame. Start by defining the inertial velocity resolved in ECEF coordinates as
-\begin{align}
-\mathbf{u}^e
-&= \left[\dot{\rb}^{e}\right]_i = \mathbf{v}_{i}^{e}, \\
-&= \vb^e + \boldsymbol\omega_{ie}^e \times \rb^e,
-\end{align}
-and perform the inertial differentiation by substituting into the transport theorem, \cref{eq:transport_theorem_rev2},
-\begin{equation}
-\left[\dot{\mathbf{u}}^e\right]_i
+\boxed{
+\left[
+\frac{d^2\mathbf{r}_{eo}^{e}}{dt^2}
+\right]_i
 =
-\left[\dot{\mathbf{u}}^e\right]_e
+\left[
+\frac{d\mathbf{v}_{eo}^{e}}{dt}
+\right]_e
 +
-\boldsymbol\omega_{ie}^e \times \mathbf{u}^e.
-\label{eq:second_transport_start}
-\end{equation}
-The first term is
-\begin{align}
-\left[\dot{\mathbf{u}}^e\right]_e
-&=
-\frac{d}{dt}\left[\vb^e + \boldsymbol\omega_{ie}^e \times \rb^e\right]_e \\
-&=
-\dot{\vb}^e + \dot{\boldsymbol\omega}_{ie}^e \times \rb^e + \boldsymbol\omega_{ie}^e \times \dot{\rb}^e, \\
-&=
-\ab^e + \dot{\boldsymbol\omega}_{ie}^e \times \rb^e + \boldsymbol\omega_{ie}^e \times \vb^e.
-\end{align}
-For the ECEF frame, Earth rate is normally treated as constant in ECEF coordinates, so $\dot{\boldsymbol\omega}_{ie}^e=0$, and $\dot{\rb}^e=\vb^e$. Therefore,
-\begin{equation}
-\left[\dot{\mathbf{u}}^e\right]_e
-= \ab^e + \boldsymbol\omega_{ie}^e \times \vb^e.
-\end{equation}
-The second term in \cref{eq:second_transport_start} is
-\begin{align}
-\boldsymbol\omega_{ie}^e \times \mathbf{u}^e
-&=
-\boldsymbol\omega_{ie}^e \times \left(\vb^e + \boldsymbol\omega_{ie}^e \times \rb^e\right)\\
-&=
-\boldsymbol\omega_{ie}^e \times \vb^e
+2\boldsymbol{\omega}_{ie}^{e}
+\times
+\mathbf{v}_{eo}^{e}
 +
-\boldsymbol\omega_{ie}^e \times \left(\boldsymbol\omega_{ie}^e \times \rb^e\right).
-\end{align}
-Combining terms gives the inertial acceleration resolved in ECEF coordinates:
-\begin{equation}
-\left[\ddot{\rb}^{e}\right]_i
-=
-\ab^e
-+2\boldsymbol\omega_{ie}^e\times\vb^e
-+
-\boldsymbol\omega_{ie}^e\times\left(\boldsymbol\omega_{ie}^e\times\rb^e\right).
-\label{eq:inertial_accel_ecef_expanded_rev2}
+\boldsymbol{\omega}_{ie}^{e}
+\times
+\left(
+\boldsymbol{\omega}_{ie}^{e}
+\times
+\mathbf{r}_{eo}^{e}
+\right)
+}
+\label{eq:ecef_acceleration_transport_full}
 \end{equation}
-\begin{equation}
-\left[\ddot{\rb}^{e}\right]_i
-=
-\ab_i^e
-\end{equation}
-Using $\Omie=\skew{\boldsymbol\omega_{ie}^{e}}$, this is equivalently
-\begin{equation}
-\ab_i^e
-= \ab^e + 2\Omie\vb^e+\Omie\Omie\rb^e.
-\label{eq:inertial_accel_ecef_matrix_rev2}
-\end{equation}
+This is the kinematic source of the Coriolis and centrifugal terms in the ECEF velocity equation.
 
-\section{Specific Force, Gravity, and the ECEF Velocity Equation}
+\section{Specific Force, Gravity, and the ECEF Navigation Equations}
+
 Accelerometers measure specific force, not gravitational acceleration. In an inertial frame, Newton's law for the origin frame $o$ is
 \begin{equation}
-\left[\ddot{\rb}_{eo}^{e}\right]_i
+\boxed{
+\left[
+\frac{d^2\mathbf{r}_{eo}^{e}}{dt^2}
+\right]_i
 =
-\Coe \fb_{io}^o + \boldsymbol\gamma^e(\rb_{eo}^e),
-\label{eq:newton_specific_force_nrp}
+C_o^e\mathbf{f}_{io}^{o}
++
+\boldsymbol{\gamma}^{e}\left(\mathbf{r}_{eo}^{e}\right)
+}
+\label{eq:newton_specific_force_origin}
 \end{equation}
-where $\boldsymbol\gamma^e$ is mass-attraction gravity and $\fb_{io}^o$ is specific force at the origin frame $o$, resolved in body coordinates. Equating \cref{eq:inertial_accel_ecef_matrix_rev2,eq:newton_specific_force_nrp} gives
+where $\boldsymbol{\gamma}^{e}$ is mass-attraction gravity, and $\mathbf{f}_{io}^{o}$ is the specific force of origin frame $o$ with respect to inertial frame $i$, resolved in origin frame $o$.
+
+Equating \cref{eq:ecef_acceleration_transport_full,eq:newton_specific_force_origin} gives
 \begin{equation}
-\dot{\vb}_{eo}^e
+\left[
+\frac{d\mathbf{v}_{eo}^{e}}{dt}
+\right]_e
 =
-\Coe \fb_{io}^o
-+\boldsymbol\gamma^e
--2\Omie\vb_{eo}^e
--\Omie\Omie\rb_{eo}^e.
-\label{eq:ecef_velocity_mass_attraction_rev2}
+C_o^e\mathbf{f}_{io}^{o}
++
+\boldsymbol{\gamma}^{e}\left(\mathbf{r}_{eo}^{e}\right)
+-
+2\boldsymbol{\omega}_{ie}^{e}\times\mathbf{v}_{eo}^{e}
+-
+\boldsymbol{\omega}_{ie}^{e}\times
+\left(
+\boldsymbol{\omega}_{ie}^{e}\times
+\mathbf{r}_{eo}^{e}
+\right).
+\label{eq:ecef_velocity_mass_attraction_origin}
 \end{equation}
 Define plumb-bob gravity as
 \begin{equation}
-\gb^e(\rb^e)=\boldsymbol\gamma^e(\rb^e)-\Omie\Omie\rb^e.
-\label{eq:plumb_bob_gravity_rev2}
+\mathbf{g}^{e}\left(\mathbf{r}_{eo}^{e}\right)
+\triangleq
+\boldsymbol{\gamma}^{e}\left(\mathbf{r}_{eo}^{e}\right)
+-
+\boldsymbol{\omega}_{ie}^{e}\times
+\left(
+\boldsymbol{\omega}_{ie}^{e}\times
+\mathbf{r}_{eo}^{e}
+\right).
+\label{eq:plumb_bob_gravity_origin}
 \end{equation}
-Then the ECEF velocity equation is
+Then the ECEF velocity equation becomes
 \begin{equation}
-\dot{\vb}_{eo}^e
+\boxed{
+\dot{\mathbf{v}}_{eo}^{e}
 =
-\Coe \fb_{io}^o
-+\gb^e(\rb_{eo}^e)
--2\Omie\vb_{eo}^e.
-\label{eq:ecef_velocity_plumbbob_rev2}
+C_o^e\mathbf{f}_{io}^{o}
++
+\mathbf{g}^{e}\left(\mathbf{r}_{eo}^{e}\right)
+-
+2\boldsymbol{\omega}_{ie}^{e}\times\mathbf{v}_{eo}^{e}
+}
+\label{eq:ecef_velocity_plumb_bob_origin}
 \end{equation}
-The corresponding position equation is
+where the dot denotes differentiation with respect to the resolving frame $e$.
+
+The complete ECEF translational mechanization for the origin frame is
 \begin{equation}
-\dot{\rb}_{eo}^e=\vb_{eo}^e.
-\label{eq:ecef_position_nrp_rev2}
+\boxed{
+\dot{\mathbf{r}}_{eo}^{e}
+=
+\mathbf{v}_{eo}^{e}
+}
+\end{equation}
+
+\begin{equation}
+\boxed{
+\dot{\mathbf{v}}_{eo}^{e}
+=
+C_o^e\mathbf{f}_{io}^{o}
++
+\mathbf{g}^{e}\!\left(\mathbf{r}_{eo}^{e}\right)
+-
+2\boldsymbol{\omega}_{ie}^{e}
+\times
+\mathbf{v}_{eo}^{e}
+}
 \end{equation}
 
 \section{Rigid-Body Lever Arms and IMU Offset}
-For any point $s$ fixed in the body, with lever arm $l_{os}^o$ from the origin frame $o$ to the sensor, the position, velocity, and acceleration of that point are
-\begin{align}
-\rb_s^e &= \rb_{eo}^e + \Coe l_{os}^o,\\
-\vb_s^e &= \vb_{eo}^e + \Coe\left(\boldsymbol\omega_{eb}^o\times l_{os}^o\right),\\
-\ab_s^e &= \ab_{eo}^e + \Coe\left(\dot{\boldsymbol\omega}_{eb}^o\times l_{os}^o + \boldsymbol\omega_{eb}^o\times\left(\boldsymbol\omega_{eb}^o\times l_{os}^o\right)\right).
-\end{align}
-An offset IMU measures angular rate at the IMU mounting frame and specific force at the IMU proof-mass location. If the IMU lever arm is $l_{ou}^o$, then the specific force at the IMU is approximately
+
+For any sensor frame $s$ fixed in the vehicle, define the lever arm
 \begin{equation}
-\fb_u^o
-=
-\fb_{io}^o
-+\dot{\boldsymbol\omega}_{eb}^o\times l_{ou}^o
-+\boldsymbol\omega_{eb}^o\times\left(\boldsymbol\omega_{eb}^o\times l_{ou}^o\right),
-\label{eq:imu_specific_force_offset}
+\mathbf{l}_{os}^{o}
 \end{equation}
-assuming gravity variation across the vehicle is negligible. Therefore, if the mechanization state is defined at the origin frame $o$, the origin frame $o$ specific force used in \cref{eq:ecef_velocity_plumbbob_rev2} is recovered from the IMU location by
+as the position of sensor frame $s$ with respect to origin frame $o$, resolved in origin frame $o$.
+
+The ECEF position of sensor $s$ is
 \begin{equation}
-\fb_{io}^o
+\boxed{
+\mathbf{r}_{es}^{e}
 =
-\fb_u^o
--\dot{\boldsymbol\omega}_{eb}^o\times l_{ou}^o
--\boldsymbol\omega_{eb}^o\times\left(\boldsymbol\omega_{eb}^o\times l_{ou}^o\right).
-\label{eq:imu_specific_force_to_nrp}
+\mathbf{r}_{eo}^{e}
++
+C_o^e\mathbf{l}_{os}^{o}.
+}
+\label{eq:sensor_position_lever_arm_origin}
 \end{equation}
-This is the exact lever-arm correction for a rigid body, subject to the assumption that $\dot{\boldsymbol\omega}_{eb}^o$ is available or estimated. In embedded systems, angular acceleration may be obtained by differentiating gyro measurements, filtering angular-rate history, using a rotational dynamics model, or neglecting the term when the lever arm or angular accelerations are small.
+
+The ECEF velocity of sensor $s$ is
+\begin{equation}
+\boxed{
+\mathbf{v}_{es}^{e}
+=
+\mathbf{v}_{eo}^{e}
++
+C_o^e
+\left(
+\boldsymbol{\omega}_{eo}^{o}
+\times
+\mathbf{l}_{os}^{o}
+\right).
+}
+\label{eq:sensor_velocity_lever_arm_origin}
+\end{equation}
+This velocity is relative to the rotating ECEF frame. For inertial acceleration and specific-force corrections, the relevant angular rate is the inertial angular rate $\boldsymbol{\omega}_{io}^{o}$.
+
+The inertial acceleration of the sensor point is, neglecting gravity variation across the vehicle,
+\begin{equation}
+\boxed{
+\left[
+\frac{d^2\mathbf{r}_{es}^{e}}{dt^2}
+\right]_i
+=
+\left[
+\frac{d^2\mathbf{r}_{eo}^{e}}{dt^2}
+\right]_i
++
+C_o^e
+\left(
+\dot{\boldsymbol{\omega}}_{io}^{o}
+\times
+\mathbf{l}_{os}^{o}
++
+\boldsymbol{\omega}_{io}^{o}
+\times
+\left(
+\boldsymbol{\omega}_{io}^{o}
+\times
+\mathbf{l}_{os}^{o}
+\right)
+\right).
+}
+\label{eq:sensor_acceleration_lever_arm_origin}
+\end{equation}
+
+Therefore, the specific force at an offset IMU frame $u$, resolved in the origin frame, is approximately
+\begin{equation}
+\boxed{
+\mathbf{f}_{iu}^{o}
+=
+\mathbf{f}_{io}^{o}
++
+\dot{\boldsymbol{\omega}}_{io}^{o}
+\times
+\mathbf{l}_{ou}^{o}
++
+\boldsymbol{\omega}_{io}^{o}
+\times
+\left(
+\boldsymbol{\omega}_{io}^{o}
+\times
+\mathbf{l}_{ou}^{o}
+\right).
+}
+\label{eq:imu_specific_force_offset_origin}
+\end{equation}
+Thus, if the mechanization state is defined at the origin frame $o$, the origin-frame specific force used in \cref{eq:ecef_velocity_plumb_bob_origin} is recovered from the IMU location by
+\begin{equation}
+\boxed{
+\mathbf{f}_{io}^{o}
+=
+\mathbf{f}_{iu}^{o}
+-
+\dot{\boldsymbol{\omega}}_{io}^{o}
+\times
+\mathbf{l}_{ou}^{o}
+-
+\boldsymbol{\omega}_{io}^{o}
+\times
+\left(
+\boldsymbol{\omega}_{io}^{o}
+\times
+\mathbf{l}_{ou}^{o}
+\right).
+}
+\label{eq:imu_specific_force_to_origin}
+\end{equation}
 
 \begin{warningbox}
 The IMU lever-arm acceleration correction contains both angular acceleration and centripetal terms. If the IMU is not at the origin frame $o$ and the vehicle undergoes high angular acceleration, neglecting these terms can look like accelerometer bias, vibration, or unexplained maneuver-correlated filter residuals.
 \end{warningbox}
 
 \section{Direction Cosine Matrix Kinematics}
-The DCM $\Coe$ maps body-frame components into ECEF components:
+
+The DCM $C_o^e$ maps components resolved in the origin frame $o$ into components resolved in ECEF:
 \begin{equation}
-\mathbf{a}^e=\Coe\mathbf{a}^o.
+\mathbf{a}^{e}=C_o^e\mathbf{a}^{o}.
 \end{equation}
-Consider a vector $\mathbf{a}$ fixed in the body frame, so $[\dot{\mathbf{a}}^o]_b=0$. Its time derivative with respect to ECEF, resolved in ECEF, is caused by the angular velocity of body relative to ECEF:
+For a vector fixed in the origin frame, $[\dot{\mathbf{a}}^o]_o=0$. Its derivative with respect to ECEF, resolved in ECEF, is caused by the angular velocity of the origin frame relative to ECEF:
 \begin{equation}
-[\dot{\mathbf{a}}^e]_e = \boldsymbol\omega_{eb}^e\times\mathbf{a}^e = \skew{\boldsymbol\omega_{eb}^e}\mathbf{a}^e.
-\label{eq:fixed_body_vector_ecef_derivative_rev2}
+\left[
+\dot{\mathbf{a}}^e
+\right]_e
+=
+\boldsymbol{\omega}_{eo}^{e}\times\mathbf{a}^{e}
+=
+[\boldsymbol{\omega}_{eo}^{e}]_\times\mathbf{a}^{e}.
 \end{equation}
-But since $\mathbf{a}^e=\Coe\mathbf{a}^o$ and $\mathbf{a}^o$ is constant,
+Since $\mathbf{a}^e=C_o^e\mathbf{a}^o$ and $\mathbf{a}^o$ is constant,
 \begin{equation}
-[\dot{\mathbf{a}}^e]_e=\dot{\Coe}\mathbf{a}^o.
+\left[
+\dot{\mathbf{a}}^e
+\right]_e
+=
+\dot{C}_o^e\mathbf{a}^{o}.
 \end{equation}
-Substitute $\mathbf{a}^e=\Coe\mathbf{a}^o$ into \cref{eq:fixed_body_vector_ecef_derivative_rev2}:
+Substituting $\mathbf{a}^e=C_o^e\mathbf{a}^o$,
 \begin{equation}
-\dot{\Coe}\mathbf{a}^o = \skew{\boldsymbol\omega_{eb}^e}\Coe\mathbf{a}^o.
+\dot{C}_o^e\mathbf{a}^{o}
+=
+[\boldsymbol{\omega}_{eo}^{e}]_\times C_o^e\mathbf{a}^{o}.
 \end{equation}
-Because this holds for any fixed body-frame vector,
+Because this holds for any origin-frame vector,
 \begin{equation}
-\dot{\Coe}=\skew{\boldsymbol\omega_{eb}^e}\Coe.
-\label{eq:dcm_kinematics_eb_left_rev2}
+\dot{C}_o^e
+=
+[\boldsymbol{\omega}_{eo}^{e}]_\times C_o^e.
+\label{eq:dcm_kinematics_origin_left}
 \end{equation}
-The relative rate is
+The relative angular rate satisfies
 \begin{equation}
-\boldsymbol\omega_{eb}^e=\boldsymbol\omega_{ib}^e-\boldsymbol\omega_{ie}^e.
+\boldsymbol{\omega}_{eo}^{e}
+=
+\boldsymbol{\omega}_{io}^{e}
+-
+\boldsymbol{\omega}_{ie}^{e}.
 \end{equation}
-Thus
+Using $\boldsymbol{\omega}_{io}^{e}=C_o^e\boldsymbol{\omega}_{io}^{o}$ and the identity
 \begin{equation}
-\dot{\Coe}=\skew{\boldsymbol\omega_{ib}^e}\Coe-\skew{\boldsymbol\omega_{ie}^e}\Coe.
+[C_o^e\mathbf{x}^{o}]_\times
+=
+C_o^e[\mathbf{x}^{o}]_\times C_e^o,
 \end{equation}
-Using $\boldsymbol\omega_{ib}^e=\Coe\boldsymbol\omega_{ib}^o$ and the identity $\skew{\Coe\mathbf{x}}=\Coe\skew{\mathbf{x}}\Ceo$, we obtain
+we obtain
 \begin{equation}
-\skew{\boldsymbol\omega_{ib}^e}\Coe
-=\Coe\skew{\boldsymbol\omega_{ib}^o}\Ceo\Coe
-=\Coe\skew{\boldsymbol\omega_{ib}^o}.
+\boxed{
+\dot{C}_o^e
+=
+C_o^e[\boldsymbol{\omega}_{io}^{o}]_\times
+-
+[\boldsymbol{\omega}_{ie}^{e}]_\times C_o^e.
+}
+\label{eq:dcm_kinematics_origin_to_ecef}
 \end{equation}
-Therefore the body-to-ECEF DCM kinematics are
+Equivalently, define
 \begin{equation}
-\dot{\Coe}=\Coe\skew{\boldsymbol\omega_{ib}^o}-\skew{\boldsymbol\omega_{ie}^e}\Coe.
-\label{eq:dcm_kinematics_body_to_ecef_rev2}
+\boldsymbol{\omega}_{eo}^{o}
+=
+\boldsymbol{\omega}_{io}^{o}
+-
+C_e^o\boldsymbol{\omega}_{ie}^{e},
 \end{equation}
-This is the form typically used for ECEF mechanization when the gyro provides $\boldsymbol\omega_{ib}^o$ \cite{groves2013,titterton2004}.
+so that
+\begin{equation}
+\boxed{
+\dot{C}_o^e
+=
+C_o^e[\boldsymbol{\omega}_{eo}^{o}]_\times.
+}
+\label{eq:dcm_kinematics_origin_relative}
+\end{equation}
+This is the ECEF attitude mechanization written entirely in the origin-frame convention.
 
 \section{Quaternion Representation and Propagation}
+
 Let a scalar-first unit quaternion be
 \begin{equation}
-\quat=\begin{bmatrix}q_0 & q_1 & q_2 & q_3\end{bmatrix}^T
-=\begin{bmatrix}q_0\\\mathbf{q}_v\end{bmatrix},
-\qquad \norm{\quat}=1.
+\mathbf{q}=
+\begin{bmatrix}
+q_0 & q_1 & q_2 & q_3
+\end{bmatrix}^T
+=
+\begin{bmatrix}
+q_0\\
+\mathbf{q}_v
+\end{bmatrix},
+\qquad
+\norm{\mathbf{q}}=1.
 \end{equation}
 The quaternion product is
 \begin{equation}
-\quat_1\otimes\quat_2=
+\mathbf{q}_1\otimes\mathbf{q}_2=
 \begin{bmatrix}
 q_{01}q_{02}-\mathbf{q}_{v1}^T\mathbf{q}_{v2}\\
 q_{01}\mathbf{q}_{v2}+q_{02}\mathbf{q}_{v1}+\mathbf{q}_{v1}\times\mathbf{q}_{v2}
 \end{bmatrix}.
 \end{equation}
-The DCM corresponding to a scalar-first quaternion mapping body to ECEF is
+The DCM corresponding to a scalar-first quaternion mapping origin-frame components to ECEF components is
 \begin{equation}
-\Coe(\quat)=(q_0^2-\mathbf{q}_v^T\mathbf{q}_v)\I+2\mathbf{q}_v\mathbf{q}_v^T+2q_0\skew{\mathbf{q}_v}.
+C_o^e(\mathbf{q})
+=
+(q_0^2-\mathbf{q}_v^T\mathbf{q}_v)I
++
+2\mathbf{q}_v\mathbf{q}_v^T
++
+2q_0[\mathbf{q}_v]_\times.
 \end{equation}
-Given a DCM $\mathbf{C}$, one common non-singular branch when $q_0$ is not small is
+Given a DCM $C$, one common non-singular branch when $q_0$ is not small is
 \begin{align}
 q_0 &= \frac{1}{2}\sqrt{1+C_{11}+C_{22}+C_{33}},\\
 q_1 &= \frac{C_{32}-C_{23}}{4q_0},\\
@@ -386,24 +708,50 @@ q_3 &= \frac{C_{21}-C_{12}}{4q_0}.
 \end{align}
 Robust software normally uses the largest diagonal element branch to avoid division by a small $q_0$ \cite{titterton2004,groves2013,sola2018}.
 
-For angular rate $\boldsymbol\omega_{ib}^o$, define the pure quaternion
+For ECEF attitude propagation, form the relative angular rate
 \begin{equation}
-\boldsymbol\omega_q=\begin{bmatrix}0\\\boldsymbol\omega_{ib}^o\end{bmatrix}.
+\boldsymbol{\omega}_{eo}^{o}
+=
+\boldsymbol{\omega}_{io}^{o}
+-
+C_e^o\boldsymbol{\omega}_{ie}^{e}.
 \end{equation}
-Ignoring Earth-rate subtraction for the moment, quaternion propagation may be written as
+Define the pure quaternion
 \begin{equation}
-\dot{\quat}_{b}^{i}=\frac{1}{2}\quat_b^i\otimes\boldsymbol\omega_q.
+\boldsymbol{\omega}_{q}
+=
+\begin{bmatrix}
+0\\
+\boldsymbol{\omega}_{eo}^{o}
+\end{bmatrix}.
 \end{equation}
-For body-to-ECEF attitude, the equivalent DCM kinematics in \cref{eq:dcm_kinematics_body_to_ecef_rev2} must be respected. In practical code this is often handled by integrating the body incremental rotation from the gyro and composing it with the Earth-frame incremental rotation due to Earth rate:
+With the scalar-first convention and right multiplication by the relative angular-rate quaternion, the quaternion propagation equation is
 \begin{equation}
-\mathbf{C}_{b,k+1}^{e}\approx \mathbf{C}_{e_k}^{e_{k+1}}\mathbf{C}_{b,k}^{e}\mathbf{C}_{b_{k+1}}^{b_k},
+\boxed{
+\dot{\mathbf{q}}_{o}^{e}
+=
+\frac{1}{2}
+\mathbf{q}_{o}^{e}
+\otimes
+\boldsymbol{\omega}_{q}.
+}
+\label{eq:quat_origin_to_ecef}
 \end{equation}
-where $\mathbf{C}_{b_{k+1}}^{b_k}$ is formed from the body incremental angle and $\mathbf{C}_{e_k}^{e_{k+1}}$ accounts for Earth rotation over the integration interval.
+In practical code, the same physics is often implemented by composing an origin-frame incremental rotation from the gyro with an Earth-frame incremental rotation:
+\begin{equation}
+C_{o,k+1}^{e}
+\approx
+C_{e_k}^{e_{k+1}}
+C_{o,k}^{e}
+C_{o_{k+1}}^{o_k}.
+\end{equation}
 
 \section{Coning and Sculling}
+
 Coning errors arise when finite rotations about changing axes are approximated as a single vector sum. Sculling errors arise when finite rotations and specific-force increments interact. In continuous time, the equations are exact. In discrete strapdown implementation, finite IMU increments must approximate the time-ordered exponential of angular rate and the rotated integral of specific force. Two-sample and multi-sample coning and sculling compensation formulas are standard in production inertial mechanizations \cite{titterton2004,groves2013}.
 
 \section{Schuler Dynamics}
+
 Schuler dynamics explain why horizontal inertial navigation errors have a natural oscillatory mode instead of immediate unbounded divergence. Suppose the estimated horizontal position has error $\delta r$ on a spherical Earth of radius $R_E$. The computed local vertical is tilted by approximately
 \begin{equation}
 \delta\theta \approx \frac{\delta r}{R_E}.
@@ -437,9 +785,11 @@ A positive altitude error causes the mechanization to compute gravity with too s
 The vertical channel therefore has exponentially growing modes without aiding \cite{titterton2004,groves2013}.
 
 \section{IMU Error Propagation}
+
 The following table gives first-order unaided error-growth intuition. Coefficients depend on trajectory, frame, gravity model, and coupling assumptions. The powers of time are the main interview-level result.
 
 \begin{longtable}{p{0.20\textwidth}p{0.22\textwidth}p{0.18\textwidth}p{0.18\textwidth}p{0.18\textwidth}}
+\caption{First-order unaided inertial error-growth intuition.}\\
 \toprule
 Error source & Primary effect & Attitude error & Velocity error & Position error\\
 \midrule
@@ -451,7 +801,7 @@ Accel velocity random walk $N_a$ & Random-walk velocity error & none directly & 
 Gyro scale factor $s_g$ & Rate-proportional gyro error & $s_g\omega t$ & $\frac{1}{2}g s_g\omega t^2$ & $\frac{1}{6}g s_g\omega t^3$\\
 Accel scale factor $s_a$ & Force-proportional accel error & none directly & $s_a f t$ & $\frac{1}{2}s_a f t^2$\\
 IMU misalignment & Cross-axis coupling & maneuver dependent & maneuver dependent & maneuver dependent\\
-IMU lever-arm error $\delta l_{ou}$ & Wrong rotational acceleration compensation & none directly & $\left(\dot\omega+\omega^2\right)\delta l_{ou}\,t$ & $\frac{1}{2}\left(\dot\omega+\omega^2\right)\delta l_{ou}\,t^2$\\
+IMU lever-arm error $\delta l_{ou}$ & Wrong rotational acceleration compensation & none directly & $(\dot\omega+\omega^2)\delta l_{ou}\,t$ & $\frac{1}{2}(\dot\omega+\omega^2)\delta l_{ou}\,t^2$\\
 \bottomrule
 \end{longtable}
 
@@ -545,7 +895,7 @@ Then the calibrated input is
 \end{equation}
 For an EKF, biases are often estimated dynamically, while scale factors, nonorthogonality, and installation terms may be treated as fixed calibration constants or appended to the state if sufficiently observable \cite{titterton2004,groves2013,grewal2020}.
 
-For an offset IMU, the accelerometer calibrated specific force must be corrected from the IMU point to the origin frame $o$ using \cref{eq:imu_specific_force_to_nrp}. If the calibrated IMU specific force is $\hat{\fb}_u^o$, then
+For an offset IMU, the accelerometer calibrated specific force must be corrected from the IMU point to the origin frame $o$ using \cref{eq:imu_specific_force_to_origin}. If the calibrated IMU specific force is $\hat{\fb}_u^o$, then
 \begin{equation}
 \hat{\fb}_{io}^o
 =
@@ -631,7 +981,7 @@ Thus
 \label{eq:vel_error_dyn_rev2}
 \end{equation}
 
-For attitude, linearization of \cref{eq:dcm_kinematics_body_to_ecef_rev2} gives the standard first-order form
+For attitude, linearization of \cref{eq:dcm_kinematics_origin_to_ecef} gives the standard first-order form
 \begin{equation}
 \delta\dot{\boldsymbol\theta}
 \approx
