@@ -69,29 +69,6 @@
 \maketitle
 \tableofcontents
 \clearpage
-\chapter*{Reference Frame Definitions}
-\addcontentsline{toc}{chapter}{Reference Frame Definitions}
-
-\begin{center}
-\renewcommand{\arraystretch}{1.25}
-\begin{tabular}{p{0.10\textwidth}p{0.28\textwidth}p{0.52\textwidth}}
-\toprule
-\textbf{Letter} & \textbf{Reference Frame} & \textbf{Description}\\
-\midrule
-$i$ & Earth-Centered-Inertial Frame (ECI) & Non-accelerating, non-rotating frame.\\
-$e$ & Earth-Centered-Earth-Fixed Frame (ECEF) & Frame that rotates with the Earth.\\
-$n$ & North-East-Down (NED) Frame & Local geographic frame oriented to NED.\\
-$b$ & Body Frame & Frame rigidly attached to the vehicle, centered at the nominal CG.\\
-$o$ & Origin Frame & Center of navigation origin frame used to aggregate sensor lever arms.\\
-$u$ & IMU Frame & Frame centered at the IMU.\\
-$s$ & Generic Sensor Frame & Generic aiding-sensor frame.\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\noindent Throughout this document, $o$ denotes the arbitrary body-fixed origin frame used as the mechanization reference point. Sensor lever arms are written as $l_{os}^{o}$, meaning the vector from the origin frame $o$ to sensor frame $s$, resolved in the origin frame $o$.
-
-
 \chapter*{Preface}
 This text is meant to be a standalone reference to be used for deriving a navigator from first principles to embedded software implementation. The focus is practical navigation systems engineering: inertial mechanization, error-state filtering, delayed measurements, statistical consistency, observability, GPS-denied aiding, and embedded estimator architecture.
 
@@ -99,229 +76,56 @@ The primary sources are \cite{groves2013}, \cite{titterton2004}, and \cite{simon
 
 \mainmatter
 
-\chapter{Navigation System Architecture and Design Philosophy}
+\chapter{Coordinate Systems, Attitude Representation, Kinematics, Earth and Gravity Modeling}
 
-\section{Navigation System Requirements}
-A navigation system is not merely an estimator that outputs position, velocity, and attitude. It is a real-time information system whose outputs are consumed by guidance, control, targeting, autonomy, mapping, logging, fault management, and human-machine interfaces. This is why navigation requirements must be stated in terms of accuracy, integrity, availability, continuity, latency, and implementation constraints rather than accuracy alone \cite{groves2013,titterton2004,farrell2008,kaplan2017}.
+\section{Reference Frame Definitions}
+This document uses a compact frame notation inspired by Groves \cite{groves2013}. The reference frames used throughout the document are summarized in \cref{tab:reference_frames}.
 
-\subsection{Accuracy}
-Accuracy describes statistical closeness of the estimate to truth. Typical metrics include three-dimensional position error, horizontal and vertical position error, velocity error, attitude error, circular error probable, spherical error probable, root mean square error, and percentile bounds. In a Kalman filter, accuracy should be compared to the filter covariance. A navigation solution that is accurate but overconfident can be dangerous because downstream systems may trust it too much.
+\begin{table}[htbp]
+\centering
+\caption{Reference frame definitions used throughout this document.}
+\label{tab:reference_frames}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{p{0.10\textwidth}p{0.27\textwidth}p{0.53\textwidth}}
+\toprule
+\textbf{Letter} & \textbf{Reference Frame} & \textbf{Description}\\
+\midrule
+$i$ & Earth-Centered Inertial (ECI) & Non-accelerating, non-rotating inertial frame used as the conceptual reference for Newtonian dynamics.\\
+$e$ & Earth-Centered Earth-Fixed (ECEF) & Earth-fixed frame that rotates with the Earth.\\
+$n$ & North-East-Down (NED) & Local geographic frame oriented north, east, and down.\\
+$b$ & Body & Vehicle-fixed frame, conventionally centered at the nominal vehicle center of gravity.\\
+$o$ & Origin (Navigation Reference Point) & Body-fixed navigation origin frame used as the mechanization reference point and to aggregate sensor lever arms.\\
+$u$ & IMU & Sensor frame centered at the inertial measurement unit.\\
+$s$ & Sensor & Generic aiding-sensor frame, such as a GNSS antenna, altimeter, camera, magnetometer, or speed sensor.\\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\subsection{Integrity}
-Integrity is the ability to detect, exclude, and bound hazardous errors. A high-integrity system does not merely estimate well under nominal conditions; it also detects when measurements, dynamics, assumptions, or timing become inconsistent. GNSS receiver autonomous integrity monitoring, innovation-based chi-square tests, carrier tracking health metrics, and spoofing or jamming monitors are all examples of integrity mechanisms \cite{kaplan2017,groves2013}.
+\noindent The origin frame $o$ replaces earlier placeholder notation for the Navigation Reference Point. Sensor lever arms are written as $l_{os}^{b}$, meaning the position of sensor frame $s$ with respect to origin frame $o$, resolved in the body frame $b$.
 
-\subsection{Availability and Continuity}
-Availability is the probability that the system can provide a usable navigation solution meeting required performance at a given time. Continuity is the probability that the system remains available over a specified mission interval without unscheduled interruption. In GPS-denied navigation, availability often depends on sensor diversity. A system that combines inertial sensors, GNSS, barometry, magnetics, vision, Doppler, signals of opportunity, or terrain aiding may remain available under conditions where a pure GNSS solution fails.
-
-\subsection{Latency}
-Latency is the delay between the physical event being measured and the time the navigation estimate using that measurement becomes available. Latency affects estimator architecture because measurements are not always received in time order. A delayed but accurate measurement can improve state history and perhaps improve the current state through retrodictive filtering or fixed-lag smoothing, but the computational cost and timing semantics must be explicit.
-
-\subsection{Embedded Resource Constraints}
-Embedded navigation software must satisfy CPU, memory, determinism, fault tolerance, and verification constraints. A mathematically attractive estimator may be unacceptable if it uses dynamic memory allocation, has unbounded worst-case execution time, or is difficult to verify. For production embedded navigation, deterministic execution and inspectable failure modes often matter as much as asymptotic estimator optimality.
-
-\begin{interviewbox}
-A strong interview answer is: navigation is a systems problem. Accuracy matters, but integrity, availability, continuity, latency, sensor fault behavior, timing, and deterministic implementation are all design drivers. A navigation filter that performs well in a notebook but cannot be time-aligned, verified, or trusted by downstream control software is not a complete navigation system.
-\end{interviewbox}
-
-\section{Navigation Reference Frames}
-Reference-frame choice affects equation complexity, numerical conditioning, software architecture, and the intuitive interpretation of error channels. The major choices are Earth-centered inertial, Earth-centered Earth-fixed, local-level north-east-down or east-north-up, and wander-azimuth frames \cite{groves2013,titterton2004,farrell2008}.
-
-\subsection{Earth-Centered Inertial Frame}
-An Earth-centered inertial frame is attractive when Newtonian dynamics dominate, especially for orbital or very long range applications. In an inertial frame, Newton's second law has its simplest form because fictitious Earth-rotation terms are not required. The disadvantages are that Earth-fixed maps, GNSS receiver outputs, ground users, and most mission interfaces are Earth-fixed, so transformations are required at boundaries.
-
-\subsection{Earth-Centered Earth-Fixed Frame}
-An Earth-centered Earth-fixed frame rotates with the Earth. ECEF is globally nonsingular and naturally compatible with GNSS position, ECEF velocity, Earth-fixed maps, and global operations. In ECEF, position and velocity are ordinary Cartesian vectors, which can simplify software architecture. The tradeoff is that the velocity equation includes Coriolis and Earth-rate terms, and gravity modeling must be handled consistently.
-
-\subsection{Local-Level Frames}
-Local-level frames such as north-east-down and east-north-up align axes with intuitive horizontal and vertical directions. This makes error interpretation convenient: horizontal channels and vertical channels naturally separate. Local-level frames are common in aircraft, ground vehicle, and missile navigation. The disadvantages are curvature terms, transport rates, singular behavior near the poles, and the need to continuously update the local frame origin and orientation.
-
-\subsection{Wander-Azimuth Frames}
-A wander-azimuth frame is a local-level frame whose horizontal axes are not forced to remain aligned with north and east. This can reduce singular behavior at high latitude and improve numerical behavior in polar operations \cite{titterton2004,groves2013}.
-
-
-\section{Origin Frame and Sensor Lever Arms}
-Most textbook strapdown derivations implicitly place the IMU at the origin of the body frame and define the navigation state at that same point. That convention is clean for derivation, but real systems often have multiple sensors distributed across a vehicle. A GNSS antenna, pitot probe, altimeter, radar, camera, seeker, and redundant IMUs are rarely collocated. For a reusable navigation architecture, it is often cleaner to define an arbitrary body-fixed \emph{origin frame} $o$ fixed in the vehicle and then express every sensor through a mounting rotation and lever arm relative to that origin frame.
-
-Let $o$ denote the origin frame used as the mechanization reference. The nominal navigation state estimates the position, velocity, and attitude of the origin frame. Let sensor $s$ have body-frame lever arm $l_{os}^b$ from the origin frame $o$ to the sensor phase center or measurement point. The ECEF position of the sensor is
+\section{Kinematic Vector Convention}
+All kinematic Cartesian vectors use the convention
 \begin{equation}
-\rb_s^e = \rb_{eo}^e + \mathbf{C}_b^e l_{os}^b.
-\label{eq:nrp_sensor_position}
+\mathbf{x}_{\beta\alpha}^{\gamma},
 \end{equation}
-The corresponding velocity is
-\begin{equation}
-\vb_s^e = \vb_{eo}^e + \mathbf{C}_b^e\left(\boldsymbol\omega_{eb}^b \times l_{os}^b\right),
-\label{eq:nrp_sensor_velocity}
-\end{equation}
-where $\boldsymbol\omega_{eb}^b$ is the angular rate of the body frame relative to ECEF, resolved in body coordinates. The corresponding acceleration is
-\begin{equation}
-\ab_s^e = \ab_{eo}^e + \mathbf{C}_b^e\left(\dot{\boldsymbol\omega}_{eb}^b \times l_{os}^b + \boldsymbol\omega_{eb}^b \times \left(\boldsymbol\omega_{eb}^b \times l_{os}^b\right)\right).
-\label{eq:nrp_sensor_accel}
-\end{equation}
-These expressions are just rigid-body kinematics. They are the foundation for plug-and-play sensor fusion: each sensor measurement model maps the origin frame $o$ state to the sensor measurement point, then maps the predicted physical quantity into the sensor frame.
-
-For an IMU mounted at lever arm $l_{ou}^b$ and sensor-frame mounting rotation $\mathbf{C}_b^u$, the angular-rate measurement is driven by the body angular rate, while the accelerometer measurement is driven by the specific force at the IMU proof-mass location. Thus, if the filter mechanizes the origin frame $o$ rather than the IMU point, the IMU specific-force correction must account for rotational acceleration and centripetal acceleration. This is exact rigid-body mechanics, but it requires either angular acceleration, a numerical angular-rate derivative, or a model-based approximation. The standard textbook mechanization is recovered by setting $l_{ou}^b=0$.
-
-\begin{interviewbox}
-A clean architecture answer is: define a single origin frame $o$ for the navigation state, then treat all sensors, including the IMU, as mounted sensors with lever arms and mounting rotations. This makes the navigator generic enough to support multiple IMUs, GNSS antenna offsets, cameras, altimeters, pitot probes, and future aiding sources without redefining the filter state for every vehicle layout.
-\end{interviewbox}
-
-\section{Error-State vs Full-State Estimation}
-
-\subsection{Full-State EKF}
-A full-state EKF estimates the navigation state directly. If attitude is represented by a quaternion, then the filter state includes a four-component vector constrained to unit norm. A direct additive Kalman correction to a quaternion is awkward because the quaternion lives on the unit three-sphere, not in unconstrained Euclidean space. Normalizing the quaternion after an additive update fixes the nominal state but does not automatically give a clean covariance interpretation.
-
-\subsection{Error-State EKF}
-An error-state EKF propagates a nonlinear nominal state and estimates a small perturbation about that nominal state. The nominal state contains the best estimate of the physical navigation solution. The error state contains the small difference between truth and the nominal solution. The Kalman filter estimates the error state, injects that correction into the nominal state, and then resets the error state to zero.
-
-For the navigation architecture considered here, a representative nominal state is
-\begin{equation}
-\hat{\xb} =
-\begin{bmatrix}
-\hat{\rb}^{eT} &
-\hat{\vb}^{eT} &
-\hat{\quat}_{b}^{eT} &
-\hat{\bb}_{g}^{T} &
-\hat{\bb}_{a}^{T} &
-\hat{\mathbf{s}}_{g}^{T} &
-\hat{\mathbf{s}}_{a}^{T} &
-\hat{\mathbf{m}}^{T} &
-\hat b_c &
-\hat d_c
-\end{bmatrix}^{T},
-\label{eq:nominal_state_ch1}
-\end{equation}
-where \(\hat{\rb}^{e}\) is ECEF position, \(\hat{\vb}^{e}\) is ECEF velocity, \(\hat{\quat}_{b}^{e}\) represents body-to-ECEF attitude, \(\hat{\bb}_{g}\) and \(\hat{\bb}_{a}\) are gyro and accelerometer biases, \(\hat{\mathbf{s}}_{g}\) and \(\hat{\mathbf{s}}_{a}\) are gyro and accelerometer scale-factor states, \(\hat{\mathbf{m}}\) represents selected IMU misalignment or nonorthogonality states, and \(\hat b_c, \hat d_c\) are receiver clock bias and clock drift.
-
-The corresponding error state is
-\begin{equation}
-\deltax =
-\begin{bmatrix}
-\delta\rb^{eT} &
-\delta\vb^{eT} &
-\delta\boldsymbol\theta^{T} &
-\delta\bb_{g}^{T} &
-\delta\bb_{a}^{T} &
-\delta\mathbf{s}_{g}^{T} &
-\delta\mathbf{s}_{a}^{T} &
-\delta\mathbf{m}^{T} &
-\delta b_c &
-\delta d_c
-\end{bmatrix}^{T}.
-\label{eq:error_state_ch1}
-\end{equation}
-The attitude error is represented by the three-component small-angle vector \(\delta\boldsymbol\theta\), not by a four-component quaternion error. This is the central practical advantage of the error-state formulation \cite{groves2013,titterton2004,sola2018}.
-
-\subsection{Full Derivation of the Small-Rotation Approximation}
-This section derives the small-rotation approximation used in the error-state attitude model. Let \(\delta\boldsymbol\theta \in \R^3\) be a small rotation vector with magnitude
-\begin{equation}
-\delta\theta = \norm{\delta\boldsymbol\theta}
-\end{equation}
-and unit axis
-\begin{equation}
-\mathbf{u} = \frac{\delta\boldsymbol\theta}{\delta\theta}.
-\end{equation}
-The exact direction cosine matrix associated with a finite rotation of angle \(\delta\theta\) about axis \(\mathbf{u}\) is given by Rodrigues' formula:
-\begin{equation}
-\mathbf{R}(\delta\boldsymbol\theta)
-= \I + \sin(\delta\theta)\skew{\mathbf{u}}
-+ \left(1-\cos(\delta\theta)\right)\skew{\mathbf{u}}^2.
-\label{eq:rodrigues_axis_angle}
-\end{equation}
-Because \(\skew{\delta\boldsymbol\theta}=\delta\theta\skew{\mathbf{u}}\), this may be written as
-\begin{equation}
-\mathbf{R}(\delta\boldsymbol\theta)
-= \I
-+ \frac{\sin(\delta\theta)}{\delta\theta}\skew{\delta\boldsymbol\theta}
-+ \frac{1-\cos(\delta\theta)}{\delta\theta^2}\skew{\delta\boldsymbol\theta}^{2}.
-\label{eq:rodrigues_rotation_vector}
-\end{equation}
-For small \(\delta\theta\), the Taylor expansions are
+where $\alpha$ is the object frame, $\beta$ is the reference frame with respect to which the object is described, and $\gamma$ is the resolving frame. The object frame and reference frame must be distinct for motion quantities. The resolving frame may be any convenient frame. For example,
 \begin{align}
-\sin(\delta\theta) &= \delta\theta - \frac{\delta\theta^3}{6} + O(\delta\theta^5),\\
-\cos(\delta\theta) &= 1 - \frac{\delta\theta^2}{2} + O(\delta\theta^4).
+\mathbf{r}_{eo}^{e} &: \text{position of } o \text{ with respect to } e \text{ resolved in } e,\\
+\mathbf{v}_{eo}^{e} &: \text{velocity of } o \text{ with respect to } e \text{ resolved in } e,\\
+\boldsymbol{\omega}_{io}^{o} &: \text{angular rate of } o \text{ with respect to } i \text{ resolved in } o,\\
+\mathbf{f}_{io}^{o} &: \text{specific force of } o \text{ with respect to } i \text{ resolved in } o.
 \end{align}
-Therefore,
-\begin{align}
-\frac{\sin(\delta\theta)}{\delta\theta} &= 1 - \frac{\delta\theta^2}{6} + O(\delta\theta^4),\\
-\frac{1-\cos(\delta\theta)}{\delta\theta^2} &= \frac{1}{2} + O(\delta\theta^2).
-\end{align}
-Substituting into \cref{eq:rodrigues_rotation_vector} gives
-\begin{equation}
-\mathbf{R}(\delta\boldsymbol\theta)
-= \I + \skew{\delta\boldsymbol\theta} + \frac{1}{2}\skew{\delta\boldsymbol\theta}^{2} + O(\delta\theta^3).
-\end{equation}
-Keeping only first-order terms gives
-\begin{equation}
-\mathbf{R}(\delta\boldsymbol\theta)
-\approx \I + \skew{\delta\boldsymbol\theta}.
-\label{eq:first_order_rotation_plus}
-\end{equation}
-If the error is defined with the opposite sign, then the corresponding correction is
-\begin{equation}
-\mathbf{R}(-\delta\boldsymbol\theta)
-\approx \I - \skew{\delta\boldsymbol\theta}.
-\label{eq:first_order_rotation_minus}
-\end{equation}
-In this document, the attitude-error convention is chosen so that the true body-to-ECEF DCM is related to the nominal DCM by
-\begin{equation}
-\mathbf{C}_{b}^{e,true}
-\approx
-\left(\I - \skew{\delta\boldsymbol\theta}\right)
-\mathbf{C}_{b}^{e,nom}.
-\label{eq:small_angle_dcm_relation}
-\end{equation}
-This is a first-order local attitude-error model. Other texts use the opposite sign or right-multiplicative convention; the physics is unchanged if the convention is applied consistently.
+This convention is intentionally explicit. For instance, a shorthand such as $\mathbf{r}_{s}^{e}$ should be written as $\mathbf{r}_{es}^{e}$ when the vector denotes the position of sensor frame $s$ with respect to ECEF frame $e$, resolved in ECEF coordinates.
 
-The quaternion version follows from the axis-angle quaternion
-\begin{equation}
-\delta\quat
-=
-\begin{bmatrix}
-\cos(\delta\theta/2)\\
-\mathbf{u}\sin(\delta\theta/2)
-\end{bmatrix}.
-\end{equation}
-Using
-\begin{align}
-\cos(\delta\theta/2)&=1-O(\delta\theta^2),\\
-\sin(\delta\theta/2)&=\frac{\delta\theta}{2}+O(\delta\theta^3),
-\end{align}
-gives the first-order quaternion perturbation
-\begin{equation}
-\delta\quat
-\approx
-\begin{bmatrix}
-1\\
-\frac{1}{2}\delta\boldsymbol\theta
-\end{bmatrix}.
-\label{eq:small_angle_quaternion}
-\end{equation}
-Thus the ES-EKF can estimate a three-component attitude perturbation while the nominal mechanization maintains a normalized quaternion.
+\section{Attitude Representation Overview}
+Attitude represents the orientation of one frame relative to another. This document primarily uses direction cosine matrices and quaternions for propagation and small rotation vectors for error-state perturbations. Euler angles are useful for interpretation, but they are not ideal for propagation because of singularities and order-dependent definitions.
 
-\begin{interviewbox}
-The core argument for the ES-EKF is that the nominal state carries the large nonlinear motion, while the filter estimates small local errors. The small attitude error lives in \(\R^3\), so the filter covariance has a clean physical interpretation. The small-angle approximation is not pretending the vehicle attitude is small; it assumes the attitude error is small after nominal mechanization and regular aiding.
-\end{interviewbox}
+\subsection{Euler Angles}
+Euler angles parameterize orientation as an ordered sequence of three rotations. For aerospace applications, yaw, pitch, and roll are commonly used for interpretation. They are intuitive, but they suffer from singularities and should generally not be used as the propagated attitude state in a high-performance inertial navigator.
 
-\subsection{Why Error-State Dynamics Are Usually Less Nonlinear}
-In inertial navigation, position, velocity, and attitude obey nonlinear equations. However, the difference between the true and nominal solution is often small if the mechanization is good and aiding is frequent. Linearizing the error dynamics around the nominal trajectory produces a model that captures how small position, velocity, attitude, bias, scale-factor, and misalignment errors evolve. This is usually better conditioned than trying to directly linearize the full state over large attitude motions.
+\subsection{Rotation Vectors and Small-Angle Perturbations}
+A rotation vector represents attitude error as a three-dimensional vector whose direction is the rotation axis and whose magnitude is the rotation angle. For small errors, the skew-symmetric matrix $[\delta\boldsymbol{\theta}]_\times$ provides the first-order perturbation used in error-state filtering.
 
-\section{Estimator Architectures}
-
-\subsection{Centralized vs Decentralized Estimation}
-A centralized estimator maintains one global state vector and processes all measurements into that state. A decentralized estimator partitions estimation across local filters, subfilters, or sensor-specific estimators. The distinction matters for computational scaling, fault containment, interface control, and verification \cite{simon2006,barshalom2001,farrell2008}.
-
-\subsection{Monolithic EKF}
-A monolithic EKF estimates all relevant states in one filter. Its strengths are consistency and simplicity of probabilistic bookkeeping. All cross-correlations are explicitly represented, so measurement information naturally propagates across the entire state. Its weaknesses are state dimension, computational cost, software coupling, and vulnerability to one bad sensor contaminating a large state.
-
-\subsection{Federated EKF}
-A federated filter uses local filters for subsets of sensors or states and combines information in a master filter. This can improve modularity, sensor fault isolation, and computational decomposition. However, maintaining correct cross-correlation information is difficult. If information is double-counted, the master covariance can become overconfident. Federated filters are attractive when sensor subsystems are naturally separable or when fault isolation is more important than strict optimality \cite{farrell2008,barshalom2001}.
-
-\begin{interviewbox}
-A concise trade answer: monolithic filters are statistically cleaner because all correlations are represented in one covariance, but they can be computationally and organizationally heavy. Federated filters improve modularity and fault containment, but require careful information accounting to avoid double-counting and covariance overconfidence.
-\end{interviewbox}
-
-
-\chapter{Strapdown Inertial Navigation Fundamentals}
 
 \section{Notation for Rotating-Frame Derivatives}
 A major source of confusion in inertial-navigation derivations is the distinction between the physical vector, the frame in which its components are resolved, and the frame with respect to which its time derivative is taken. This document uses the following convention. The superscript on a vector denotes the frame in which the vector is resolved. The subscript outside square brackets denotes the frame with respect to which the derivative is taken. Thus
@@ -332,7 +136,7 @@ means the time derivative of the physical vector $\rb$ with respect to inertial 
 \begin{equation}
 \left[\dot{\rb}^{e}\right]_e
 \end{equation}
-means the time derivative of the same vector with respect to the rotating ECEF frame, resolved in ECEF coordinates. When no derivative-frame subscript is shown on an ECEF navigation state, the derivative is normally with respect to the ECEF coordinate frame. For example, $\dot{\rb}^e$ is shorthand for $[\dot{\rb}^e]_e$.
+means the time derivative of the same vector with respect to the rotating ECEF frame, resolved in ECEF coordinates. When no derivative-frame subscript is shown on a vector that is a time derivative, the resolving frame is the same as the time derivative frame. For example, $\dot{\rb}^e$ is shorthand for $[\dot{\rb}^e]_e$.
 
 \section{Transport Theorem and ECEF Kinematics}
 The transport theorem states that for any vector $\mathbf{a}$, the derivative with respect to inertial frame $i$ is related to the derivative with respect to rotating frame $e$ by
@@ -365,11 +169,13 @@ Therefore,
 \left[\dot{\rb}^{e}\right]_i = \vb^e + \boldsymbol\omega_{ie}^e \times \rb^e.
 \label{eq:inertial_velocity_resolved_ecef_rev2}
 \end{equation}
-Now differentiate again with respect to the inertial frame. Starting from the physical inertial velocity, resolved in ECEF coordinates,
-\begin{equation}
-\mathbf{u}^e = \vb^e + \boldsymbol\omega_{ie}^e \times \rb^e,
-\end{equation}
-we have
+Now differentiate again with respect to the inertial frame. Start by defining the inertial velocity resolved in ECEF coordinates as
+\begin{align}
+\mathbf{u}^e
+&= \left[\dot{\rb}^{e}\right]_i = \mathbf{v}_{i}^{e}, \\
+&= \vb^e + \boldsymbol\omega_{ie}^e \times \rb^e,
+\end{align}
+and perform the inertial differentiation by substituting into the transport theorem, \cref{eq:transport_theorem_rev2},
 \begin{equation}
 \left[\dot{\mathbf{u}}^e\right]_i
 =
@@ -382,14 +188,16 @@ The first term is
 \begin{align}
 \left[\dot{\mathbf{u}}^e\right]_e
 &=
-\left[\frac{d}{dt}\left(\vb^e + \boldsymbol\omega_{ie}^e \times \rb^e\right)\right]_e \\
+\frac{d}{dt}\left[\vb^e + \boldsymbol\omega_{ie}^e \times \rb^e\right]_e \\
 &=
-\dot{\vb}^e + \dot{\boldsymbol\omega}_{ie}^e \times \rb^e + \boldsymbol\omega_{ie}^e \times \dot{\rb}^e.
+\dot{\vb}^e + \dot{\boldsymbol\omega}_{ie}^e \times \rb^e + \boldsymbol\omega_{ie}^e \times \dot{\rb}^e, \\
+&=
+\ab^e + \dot{\boldsymbol\omega}_{ie}^e \times \rb^e + \boldsymbol\omega_{ie}^e \times \vb^e.
 \end{align}
 For the ECEF frame, Earth rate is normally treated as constant in ECEF coordinates, so $\dot{\boldsymbol\omega}_{ie}^e=0$, and $\dot{\rb}^e=\vb^e$. Therefore,
 \begin{equation}
 \left[\dot{\mathbf{u}}^e\right]_e
-=\dot{\vb}^e + \boldsymbol\omega_{ie}^e \times \vb^e.
+= \ab^e + \boldsymbol\omega_{ie}^e \times \vb^e.
 \end{equation}
 The second term in \cref{eq:second_transport_start} is
 \begin{align}
@@ -405,16 +213,21 @@ Combining terms gives the inertial acceleration resolved in ECEF coordinates:
 \begin{equation}
 \left[\ddot{\rb}^{e}\right]_i
 =
-\dot{\vb}^e
+\ab^e
 +2\boldsymbol\omega_{ie}^e\times\vb^e
 +
 \boldsymbol\omega_{ie}^e\times\left(\boldsymbol\omega_{ie}^e\times\rb^e\right).
 \label{eq:inertial_accel_ecef_expanded_rev2}
 \end{equation}
-Using $\Omie=\skew{\boldsymbol\omega_{ie}^{e}}$, this is equivalently
 \begin{equation}
 \left[\ddot{\rb}^{e}\right]_i
-=\dot{\vb}^e+2\Omie\vb^e+\Omie\Omie\rb^e.
+=
+\ab_i^e
+\end{equation}
+Using $\Omie=\skew{\boldsymbol\omega_{ie}^{e}}$, this is equivalently
+\begin{equation}
+\ab_i^e
+= \ab^e + 2\Omie\vb^e+\Omie\Omie\rb^e.
 \label{eq:inertial_accel_ecef_matrix_rev2}
 \end{equation}
 
@@ -1268,6 +1081,228 @@ Placeholder.
 Placeholder.
 \section{Navigation Trade Studies}
 Placeholder.
+
+\chapter{Navigation System Architecture and Design Philosophy}
+
+\section{Navigation System Requirements}
+A navigation system is not merely an estimator that outputs position, velocity, and attitude. It is a real-time information system whose outputs are consumed by guidance, control, targeting, autonomy, mapping, logging, fault management, and human-machine interfaces. This is why navigation requirements must be stated in terms of accuracy, integrity, availability, continuity, latency, and implementation constraints rather than accuracy alone \cite{groves2013,titterton2004,farrell2008,kaplan2017}.
+
+\subsection{Accuracy}
+Accuracy describes statistical closeness of the estimate to truth. Typical metrics include three-dimensional position error, horizontal and vertical position error, velocity error, attitude error, circular error probable, spherical error probable, root mean square error, and percentile bounds. In a Kalman filter, accuracy should be compared to the filter covariance. A navigation solution that is accurate but overconfident can be dangerous because downstream systems may trust it too much.
+
+\subsection{Integrity}
+Integrity is the ability to detect, exclude, and bound hazardous errors. A high-integrity system does not merely estimate well under nominal conditions; it also detects when measurements, dynamics, assumptions, or timing become inconsistent. GNSS receiver autonomous integrity monitoring, innovation-based chi-square tests, carrier tracking health metrics, and spoofing or jamming monitors are all examples of integrity mechanisms \cite{kaplan2017,groves2013}.
+
+\subsection{Availability and Continuity}
+Availability is the probability that the system can provide a usable navigation solution meeting required performance at a given time. Continuity is the probability that the system remains available over a specified mission interval without unscheduled interruption. In GPS-denied navigation, availability often depends on sensor diversity. A system that combines inertial sensors, GNSS, barometry, magnetics, vision, Doppler, signals of opportunity, or terrain aiding may remain available under conditions where a pure GNSS solution fails.
+
+\subsection{Latency}
+Latency is the delay between the physical event being measured and the time the navigation estimate using that measurement becomes available. Latency affects estimator architecture because measurements are not always received in time order. A delayed but accurate measurement can improve state history and perhaps improve the current state through retrodictive filtering or fixed-lag smoothing, but the computational cost and timing semantics must be explicit.
+
+\subsection{Embedded Resource Constraints}
+Embedded navigation software must satisfy CPU, memory, determinism, fault tolerance, and verification constraints. A mathematically attractive estimator may be unacceptable if it uses dynamic memory allocation, has unbounded worst-case execution time, or is difficult to verify. For production embedded navigation, deterministic execution and inspectable failure modes often matter as much as asymptotic estimator optimality.
+
+\begin{interviewbox}
+A strong interview answer is: navigation is a systems problem. Accuracy matters, but integrity, availability, continuity, latency, sensor fault behavior, timing, and deterministic implementation are all design drivers. A navigation filter that performs well in a notebook but cannot be time-aligned, verified, or trusted by downstream control software is not a complete navigation system.
+\end{interviewbox}
+
+\section{Navigation Reference Frames}
+Reference-frame choice affects equation complexity, numerical conditioning, software architecture, and the intuitive interpretation of error channels. The major choices are Earth-centered inertial, Earth-centered Earth-fixed, local-level north-east-down or east-north-up, and wander-azimuth frames \cite{groves2013,titterton2004,farrell2008}.
+
+\subsection{Earth-Centered Inertial Frame}
+An Earth-centered inertial frame is attractive when Newtonian dynamics dominate, especially for orbital or very long range applications. In an inertial frame, Newton's second law has its simplest form because fictitious Earth-rotation terms are not required. The disadvantages are that Earth-fixed maps, GNSS receiver outputs, ground users, and most mission interfaces are Earth-fixed, so transformations are required at boundaries.
+
+\subsection{Earth-Centered Earth-Fixed Frame}
+An Earth-centered Earth-fixed frame rotates with the Earth. ECEF is globally nonsingular and naturally compatible with GNSS position, ECEF velocity, Earth-fixed maps, and global operations. In ECEF, position and velocity are ordinary Cartesian vectors, which can simplify software architecture. The tradeoff is that the velocity equation includes Coriolis and Earth-rate terms, and gravity modeling must be handled consistently.
+
+\subsection{Local-Level Frames}
+Local-level frames such as north-east-down and east-north-up align axes with intuitive horizontal and vertical directions. This makes error interpretation convenient: horizontal channels and vertical channels naturally separate. Local-level frames are common in aircraft, ground vehicle, and missile navigation. The disadvantages are curvature terms, transport rates, singular behavior near the poles, and the need to continuously update the local frame origin and orientation.
+
+\subsection{Wander-Azimuth Frames}
+A wander-azimuth frame is a local-level frame whose horizontal axes are not forced to remain aligned with north and east. This can reduce singular behavior at high latitude and improve numerical behavior in polar operations \cite{titterton2004,groves2013}.
+
+
+\section{Origin Frame and Sensor Lever Arms}
+Most textbook strapdown derivations implicitly place the IMU at the origin of the body frame and define the navigation state at that same point. That convention is clean for derivation, but real systems often have multiple sensors distributed across a vehicle. A GNSS antenna, pitot probe, altimeter, radar, camera, seeker, and redundant IMUs are rarely collocated. For a reusable navigation architecture, it is often cleaner to define an arbitrary body-fixed \emph{origin frame} $o$ fixed in the vehicle and then express every sensor through a mounting rotation and lever arm relative to that origin frame.
+
+Let $o$ denote the origin frame used as the mechanization reference. The nominal navigation state estimates the position, velocity, and attitude of the origin frame. Let sensor $s$ have body-frame lever arm $l_{os}^b$ from the origin frame $o$ to the sensor phase center or measurement point. The ECEF position of the sensor is
+\begin{equation}
+\rb_s^e = \rb_{eo}^e + \mathbf{C}_b^e l_{os}^b.
+\label{eq:nrp_sensor_position}
+\end{equation}
+The corresponding velocity is
+\begin{equation}
+\vb_s^e = \vb_{eo}^e + \mathbf{C}_b^e\left(\boldsymbol\omega_{eb}^b \times l_{os}^b\right),
+\label{eq:nrp_sensor_velocity}
+\end{equation}
+where $\boldsymbol\omega_{eb}^b$ is the angular rate of the body frame relative to ECEF, resolved in body coordinates. The corresponding acceleration is
+\begin{equation}
+\ab_s^e = \ab_{eo}^e + \mathbf{C}_b^e\left(\dot{\boldsymbol\omega}_{eb}^b \times l_{os}^b + \boldsymbol\omega_{eb}^b \times \left(\boldsymbol\omega_{eb}^b \times l_{os}^b\right)\right).
+\label{eq:nrp_sensor_accel}
+\end{equation}
+These expressions are just rigid-body kinematics. They are the foundation for plug-and-play sensor fusion: each sensor measurement model maps the origin frame $o$ state to the sensor measurement point, then maps the predicted physical quantity into the sensor frame.
+
+For an IMU mounted at lever arm $l_{ou}^b$ and sensor-frame mounting rotation $\mathbf{C}_b^u$, the angular-rate measurement is driven by the body angular rate, while the accelerometer measurement is driven by the specific force at the IMU proof-mass location. Thus, if the filter mechanizes the origin frame $o$ rather than the IMU point, the IMU specific-force correction must account for rotational acceleration and centripetal acceleration. This is exact rigid-body mechanics, but it requires either angular acceleration, a numerical angular-rate derivative, or a model-based approximation. The standard textbook mechanization is recovered by setting $l_{ou}^b=0$.
+
+\begin{interviewbox}
+A clean architecture answer is: define a single origin frame $o$ for the navigation state, then treat all sensors, including the IMU, as mounted sensors with lever arms and mounting rotations. This makes the navigator generic enough to support multiple IMUs, GNSS antenna offsets, cameras, altimeters, pitot probes, and future aiding sources without redefining the filter state for every vehicle layout.
+\end{interviewbox}
+
+\section{Error-State vs Full-State Estimation}
+
+\subsection{Full-State EKF}
+A full-state EKF estimates the navigation state directly. If attitude is represented by a quaternion, then the filter state includes a four-component vector constrained to unit norm. A direct additive Kalman correction to a quaternion is awkward because the quaternion lives on the unit three-sphere, not in unconstrained Euclidean space. Normalizing the quaternion after an additive update fixes the nominal state but does not automatically give a clean covariance interpretation.
+
+\subsection{Error-State EKF}
+An error-state EKF propagates a nonlinear nominal state and estimates a small perturbation about that nominal state. The nominal state contains the best estimate of the physical navigation solution. The error state contains the small difference between truth and the nominal solution. The Kalman filter estimates the error state, injects that correction into the nominal state, and then resets the error state to zero.
+
+For the navigation architecture considered here, a representative nominal state is
+\begin{equation}
+\hat{\xb} =
+\begin{bmatrix}
+\hat{\rb}^{eT} &
+\hat{\vb}^{eT} &
+\hat{\quat}_{b}^{eT} &
+\hat{\bb}_{g}^{T} &
+\hat{\bb}_{a}^{T} &
+\hat{\mathbf{s}}_{g}^{T} &
+\hat{\mathbf{s}}_{a}^{T} &
+\hat{\mathbf{m}}^{T} &
+\hat b_c &
+\hat d_c
+\end{bmatrix}^{T},
+\label{eq:nominal_state_ch1}
+\end{equation}
+where \(\hat{\rb}^{e}\) is ECEF position, \(\hat{\vb}^{e}\) is ECEF velocity, \(\hat{\quat}_{b}^{e}\) represents body-to-ECEF attitude, \(\hat{\bb}_{g}\) and \(\hat{\bb}_{a}\) are gyro and accelerometer biases, \(\hat{\mathbf{s}}_{g}\) and \(\hat{\mathbf{s}}_{a}\) are gyro and accelerometer scale-factor states, \(\hat{\mathbf{m}}\) represents selected IMU misalignment or nonorthogonality states, and \(\hat b_c, \hat d_c\) are receiver clock bias and clock drift.
+
+The corresponding error state is
+\begin{equation}
+\deltax =
+\begin{bmatrix}
+\delta\rb^{eT} &
+\delta\vb^{eT} &
+\delta\boldsymbol\theta^{T} &
+\delta\bb_{g}^{T} &
+\delta\bb_{a}^{T} &
+\delta\mathbf{s}_{g}^{T} &
+\delta\mathbf{s}_{a}^{T} &
+\delta\mathbf{m}^{T} &
+\delta b_c &
+\delta d_c
+\end{bmatrix}^{T}.
+\label{eq:error_state_ch1}
+\end{equation}
+The attitude error is represented by the three-component small-angle vector \(\delta\boldsymbol\theta\), not by a four-component quaternion error. This is the central practical advantage of the error-state formulation \cite{groves2013,titterton2004,sola2018}.
+
+\subsection{Full Derivation of the Small-Rotation Approximation}
+This section derives the small-rotation approximation used in the error-state attitude model. Let \(\delta\boldsymbol\theta \in \R^3\) be a small rotation vector with magnitude
+\begin{equation}
+\delta\theta = \norm{\delta\boldsymbol\theta}
+\end{equation}
+and unit axis
+\begin{equation}
+\mathbf{u} = \frac{\delta\boldsymbol\theta}{\delta\theta}.
+\end{equation}
+The exact direction cosine matrix associated with a finite rotation of angle \(\delta\theta\) about axis \(\mathbf{u}\) is given by Rodrigues' formula:
+\begin{equation}
+\mathbf{R}(\delta\boldsymbol\theta)
+= \I + \sin(\delta\theta)\skew{\mathbf{u}}
++ \left(1-\cos(\delta\theta)\right)\skew{\mathbf{u}}^2.
+\label{eq:rodrigues_axis_angle}
+\end{equation}
+Because \(\skew{\delta\boldsymbol\theta}=\delta\theta\skew{\mathbf{u}}\), this may be written as
+\begin{equation}
+\mathbf{R}(\delta\boldsymbol\theta)
+= \I
++ \frac{\sin(\delta\theta)}{\delta\theta}\skew{\delta\boldsymbol\theta}
++ \frac{1-\cos(\delta\theta)}{\delta\theta^2}\skew{\delta\boldsymbol\theta}^{2}.
+\label{eq:rodrigues_rotation_vector}
+\end{equation}
+For small \(\delta\theta\), the Taylor expansions are
+\begin{align}
+\sin(\delta\theta) &= \delta\theta - \frac{\delta\theta^3}{6} + O(\delta\theta^5),\\
+\cos(\delta\theta) &= 1 - \frac{\delta\theta^2}{2} + O(\delta\theta^4).
+\end{align}
+Therefore,
+\begin{align}
+\frac{\sin(\delta\theta)}{\delta\theta} &= 1 - \frac{\delta\theta^2}{6} + O(\delta\theta^4),\\
+\frac{1-\cos(\delta\theta)}{\delta\theta^2} &= \frac{1}{2} + O(\delta\theta^2).
+\end{align}
+Substituting into \cref{eq:rodrigues_rotation_vector} gives
+\begin{equation}
+\mathbf{R}(\delta\boldsymbol\theta)
+= \I + \skew{\delta\boldsymbol\theta} + \frac{1}{2}\skew{\delta\boldsymbol\theta}^{2} + O(\delta\theta^3).
+\end{equation}
+Keeping only first-order terms gives
+\begin{equation}
+\mathbf{R}(\delta\boldsymbol\theta)
+\approx \I + \skew{\delta\boldsymbol\theta}.
+\label{eq:first_order_rotation_plus}
+\end{equation}
+If the error is defined with the opposite sign, then the corresponding correction is
+\begin{equation}
+\mathbf{R}(-\delta\boldsymbol\theta)
+\approx \I - \skew{\delta\boldsymbol\theta}.
+\label{eq:first_order_rotation_minus}
+\end{equation}
+In this document, the attitude-error convention is chosen so that the true body-to-ECEF DCM is related to the nominal DCM by
+\begin{equation}
+\mathbf{C}_{b}^{e,true}
+\approx
+\left(\I - \skew{\delta\boldsymbol\theta}\right)
+\mathbf{C}_{b}^{e,nom}.
+\label{eq:small_angle_dcm_relation}
+\end{equation}
+This is a first-order local attitude-error model. Other texts use the opposite sign or right-multiplicative convention; the physics is unchanged if the convention is applied consistently.
+
+The quaternion version follows from the axis-angle quaternion
+\begin{equation}
+\delta\quat
+=
+\begin{bmatrix}
+\cos(\delta\theta/2)\\
+\mathbf{u}\sin(\delta\theta/2)
+\end{bmatrix}.
+\end{equation}
+Using
+\begin{align}
+\cos(\delta\theta/2)&=1-O(\delta\theta^2),\\
+\sin(\delta\theta/2)&=\frac{\delta\theta}{2}+O(\delta\theta^3),
+\end{align}
+gives the first-order quaternion perturbation
+\begin{equation}
+\delta\quat
+\approx
+\begin{bmatrix}
+1\\
+\frac{1}{2}\delta\boldsymbol\theta
+\end{bmatrix}.
+\label{eq:small_angle_quaternion}
+\end{equation}
+Thus the ES-EKF can estimate a three-component attitude perturbation while the nominal mechanization maintains a normalized quaternion.
+
+\begin{interviewbox}
+The core argument for the ES-EKF is that the nominal state carries the large nonlinear motion, while the filter estimates small local errors. The small attitude error lives in \(\R^3\), so the filter covariance has a clean physical interpretation. The small-angle approximation is not pretending the vehicle attitude is small; it assumes the attitude error is small after nominal mechanization and regular aiding.
+\end{interviewbox}
+
+\subsection{Why Error-State Dynamics Are Usually Less Nonlinear}
+In inertial navigation, position, velocity, and attitude obey nonlinear equations. However, the difference between the true and nominal solution is often small if the mechanization is good and aiding is frequent. Linearizing the error dynamics around the nominal trajectory produces a model that captures how small position, velocity, attitude, bias, scale-factor, and misalignment errors evolve. This is usually better conditioned than trying to directly linearize the full state over large attitude motions.
+
+\section{Estimator Architectures}
+
+\subsection{Centralized vs Decentralized Estimation}
+A centralized estimator maintains one global state vector and processes all measurements into that state. A decentralized estimator partitions estimation across local filters, subfilters, or sensor-specific estimators. The distinction matters for computational scaling, fault containment, interface control, and verification \cite{simon2006,barshalom2001,farrell2008}.
+
+\subsection{Monolithic EKF}
+A monolithic EKF estimates all relevant states in one filter. Its strengths are consistency and simplicity of probabilistic bookkeeping. All cross-correlations are explicitly represented, so measurement information naturally propagates across the entire state. Its weaknesses are state dimension, computational cost, software coupling, and vulnerability to one bad sensor contaminating a large state.
+
+\subsection{Federated EKF}
+A federated filter uses local filters for subsets of sensors or states and combines information in a master filter. This can improve modularity, sensor fault isolation, and computational decomposition. However, maintaining correct cross-correlation information is difficult. If information is double-counted, the master covariance can become overconfident. Federated filters are attractive when sensor subsystems are naturally separable or when fault isolation is more important than strict optimality \cite{farrell2008,barshalom2001}.
+
+\begin{interviewbox}
+A concise trade answer: monolithic filters are statistically cleaner because all correlations are represented in one covariance, but they can be computationally and organizationally heavy. Federated filters improve modularity and fault containment, but require careful information accounting to avoid double-counting and covariance overconfidence.
+\end{interviewbox}
+
 
 \chapter{Embedded Navigation Software and Modern C++}
 \section{Real-Time Navigation Software Design}
