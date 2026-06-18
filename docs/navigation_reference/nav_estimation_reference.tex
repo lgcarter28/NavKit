@@ -78,22 +78,22 @@
 \toprule
 \textbf{Letter} & \textbf{Reference Frame} & \textbf{Description}\\
 \midrule
-$i$ & Earth-Centered-Inertial Frame & Non-accelerating, non-rotating space (ECI).\\
-$e$ & Earth-Centered-Earth-Fixed Frame & Rotates with the Earth (ECEF).\\
-$n$ & NED Frame & Local geographic frame oriented to North-East-Down (NED).\\
-$b$ & Body Frame & Rigidly attached to the vehicle, centered at the nominal CG.\\
-$o$ & Origin Frame & Origin frame used to aggregate sensor lever arms.\\
-$u$ & IMU Frame & Centered at the IMU.\\
+$i$ & Earth-Centered-Inertial Frame (ECI) & Non-accelerating, non-rotating frame.\\
+$e$ & Earth-Centered-Earth-Fixed Frame (ECEF) & Frame that rotates with the Earth.\\
+$n$ & North-East-Down (NED) Frame & Local geographic frame oriented to NED.\\
+$b$ & Body Frame & Frame rigidly attached to the vehicle, centered at the nominal CG.\\
+$o$ & Origin Frame & Center of navigation origin frame used to aggregate sensor lever arms.\\
+$u$ & IMU Frame & Frame centered at the IMU.\\
 $s$ & Generic Sensor Frame & Generic aiding-sensor frame.\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\noindent Throughout this document, $o$ denotes the arbitrary body-fixed origin frame used as the mechanization reference point. Sensor lever arms are written as $l_{os}^{b}$, meaning the vector from the origin frame $o$ to sensor frame $s$, resolved in the body frame $b$.
+\noindent Throughout this document, $o$ denotes the arbitrary body-fixed origin frame used as the mechanization reference point. Sensor lever arms are written as $l_{os}^{o}$, meaning the vector from the origin frame $o$ to sensor frame $s$, resolved in the origin frame $o$.
 
 
 \chapter*{Preface}
-This reference is written as an interview preparation ``answer sheet'' rather than as a conventional textbook. The derivations are intentionally interleaved with implementation notes and interview-style explanations so that each topic can be reviewed in one place without repeatedly jumping to appendices. The focus is practical navigation systems engineering: inertial mechanization, error-state filtering, delayed measurements, statistical consistency, observability, GPS-denied aiding, and embedded estimator architecture.
+This text is meant to be a standalone reference to be used for deriving a navigator from first principles to embedded software implementation. The focus is practical navigation systems engineering: inertial mechanization, error-state filtering, delayed measurements, statistical consistency, observability, GPS-denied aiding, and embedded estimator architecture.
 
 The primary sources are \cite{groves2013}, \cite{titterton2004}, and \cite{simon2006}. Supporting references include \cite{farrell2008}, \cite{brown2012}, \cite{barshalom2001}, \cite{gelb1974}, \cite{maybeck1979}, \cite{kaplan2017}, \cite{grewal2020}, and \cite{vanloan1978}. Quaternion and error-state notation is also informed by \cite{sola2018}. Conventions vary across navigation texts; this document states the conventions used before each derivation.
 
