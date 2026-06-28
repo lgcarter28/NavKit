@@ -15,19 +15,24 @@ def repo_root() -> Path:
 
 
 def run(cmd: list[str], cwd: Path) -> None:
-    print("+", " ".join(cmd))
+    print("+", " ".join(str(c) for c in cmd))
     subprocess.check_call(cmd, cwd=cwd)
 
 
+def find_executable_near_python(name: str) -> str:
+    scripts_dir = Path(__file__).resolve().parents[1] / ".venv" / "Scripts"
+    exe = scripts_dir / f"{name}.exe"
+    if exe.exists():
+        return str(exe)
+
+    found = shutil.which(name)
+    if found:
+        return found
+
+    raise FileNotFoundError(f"Could not find executable: {name}")
+
+
 def find_conan_toolchain(build_dir: Path) -> Path:
-    """Locate Conan's generated CMake toolchain file.
-
-    Conan 2 commonly writes it to:
-        <output-folder>/build/generators/conan_toolchain.cmake
-
-    Some generator configurations may write it to:
-        <output-folder>/generators/conan_toolchain.cmake
-    """
     candidates = [
         build_dir / "build" / "generators" / "conan_toolchain.cmake",
         build_dir / "generators" / "conan_toolchain.cmake",
@@ -46,24 +51,11 @@ def find_conan_toolchain(build_dir: Path) -> Path:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Configure and build NavKit.")
-    parser.add_argument(
-        "--build-type",
-        choices=["Release", "Debug"],
-        default="Release",
-        help="CMake/Conan build type.",
-    )
-    parser.add_argument(
-        "--clean",
-        action="store_true",
-        help="Remove the selected build directory before configuring.",
-    )
-    parser.add_argument(
-        "--jobs",
-        "-j",
-        type=int,
-        default=None,
-        help="Parallel build jobs passed to cmake --build.",
-    )
+    parser.add_argument("--build-type", choices=["Release", "Debug"], default="Release")
+    parser.add_argument("--clean", action="store_true")
+    parser.add_argument("--skip-conan", action="store_true")
+    parser.add_argument("--build-only", action="store_true")
+    parser.add_argument("--jobs", "-j", type=int, default=None)
     args = parser.parse_args()
 
     root = repo_root()
@@ -74,38 +66,39 @@ def main() -> int:
 
     build_dir.mkdir(parents=True, exist_ok=True)
 
-    # Do not use `cmake --preset conan-release/debug` here. Conan also generates
-    # presets, and if the repository has presets with the same names CMake fails
-    # with "Duplicate presets". Driving CMake directly through the generated
-    # toolchain file avoids that conflict and works consistently with Conan 2.
-    run(
-        [
-            "conan",
-            "install",
-            ".",
-            "--output-folder",
-            str(build_dir),
-            "--build=missing",
-            "-s",
-            f"build_type={args.build_type}",
-        ],
-        cwd=root,
-    )
+    if args.build_only and args.clean:
+        raise ValueError("--clean cannot be used with --build-only")
 
-    toolchain_file = find_conan_toolchain(build_dir)
+    if not args.build_only and not args.skip_conan:
+        conan = find_executable_near_python("conan")
+        run(
+            [
+                conan,
+                "install",
+                ".",
+                "--output-folder",
+                str(build_dir),
+                "--build=missing",
+                "-s",
+                f"build_type={args.build_type}",
+            ],
+            cwd=root,
+        )
 
-    run(
-        [
-            "cmake",
-            "-S",
-            str(root),
-            "-B",
-            str(build_dir),
-            f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file}",
-            f"-DCMAKE_BUILD_TYPE={args.build_type}",
-        ],
-        cwd=root,
-    )
+    if not args.build_only:
+        toolchain_file = find_conan_toolchain(build_dir)
+        run(
+            [
+                "cmake",
+                "-S",
+                str(root),
+                "-B",
+                str(build_dir),
+                f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file}",
+                f"-DCMAKE_BUILD_TYPE={args.build_type}",
+            ],
+            cwd=root,
+        )
 
     build_cmd = [
         "cmake",
@@ -114,6 +107,7 @@ def main() -> int:
         "--config",
         args.build_type,
     ]
+
     if args.jobs is not None:
         build_cmd += ["--parallel", str(args.jobs)]
 
