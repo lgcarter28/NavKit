@@ -239,6 +239,7 @@ public:
         return H;
     }
 
+    template <typename NoiseContext>
     static R_t compute_r_impl(const NoiseContext& ctx)
     {
         R_t R = R_t::Zero();

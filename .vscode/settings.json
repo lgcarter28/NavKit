@@ -1,5 +1,9 @@
 {
-    "latex-workshop.latex.autoBuild.run": "onSave",
-    "latex-workshop.view.pdf.viewer": "tab",
-    "latex-workshop.latex.recipe.default": "lastUsed"
+  "C_Cpp.default.cppStandard": "c++20",
+  "cmake.configureOnOpen": false,
+  "editor.formatOnSave": true,
+  "files.associations": {
+    "*.hpp": "cpp",
+    "Eigen/Dense": "cpp"
+  }
 }

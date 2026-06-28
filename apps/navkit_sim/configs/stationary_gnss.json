@@ -1,0 +1,20 @@
+{
+  "run_name": "stationary_gnss_demo",
+  "output_dir": "data/logs/stationary_gnss_demo",
+  "trajectory": {
+    "type": "stationary",
+    "duration_s": 60.0,
+    "dt_s": 1.0,
+    "p_e_m": [6378137.0, 0.0, 0.0]
+  },
+  "gnss": {
+    "dt_s": 1.0,
+    "sigma_h_m": 3.0,
+    "sigma_v_m": 5.0,
+    "seed": 42
+  },
+  "filter": {
+    "initial_position_offset_m": [25.0, -15.0, 10.0],
+    "initial_position_sigma_m": 100.0
+  }
+}

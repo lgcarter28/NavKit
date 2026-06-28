@@ -1,0 +1,6 @@
+[project]
+name = "navkit-analysis"
+version = "0.1.0"
+description = "Python plotting and analysis helpers for NavKit logs"
+requires-python = ">=3.10"
+dependencies = ["numpy", "pandas", "matplotlib"]
