@@ -2,20 +2,25 @@
 
 #include "navkit/core/Segment.hpp"
 
-namespace navkit {
+namespace navkit
+{
 
-template <typename Seg>
-struct AdditiveInjection {
-    template <typename State_t>
-    static void apply(State_t& x, const State_t& dx) {
-        segment<Seg>(x) += segment<Seg>(dx);
+template<typename Seg>
+struct AdditiveInjection
+{
+    template<typename State_t>
+    static void apply(State_t& x, const State_t& dx)
+    {
+        segment<Seg>(x) -= segment<Seg>(dx);
     }
 };
 
-template <typename StateDef>
-struct InsInjectionPolicy {
-    template <typename State_t>
-    static void apply(State_t& x, const State_t& dx) {
+template<typename StateDef>
+struct InsInjectionPolicy
+{
+    template<typename State_t>
+    static void apply(State_t& x, const State_t& dx)
+    {
         AdditiveInjection<typename StateDef::Pos>::apply(x, dx);
         AdditiveInjection<typename StateDef::Vel>::apply(x, dx);
         AdditiveInjection<typename StateDef::Att>::apply(x, dx);
@@ -26,7 +31,7 @@ struct InsInjectionPolicy {
     }
 };
 
-template <typename StateDef>
+template<typename StateDef>
 using DefaultInjectionPolicy = InsInjectionPolicy<StateDef>;
 
 } // namespace navkit

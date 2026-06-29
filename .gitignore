@@ -35,3 +35,4 @@ data/logs/*
 *.xdv
 *.dpth
 *.md5
+*.pdf

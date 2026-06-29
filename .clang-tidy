@@ -1,13 +1,24 @@
 Checks: >
   clang-diagnostic-*,
   clang-analyzer-*,
-  modernize-*,
-  performance-*,
-  readability-*,
   bugprone-*,
-  cppcoreguidelines-*
+  performance-*,
+  modernize-*,
+  readability-*,
+  cppcoreguidelines-*,
+  -modernize-use-trailing-return-type,
+  -readability-magic-numbers,
+  -readability-function-cognitive-complexity,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-vararg,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-avoid-do-while,
+  -cppcoreguidelines-non-private-member-variables-in-classes
 WarningsAsErrors: ''
 HeaderFilterRegex: '.*include/navkit/.*'
+FormatStyle: file
 CheckOptions:
   - key: readability-identifier-naming.NamespaceCase
     value: lower_case
@@ -15,9 +26,27 @@ CheckOptions:
     value: CamelCase
   - key: readability-identifier-naming.StructCase
     value: CamelCase
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumConstantCase
+    value: CamelCase
   - key: readability-identifier-naming.FunctionCase
     value: lower_case
   - key: readability-identifier-naming.VariableCase
     value: lower_case
+  - key: readability-identifier-naming.ParameterCase
+    value: lower_case
+  - key: readability-identifier-naming.PrivateMemberCase
+    value: lower_case
   - key: readability-identifier-naming.PrivateMemberPrefix
     value: m_
+  - key: readability-identifier-naming.ProtectedMemberCase
+    value: lower_case
+  - key: readability-identifier-naming.ProtectedMemberPrefix
+    value: m_
+  - key: readability-identifier-naming.ConstantCase
+    value: lower_case
+  - key: readability-identifier-naming.StaticConstantCase
+    value: CamelCase
+  - key: readability-identifier-naming.TemplateParameterCase
+    value: CamelCase
