@@ -1,0 +1,91 @@
+from __future__ import annotations
+
+import matplotlib.pyplot as plt
+from scipy.stats import chi2
+
+from navkit_analysis.data import RunData
+from navkit_analysis.figures.common import save_figure
+from navkit_analysis.style import BOUND_COLOR, RESIDUAL_COLOR, apply_nav_axes_style
+
+
+def _measurement_dof(updates) -> int:
+    """Infer measurement dimension from innovation columns."""
+    return len([col for col in updates.columns if col.startswith("nu_")])
+
+
+def plot_gnss_position_nis(run: RunData, save: bool = True) -> plt.Figure | None:
+    """Plot GNSS position NIS and chi-square upper-tail p-values."""
+    updates = run.gnss_pos_update
+
+    if updates is None:
+        print("Skipping GNSS NIS plot; missing gnss_pos_update.csv")
+        return None
+
+    time_s = updates["time_s"]
+    nis = updates["nis"]
+
+    dof = _measurement_dof(updates)
+    nis_95 = chi2.ppf(0.95, df=dof)
+    nis_99 = chi2.ppf(0.99, df=dof)
+
+    # Upper-tail p-value:
+    #   p = P(ChiSq_dof >= observed NIS)
+    # For a statistically consistent filter, p-values should be Uniform(0, 1),
+    # with expected value 0.5.
+    p_value = chi2.sf(nis, df=dof)
+    mean_p_value = p_value.mean()
+
+    fig, axes = plt.subplots(
+        nrows=2,
+        ncols=1,
+        sharex=True,
+        figsize=(14.0, 8.0),
+        constrained_layout=True,
+    )
+
+    fig.suptitle("GNSS Position NIS Consistency")
+
+    ax_nis = axes[0]
+    ax_nis.scatter(time_s, nis, color=RESIDUAL_COLOR, label="NIS", s=28)
+    ax_nis.axhline(
+        nis_95,
+        color=BOUND_COLOR,
+        linestyle="--",
+        label=rf"$\chi^2_{{{dof},0.95}}$",
+    )
+    ax_nis.axhline(
+        nis_99,
+        color=BOUND_COLOR,
+        linestyle="-",
+        label=rf"$\chi^2_{{{dof},0.99}}$",
+    )
+    ax_nis.set_ylabel("NIS [-]")
+    ax_nis.legend(loc="upper right")
+    apply_nav_axes_style(ax_nis)
+
+    ax_p = axes[1]
+    ax_p.scatter(time_s, p_value, color=RESIDUAL_COLOR, label="p-value", s=28)
+    ax_p.axhline(
+        mean_p_value,
+        color=BOUND_COLOR,
+        linestyle="--",
+        label=rf"$\bar{{p}}={mean_p_value:.3f}$",
+    )
+    ax_p.axhline(
+        0.5,
+        color=BOUND_COLOR,
+        linestyle=":",
+        label=r"$E[p]=0.5$",
+    )
+    ax_p.axhline(0.05, color=BOUND_COLOR, linestyle="-.", label=r"$p=0.05$")
+    ax_p.axhline(0.01, color=BOUND_COLOR, linestyle=(0, (3, 1, 1, 1)), label=r"$p=0.01$")
+    ax_p.set_xlabel("Time [s]")
+    ax_p.set_ylabel("p-value [-]")
+    ax_p.set_ylim(-0.02, 1.02)
+    ax_p.legend(loc="upper right")
+    apply_nav_axes_style(ax_p)
+
+    if save:
+        save_figure(fig, run.run_dir / "gnss_position_nis.png")
+
+    return fig

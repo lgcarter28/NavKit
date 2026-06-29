@@ -74,9 +74,9 @@ int main(int argc, char** argv)
         using Sensors = std::tuple<GnssSensor>;
         using MeasurementModels = std::tuple<GnssModel>;
         using Filter = navkit::KalmanFilter<StateDef,
-                                            navkit::DefaultInjectionPolicy<StateDef>,
-                                            navkit::DefaultResetPolicy<StateDef>,
-                                            MeasurementModels>;
+                                           navkit::DefaultInjectionPolicy<StateDef>,
+                                           navkit::DefaultResetPolicy<StateDef>,
+                                           MeasurementModels>;
         using Navigator = navkit::Navigator<Filter, Sensors, navkit::UpdatePostFilter>;
 
         Navigator navigator;

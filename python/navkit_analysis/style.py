@@ -49,6 +49,16 @@ def axis_position_error_label(axis_name: str) -> str:
     return f"{axis_name.upper()} Error [m]"
 
 
+def axis_innovation_label(axis_name: str) -> str:
+    """Return a capitalized innovation axis label, e.g. 'X Innovation [m]'."""
+    return f"{axis_name.upper()} Innovation [m]"
+
+
 def ecef_position_error_label(axis_name: str) -> str:
     """Return a LaTeX-style ECEF position error legend label."""
     return rf"$\delta p_{{{axis_name}}}^e$"
+
+
+def gnss_position_innovation_label(axis_name: str) -> str:
+    """Return a LaTeX-style GNSS position innovation legend label."""
+    return rf"$\nu_{{p_{axis_name}}}$"

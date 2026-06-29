@@ -1,256 +1,84 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
+# Support both:
+#   python -m navkit_analysis.plots ...
+# and:
+#   python python/navkit_analysis/plots.py ...
+#
+# When this file is executed directly, Python puts python/navkit_analysis on
+# sys.path instead of python/. Add python/ explicitly so absolute package imports
+# work consistently.
+if __package__ is None or __package__ == "":
+    python_root = Path(__file__).resolve().parents[1]
+    if str(python_root) not in sys.path:
+        sys.path.insert(0, str(python_root))
+
 import matplotlib.pyplot as plt
-import pandas as pd
 
-try:
-    from navkit_analysis.style import (
-        BOUND_COLOR,
-        ERROR_COLOR,
-        RESIDUAL_COLOR,
-        apply_nav_axes_style,
-        apply_style,
-        axis_position_error_label,
-        ecef_position_error_label,
-    )
-except ModuleNotFoundError:
-    # Allows direct execution as:
-    #   python python/navkit_analysis/plots.py <run_dir>
-    from style import (  # type: ignore[no-redef]
-        BOUND_COLOR,
-        ERROR_COLOR,
-        RESIDUAL_COLOR,
-        apply_nav_axes_style,
-        apply_style,
-        axis_position_error_label,
-        ecef_position_error_label,
-    )
+from navkit_analysis.data import load_run
+from navkit_analysis.figures import (
+    plot_gnss_position_histograms,
+    plot_gnss_position_innovation,
+    plot_gnss_position_nis,
+    plot_position_error_covariance,
+)
+from navkit_analysis.style import apply_style
 
 
-AXES = ("x", "y", "z")
-NIS_95_DOF3 = 7.814727903251179
-NIS_99_DOF3 = 11.344866730144373
+def plot_run(run_dir: Path, save: bool = True) -> list[plt.Figure]:
+    """Create all standard figures for one NavKit run.
+
+    Figure functions save outputs and return open figure objects. This function
+    intentionally does not call ``plt.show()``; the caller owns figure lifetime.
+    """
+    apply_style()
+    run_data = load_run(run_dir)
+
+    maybe_figures = [
+        plot_position_error_covariance(run_data, save=save),
+        plot_gnss_position_innovation(run_data, save=save),
+        plot_gnss_position_nis(run_data, save=save),
+        plot_gnss_position_histograms(run_data, save=save),
+    ]
+
+    return [fig for fig in maybe_figures if fig is not None]
 
 
-def _position_columns(axis_name: str) -> tuple[str, str]:
-    err_col = f"err_p_e_{axis_name}_m"
-    sigma_col = f"sigma_p_e_{axis_name}_m"
-    return err_col, sigma_col
-
-
-def _innovation_columns(axis_name: str) -> tuple[str, str]:
-    nu_col = f"nu_p_e_{axis_name}_m"
-    sigma_col = f"sigma_nu_p_e_{axis_name}_m"
-    return nu_col, sigma_col
-
-
-def _save_or_show(fig: plt.Figure, out: Path, show: bool) -> Path:
-    fig.savefig(out)
-    print(f"Wrote {out}")
-
-    if show:
-        plt.show()
-    else:
+def close_figures(figures: list[plt.Figure]) -> None:
+    """Close all generated figures."""
+    for fig in figures:
         plt.close(fig)
 
-    return out
 
-
-def plot_position_error_covariance(run_dir: Path, show: bool = False) -> Path:
-    """Plot ECEF position error with 1-sigma and 3-sigma covariance bounds."""
-    apply_style()
-
-    nav = pd.read_csv(run_dir / "nav.csv")
-    time_s = nav["time_s"]
-
-    fig, axes = plt.subplots(
-        nrows=3,
-        ncols=1,
-        sharex=True,
-        figsize=(14.0, 9.0),
-        constrained_layout=True,
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Generate NavKit analysis plots.")
+    parser.add_argument("run_dir", type=Path, help="Run directory containing NavKit CSV logs.")
+    parser.add_argument(
+        "--show",
+        action="store_true",
+        help="Open all figures interactively after generating/saving them.",
+    )
+    parser.add_argument(
+        "--no-save",
+        action="store_true",
+        help="Create figures without saving PNG files.",
     )
 
-    fig.suptitle(r"ECEF Position Error with $1\sigma$ and $3\sigma$ Bounds")
+    args = parser.parse_args(argv)
 
-    for ax, axis_name in zip(axes, AXES):
-        err_col, sigma_col = _position_columns(axis_name)
-        err = nav[err_col]
-        sigma = nav[sigma_col]
+    figures = plot_run(args.run_dir, save=not args.no_save)
 
-        ax.plot(
-            time_s,
-            err,
-            color=ERROR_COLOR,
-            label=ecef_position_error_label(axis_name),
-        )
+    if args.show:
+        # Call show once after all figures have been created so the user can
+        # toggle between windows instead of closing one plot at a time.
+        plt.show()
+    else:
+        close_figures(figures)
 
-        ax.plot(
-            time_s,
-            sigma,
-            color=BOUND_COLOR,
-            linestyle="--",
-            label=r"$1\sigma$",
-        )
-        ax.plot(time_s, -sigma, color=BOUND_COLOR, linestyle="--")
-
-        ax.plot(
-            time_s,
-            3.0 * sigma,
-            color=BOUND_COLOR,
-            linestyle="-",
-            label=r"$3\sigma$",
-        )
-        ax.plot(time_s, -3.0 * sigma, color=BOUND_COLOR, linestyle="-")
-
-        ax.axhline(0.0, color="0.25", linewidth=0.8)
-        ax.set_ylabel(axis_position_error_label(axis_name))
-        ax.legend(loc="upper right")
-        apply_nav_axes_style(ax)
-
-    axes[-1].set_xlabel("Time [s]")
-
-    return _save_or_show(fig, run_dir / "position_error_covariance.png", show)
-
-
-def plot_gnss_position_innovation(run_dir: Path, show: bool = False) -> Path | None:
-    """Plot GNSS position innovations with 1-sigma and 3-sigma innovation bounds."""
-    update_path = run_dir / "gnss_pos_update.csv"
-    if not update_path.exists():
-        print(f"Skipping GNSS innovation plot; missing {update_path}")
-        return None
-
-    apply_style()
-
-    updates = pd.read_csv(update_path)
-    time_s = updates["time_s"]
-
-    fig, axes = plt.subplots(
-        nrows=3,
-        ncols=1,
-        sharex=True,
-        figsize=(14.0, 9.0),
-        constrained_layout=True,
-    )
-
-    fig.suptitle(r"GNSS Position Innovation with $1\sigma$ and $3\sigma$ Bounds")
-
-    for ax, axis_name in zip(axes, AXES):
-        nu_col, sigma_col = _innovation_columns(axis_name)
-        nu = updates[nu_col]
-        sigma = updates[sigma_col]
-
-        ax.plot(
-            time_s,
-            nu,
-            color=RESIDUAL_COLOR,
-            label=rf"$\nu_{{p_{axis_name}}}$",
-        )
-
-        ax.plot(
-            time_s,
-            sigma,
-            color=BOUND_COLOR,
-            linestyle="--",
-            label=r"$1\sigma$",
-        )
-        ax.plot(time_s, -sigma, color=BOUND_COLOR, linestyle="--")
-
-        ax.plot(
-            time_s,
-            3.0 * sigma,
-            color=BOUND_COLOR,
-            linestyle="-",
-            label=r"$3\sigma$",
-        )
-        ax.plot(time_s, -3.0 * sigma, color=BOUND_COLOR, linestyle="-")
-
-        ax.axhline(0.0, color="0.25", linewidth=0.8)
-        ax.set_ylabel(f"{axis_name.upper()} Innovation [m]")
-        ax.legend(loc="upper right")
-        apply_nav_axes_style(ax)
-
-    axes[-1].set_xlabel("Time [s]")
-
-    return _save_or_show(fig, run_dir / "gnss_position_innovation.png", show)
-
-
-def plot_gnss_position_nis(run_dir: Path, show: bool = False) -> Path | None:
-    """Plot GNSS position NIS with common chi-square thresholds for 3 DOF."""
-    update_path = run_dir / "gnss_pos_update.csv"
-    if not update_path.exists():
-        print(f"Skipping GNSS NIS plot; missing {update_path}")
-        return None
-
-    apply_style()
-
-    updates = pd.read_csv(update_path)
-    time_s = updates["time_s"]
-
-    fig, ax = plt.subplots(figsize=(14.0, 5.0), constrained_layout=True)
-    fig.suptitle("GNSS Position Normalized Innovation Squared")
-
-    ax.plot(time_s, updates["nis"], color=RESIDUAL_COLOR, label="NIS")
-    ax.axhline(NIS_95_DOF3, color=BOUND_COLOR, linestyle="--", label=r"$\chi^2_{3,0.95}$")
-    ax.axhline(NIS_99_DOF3, color=BOUND_COLOR, linestyle="-", label=r"$\chi^2_{3,0.99}$")
-
-    ax.set_xlabel("Time [s]")
-    ax.set_ylabel("NIS [-]")
-    ax.legend(loc="upper right")
-    apply_nav_axes_style(ax)
-
-    return _save_or_show(fig, run_dir / "gnss_position_nis.png", show)
-
-
-def plot_gnss_position_residual_histograms(run_dir: Path, show: bool = False) -> Path | None:
-    """Plot GNSS position residual/innovation histograms by ECEF axis."""
-    update_path = run_dir / "gnss_pos_update.csv"
-    if not update_path.exists():
-        print(f"Skipping GNSS residual histogram; missing {update_path}")
-        return None
-
-    apply_style()
-
-    updates = pd.read_csv(update_path)
-
-    fig, axes = plt.subplots(
-        nrows=3,
-        ncols=1,
-        sharex=False,
-        figsize=(10.0, 9.0),
-        constrained_layout=True,
-    )
-
-    fig.suptitle("GNSS Position Innovation Histograms")
-
-    for ax, axis_name in zip(axes, AXES):
-        nu_col, _ = _innovation_columns(axis_name)
-        ax.hist(updates[nu_col], bins=30, color=RESIDUAL_COLOR, alpha=0.75)
-        ax.axvline(0.0, color=BOUND_COLOR, linewidth=1.0)
-        ax.set_ylabel(f"{axis_name.upper()} Count")
-        ax.set_xlabel(f"{axis_name.upper()} Innovation [m]")
-        apply_nav_axes_style(ax)
-
-    return _save_or_show(fig, run_dir / "gnss_position_innovation_histograms.png", show)
-
-
-def plot_run(run_dir: Path, show: bool = False) -> None:
-    plot_position_error_covariance(run_dir, show=show)
-    plot_gnss_position_innovation(run_dir, show=show)
-    plot_gnss_position_nis(run_dir, show=show)
-    plot_gnss_position_residual_histograms(run_dir, show=show)
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("run_dir", type=Path)
-    parser.add_argument("--show", action="store_true", help="Open interactive matplotlib windows.")
-    args = parser.parse_args()
-
-    plot_run(args.run_dir, show=args.show)
     return 0
 
 

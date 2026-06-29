@@ -58,7 +58,8 @@ public:
                         "sigma_p_e_y_m",
                         "sigma_p_e_z_m"});
 
-        m_gnss_pos_update_csv.open(m_output_dir / "gnss_pos_update.csv", gnss_pos_update_header());
+        m_gnss_pos_update_csv.open(m_output_dir / "gnss_pos_update.csv",
+                                   gnss_pos_update_header());
     }
 
     void set_gnss_metadata(double sigma_h_m, double sigma_v_m, unsigned int seed)
@@ -372,21 +373,21 @@ private:
 
     static nlohmann::json gnss_pos_update_metadata()
     {
-        return {{"schema", "gnss_pos_update_v1"},
-                {"file", "gnss_pos_update.csv"},
-                {"model", "gnss_pos"},
-                {"units",
-                 {{"time", "s"},
-                  {"innovation", "m"},
-                  {"innovation_covariance", "m^2"},
-                  {"measurement_covariance", "m^2"},
-                  {"jacobian_h", "mixed"},
-                  {"kalman_gain", "mixed"},
-                  {"nis", "dimensionless"}}},
-                {"description",
-                 "GNSS position measurement update statistics. The CSV includes innovation, S, R, "
-                 "H, K, "
-                 "NIS, timestamp, and accepted flag."}};
+        return {
+            {"schema", "gnss_pos_update_v1"},
+            {"file", "gnss_pos_update.csv"},
+            {"model", "gnss_pos"},
+            {"units",
+             {{"time", "s"},
+              {"innovation", "m"},
+              {"innovation_covariance", "m^2"},
+              {"measurement_covariance", "m^2"},
+              {"jacobian_h", "mixed"},
+              {"kalman_gain", "mixed"},
+              {"nis", "dimensionless"}}},
+            {"description",
+             "GNSS position measurement update statistics. The CSV includes innovation, S, R, H, K, "
+             "NIS, timestamp, and accepted flag."}};
     }
 
     nlohmann::json run_manifest() const
@@ -398,7 +399,8 @@ private:
                   {"gnss", {{"csv", "gnss.csv"}, {"manifest", "gnss.meta.json"}}},
                   {"nav", {{"csv", "nav.csv"}, {"manifest", "nav.meta.json"}}},
                   {"gnss_pos_update",
-                   {{"csv", "gnss_pos_update.csv"}, {"manifest", "gnss_pos_update.meta.json"}}}}}};
+                   {{"csv", "gnss_pos_update.csv"},
+                    {"manifest", "gnss_pos_update.meta.json"}}}}}};
     }
 
     std::filesystem::path m_output_dir;
