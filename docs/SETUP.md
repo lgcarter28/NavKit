@@ -414,6 +414,11 @@ Example:
 python python/navkit_analysis/plots.py data/logs/stationary_gnss_demo
 ```
 
+Or, to display an interactive browser of the figures:
+```bash
+python python/navkit_analysis/plots.py data/logs/stationary_gnss_demo --show
+```
+
 Future plotting utilities will include:
 
 - Truth vs estimate
@@ -548,7 +553,7 @@ python tools/run_tests.py --build-type Debug
 
 python tools/run_first_sim.py
 
-python python/navkit_analysis/plots.py data/logs/stationary_gnss_demo
+python python/navkit_analysis/plots.py data/logs/stationary_gnss_demo --show
 
 git status
 git add ...
