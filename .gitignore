@@ -1,3 +1,4 @@
+# Primary ignore
 build/
 cmake-build-*/
 .vs/
@@ -10,3 +11,27 @@ __pycache__/
 .env/
 data/logs/*
 !data/logs/.gitkeep
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.idx
+*.ilg
+*.ind
+*.lof
+*.log
+*.lot
+*.nav
+*.out
+*.run.xml
+*.snm
+*.synctex.gz
+*.toc
+*.vrb
+*.xdv
+*.dpth
+*.md5
