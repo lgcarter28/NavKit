@@ -3,12 +3,16 @@
 #include "navkit/core/Segment.hpp"
 #include "navkit/core/SensorModelBase.hpp"
 
+#include <string_view>
+
 namespace navkit
 {
 template<typename StateDef>
 class GnssVelModel : public SensorModelBase<GnssVelModel<StateDef>, StateDef, 3>
 {
 public:
+    static constexpr std::string_view Name = "gnss_vel";
+
     using Base = SensorModelBase<GnssVelModel<StateDef>, StateDef, 3>;
     using State_t = typename Base::State_t;
     using H_t = typename Base::H_t;

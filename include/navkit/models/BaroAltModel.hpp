@@ -2,12 +2,16 @@
 
 #include "navkit/core/SensorModelBase.hpp"
 
+#include <string_view>
+
 namespace navkit
 {
 template<typename StateDef>
 class BaroAltModel : public SensorModelBase<BaroAltModel<StateDef>, StateDef, 1>
 {
 public:
+    static constexpr std::string_view Name = "baro_alt";
+
     using Base = SensorModelBase<BaroAltModel<StateDef>, StateDef, 1>;
     using State_t = typename Base::State_t;
     using H_t = typename Base::H_t;
