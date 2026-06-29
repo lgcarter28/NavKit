@@ -197,7 +197,7 @@ private:
             stats.innovation = innovation;
             stats.innovation_covariance = S;
             stats.measurement_covariance = R;
-            stats.jacobian = H;
+            stats.jacobian_h = H;
             stats.kalman_gain = K;
             stats.nis = nis;
         }

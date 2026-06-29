@@ -72,7 +72,11 @@ int main(int argc, char** argv)
         using GnssSensor =
             navkit::Sensor<GnssModel, navkit::Config::GNSS_BUFF_SIZE, navkit::GnssFixedNoisePolicy>;
         using Sensors = std::tuple<GnssSensor>;
-        using Filter = navkit::KalmanFilter<StateDef>;
+        using MeasurementModels = std::tuple<GnssModel>;
+        using Filter = navkit::KalmanFilter<StateDef,
+                                            navkit::DefaultInjectionPolicy<StateDef>,
+                                            navkit::DefaultResetPolicy<StateDef>,
+                                            MeasurementModels>;
         using Navigator = navkit::Navigator<Filter, Sensors, navkit::UpdatePostFilter>;
 
         Navigator navigator;
@@ -115,6 +119,10 @@ int main(int argc, char** argv)
             }
 
             navigator.process_measurements();
+
+            if (filter.template has_measurement_statistics<GnssModel>()) {
+                logger.log_gnss_pos_statistics(filter.template measurement_statistics<GnssModel>());
+            }
 
             logger.log_nav<StateDef>(sample.time, filter, sample);
         }
