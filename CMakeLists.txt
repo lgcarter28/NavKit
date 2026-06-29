@@ -1,3 +1,6 @@
+# Copyright (c) 2026 William Gordon Carter.
+# All Rights Reserved.
+
 cmake_minimum_required(VERSION 3.23)
 project(navkit VERSION 0.1.0 LANGUAGES CXX)
 

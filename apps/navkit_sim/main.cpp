@@ -1,3 +1,6 @@
+// Copyright (c) 2026 William Gordon Carter.
+// All Rights Reserved.
+
 #include "navkit/core/Config.hpp"
 #include "navkit/core/KalmanFilter.hpp"
 #include "navkit/core/Navigator.hpp"
@@ -74,9 +77,9 @@ int main(int argc, char** argv)
         using Sensors = std::tuple<GnssSensor>;
         using MeasurementModels = std::tuple<GnssModel>;
         using Filter = navkit::KalmanFilter<StateDef,
-                                           navkit::DefaultInjectionPolicy<StateDef>,
-                                           navkit::DefaultResetPolicy<StateDef>,
-                                           MeasurementModels>;
+                                            navkit::DefaultInjectionPolicy<StateDef>,
+                                            navkit::DefaultResetPolicy<StateDef>,
+                                            MeasurementModels>;
         using Navigator = navkit::Navigator<Filter, Sensors, navkit::UpdatePostFilter>;
 
         Navigator navigator;

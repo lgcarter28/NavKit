@@ -1,3 +1,6 @@
+// Copyright (c) 2026 William Gordon Carter.
+// All Rights Reserved.
+
 #include "navkit/core/KalmanFilter.hpp"
 #include "navkit/core/StateDefs.hpp"
 #include "navkit/models/GnssPosModel.hpp"

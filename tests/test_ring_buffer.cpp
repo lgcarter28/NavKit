@@ -1,3 +1,6 @@
+// Copyright (c) 2026 William Gordon Carter.
+// All Rights Reserved.
+
 #include "navkit/core/RingBuffer.hpp"
 #include "test_main.hpp"
 

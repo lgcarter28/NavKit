@@ -1,3 +1,6 @@
+// Copyright (c) 2026 William Gordon Carter.
+// All Rights Reserved.
+
 #include "navkit/core/Navigator.hpp"
 #include "navkit/core/Sensor.hpp"
 #include "navkit/core/StateDefs.hpp"

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 William Gordon Carter.
+// All Rights Reserved.
+
 #pragma once
 
 #include "navkit/core/Config.hpp"
@@ -48,18 +51,15 @@ struct tuple_contains;
 
 template<typename T>
 struct tuple_contains<T, std::tuple<>> : std::false_type
-{
-};
+{};
 
 template<typename T, typename... Rest>
 struct tuple_contains<T, std::tuple<T, Rest...>> : std::true_type
-{
-};
+{};
 
 template<typename T, typename First, typename... Rest>
 struct tuple_contains<T, std::tuple<First, Rest...>> : tuple_contains<T, std::tuple<Rest...>>
-{
-};
+{};
 
 template<typename T, typename Tuple>
 inline constexpr bool tuple_contains_v = tuple_contains<T, Tuple>::value;
@@ -69,14 +69,12 @@ struct tuple_index;
 
 template<typename T, typename... Rest>
 struct tuple_index<T, std::tuple<T, Rest...>> : std::integral_constant<std::size_t, 0>
-{
-};
+{};
 
 template<typename T, typename First, typename... Rest>
 struct tuple_index<T, std::tuple<First, Rest...>>
     : std::integral_constant<std::size_t, 1 + tuple_index<T, std::tuple<Rest...>>::value>
-{
-};
+{};
 
 template<typename T, typename Tuple>
 inline constexpr std::size_t tuple_index_v = tuple_index<T, Tuple>::value;

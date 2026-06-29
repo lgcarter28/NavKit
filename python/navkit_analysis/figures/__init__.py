@@ -1,3 +1,6 @@
+# Copyright (c) 2026 William Gordon Carter.
+# All Rights Reserved.
+
 """Public figure-generation API for NavKit analysis."""
 
 from __future__ import annotations

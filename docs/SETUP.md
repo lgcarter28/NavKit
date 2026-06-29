@@ -253,6 +253,27 @@ python/pyproject.toml
 
 ---
 
+## Repository Tooling
+
+NavKit provides a collection of Python utilities under `tools/` that serve as the primary developer interface to the project.
+
+These scripts provide a consistent cross-platform workflow and abstract away platform-specific differences between Windows and Linux.
+
+| Script | Purpose |
+|---------|---------|
+| `build.py` | Configure, build, and rebuild NavKit using Conan and CMake |
+| `run_tests.py` | Execute the complete unit test suite |
+| `run_first_sim.py` | Run the default stationary GNSS simulation |
+| `run_analysis.py` | Generate plots and analysis from simulation logs |
+| `format.py` | Run clang-format and optional clang-tidy |
+| `copyright.py` | Insert or verify copyright headers |
+
+For normal development, prefer these Python wrappers over invoking Conan, CMake, or CTest directly.
+
+The raw commands are still documented throughout this guide for debugging and advanced workflows.
+
+---
+
 ## Build NavKit with the Python Wrapper
 
 The recommended interface is the Python build wrapper.
@@ -429,11 +450,27 @@ Future plotting utilities will include:
 - NIS
 - Monte Carlo statistics
 
+The analysis package is intentionally separated from the embedded navigation library to allow richer offline validation, visualization, Monte Carlo analysis, and future report generation without impacting embedded flight software.
+
 ---
 
-## Format and Lint
+## Format, Lint, and Copyright
 
-Format all C++ source files:
+NavKit uses repository-wide formatting and copyright tools.
+
+Insert or update copyright headers:
+
+```bash
+python tools/copyright.py --write
+```
+
+Verify all source files contain the required copyright header:
+
+```bash
+python tools/copyright.py --check
+```
+
+Format all source files:
 
 ```bash
 python tools/format.py
@@ -451,19 +488,19 @@ Run static analysis:
 python tools/format.py --tidy
 ```
 
-Apply available `clang-tidy` fixes:
+Apply available clang-tidy fixes:
 
 ```bash
 python tools/format.py --tidy --fix
 ```
 
-Formatting is controlled by:
+Formatting behavior is controlled by:
 
 ```text
 .clang-format
 ```
 
-Static-analysis checks are controlled by:
+Static-analysis rules are controlled by:
 
 ```text
 .clang-tidy
@@ -538,14 +575,18 @@ Because NavKit uses templates and Eigen, stepping line-by-line can enter a lot o
 
 ---
 
-## Recommended Daily Workflow
+## Recommended Development Workflow
 
-Typical development workflow:
+A typical NavKit development cycle is:
 
 ```text
 git pull
 
 activate virtual environment
+
+python tools/copyright.py --write
+
+python tools/format.py
 
 python tools/build.py --build-type Debug --build-only
 
@@ -553,39 +594,37 @@ python tools/run_tests.py --build-type Debug
 
 python tools/run_first_sim.py
 
-python python/navkit_analysis/plots.py data/logs/stationary_gnss_demo --show
+python tools/run_analysis.py data/logs/stationary_gnss_demo --show
 
 git status
 git add ...
 git commit
 ```
 
-If CMake, Conan, or build configuration files changed:
+### Common Build Scenarios
+
+Incremental rebuild:
 
 ```bash
-python tools/build.py --build-type Debug --clean
+python tools/build.py --build-type Debug --build-only
 ```
 
-If dependencies are unchanged but CMake files changed:
+Reconfigure CMake without reinstalling Conan dependencies:
 
 ```bash
 python tools/build.py --build-type Debug --skip-conan
 ```
 
+Full clean rebuild:
+
+```bash
+python tools/build.py --build-type Debug --clean
+```
+
+Release build:
+
+```bash
+python tools/build.py --build-type Release --clean
+```
+
 ---
-
-## Repository Philosophy
-
-NavKit is intended to be:
-
-- Modern C++23
-- Cross-platform
-- Compile-time configurable
-- Deterministic
-- Embedded-friendly
-- Header-heavy for generic framework components
-- Source-based for simulations, utilities, and applications
-- JSON-configured for runs and metadata
-- CSV-based for time-history logs
-
-The initial development focus is on correctness, testing, and clean architecture before embedded deployment, hardware abstraction layers, fixed-lag smoothing, and RTS smoothing are introduced.

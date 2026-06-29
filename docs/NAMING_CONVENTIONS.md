@@ -4,21 +4,21 @@ NavKit uses Groves-style inertial navigation notation in code and logs.
 
 ## Kinematic variable names
 
-The convention is:
+The convention is, for the mathematical variable $x_{ab}^c$, the programming variable name follows:
 
-```text
-x_ab_c means x_ab^c
+``` text
+x_ab_c
 ```
 
 where:
 
-- `a` and `b` define the object or relative relationship,
-- `c` is the resolving frame,
-- `x` is the physical quantity.
+-   `a` and `b` define the object or relative relationship, where `b` is the object frame, and `a` is the frame object `b` is observed relative to.
+-   `c` is the resolving frame,
+-   `x` is the physical quantity.
 
 Examples:
 
-```text
+``` text
 w_ib_b   angular rate of body frame b with respect to inertial frame i, resolved in body frame b
 f_ib_b   specific force of body frame b with respect to inertial frame i, resolved in body frame b
 C_eb     DCM that transforms b-frame components into e-frame components
@@ -28,11 +28,12 @@ v_eb_e   velocity of body/object b with respect to ECEF e, resolved in ECEF e
 
 ## Simplified notation
 
-When the object/wrt/resolving-frame meaning is obvious or redundant, names may be simplified.
+When the object/wrt/resolving-frame meaning is obvious or redundant,
+names may be simplified.
 
 For example:
 
-```text
+``` text
 p_eb_e -> p_e
 v_eb_e -> v_e
 ```
@@ -41,9 +42,10 @@ Use `p` for position, not `r`.
 
 ## Units in code vs logs
 
-C++ variable names use Groves notation and usually omit unit suffixes when the unit is clear from the type or struct documentation:
+C++ variable names use Groves notation and usually omit unit suffixes
+when the unit is clear from the type or struct documentation:
 
-```cpp
+``` cpp
 Eigen::Vector3d p_e;      // meters
 Eigen::Vector3d v_e;      // meters/second
 Eigen::Vector3d a_e;      // meters/second^2
@@ -53,7 +55,7 @@ Eigen::Vector3d w_ib_b;   // radians/second
 
 CSV headers include units explicitly:
 
-```text
+``` text
 time_s,
 p_e_x_m,p_e_y_m,p_e_z_m,
 v_e_x_mps,v_e_y_mps,v_e_z_mps,

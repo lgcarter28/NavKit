@@ -1,3 +1,6 @@
+# Copyright (c) 2026 William Gordon Carter.
+# All Rights Reserved.
+
 from conan import ConanFile
 from conan.tools.cmake import CMakeToolchain, CMakeDeps, cmake_layout
 
