@@ -1,8 +1,10 @@
 #pragma once
 
-namespace navkit::sim {
+namespace navkit::sim
+{
 
-class SensorSimulatorBase {
+class SensorSimulatorBase
+{
 public:
     virtual ~SensorSimulatorBase() = default;
 };

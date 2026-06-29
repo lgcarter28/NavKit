@@ -1,12 +1,15 @@
 #pragma once
 
-#include <Eigen/Dense>
-#include <Eigen/Geometry>
 #include "navkit/core/Config.hpp"
 
-namespace navkit::sim {
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
 
-struct TruthSample {
+namespace navkit::sim
+{
+
+struct TruthSample
+{
     Time_t time{0.0};
     Eigen::Matrix<Scalar_t, 3, 1> p_e{Eigen::Matrix<Scalar_t, 3, 1>::Zero()};
     Eigen::Matrix<Scalar_t, 3, 1> v_e{Eigen::Matrix<Scalar_t, 3, 1>::Zero()};

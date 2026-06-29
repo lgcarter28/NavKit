@@ -1,24 +1,33 @@
 #pragma once
 
-#include <Eigen/Dense>
 #include "navkit/core/Config.hpp"
 
-namespace navkit::frames {
+#include <Eigen/Dense>
 
-struct Eci {};
-struct Ecef {};
-struct Ned {};
-struct Body {};
-struct Sensor {};
+namespace navkit::frames
+{
 
-template <typename From, typename To, typename Scalar = navkit::Scalar_t>
-struct Dcm {
+struct Eci
+{};
+struct Ecef
+{};
+struct Ned
+{};
+struct Body
+{};
+struct Sensor
+{};
+
+template<typename From, typename To, typename Scalar = navkit::Scalar_t>
+struct Dcm
+{
     Eigen::Matrix<Scalar, 3, 3> C{Eigen::Matrix<Scalar, 3, 3>::Identity()};
 };
 
-template <typename From, typename To, typename Scalar>
+template<typename From, typename To, typename Scalar>
 Eigen::Matrix<Scalar, 3, 1> operator*(const Dcm<From, To, Scalar>& dcm,
-                                      const Eigen::Matrix<Scalar, 3, 1>& v_from) {
+                                      const Eigen::Matrix<Scalar, 3, 1>& v_from)
+{
     return dcm.C * v_from;
 }
 

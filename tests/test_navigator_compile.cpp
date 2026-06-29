@@ -1,11 +1,13 @@
-#include "test_main.hpp"
-#include <tuple>
 #include "navkit/core/Navigator.hpp"
 #include "navkit/core/Sensor.hpp"
 #include "navkit/core/StateDefs.hpp"
 #include "navkit/models/GnssPosModel.hpp"
+#include "test_main.hpp"
 
-TEST_CASE("Navigator compiles and processes GNSS sensor") {
+#include <tuple>
+
+TEST_CASE("Navigator compiles and processes GNSS sensor")
+{
     using StateDef = navkit::InsStateDef;
     using Model = navkit::GnssPosModel<StateDef>;
     using Sensor = navkit::Sensor<Model, 4>;

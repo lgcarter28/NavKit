@@ -3,23 +3,28 @@
 #include <array>
 #include <cstddef>
 
-namespace navkit {
+namespace navkit
+{
 
-enum class OverflowPolicy {
+enum class OverflowPolicy
+{
     Reject,
     OverwriteOldest
 };
 
-template <typename T, std::size_t N, OverflowPolicy Policy = OverflowPolicy::Reject>
-class RingBuffer {
+template<typename T, std::size_t N, OverflowPolicy Policy = OverflowPolicy::Reject>
+class RingBuffer
+{
 public:
     static_assert(N > 0, "RingBuffer capacity must be greater than zero");
 
-    bool push(const T& value) {
+    bool push(const T& value)
+    {
         if (m_count == N) {
             if constexpr (Policy == OverflowPolicy::OverwriteOldest) {
                 advance_tail();
-            } else {
+            }
+            else {
                 return false;
             }
         }
@@ -30,7 +35,8 @@ public:
         return true;
     }
 
-    bool pop(T& out) {
+    bool pop(T& out)
+    {
         if (empty()) {
             return false;
         }
@@ -39,7 +45,8 @@ public:
         return true;
     }
 
-    bool front(T& out) const {
+    bool front(T& out) const
+    {
         if (empty()) {
             return false;
         }
@@ -47,19 +54,33 @@ public:
         return true;
     }
 
-    [[nodiscard]] bool empty() const { return m_count == 0U; }
-    [[nodiscard]] bool full() const { return m_count == N; }
-    [[nodiscard]] std::size_t size() const { return m_count; }
-    [[nodiscard]] constexpr std::size_t capacity() const { return N; }
+    [[nodiscard]] bool empty() const
+    {
+        return m_count == 0U;
+    }
+    [[nodiscard]] bool full() const
+    {
+        return m_count == N;
+    }
+    [[nodiscard]] std::size_t size() const
+    {
+        return m_count;
+    }
+    [[nodiscard]] constexpr std::size_t capacity() const
+    {
+        return N;
+    }
 
-    void clear() {
+    void clear()
+    {
         m_head = 0U;
         m_tail = 0U;
         m_count = 0U;
     }
 
 private:
-    void advance_tail() {
+    void advance_tail()
+    {
         m_tail = (m_tail + 1U) % N;
         --m_count;
     }

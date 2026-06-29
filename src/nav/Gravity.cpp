@@ -1,8 +1,10 @@
 #include "navkit/nav/Gravity.hpp"
 
-namespace navkit::gravity {
+namespace navkit::gravity
+{
 
-Eigen::Matrix<Scalar_t, 3, 1> simple_gravity_ecef(const Eigen::Matrix<Scalar_t, 3, 1>& p_e) {
+Eigen::Matrix<Scalar_t, 3, 1> simple_gravity_ecef(const Eigen::Matrix<Scalar_t, 3, 1>& p_e)
+{
     constexpr Scalar_t mu = 3.986004418e14;
     const Scalar_t r = p_e.norm();
     if (r <= 0.0) {

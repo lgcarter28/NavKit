@@ -1,8 +1,10 @@
 #pragma once
 
-namespace navkit::sim {
+namespace navkit::sim
+{
 
-class ImuSimulator {
+class ImuSimulator
+{
 public:
     ImuSimulator() = default;
 };

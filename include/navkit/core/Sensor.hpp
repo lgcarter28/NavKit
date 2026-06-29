@@ -1,14 +1,17 @@
 #pragma once
 
-#include <cstddef>
 #include "navkit/core/Measurement.hpp"
 #include "navkit/core/RingBuffer.hpp"
 #include "navkit/core/policies/NoisePolicies.hpp"
 
-namespace navkit {
+#include <cstddef>
 
-template <typename Model, std::size_t BufferSize, typename NoisePolicy = DefaultNoisePolicy>
-class Sensor {
+namespace navkit
+{
+
+template<typename Model, std::size_t BufferSize, typename NoisePolicy = DefaultNoisePolicy>
+class Sensor
+{
 public:
     using Model_t = Model;
     using O_t = typename Model_t::O_t;
@@ -17,27 +20,33 @@ public:
     using Measurement_t = Measurement<Model_t::M>;
     using NoiseContext_t = typename Model_t::NoiseContext;
 
-    bool push(const Measurement_t& meas) {
+    bool push(const Measurement_t& meas)
+    {
         return m_buffer.push(meas);
     }
 
-    [[nodiscard]] bool has_measurement() const {
+    [[nodiscard]] bool has_measurement() const
+    {
         return !m_buffer.empty();
     }
 
-    bool pop(Measurement_t& meas) {
+    bool pop(Measurement_t& meas)
+    {
         return m_buffer.pop(meas);
     }
 
-    [[nodiscard]] const NoiseContext_t& noise_context() const {
+    [[nodiscard]] const NoiseContext_t& noise_context() const
+    {
         return m_noise_ctx;
     }
 
-    NoiseContext_t& noise_context() {
+    NoiseContext_t& noise_context()
+    {
         return m_noise_ctx;
     }
 
-    void update_noise_context(const Measurement_t& meas) {
+    void update_noise_context(const Measurement_t& meas)
+    {
         NoisePolicy::update(m_noise_ctx, meas);
     }
 

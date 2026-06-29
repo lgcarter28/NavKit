@@ -1,8 +1,9 @@
-#include "test_main.hpp"
 #include "navkit/nav/Frames.hpp"
 #include "navkit/nav/Units.hpp"
+#include "test_main.hpp"
 
-TEST_CASE("Unit cast feet to meters") {
+TEST_CASE("Unit cast feet to meters")
+{
     using namespace navkit::units;
     using Frame = navkit::frames::Ecef;
     Vec<Foot, Frame, 3> p_ft;
@@ -11,7 +12,8 @@ TEST_CASE("Unit cast feet to meters") {
     CHECK(p_m.v(0) == doctest::Approx(0.3048));
 }
 
-TEST_CASE("Frame DCM multiply compiles") {
+TEST_CASE("Frame DCM multiply compiles")
+{
     navkit::frames::Dcm<navkit::frames::Body, navkit::frames::Ecef> C_eb;
     Eigen::Vector3d f_b;
     f_b << 1.0, 0.0, 0.0;

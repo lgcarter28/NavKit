@@ -2,9 +2,11 @@
 
 #include <cstddef>
 
-namespace navkit {
+namespace navkit
+{
 
-struct Config {
+struct Config
+{
     using Scalar_t = double;
     using Time_t = double;
 

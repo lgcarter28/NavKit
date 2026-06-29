@@ -1,8 +1,10 @@
 #pragma once
 
-namespace navkit::sim {
+namespace navkit::sim
+{
 
-class BaroSimulator {
+class BaroSimulator
+{
 public:
     BaroSimulator() = default;
 };

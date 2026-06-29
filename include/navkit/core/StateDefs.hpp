@@ -2,9 +2,11 @@
 
 #include "navkit/core/Segment.hpp"
 
-namespace navkit {
+namespace navkit
+{
 
-struct InsStateDef {
+struct InsStateDef
+{
     using Pos = Segment<0, 3>;
     using Vel = Segment<3, 3>;
     using Att = Segment<6, 3>;
@@ -16,7 +18,8 @@ struct InsStateDef {
     static constexpr int N = 21;
 };
 
-struct GnssTcStateDef {
+struct GnssTcStateDef
+{
     using Pos = Segment<0, 3>;
     using Vel = Segment<3, 3>;
     using Att = Segment<6, 3>;

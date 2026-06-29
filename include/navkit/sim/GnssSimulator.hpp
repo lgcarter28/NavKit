@@ -1,24 +1,31 @@
 #pragma once
 
-#include <random>
 #include "navkit/core/Measurement.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
-namespace navkit::sim {
+#include <random>
 
-struct GnssSimulatorConfig {
+namespace navkit::sim
+{
+
+struct GnssSimulatorConfig
+{
     Time_t dt_s{1.0};
     Scalar_t sigma_h_m{3.0};
     Scalar_t sigma_v_m{5.0};
     unsigned int seed{42U};
 };
 
-class GnssSimulator {
+class GnssSimulator
+{
 public:
     explicit GnssSimulator(const GnssSimulatorConfig& cfg);
 
     Measurement<3> generate(const TruthSample& truth);
-    [[nodiscard]] Time_t dt_s() const { return m_cfg.dt_s; }
+    [[nodiscard]] Time_t dt_s() const
+    {
+        return m_cfg.dt_s;
+    }
 
 private:
     GnssSimulatorConfig m_cfg;

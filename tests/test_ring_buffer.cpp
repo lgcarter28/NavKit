@@ -1,7 +1,8 @@
-#include "test_main.hpp"
 #include "navkit/core/RingBuffer.hpp"
+#include "test_main.hpp"
 
-TEST_CASE("RingBuffer push/pop order") {
+TEST_CASE("RingBuffer push/pop order")
+{
     navkit::RingBuffer<int, 3> rb;
     CHECK(rb.empty());
     CHECK(rb.push(1));
@@ -14,7 +15,8 @@ TEST_CASE("RingBuffer push/pop order") {
     CHECK(rb.empty());
 }
 
-TEST_CASE("RingBuffer rejects overflow by default") {
+TEST_CASE("RingBuffer rejects overflow by default")
+{
     navkit::RingBuffer<int, 2> rb;
     CHECK(rb.push(1));
     CHECK(rb.push(2));

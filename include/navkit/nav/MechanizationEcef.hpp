@@ -1,8 +1,10 @@
 #pragma once
 
-namespace navkit {
+namespace navkit
+{
 
-struct MechanizationEcefPlaceholder {
+struct MechanizationEcefPlaceholder
+{
     // Placeholder for future ECEF INS mechanization.
 };
 

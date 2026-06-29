@@ -1,11 +1,15 @@
 #include "navkit/sim/GnssSimulator.hpp"
 
-namespace navkit::sim {
+namespace navkit::sim
+{
 
 GnssSimulator::GnssSimulator(const GnssSimulatorConfig& cfg)
-    : m_cfg(cfg), m_rng(cfg.seed) {}
+    : m_cfg(cfg)
+    , m_rng(cfg.seed)
+{}
 
-Measurement<3> GnssSimulator::generate(const TruthSample& truth) {
+Measurement<3> GnssSimulator::generate(const TruthSample& truth)
+{
     Measurement<3> meas;
     meas.time = truth.time;
     meas.z = truth.p_e;

@@ -1,7 +1,7 @@
-#include "test_main.hpp"
 #include "navkit/core/KalmanFilter.hpp"
 #include "navkit/core/StateDefs.hpp"
 #include "navkit/models/GnssPosModel.hpp"
+#include "test_main.hpp"
 
 TEST_CASE("GNSS position update moves state toward measurement")
 {

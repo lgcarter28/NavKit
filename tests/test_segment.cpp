@@ -1,8 +1,10 @@
-#include <Eigen/Dense>
-#include "test_main.hpp"
 #include "navkit/core/Segment.hpp"
+#include "test_main.hpp"
 
-TEST_CASE("Segment helper selects vector block") {
+#include <Eigen/Dense>
+
+TEST_CASE("Segment helper selects vector block")
+{
     using Pos = navkit::Segment<0, 3>;
     Eigen::Matrix<double, 6, 1> x;
     x << 1, 2, 3, 4, 5, 6;

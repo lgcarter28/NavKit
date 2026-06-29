@@ -1,6 +1,7 @@
 #include <iostream>
 
-int main() {
+int main()
+{
     std::cout << "navkit_replay placeholder\n";
     return 0;
 }

@@ -1,8 +1,10 @@
 #pragma once
 
-namespace navkit {
+namespace navkit
+{
 
-struct ImuProcessModelPlaceholder {
+struct ImuProcessModelPlaceholder
+{
     // Placeholder for the high-rate IMU propagation/process model.
 };
 
