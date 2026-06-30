@@ -15,8 +15,6 @@ find_package(nlohmann_json REQUIRED CONFIG)
 
 add_library(navkit_core
     src/core/dummy.cpp
-    src/nav/Earth.cpp
-    src/nav/Gravity.cpp
     src/sim/TrajectoryGenerator.cpp
     src/sim/GnssSimulator.cpp
     src/sim/ImuSimulator.cpp

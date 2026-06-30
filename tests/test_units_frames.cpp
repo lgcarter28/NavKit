@@ -1,8 +1,8 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/nav/Frames.hpp"
-#include "navkit/nav/Units.hpp"
+#include "navkit/frames/Frames.hpp"
+#include "navkit/units/Units.hpp"
 #include "test_main.hpp"
 
 TEST_CASE("Unit cast feet to meters")
