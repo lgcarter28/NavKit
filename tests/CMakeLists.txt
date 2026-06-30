@@ -8,6 +8,7 @@ add_executable(navkit_tests
     test_ring_buffer.cpp
     test_segment.cpp
     test_units_frames.cpp
+    test_environment_policies.cpp
     test_gnss_pos_update.cpp
     test_navigator_compile.cpp
 )
