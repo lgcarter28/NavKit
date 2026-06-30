@@ -1,0 +1,458 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue,
+    citecolor=blue
+}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    columns=fullflexible,
+    showstringspaces=false
+}
+\title{ADR-001\\Compile-Time Policy Architecture}
+\author{William Gordon Carter}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Field} & \textbf{Value} \\
+\midrule
+ADR & 001 \\
+Title & Compile-Time Policy Architecture \\
+Status & Proposed \\
+Author & William Gordon Carter \\
+Created & \today \\
+Supersedes & None \\
+Superseded By & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\tableofcontents
+\newpage
+
+\section{Context}
+
+NavKit is intended to be a modular estimation and navigation development
+platform for embedded aerospace systems. Many of the most important choices in
+such a system are not runtime choices. They are compile-time engineering
+assumptions: state layout, measurement structure, process model, injection
+strategy, reset strategy, planet, gravity, mechanization, frame convention, and
+simulation environment.
+
+This ADR defines the broad architectural pattern NavKit uses to represent
+those assumptions.
+
+\section{Decision}
+
+NavKit shall use a compile-time policy architecture based on:
+
+\begin{center}
+\textbf{Concept} $\rightarrow$ \textbf{CRTP Policy Base} $\rightarrow$
+\textbf{Concrete Policy} $\rightarrow$ \textbf{Runtime Algorithm}
+\end{center}
+
+Concepts define compile-time capabilities. CRTP policy bases provide shared
+static implementation. Concrete policies aggregate the facts, equations, or
+behavior needed for a particular configuration. Runtime algorithms consume
+policies through constrained template parameters.
+
+\section{Core Idea}
+
+A C++20 concept is not a base class and is not explicitly implemented by a
+concrete type. A concept is a compile-time predicate. It asks whether a type
+satisfies a set of requirements.
+
+For example:
+
+\begin{lstlisting}[language=C++]
+template<typename T>
+concept PlanetPolicy = requires
+{
+    T::mu_m3_s2;
+    typename T::InertialFrame;
+    typename T::FixedFrame;
+};
+\end{lstlisting}
+
+A concrete type does not declare that it implements \texttt{PlanetPolicy}. It
+simply provides the required members:
+
+\begin{lstlisting}[language=C++]
+struct Wgs84
+{
+    using InertialFrame = frames::EarthCenteredInertial;
+    using FixedFrame = frames::EarthCenteredEarthFixed;
+
+    static inline constexpr double mu_m3_s2 = 3.986004418e14;
+};
+\end{lstlisting}
+
+The concept becomes useful when it constrains a template:
+
+\begin{lstlisting}[language=C++]
+template<PlanetPolicy Planet>
+struct SphericalGravity;
+\end{lstlisting}
+
+The syntax above is shorthand for:
+
+\begin{lstlisting}[language=C++]
+template<typename Planet>
+requires PlanetPolicy<Planet>
+struct SphericalGravity;
+\end{lstlisting}
+
+At this point, the compiler checks whether the supplied template argument
+satisfies \texttt{PlanetPolicy}.
+
+\section{Terminology}
+
+\subsection{Policy}
+
+A policy is a compile-time type that defines an engineering choice. Policies
+may define constants, equations, behavior, static helpers, frame types, or
+compile-time metadata.
+
+Examples include:
+
+\begin{itemize}
+    \item \texttt{PlanetPolicy}
+    \item \texttt{GravityPolicy}
+    \item \texttt{PropagationPolicy}
+    \item \texttt{MechanizationPolicy}
+    \item \texttt{MeasurementPolicy}
+    \item \texttt{InjectionPolicy}
+    \item \texttt{ResetPolicy}
+    \item \texttt{NoisePolicy}
+\end{itemize}
+
+\subsection{Concept}
+
+A concept defines compile-time requirements. In NavKit, concepts should usually
+represent capabilities rather than inheritance hierarchies.
+
+Examples:
+
+\begin{itemize}
+    \item \texttt{PlanetPolicy}
+    \item \texttt{RotatingPlanetPolicy}
+    \item \texttt{EllipsoidPlanetPolicy}
+    \item \texttt{J2PlanetPolicy}
+\end{itemize}
+
+A single concrete policy may satisfy many concepts without explicitly declaring
+any of them.
+
+\subsection{CRTP Policy Base}
+
+A CRTP policy base provides shared static functionality for a family of
+policies.
+
+Example:
+
+\begin{lstlisting}[language=C++]
+template<typename Derived>
+struct PlanetPolicyBase
+{
+    static constexpr double eccentricity_squared()
+    {
+        return 1.0 -
+            (Derived::b_m * Derived::b_m) /
+            (Derived::a_m * Derived::a_m);
+    }
+};
+\end{lstlisting}
+
+\subsection{Concrete Policy}
+
+A concrete policy supplies actual engineering content.
+
+Example:
+
+\begin{lstlisting}[language=C++]
+struct Wgs84 : PlanetPolicyBase<Wgs84>
+{
+    using InertialFrame = frames::EarthCenteredInertial;
+    using FixedFrame = frames::EarthCenteredEarthFixed;
+
+    static inline constexpr double mu_m3_s2 = 3.986004418e14;
+    static inline constexpr double omega_rad_s = 7.292115e-5;
+    static inline constexpr double a_m = 6378137.0;
+    static inline constexpr double b_m = 6356752.314245179;
+    static inline constexpr double J2 = 1.08262668e-3;
+};
+\end{lstlisting}
+
+\subsection{Runtime Algorithm}
+
+A runtime algorithm operates on runtime data: state, covariance, measurements,
+sensor samples, logs, buffers, and configuration values. It may be templated on
+policies, but it should not own unrelated domain details.
+
+\section{Design Drivers}
+
+The design drivers are:
+
+\begin{itemize}
+    \item Zero runtime overhead
+    \item Embedded suitability
+    \item Compile-time validation
+    \item Clear compiler diagnostics
+    \item Avoidance of runtime polymorphism for static engineering choices
+    \item Separation of domain definitions from runtime algorithms
+    \item Ability to compose compatible policies
+    \item Avoidance of inheritance hierarchy explosion
+\end{itemize}
+
+\section{Concepts as Capabilities}
+
+Concepts in NavKit should generally represent capabilities.
+
+For example, rather than creating a class hierarchy such as:
+
+\begin{verbatim}
+Planet
+  -> RotatingPlanet
+       -> EllipsoidPlanet
+            -> J2Planet
+\end{verbatim}
+
+NavKit defines independent capability concepts:
+
+\begin{lstlisting}[language=C++]
+template<typename T>
+concept PlanetPolicy = requires
+{
+    T::mu_m3_s2;
+    typename T::InertialFrame;
+    typename T::FixedFrame;
+};
+
+template<typename T>
+concept RotatingPlanetPolicy =
+    PlanetPolicy<T> &&
+    requires { T::omega_rad_s; };
+
+template<typename T>
+concept EllipsoidPlanetPolicy =
+    PlanetPolicy<T> &&
+    requires
+    {
+        T::a_m;
+        T::b_m;
+    };
+
+template<typename T>
+concept J2PlanetPolicy =
+    PlanetPolicy<T> &&
+    requires
+    {
+        T::J2;
+        T::a_m;
+    };
+\end{lstlisting}
+
+This avoids combinatorial inheritance problems. A concrete policy simply
+aggregates the facts it supports. The compiler determines which capabilities it
+satisfies.
+
+\section{Policy Aggregation}
+
+Concrete policies should generally be flat aggregations of the facts and types
+they support.
+
+For example, \texttt{Wgs84} may simultaneously satisfy:
+
+\begin{itemize}
+    \item \texttt{PlanetPolicy}
+    \item \texttt{RotatingPlanetPolicy}
+    \item \texttt{EllipsoidPlanetPolicy}
+    \item \texttt{J2PlanetPolicy}
+\end{itemize}
+
+without explicitly declaring any of those concepts.
+
+This style is intentionally different from traditional object-oriented
+inheritance. Algorithms constrain on the capabilities they need, not on a
+particular place in a class hierarchy.
+
+\section{Algorithm Constraints}
+
+Runtime algorithms and higher-level policies should constrain template
+parameters using the weakest concept that expresses their actual requirements.
+
+Examples:
+
+\begin{lstlisting}[language=C++]
+template<PlanetPolicy Planet>
+struct SphericalGravity;
+
+template<J2PlanetPolicy Planet>
+struct J2Gravity;
+
+template<RotatingPlanetPolicy Planet, GravityPolicy Gravity>
+struct MechanizationPcpf;
+\end{lstlisting}
+
+This means a planet that supports only \texttt{mu\_m3\_s2} may still be used
+with spherical gravity, while a high-fidelity gravity policy may require
+additional capabilities.
+
+\section{CRTP Policy Bases}
+
+CRTP policy bases are used for shared implementation, not for concept
+satisfaction by declaration.
+
+For example, \texttt{Wgs84} may inherit from
+\texttt{PlanetPolicyBase<Wgs84>} to inherit helper functions. However, the
+compiler determines concept satisfaction from the public interface, not from an
+explicit \texttt{implements} declaration.
+
+This distinction is important:
+
+\begin{description}
+    \item[Concepts] answer: ``Can this type be used here?''
+    \item[CRTP bases] answer: ``What shared implementation can this family of
+    policies reuse?''
+\end{description}
+
+\section{Dependency Containment}
+
+Template types may indirectly encode lower-level policies. This is acceptable.
+
+Example:
+
+\begin{lstlisting}[language=C++]
+using Planet = planet::Wgs84;
+using Gravity = gravity::J2<Planet>;
+using Propagation = nav::MechanizationPcpf<Planet, Gravity>;
+using Nav = Navigator<Filter, Sensors, Propagation, UpdatePolicy>;
+\end{lstlisting}
+
+The concrete \texttt{Navigator} type indirectly contains the planet and gravity
+choice through its propagation policy. The important point is that
+\texttt{Navigator} is semantically constrained on \texttt{PropagationPolicy},
+not directly on planet, gravity, and frame policies.
+
+\section{Naming Conventions}
+
+NavKit shall use the following naming conventions for compile-time policies:
+
+\begin{itemize}
+    \item Concepts end with \texttt{Policy}
+    \item CRTP bases end with \texttt{PolicyBase}
+    \item Concrete policies use descriptive domain names
+    \item Runtime algorithms use algorithmic names
+\end{itemize}
+
+Examples:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Role} & \textbf{Example} & \textbf{Meaning} \\
+\midrule
+Concept & \texttt{PlanetPolicy} & Required planet capability \\
+Concept & \texttt{J2PlanetPolicy} & Planet with J2 support \\
+CRTP Base & \texttt{PlanetPolicyBase} & Shared planet helpers \\
+Concrete Policy & \texttt{Wgs84} & Specific planet definition \\
+Concrete Policy & \texttt{J2<Planet>} & Specific gravity definition \\
+Runtime Algorithm & \texttt{Navigator} & Orchestration object \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Alternatives Considered}
+
+\subsection{Runtime Polymorphism}
+
+Runtime inheritance and virtual dispatch were rejected for static engineering
+choices because they introduce runtime overhead and complicate embedded
+deployment.
+
+\subsection{Traditional Inheritance Hierarchies}
+
+Deep inheritance hierarchies were rejected because capability combinations
+quickly become difficult to represent. Concepts allow independent capabilities
+without forcing a rigid taxonomy.
+
+\subsection{Plain Templates Without Concepts}
+
+Plain templates provide zero-overhead abstraction but produce poor compiler
+diagnostics when requirements are not met.
+
+\subsection{CRTP Without Concepts}
+
+CRTP provides shared implementation but does not clearly constrain algorithm
+interfaces at template boundaries.
+
+\section{Consequences}
+
+\subsection{Benefits}
+
+\begin{itemize}
+    \item Static configuration with no runtime dispatch
+    \item Better compiler diagnostics
+    \item Capability-based composition
+    \item Avoidance of inheritance hierarchy explosion
+    \item Reusable shared implementation
+    \item Stronger architectural consistency
+\end{itemize}
+
+\subsection{Costs}
+
+\begin{itemize}
+    \item Increased template complexity
+    \item Requires familiarity with C++20 concepts
+    \item Potentially longer compile times
+    \item Requires discipline to avoid propagating low-level policies too high
+    in the architecture
+\end{itemize}
+
+\section{Guiding Rule}
+
+Introduce a policy when an engineering assumption is:
+
+\begin{itemize}
+    \item fundamental to the algorithm,
+    \item naturally static for a build or scenario,
+    \item likely to have multiple valid implementations or capability levels,
+    \item useful to express in the type system.
+\end{itemize}
+
+Use runtime objects for values that change during execution or represent
+state, measurements, logs, buffers, and runtime configuration.
+
+\section{Decision Summary}
+
+NavKit shall use Concepts to express compile-time capabilities, CRTP policy
+bases to share implementation, concrete policies to aggregate domain facts or
+behavior, and runtime algorithms to operate on runtime data.
+
+Concepts in NavKit are capability predicates, not base classes. Concrete
+policies do not explicitly declare which concepts they implement. Instead,
+algorithms constrain template parameters using the weakest concept that
+expresses their actual requirements.
+
+\end{document}

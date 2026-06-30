@@ -1,0 +1,433 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue,
+    citecolor=blue
+}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    columns=fullflexible,
+    showstringspaces=false
+}
+\title{ADR-002\\Compile-Time Environment Policy Architecture}
+\author{William Gordon Carter}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Field} & \textbf{Value} \\
+\midrule
+ADR & 002 \\
+Title & Compile-Time Environment Policy Architecture \\
+Status & Proposed \\
+Author & William Gordon Carter \\
+Created & \today \\
+Supersedes & Original ADR-001 environment draft \\
+Superseded By & --- \\
+Depends On & ADR-001 Compile-Time Policy Architecture \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\tableofcontents
+\newpage
+
+\section{Context}
+
+NavKit initially used Earth-specific terminology and constants, including
+WGS-84, ECEF, and Earth gravity. This was appropriate for the initial prototype
+but would tightly couple generic navigation algorithms to Earth.
+
+The long-term NavKit architecture should support Earth, Moon, Mars, and other
+central bodies. It should also support multiple gravity approximations,
+mechanization frames, and future environment policies such as atmosphere and
+magnetic field models.
+
+This ADR applies the compile-time policy architecture defined in ADR-001 to
+physical environment definitions.
+
+\section{Decision}
+
+NavKit shall represent physical environment assumptions using composable
+compile-time policies.
+
+The initial environment policy families are:
+
+\begin{itemize}
+    \item Planet policies
+    \item Gravity policies
+    \item Reference frame types
+    \item Propagation / mechanization policies
+\end{itemize}
+
+Planet policies define physical constants and associated frames. Gravity
+policies define gravitational acceleration equations. Mechanization policies
+consume planet and gravity policies to propagate navigation state. The
+Navigator remains an orchestration layer.
+
+\section{Design Drivers}
+
+\begin{itemize}
+    \item Avoid Earth-specific assumptions in generic algorithms
+    \item Support multiple celestial bodies
+    \item Support multiple gravity fidelity levels
+    \item Keep planetary constants separate from gravity equations
+    \item Tie reference frames to central bodies explicitly
+    \item Avoid inheritance hierarchy explosion
+    \item Preserve zero-overhead compile-time configuration
+    \item Keep the Navigator independent of direct environment details
+\end{itemize}
+
+\section{Planet Policies}
+
+A planet policy defines immutable properties of a central body. The minimal
+planet capability requires only the quantities needed by the lowest-fidelity
+algorithms.
+
+Example minimal concept:
+
+\begin{lstlisting}[language=C++]
+template<typename T>
+concept PlanetPolicy = requires
+{
+    T::mu_m3_s2;
+    typename T::InertialFrame;
+    typename T::FixedFrame;
+};
+\end{lstlisting}
+
+Additional concepts describe additional physical capabilities:
+
+\begin{lstlisting}[language=C++]
+template<typename T>
+concept RotatingPlanetPolicy =
+    PlanetPolicy<T> &&
+    requires
+    {
+        T::omega_rad_s;
+    };
+
+template<typename T>
+concept EllipsoidPlanetPolicy =
+    PlanetPolicy<T> &&
+    requires
+    {
+        T::a_m;
+        T::b_m;
+    };
+
+template<typename T>
+concept J2PlanetPolicy =
+    PlanetPolicy<T> &&
+    requires
+    {
+        T::J2;
+        T::a_m;
+    };
+\end{lstlisting}
+
+This capability-based structure avoids a rigid inheritance taxonomy.
+
+\section{Concrete Planet Policies}
+
+Concrete planet policies aggregate the facts they support.
+
+Example:
+
+\begin{lstlisting}[language=C++]
+struct Wgs84 : PlanetPolicyBase<Wgs84>
+{
+    using InertialFrame = frames::EarthCenteredInertial;
+    using FixedFrame = frames::EarthCenteredEarthFixed;
+
+    static inline constexpr double mu_m3_s2 = 3.986004418e14;
+    static inline constexpr double omega_rad_s = 7.292115e-5;
+
+    static inline constexpr double a_m = 6378137.0;
+    static inline constexpr double b_m = 6356752.314245179;
+
+    static inline constexpr double J2 = 1.08262668e-3;
+};
+\end{lstlisting}
+
+This single policy may satisfy:
+
+\begin{itemize}
+    \item \texttt{PlanetPolicy}
+    \item \texttt{RotatingPlanetPolicy}
+    \item \texttt{EllipsoidPlanetPolicy}
+    \item \texttt{J2PlanetPolicy}
+\end{itemize}
+
+without explicitly declaring that it implements any concept.
+
+\section{Gravity Policies}
+
+Gravity policies define equations, not planetary constants.
+
+A gravity policy should constrain its planet template parameter using the
+weakest concept that expresses its requirements.
+
+Examples:
+
+\begin{lstlisting}[language=C++]
+template<PlanetPolicy Planet>
+struct Spherical;
+
+template<J2PlanetPolicy Planet>
+struct J2;
+\end{lstlisting}
+
+This allows valid low-fidelity configurations even when a planet does not
+provide high-fidelity fields.
+
+For example:
+
+\begin{lstlisting}[language=C++]
+using Gravity = gravity::Spherical<planet::SimpleMoon>;
+\end{lstlisting}
+
+may compile if \texttt{SimpleMoon} provides only \texttt{mu\_m3\_s2} and frame
+types, while:
+
+\begin{lstlisting}[language=C++]
+using Gravity = gravity::J2<planet::SimpleMoon>;
+\end{lstlisting}
+
+will fail at compile time if \texttt{SimpleMoon} does not satisfy
+\texttt{J2PlanetPolicy}.
+
+\section{Reference Frames}
+
+The term \emph{body-fixed} is avoided because \(b\) conventionally denotes the
+vehicle body frame in navigation notation.
+
+NavKit uses generic central-body terminology:
+
+\begin{itemize}
+    \item Planet-Centered Inertial (PCI)
+    \item Planet-Centered Planet-Fixed (PCPF)
+\end{itemize}
+
+Planet-specific frame types include:
+
+\begin{itemize}
+    \item Earth-Centered Inertial
+    \item Earth-Centered Earth-Fixed
+    \item Moon-Centered Inertial
+    \item Moon-Centered Moon-Fixed
+    \item Mars-Centered Inertial
+    \item Mars-Centered Mars-Fixed
+\end{itemize}
+
+Each planet policy exposes its frame types:
+
+\begin{lstlisting}[language=C++]
+using InertialFrame = ...;
+using FixedFrame = ...;
+\end{lstlisting}
+
+This allows generic algorithms to use \texttt{Planet::InertialFrame} and
+\texttt{Planet::FixedFrame} without being Earth-specific.
+
+\section{Mechanization and Propagation Policies}
+
+Mechanization is the layer where environment policies should enter the
+navigation stack.
+
+Example:
+
+\begin{lstlisting}[language=C++]
+using Planet = planet::Wgs84;
+using Gravity = gravity::J2<Planet>;
+using Propagation = nav::MechanizationPcpf<Planet, Gravity>;
+using Nav = Navigator<Filter, Sensors, Propagation, UpdatePolicy>;
+\end{lstlisting}
+
+The concrete \texttt{Navigator} type indirectly encodes planet and gravity
+through the propagation policy. This is acceptable. The important point is
+that \texttt{Navigator} depends on a \texttt{PropagationPolicy} interface, not
+directly on every lower-level environment policy.
+
+\section{Dependency Direction}
+
+The intended dependency direction is:
+
+\begin{verbatim}
+Navigator
+    |
+Propagation Policy / Mechanization
+    |
++---+----------------+
+|                    |
+Gravity Policy   Frame Utilities
+    \              /
+     \            /
+      Planet Policy
+\end{verbatim}
+
+Higher-level algorithms should depend on lower-level policies only through the
+nearest appropriate abstraction.
+
+\section{Compatibility Behavior}
+
+Policy compatibility is enforced by concepts.
+
+A simple gravity policy should compile for any planet satisfying the minimal
+\texttt{PlanetPolicy}. A higher-fidelity gravity policy should compile only
+for planets satisfying the required capability concept.
+
+This creates a useful rule:
+
+\begin{quote}
+Algorithms do not depend on named planets; they depend on physical
+capabilities.
+\end{quote}
+
+\section{Why Not a Planet Inheritance Hierarchy?}
+
+A rigid hierarchy such as:
+
+\begin{verbatim}
+Planet
+  -> RotatingPlanet
+       -> EllipsoidPlanet
+            -> J2Planet
+\end{verbatim}
+
+is rejected because physical capabilities are composable. A central body might
+be rotating but not modeled as an ellipsoid, spherical but rotating, ellipsoid
+without a supplied J2 coefficient, or supported only by a spherical gravity
+model.
+
+Concepts provide independent capability predicates without forcing a taxonomy.
+
+\section{Why Not Template Navigator Directly on Planet?}
+
+The following form is rejected:
+
+\begin{lstlisting}[language=C++]
+Navigator<Filter, Sensors, Planet, Gravity, Mechanization, UpdatePolicy>
+\end{lstlisting}
+
+This makes \texttt{Navigator} conceptually responsible for unrelated
+environment details.
+
+The preferred form is:
+
+\begin{lstlisting}[language=C++]
+Navigator<Filter, Sensors, Propagation, UpdatePolicy>
+\end{lstlisting}
+
+The propagation policy may internally encode planet, gravity, frame, and
+mechanization choices. This preserves compile-time configuration while keeping
+the high-level API organized.
+
+\section{Current Implementation Direction}
+
+The existing Earth-specific implementation should be refactored toward:
+
+\begin{itemize}
+    \item \texttt{planet/PlanetPolicy.hpp}
+    \item \texttt{planet/PlanetPolicyBase.hpp}
+    \item \texttt{planet/Wgs84.hpp}
+    \item \texttt{gravity/GravityPolicy.hpp}
+    \item \texttt{gravity/GravityPolicyBase.hpp}
+    \item \texttt{gravity/Spherical.hpp}
+    \item \texttt{gravity/J2.hpp}
+    \item \texttt{frames/Frames.hpp}
+\end{itemize}
+
+Earth-specific compatibility aliases may be kept temporarily during the
+transition, but new code should prefer policy-based naming.
+
+\section{Alternatives Considered}
+
+\subsection{Earth-Centric Implementation}
+
+Rejected because it couples generic navigation code to Earth and ECEF.
+
+\subsection{Single Planet Policy Owning Gravity}
+
+Rejected because planetary constants and gravity equations are separate
+concerns. The same planet may support multiple gravity policies.
+
+\subsection{Runtime Environment Selection}
+
+Rejected for the initial architecture because environment choices are static
+for a given simulation, embedded build, or analysis campaign.
+
+\subsection{Inheritance Taxonomy}
+
+Rejected because independent capabilities compose more naturally than
+hierarchical classes.
+
+\section{Consequences}
+
+\subsection{Benefits}
+
+\begin{itemize}
+    \item Earth assumptions become explicit and localized
+    \item Moon and Mars support can be added without redesigning the estimator
+    \item Gravity models can be swapped independently from planet definitions
+    \item Frame ownership becomes type-level and planet-specific
+    \item Mechanization becomes the primary abstraction for propagation
+    \item Compile-time compatibility errors occur near the invalid policy use
+\end{itemize}
+
+\subsection{Costs}
+
+\begin{itemize}
+    \item More template types in the navigation layer
+    \item More files and stronger naming discipline
+    \item Requires understanding C++20 concepts
+    \item Requires careful avoidance of unnecessary policy propagation upward
+\end{itemize}
+
+\section{Future Work}
+
+Future environment policy families may include:
+
+\begin{itemize}
+    \item Atmosphere policies
+    \item Magnetic field policies
+    \item Earth orientation policies
+    \item Geoid policies
+    \item Terrain policies
+    \item Higher-degree spherical harmonic gravity policies
+\end{itemize}
+
+These should follow ADR-001.
+
+\section{Decision Summary}
+
+NavKit shall treat the physical environment as a set of composable
+compile-time policies. Planet policies aggregate physical constants and frame
+types. Capability concepts describe which physical assumptions a planet
+supports. Gravity policies constrain on the weakest planet capability required
+by their equations. Mechanization policies consume planet and gravity policies
+to propagate navigation state. The Navigator remains an orchestration object
+parameterized by propagation behavior rather than by direct environment
+details.
+
+\end{document}
