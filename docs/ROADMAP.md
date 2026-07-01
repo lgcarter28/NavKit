@@ -113,7 +113,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 - [x] Define a noise-policy compatibility concept for a measurement model and measurement sample.
 - [x] Constrain `Sensor<Model, BufferSize, NoisePolicy>`.
-- [ ] Introduce `SensorPolicy` only if Navigator or another generic consumer has a real capability boundary that needs it.
+- [x] Defer `SensorPolicy` until Navigator or another generic consumer has a real capability boundary that needs it.
 - [x] Verify fixed-capacity, allocation-free behavior remains intact.
 
 ## Diagnostics
@@ -122,7 +122,9 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Preserve innovation, innovation covariance, measurement covariance, Jacobian, gain, NIS, timestamp, validity, and acceptance logging.
 - [x] Add runtime regression tests for accepted/rejected update behavior and statistics.
 
-**Exit criteria:** estimator templates are constrained at meaningful public boundaries; positive and negative concept tests run in the configured suite; stationary GNSS build, simulation, logs, and plots remain valid.
+**Exit evidence:** estimator templates are constrained at meaningful current public boundaries: state definition, injection, reset, measurement model, and sensor noise compatibility. Positive and negative concept tests are part of the configured `navkit_tests` target. Accepted and rejected measurement-statistics behavior has runtime regression coverage. `SensorPolicy` is intentionally deferred because no current generic consumer needs a dedicated sensor capability concept; Phase 3 will define the actual Navigator-facing sensor collection boundary. The stationary GNSS Debug build, tests, simulation, logs, and headless analysis were verified during the Phase 2 passes.
+
+**Status:** complete for the current estimator-boundary refactor scope. Remaining filter, sensor collection, propagation, and update concepts move to Phase 3.
 
 ---
 

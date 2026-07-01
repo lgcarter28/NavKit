@@ -32,6 +32,7 @@ This project follows
 - Constrained `KalmanFilter` on `StateDefPolicy`, injection policy, and reset policy boundaries.
 - Constrained `KalmanFilter` observation-update and measurement-statistics methods on measurement-model policy compatibility.
 - Constrained `Sensor<Model, BufferSize, NoisePolicy>` on noise-policy compatibility while preserving fixed-capacity buffering.
+- Completed the Phase 2 estimator-boundary refactor scope and explicitly deferred `SensorPolicy` until a Navigator-facing capability boundary exists.
 - Clarified ADR-003 and agent guidance around valid C++ concept-definition syntax versus constrained template-parameter syntax.
 
 ### Fixed
