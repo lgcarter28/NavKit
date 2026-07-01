@@ -118,9 +118,9 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Diagnostics
 
-- [ ] Decide whether `MeasurementStatistics` needs `StateDef` explicitly or can remain model-derived.
-- [ ] Preserve innovation, innovation covariance, measurement covariance, Jacobian, gain, NIS, timestamp, validity, and acceptance logging.
-- [ ] Add runtime regression tests for accepted/rejected update behavior and statistics.
+- [x] Decide whether `MeasurementStatistics` needs `StateDef` explicitly or can remain model-derived.
+- [x] Preserve innovation, innovation covariance, measurement covariance, Jacobian, gain, NIS, timestamp, validity, and acceptance logging.
+- [x] Add runtime regression tests for accepted/rejected update behavior and statistics.
 
 **Exit criteria:** estimator templates are constrained at meaningful public boundaries; positive and negative concept tests run in the configured suite; stationary GNSS build, simulation, logs, and plots remain valid.
 

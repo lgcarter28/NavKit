@@ -20,6 +20,7 @@ This project follows
 - Candidate-first `InjectionPolicy` and `ResetPolicy` concepts with positive and negative compile-time tests.
 - Candidate-first `MeasurementPolicy` concept with positive coverage for GNSS position, GNSS velocity, and barometer models plus negative compile-time tests.
 - Candidate-first `NoisePolicy` concept with positive and negative compile-time tests.
+- Measurement-statistics regression tests for accepted and rejected measurement updates.
 
 ### Changed
 
