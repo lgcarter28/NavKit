@@ -3,8 +3,8 @@
 
 #pragma once
 
+#include "navkit/environment/planet/PlanetPolicyBase.hpp"
 #include "navkit/frames/Frames.hpp"
-#include "navkit/planet/PlanetPolicyBase.hpp"
 
 namespace navkit::planet
 {

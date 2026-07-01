@@ -28,14 +28,15 @@ Concepts express capabilities; CRTP bases share implementation and are not manda
 - `KalmanFilter` performs measurement updates, stores optional per-model statistics, and delegates injection/reset. The default injection is INS-specific; the default covariance reset is intentionally a no-op.
 - `Navigator` processes a tuple-like sensor collection and applies an update policy. It has no propagation/mechanization policy yet.
 - INS propagation is not implemented; `ImuProcessModelPlaceholder` is only a placeholder.
-- Runtime virtual dispatch is avoided in core embedded algorithms, but it is not globally prohibited: simulation infrastructure currently uses a virtual `SensorSimulatorBase` interface.
+- Runtime virtual dispatch is avoided in embedded-facing algorithms, but it is not globally prohibited: simulation infrastructure currently uses a virtual `SensorSimulatorBase` interface.
 - Python analysis is modularized under `python/navkit_analysis`; `tools/run_analysis.py` is the entry point.
 
 ## Architecture and naming rules
 
-- Prefer compile-time polymorphism in core and performance-sensitive code. Introduce runtime polymorphism only with a concrete need, especially outside critical paths.
+- Prefer compile-time polymorphism in embedded-facing and performance-sensitive code. Introduce runtime polymorphism only with a concrete need, especially outside critical paths.
 - Keep runtime algorithms focused on orchestration; place planet, gravity, frames, and future mechanization details in the relevant policies.
-- Organize code by engineering domain (`planet`, `gravity`, `frames`, `core`, `models`, `sim`, etc.), not in a generic catch-all directory.
+- Organize code by engineering domain, not in a generic catch-all directory. The structured `core` tree owns the core estimation/navigation framework domains: `core/state`, `core/measurement`, `core/filter`, `core/sensor`, and `core/navigator`. Physical environment models live under `environment` domains such as `environment/planet` and `environment/gravity`. Cross-cutting support remains in specific top-level domains such as `common`, `containers`, `frames`, `units`, `models`, `sim`, and `io`.
+- Keep concepts, optional CRTP bases, and concrete policy implementations in the domain that owns the abstraction. For example, filter injection/reset policies belong under `core/filter`, sensor noise policies under `core/sensor`, Navigator update/propagation policies under `core/navigator`, and planet/gravity policies under `environment`.
 - Name concepts `<Domain>Policy`, optional CRTP bases `<Domain>PolicyBase`, and concrete policies descriptively. Do not append `Concept` to concept names.
 - For a context-dependent concept intended for constrained-parameter syntax, put the candidate type first, but keep the concept definition parameters themselves unconstrained. For example, define `template<typename Candidate, typename StateDef> concept InjectionPolicy = StateDefPolicy<StateDef> && ...`, then use it at public template boundaries as `template<StateDefPolicy StateDef, InjectionPolicy<StateDef> Injection>`.
 - Use constrained public template declarations when the constraint exists and improves diagnostics. Do not claim a template boundary is policy-constrained until the concept is actually implemented there.

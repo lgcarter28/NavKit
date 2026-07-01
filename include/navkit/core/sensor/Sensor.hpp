@@ -3,10 +3,10 @@
 
 #pragma once
 
-#include "navkit/core/Measurement.hpp"
-#include "navkit/core/NoisePolicy.hpp"
-#include "navkit/core/RingBuffer.hpp"
-#include "navkit/core/policies/NoisePolicies.hpp"
+#include "navkit/containers/RingBuffer.hpp"
+#include "navkit/core/measurement/Measurement.hpp"
+#include "navkit/core/sensor/noise/NoisePolicies.hpp"
+#include "navkit/core/sensor/noise/NoisePolicy.hpp"
 
 #include <cstddef>
 

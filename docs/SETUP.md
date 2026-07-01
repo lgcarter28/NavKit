@@ -550,11 +550,11 @@ Useful first breakpoints:
 ```text
 apps/navkit_sim/main.cpp
 
-include/navkit/core/Navigator.hpp
-include/navkit/core/KalmanFilter.hpp
-include/navkit/core/Sensor.hpp
+include/navkit/core/navigator/Navigator.hpp
+include/navkit/core/filter/KalmanFilter.hpp
+include/navkit/core/sensor/Sensor.hpp
 include/navkit/models/GnssPosModel.hpp
-include/navkit/core/policies/InjectionPolicies.hpp
+include/navkit/core/filter/injection/InjectionPolicies.hpp
 ```
 
 Useful call path for the first simulation:

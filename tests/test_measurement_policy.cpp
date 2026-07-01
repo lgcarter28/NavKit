@@ -1,9 +1,9 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/core/KalmanFilter.hpp"
-#include "navkit/core/MeasurementPolicy.hpp"
-#include "navkit/core/StateDefs.hpp"
+#include "navkit/core/filter/KalmanFilter.hpp"
+#include "navkit/core/measurement/MeasurementPolicy.hpp"
+#include "navkit/core/state/StateDefs.hpp"
 #include "navkit/models/BaroAltModel.hpp"
 #include "navkit/models/GnssPosModel.hpp"
 #include "navkit/models/GnssVelModel.hpp"

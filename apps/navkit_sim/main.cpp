@@ -1,13 +1,13 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/core/Config.hpp"
-#include "navkit/core/KalmanFilter.hpp"
-#include "navkit/core/Navigator.hpp"
-#include "navkit/core/Sensor.hpp"
-#include "navkit/core/StateDefs.hpp"
-#include "navkit/core/policies/NoisePolicies.hpp"
-#include "navkit/core/policies/UpdatePolicies.hpp"
+#include "navkit/common/Config.hpp"
+#include "navkit/core/filter/KalmanFilter.hpp"
+#include "navkit/core/navigator/Navigator.hpp"
+#include "navkit/core/navigator/update/UpdatePolicies.hpp"
+#include "navkit/core/sensor/Sensor.hpp"
+#include "navkit/core/sensor/noise/NoisePolicies.hpp"
+#include "navkit/core/state/StateDefs.hpp"
 #include "navkit/io/RunLogger.hpp"
 #include "navkit/models/GnssPosModel.hpp"
 #include "navkit/sim/GnssSimulator.hpp"

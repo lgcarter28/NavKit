@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "navkit/core/Segment.hpp"
-#include "navkit/core/SensorModelBase.hpp"
+#include "navkit/core/measurement/SensorModelBase.hpp"
+#include "navkit/core/state/Segment.hpp"
 
 #include <string_view>
 

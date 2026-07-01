@@ -3,5 +3,5 @@
 
 namespace navkit
 {
-void navkit_core_link_anchor() {}
+void navkit_link_anchor() {}
 } // namespace navkit

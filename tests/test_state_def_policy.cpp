@@ -1,9 +1,9 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/core/State.hpp"
-#include "navkit/core/StateDefPolicy.hpp"
-#include "navkit/core/StateDefs.hpp"
+#include "navkit/core/state/State.hpp"
+#include "navkit/core/state/StateDefPolicy.hpp"
+#include "navkit/core/state/StateDefs.hpp"
 
 #include <doctest/doctest.h>
 #include <type_traits>

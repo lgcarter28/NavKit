@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include "navkit/core/Config.hpp"
-#include "navkit/gravity/GravityPolicyBase.hpp"
-#include "navkit/planet/PlanetPolicy.hpp"
+#include "navkit/common/Config.hpp"
+#include "navkit/environment/gravity/GravityPolicyBase.hpp"
+#include "navkit/environment/planet/PlanetPolicy.hpp"
 
 #include <Eigen/Dense>
 

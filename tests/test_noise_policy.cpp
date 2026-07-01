@@ -1,11 +1,11 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/core/Measurement.hpp"
-#include "navkit/core/NoisePolicy.hpp"
-#include "navkit/core/Sensor.hpp"
-#include "navkit/core/StateDefs.hpp"
-#include "navkit/core/policies/NoisePolicies.hpp"
+#include "navkit/core/measurement/Measurement.hpp"
+#include "navkit/core/sensor/Sensor.hpp"
+#include "navkit/core/sensor/noise/NoisePolicies.hpp"
+#include "navkit/core/sensor/noise/NoisePolicy.hpp"
+#include "navkit/core/state/StateDefs.hpp"
 #include "navkit/models/GnssPosModel.hpp"
 
 #include <doctest/doctest.h>

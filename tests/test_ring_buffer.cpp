@@ -1,7 +1,7 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/core/RingBuffer.hpp"
+#include "navkit/containers/RingBuffer.hpp"
 #include "test_main.hpp"
 
 TEST_CASE("RingBuffer push/pop order")

@@ -1,12 +1,12 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
+#include "navkit/environment/gravity/GravityPolicy.hpp"
+#include "navkit/environment/gravity/J2.hpp"
+#include "navkit/environment/gravity/Spherical.hpp"
+#include "navkit/environment/planet/PlanetPolicy.hpp"
+#include "navkit/environment/planet/Wgs84.hpp"
 #include "navkit/frames/Frames.hpp"
-#include "navkit/gravity/GravityPolicy.hpp"
-#include "navkit/gravity/J2.hpp"
-#include "navkit/gravity/Spherical.hpp"
-#include "navkit/planet/PlanetPolicy.hpp"
-#include "navkit/planet/Wgs84.hpp"
 
 #include <Eigen/Dense>
 #include <doctest/doctest.h>

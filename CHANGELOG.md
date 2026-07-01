@@ -36,6 +36,7 @@ This project follows
 - Completed the Phase 2 estimator-boundary refactor scope and explicitly deferred `SensorPolicy` until a Navigator-facing capability boundary exists.
 - Constrained `Navigator` on current filter, sensor-collection, and update-policy capabilities.
 - Clarified ADR-003 and agent guidance around valid C++ concept-definition syntax versus constrained template-parameter syntax.
+- Reorganized public headers from the generic flat `core` bucket into structured `core` and `environment` domain folders, and renamed the internal CMake target alias from `navkit::core` to `navkit::navkit`.
 
 ### Fixed
 

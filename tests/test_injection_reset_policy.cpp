@@ -1,10 +1,10 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/core/InjectionPolicy.hpp"
-#include "navkit/core/KalmanFilter.hpp"
-#include "navkit/core/ResetPolicy.hpp"
-#include "navkit/core/StateDefs.hpp"
+#include "navkit/core/filter/KalmanFilter.hpp"
+#include "navkit/core/filter/injection/InjectionPolicy.hpp"
+#include "navkit/core/filter/reset/ResetPolicy.hpp"
+#include "navkit/core/state/StateDefs.hpp"
 
 #include <doctest/doctest.h>
 #include <type_traits>

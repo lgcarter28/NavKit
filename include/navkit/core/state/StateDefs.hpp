@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include "navkit/core/Config.hpp"
-#include "navkit/core/Segment.hpp"
-#include "navkit/core/StateDefPolicy.hpp"
+#include "navkit/common/Config.hpp"
+#include "navkit/core/state/Segment.hpp"
+#include "navkit/core/state/StateDefPolicy.hpp"
 
 namespace navkit
 {

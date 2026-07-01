@@ -3,11 +3,11 @@
 
 #pragma once
 
-#include "navkit/core/FilterPolicy.hpp"
-#include "navkit/core/KalmanFilter.hpp"
-#include "navkit/core/SensorCollectionPolicy.hpp"
-#include "navkit/core/UpdatePolicy.hpp"
-#include "navkit/core/policies/UpdatePolicies.hpp"
+#include "navkit/core/filter/FilterPolicy.hpp"
+#include "navkit/core/filter/KalmanFilter.hpp"
+#include "navkit/core/navigator/SensorCollectionPolicy.hpp"
+#include "navkit/core/navigator/update/UpdatePolicies.hpp"
+#include "navkit/core/navigator/update/UpdatePolicy.hpp"
 
 #include <cstddef>
 #include <tuple>

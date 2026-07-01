@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "navkit/core/State.hpp"
+#include "navkit/core/state/State.hpp"
 
 #include <concepts>
 

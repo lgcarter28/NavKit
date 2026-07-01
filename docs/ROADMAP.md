@@ -17,9 +17,10 @@ The roadmap separates near-term, dependency-ordered engineering from longer-term
 
 These decisions record conflicts and stale assumptions resolved during roadmap consolidation:
 
-- The task to move WGS-84 constants into `Earth.hpp` is superseded. The implemented direction is the generic `planet::Wgs84` policy under `include/navkit/planet`, consistent with ADR-002.
+- The task to move WGS-84 constants into `Earth.hpp` is superseded. The implemented direction is the generic `planet::Wgs84` policy under `include/navkit/environment/planet`, consistent with ADR-002.
 - Environment-policy Pass 1 is substantially implemented: planet/gravity concepts, CRTP bases, frame tags, WGS-84, Moon, Mars, spherical gravity, J2 gravity, and environment tests exist.
 - The estimator policy refactor is partially complete. `StateDefPolicy`, `InjectionPolicy`, `ResetPolicy`, `MeasurementPolicy`, `NoisePolicy`, `FilterPolicy`, `SensorCollectionPolicy`, and `UpdatePolicy` exist. `KalmanFilter` is constrained on state, injection, reset, and measurement-model boundaries; `Sensor` is constrained on noise-policy compatibility; and `Navigator` is constrained on current filter, sensor-collection, and update-policy boundaries. Propagation remains future work.
+- Public headers are organized by engineering domain. The structured `core` tree contains the core estimation/navigation framework domains (`state`, `measurement`, `filter`, `sensor`, and `navigator`), while physical environment models live under `environment` (`planet`, `gravity`, and future atmosphere/magnetic/geoid/terrain domains). Cross-cutting and support domains such as `common`, `containers`, `frames`, `units`, `models`, `sim`, and `io` remain top-level.
 - `GnssPosModel`, `GnssVelModel`, and `BaroAltModel` exist, but only GNSS position is integrated into the current simulation. The barometer model currently selects the third position component; it is not yet a general ECEF-to-local-vertical altitude model.
 - The current trajectory generator supports only a simplistic stationary ECEF trajectory. It sets body rate to zero and therefore does not model Earth rotation correctly for stationary IMU truth.
 - `ImuSimulator` and `BaroSimulator` are empty shells, and the IMU process model is a placeholder.
@@ -33,6 +34,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Python wrappers support build, test, stationary simulation, analysis, formatting, and copyright checks.
 - [x] Fixed-capacity `RingBuffer`, fixed-size state/covariance aliases, and named state segments exist.
 - [x] Generic measurement update, Joseph-form covariance update, injection/reset hooks, sensor queues, Navigator orchestration, and measurement statistics exist.
+- [x] Public headers use structured domain-first organization with no flat `include/navkit/core` catch-all.
 - [x] Stationary GNSS-position simulation writes truth, measurement, navigation, metadata, manifest, and update-statistics logs.
 - [x] Offline plotting is separated from the embedded C++ library.
 - [x] Planet, gravity, frame, and basic unit/frame infrastructure exists.

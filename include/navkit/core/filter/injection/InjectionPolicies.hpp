@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "navkit/core/Segment.hpp"
+#include "navkit/core/state/Segment.hpp"
 
 namespace navkit
 {

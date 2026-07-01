@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "navkit/core/Config.hpp"
-#include "navkit/core/StateDefPolicy.hpp"
+#include "navkit/common/Config.hpp"
+#include "navkit/core/state/StateDefPolicy.hpp"
 
 #include <Eigen/Dense>
 

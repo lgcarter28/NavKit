@@ -3,13 +3,13 @@
 
 #pragma once
 
-#include "navkit/core/InjectionPolicy.hpp"
-#include "navkit/core/MeasurementPolicy.hpp"
-#include "navkit/core/MeasurementStatistics.hpp"
-#include "navkit/core/ResetPolicy.hpp"
-#include "navkit/core/State.hpp"
-#include "navkit/core/policies/InjectionPolicies.hpp"
-#include "navkit/core/policies/ResetPolicies.hpp"
+#include "navkit/core/filter/MeasurementStatistics.hpp"
+#include "navkit/core/filter/injection/InjectionPolicies.hpp"
+#include "navkit/core/filter/injection/InjectionPolicy.hpp"
+#include "navkit/core/filter/reset/ResetPolicies.hpp"
+#include "navkit/core/filter/reset/ResetPolicy.hpp"
+#include "navkit/core/measurement/MeasurementPolicy.hpp"
+#include "navkit/core/state/State.hpp"
 
 #include <Eigen/Dense>
 #include <tuple>

@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "navkit/core/Config.hpp"
+#include "navkit/common/Config.hpp"
 
 #include <cmath>
 

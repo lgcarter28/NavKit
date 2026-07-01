@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "navkit/core/Measurement.hpp"
+#include "navkit/core/measurement/Measurement.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
 #include <random>

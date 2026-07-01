@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "navkit/core/SensorModelBase.hpp"
+#include "navkit/core/measurement/SensorModelBase.hpp"
 
 #include <string_view>
 

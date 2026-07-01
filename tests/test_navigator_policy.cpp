@@ -1,12 +1,12 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/core/FilterPolicy.hpp"
-#include "navkit/core/Navigator.hpp"
-#include "navkit/core/Sensor.hpp"
-#include "navkit/core/SensorCollectionPolicy.hpp"
-#include "navkit/core/StateDefs.hpp"
-#include "navkit/core/UpdatePolicy.hpp"
+#include "navkit/core/filter/FilterPolicy.hpp"
+#include "navkit/core/navigator/Navigator.hpp"
+#include "navkit/core/navigator/SensorCollectionPolicy.hpp"
+#include "navkit/core/navigator/update/UpdatePolicy.hpp"
+#include "navkit/core/sensor/Sensor.hpp"
+#include "navkit/core/state/StateDefs.hpp"
 #include "navkit/models/GnssPosModel.hpp"
 #include "test_main.hpp"
 
