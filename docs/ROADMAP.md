@@ -19,7 +19,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 - The task to move WGS-84 constants into `Earth.hpp` is superseded. The implemented direction is the generic `planet::Wgs84` policy under `include/navkit/planet`, consistent with ADR-002.
 - Environment-policy Pass 1 is substantially implemented: planet/gravity concepts, CRTP bases, frame tags, WGS-84, Moon, Mars, spherical gravity, J2 gravity, and environment tests exist.
-- The estimator policy refactor is only partially complete. `StateDefPolicy`, `InjectionPolicy`, and `ResetPolicy` exist, and `KalmanFilter` is constrained on those boundaries. Measurement, noise, filter, propagation, sensor-collection, and update concepts remain future work.
+- The estimator policy refactor is only partially complete. `StateDefPolicy`, `InjectionPolicy`, `ResetPolicy`, and `MeasurementPolicy` exist, and `KalmanFilter` is constrained on those boundaries. Noise, filter, propagation, sensor-collection, and update concepts remain future work.
 - `GnssPosModel`, `GnssVelModel`, and `BaroAltModel` exist, but only GNSS position is integrated into the current simulation. The barometer model currently selects the third position component; it is not yet a general ECEF-to-local-vertical altitude model.
 - The current trajectory generator supports only a simplistic stationary ECEF trajectory. It sets body rate to zero and therefore does not model Earth rotation correctly for stationary IMU truth.
 - `ImuSimulator` and `BaroSimulator` are empty shells, and the IMU process model is a placeholder.
@@ -103,11 +103,11 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Measurement models
 
-- [ ] Define `MeasurementPolicy<Candidate, StateDef>` around dimension, fixed-size matrix types, noise context, observation, Jacobian, and covariance operations.
-- [ ] Decide whether `SensorModelBase` provides enough shared implementation to justify retaining the CRTP base.
-- [ ] Constrain `KalmanFilter::observation_update` and measurement-statistics storage at the public policy boundary.
-- [ ] Verify GNSS position, GNSS velocity, and barometer model conformance.
-- [ ] Add negative compile-time tests for missing types and operations.
+- [x] Define `MeasurementPolicy<Candidate, StateDef>` around dimension, fixed-size matrix types, noise context, observation, Jacobian, covariance, and Kalman-gain operations.
+- [x] Decide whether `SensorModelBase` provides enough shared implementation to justify retaining the CRTP base.
+- [x] Constrain `KalmanFilter::observation_update` and measurement-statistics storage at the public policy boundary.
+- [x] Verify GNSS position, GNSS velocity, and barometer model conformance.
+- [x] Add negative compile-time tests for missing types and operations.
 
 ## Sensors and noise
 

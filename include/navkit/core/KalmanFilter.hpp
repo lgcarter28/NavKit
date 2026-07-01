@@ -4,6 +4,7 @@
 #pragma once
 
 #include "navkit/core/InjectionPolicy.hpp"
+#include "navkit/core/MeasurementPolicy.hpp"
 #include "navkit/core/MeasurementStatistics.hpp"
 #include "navkit/core/ResetPolicy.hpp"
 #include "navkit/core/State.hpp"
@@ -82,7 +83,7 @@ public:
         m_P = P;
     }
 
-    template<typename Model>
+    template<MeasurementPolicy<StateDef> Model>
     [[nodiscard]] bool has_measurement_statistics() const
     {
         if constexpr (tuple_contains_v<Model, MeasurementModels_t>) {
@@ -93,7 +94,7 @@ public:
         }
     }
 
-    template<typename Model>
+    template<MeasurementPolicy<StateDef> Model>
     MeasurementStatistics<Model>& measurement_statistics()
     {
         static_assert(tuple_contains_v<Model, MeasurementModels_t>,
@@ -101,7 +102,7 @@ public:
         return std::get<tuple_index_v<Model, MeasurementModels_t>>(m_measurement_stats);
     }
 
-    template<typename Model>
+    template<MeasurementPolicy<StateDef> Model>
     [[nodiscard]] const MeasurementStatistics<Model>& measurement_statistics() const
     {
         static_assert(tuple_contains_v<Model, MeasurementModels_t>,
@@ -109,7 +110,7 @@ public:
         return std::get<tuple_index_v<Model, MeasurementModels_t>>(m_measurement_stats);
     }
 
-    template<typename Model>
+    template<MeasurementPolicy<StateDef> Model>
     void covariance_update(const P_t& P_i,
                            const typename Model::H_t& H,
                            const typename Model::R_t& R,
@@ -126,7 +127,7 @@ public:
         P_f = IKH * P_i * IKH.transpose() + K * R * K.transpose();
     }
 
-    template<typename Model>
+    template<MeasurementPolicy<StateDef> Model>
     void observation_update(const typename Model::O_t& z,
                             Time_t time,
                             const typename Model::NoiseContext& ctx,
@@ -152,13 +153,14 @@ public:
         }
     }
 
-    template<typename Model>
+    template<MeasurementPolicy<StateDef> Model>
     void observation_update(const typename Model::O_t& z, const typename Model::NoiseContext& ctx)
     {
         observation_update<Model>(z, 0.0, ctx, true);
     }
 
     template<typename Sensor>
+        requires MeasurementPolicy<typename Sensor::Model_t, StateDef>
     void process_sensor(Sensor& sensor)
     {
         using Model = typename Sensor::Model_t;
@@ -184,7 +186,7 @@ public:
     }
 
 private:
-    template<typename Model>
+    template<MeasurementPolicy<StateDef> Model>
     void record_measurement_statistics(const Time_t time,
                                        const bool accepted,
                                        const typename Model::O_t& innovation,

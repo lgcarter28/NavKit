@@ -24,7 +24,7 @@ Concepts express capabilities; CRTP bases share implementation and are not manda
 - The project requires **C++23** (`CMAKE_CXX_STANDARD 23`). Keep public code and supported toolchains compatible with that configured standard.
 - Environment policies are the most complete realization of the target architecture: planet and gravity concepts, CRTP bases, concrete WGS84/Moon/Mars and spherical/J2 implementations, plus frame tags.
 - `StateDefPolicy` and `SegmentPolicy` exist. `State<StateDef>` and `StateCov<StateDef>` are fixed-size Eigen aliases, and `InsStateDef`/`GnssTcStateDef` provide named segments.
-- The estimator refactor is only partial. `InjectionPolicy` and `ResetPolicy` exist, and `KalmanFilter` is constrained on `StateDefPolicy`, injection, and reset policies. `Sensor`, `Navigator`, measurement models, noise policies, filter boundaries, sensor collections, propagation, and update policies still need concept coverage.
+- The estimator refactor is only partial. `InjectionPolicy`, `ResetPolicy`, and `MeasurementPolicy` exist, and `KalmanFilter` is constrained on `StateDefPolicy`, injection, reset, and measurement-model boundaries. `Sensor`, `Navigator`, noise policies, filter boundaries, sensor collections, propagation, and update policies still need concept coverage.
 - `KalmanFilter` performs measurement updates, stores optional per-model statistics, and delegates injection/reset. The default injection is INS-specific; the default covariance reset is intentionally a no-op.
 - `Navigator` processes a tuple of sensors and applies an update policy. It has no propagation/mechanization policy yet.
 - INS propagation is not implemented; `ImuProcessModelPlaceholder` is only a placeholder.

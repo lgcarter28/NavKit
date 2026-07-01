@@ -332,19 +332,36 @@ Example:
 template<typename T, typename StateDef>
 concept MeasurementPolicy =
     StateDefPolicy<StateDef> &&
-    requires(State<StateDef>& x, typename T::NoiseContext& ctx)
+    requires(const State<StateDef>& x, const typename T::NoiseContext& ctx)
 {
     T::M;
     typename T::O_t;
     typename T::R_t;
     typename T::H_t;
+    typename T::K_t;
     typename T::NoiseContext;
 
-    T::obs(x);
-    T::compute_h(x);
-    T::compute_r(ctx);
+    { T::obs(x) } -> std::same_as<typename T::O_t>;
+    { T::compute_h(x) } -> std::same_as<typename T::H_t>;
+    { T::compute_r(ctx) } -> std::same_as<typename T::R_t>;
+} &&
+requires
+{
+    requires T::M > 0;
+    requires T::O_t::RowsAtCompileTime == T::M;
+    requires T::O_t::ColsAtCompileTime == 1;
+    requires T::R_t::RowsAtCompileTime == T::M;
+    requires T::R_t::ColsAtCompileTime == T::M;
+    requires T::H_t::RowsAtCompileTime == T::M;
+    requires T::H_t::ColsAtCompileTime == StateDef::N;
+    requires T::K_t::RowsAtCompileTime == StateDef::N;
+    requires T::K_t::ColsAtCompileTime == T::M;
 };
 \end{lstlisting}
+
+\texttt{K\_t} is included in the measurement-model boundary because the current
+\texttt{KalmanFilter} records and exposes Kalman-gain statistics alongside
+innovation, covariance, and Jacobian diagnostics.
 
 This enables declarations such as:
 

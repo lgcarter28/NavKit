@@ -18,6 +18,7 @@ This project follows
 - Repository-wide agent guidance and documentation indexes.
 - Cross-platform environment bootstrap tooling and Linux/Windows GitHub Actions CI.
 - Candidate-first `InjectionPolicy` and `ResetPolicy` concepts with positive and negative compile-time tests.
+- Candidate-first `MeasurementPolicy` concept with positive coverage for GNSS position, GNSS velocity, and barometer models plus negative compile-time tests.
 
 ### Changed
 
@@ -27,6 +28,7 @@ This project follows
 - Ordered source mutation/checks before build and test verification.
 - Consolidated superseded TODO lists and early core design notes into the canonical roadmap before removing them.
 - Constrained `KalmanFilter` on `StateDefPolicy`, injection policy, and reset policy boundaries.
+- Constrained `KalmanFilter` observation-update and measurement-statistics methods on measurement-model policy compatibility.
 - Clarified ADR-003 and agent guidance around valid C++ concept-definition syntax versus constrained template-parameter syntax.
 
 ### Fixed
