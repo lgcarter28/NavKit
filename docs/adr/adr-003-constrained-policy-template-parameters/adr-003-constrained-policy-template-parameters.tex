@@ -374,20 +374,31 @@ void observation_update(...);
 
 \section{Sensor and Noise Policies}
 
-Sensor and noise policies may also depend on measurement and state definition
-policies.
+Sensor noise policies operate at a narrower boundary than full measurement
+models. A \texttt{Sensor} needs a model-provided noise context and a concrete
+measurement sample type; it does not know the state definition. Full
+state/model compatibility remains checked where a filter consumes a sensor.
 
 For example:
 
 \begin{lstlisting}[language=C++]
-template<typename T, typename Measurement, typename StateDef>
+template<typename T, typename Model, typename MeasurementSample>
 concept NoisePolicy =
-    StateDefPolicy<StateDef> &&
-    MeasurementPolicy<Measurement, StateDef> &&
-    requires(...)
+    requires(typename Model::NoiseContext& ctx,
+             const MeasurementSample& meas)
 {
-    T::compute_r(...);
+    { T::update(ctx, meas) } -> std::same_as<void>;
 };
+\end{lstlisting}
+
+This enables declarations such as:
+
+\begin{lstlisting}[language=C++]
+template<
+    typename Model,
+    std::size_t BufferSize,
+    NoisePolicy<Model, Measurement<Model::M>> Noise>
+class Sensor;
 \end{lstlisting}
 
 Where the constrained-parameter syntax becomes unclear, NavKit may use a

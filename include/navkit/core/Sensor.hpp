@@ -4,6 +4,7 @@
 #pragma once
 
 #include "navkit/core/Measurement.hpp"
+#include "navkit/core/NoisePolicy.hpp"
 #include "navkit/core/RingBuffer.hpp"
 #include "navkit/core/policies/NoisePolicies.hpp"
 
@@ -12,7 +13,9 @@
 namespace navkit
 {
 
-template<typename Model, std::size_t BufferSize, typename NoisePolicy = DefaultNoisePolicy>
+template<typename Model,
+         std::size_t BufferSize,
+         NoisePolicy<Model, Measurement<Model::M>> Noise = DefaultNoisePolicy>
 class Sensor
 {
 public:
@@ -50,7 +53,7 @@ public:
 
     void update_noise_context(const Measurement_t& meas)
     {
-        NoisePolicy::update(m_noise_ctx, meas);
+        Noise::update(m_noise_ctx, meas);
     }
 
 private:

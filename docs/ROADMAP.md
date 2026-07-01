@@ -19,7 +19,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 - The task to move WGS-84 constants into `Earth.hpp` is superseded. The implemented direction is the generic `planet::Wgs84` policy under `include/navkit/planet`, consistent with ADR-002.
 - Environment-policy Pass 1 is substantially implemented: planet/gravity concepts, CRTP bases, frame tags, WGS-84, Moon, Mars, spherical gravity, J2 gravity, and environment tests exist.
-- The estimator policy refactor is only partially complete. `StateDefPolicy`, `InjectionPolicy`, `ResetPolicy`, and `MeasurementPolicy` exist, and `KalmanFilter` is constrained on those boundaries. Noise, filter, propagation, sensor-collection, and update concepts remain future work.
+- The estimator policy refactor is only partially complete. `StateDefPolicy`, `InjectionPolicy`, `ResetPolicy`, `MeasurementPolicy`, and `NoisePolicy` exist. `KalmanFilter` is constrained on state, injection, reset, and measurement-model boundaries, and `Sensor` is constrained on noise-policy compatibility. Filter, propagation, sensor-collection, and update concepts remain future work.
 - `GnssPosModel`, `GnssVelModel`, and `BaroAltModel` exist, but only GNSS position is integrated into the current simulation. The barometer model currently selects the third position component; it is not yet a general ECEF-to-local-vertical altitude model.
 - The current trajectory generator supports only a simplistic stationary ECEF trajectory. It sets body rate to zero and therefore does not model Earth rotation correctly for stationary IMU truth.
 - `ImuSimulator` and `BaroSimulator` are empty shells, and the IMU process model is a placeholder.
@@ -111,10 +111,10 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Sensors and noise
 
-- [ ] Define a noise-policy compatibility concept for a measurement model and measurement sample.
-- [ ] Constrain `Sensor<Model, BufferSize, NoisePolicy>`.
+- [x] Define a noise-policy compatibility concept for a measurement model and measurement sample.
+- [x] Constrain `Sensor<Model, BufferSize, NoisePolicy>`.
 - [ ] Introduce `SensorPolicy` only if Navigator or another generic consumer has a real capability boundary that needs it.
-- [ ] Verify fixed-capacity, allocation-free behavior remains intact.
+- [x] Verify fixed-capacity, allocation-free behavior remains intact.
 
 ## Diagnostics
 
