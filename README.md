@@ -56,6 +56,7 @@ Target data flow adds multi-rate sensor simulation, mechanization/prediction, an
 include/navkit/core/  Reusable product-core public headers
 include/navkit/sim/   Simulation support public headers
 include/navkit/io/    Desktop logging/file/JSON public headers
+config/               Compile-time configurations and runtime input bundles
 cmake/targets/        Header-only/interface CMake target definitions
 src/sim/              Compiled simulator implementation
 apps/                 Simulation and replay applications
@@ -76,6 +77,7 @@ through `navkit::io`.
 | CMake target | Namespace | Role |
 |---|---|---|
 | `navkit::core` | `navkit::core` | Reusable product-core common API and foundational types |
+| `navkit::core` | `navkit::core::config` | Shared product-core compile-time configuration vocabulary |
 | `navkit::core` | `navkit::core::containers` | Product-core containers |
 | `navkit::core` | `navkit::core::estimation` | State definitions, measurements, filters, sensors, navigators, and estimator policies |
 | `navkit::core` | `navkit::core::environment` | Planet and gravity policies |
@@ -89,6 +91,15 @@ Public namespaces mirror the folder structure through the stable domain level.
 Deeper leaf folders may organize implementation and policy families without
 adding additional namespaces unless that subdomain becomes independently
 meaningful.
+
+Configuration concepts follow the domain that consumes them. Shared scalar/time
+configuration vocabulary lives in `navkit::core::config`; estimator-specific
+configuration concepts, such as sensor buffer capacity and measurement
+statistics availability, live with the estimation domain.
+
+Concrete compile-time configurations live under `config/compiletime` and are
+selected per build tree with `NAVKIT_CONFIG`; runtime scenario inputs live under
+`config/runtime`.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for target-boundary,
 namespace, and source-layout rationale.
@@ -135,6 +146,7 @@ python tools/run_analysis.py data/logs/stationary_gnss_demo --show
 
 - [Documentation index](docs/README.md)
 - [Current architecture](docs/ARCHITECTURE.md)
+- [Configuration model](docs/CONFIGURATION.md)
 - [Development setup and workflow](docs/SETUP.md)
 - [Master roadmap and current-state handoff](docs/ROADMAP.md)
 - [Naming conventions](docs/NAMING_CONVENTIONS.md)

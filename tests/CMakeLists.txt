@@ -5,6 +5,7 @@ find_package(doctest REQUIRED CONFIG)
 
 add_executable(navkit_tests
     test_main.cpp
+    test_config_policy.cpp
     test_injection_reset_policy.cpp
     test_measurement_policy.cpp
     test_measurement_statistics.cpp
@@ -20,5 +21,10 @@ add_executable(navkit_tests
 )
 
 target_link_libraries(navkit_tests PRIVATE navkit::core navkit::sim doctest::doctest)
+target_include_directories(navkit_tests
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/config/compiletime
+        ${NAVKIT_GENERATED_INCLUDE_DIR}
+)
 
 add_test(NAME navkit_tests COMMAND navkit_tests)

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/core/common/Config.hpp"
+#include "navkit/SelectedConfig.hpp"
 #include "navkit/core/estimation/filter/KalmanFilter.hpp"
 #include "navkit/core/estimation/navigator/Navigator.hpp"
 #include "navkit/core/estimation/navigator/update/UpdatePolicies.hpp"
@@ -41,9 +41,9 @@ Vec3 vec3_from_json(const json& j)
 int main(int argc, char** argv)
 {
     try {
-        const fs::path config_path = (argc > 1)
-                                         ? fs::path(argv[1])
-                                         : fs::path("apps/navkit_sim/configs/stationary_gnss.json");
+        const fs::path config_path =
+            (argc > 1) ? fs::path(argv[1])
+                       : fs::path("config/runtime/navkit_sim/stationary_gnss.json");
         std::ifstream cfg_stream(config_path);
         if (!cfg_stream) {
             std::cerr << "Failed to open config: " << config_path << '\n';
@@ -72,9 +72,10 @@ int main(int argc, char** argv)
 
         using StateDef = navkit::core::estimation::InsStateDef;
         using GnssModel = navkit::core::models::GnssPosModel<StateDef>;
+        using AppConfig = navkit::selected_config::Config;
         using GnssSensor =
             navkit::core::estimation::Sensor<GnssModel,
-                                             navkit::core::Config::GNSS_BUFF_SIZE,
+                                             AppConfig::GnssBuffer::BufferSize,
                                              navkit::core::estimation::GnssFixedNoisePolicy>;
         using Sensors = std::tuple<GnssSensor>;
         using MeasurementModels = std::tuple<GnssModel>;

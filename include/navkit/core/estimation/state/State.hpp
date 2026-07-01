@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "navkit/core/common/Config.hpp"
+#include "navkit/core/config/Types.hpp"
 #include "navkit/core/estimation/state/StateDefPolicy.hpp"
 
 #include <Eigen/Dense>

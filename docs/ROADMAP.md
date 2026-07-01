@@ -21,10 +21,10 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - The task to move WGS-84 constants into `Earth.hpp` is superseded. The implemented direction is the generic `navkit::core::environment::Wgs84` policy under `include/navkit/core/environment/planet`, consistent with ADR-002.
 - Environment-policy Pass 1 is substantially implemented: planet/gravity concepts, CRTP bases, frame tags, WGS-84, Moon, Mars, spherical gravity, J2 gravity, and environment tests exist.
 - The estimator policy refactor is partially complete. `StateDefPolicy`, `InjectionPolicy`, `ResetPolicy`, `MeasurementPolicy`, `NoisePolicy`, `FilterPolicy`, `SensorCollectionPolicy`, and `UpdatePolicy` exist. `KalmanFilter` is constrained on state, injection, reset, and measurement-model boundaries; `Sensor` is constrained on noise-policy compatibility; and `Navigator` is constrained on current filter, sensor-collection, and update-policy boundaries. Propagation remains future work.
-- Public headers are organized by product boundary first, then engineering domain. `include/navkit/core` is the reusable product core, with estimation/navigation domains under `core/estimation`, environment models under `core/environment`, and reusable support domains such as `common`, `containers`, `frames`, `units`, and `models` also under `core`. Desktop simulation support remains under `include/navkit/sim`; desktop logging/file/JSON support remains under `include/navkit/io`.
+- Public headers are organized by product boundary first, then engineering domain. `include/navkit/core` is the reusable product core, with estimation/navigation domains under `core/estimation`, environment models under `core/environment`, and reusable support domains such as `config`, `containers`, `frames`, `units`, and `models` also under `core`. Desktop simulation support remains under `include/navkit/sim`; desktop logging/file/JSON support remains under `include/navkit/io`.
 - CMake targets now separate product boundaries: `navkit_core`/`navkit::core` is the reusable product-core interface library, `navkit_sim`/`navkit::sim` is the compiled simulator support library, `navkit_io`/`navkit::io` is the desktop logging/file/JSON interface library, and runnable executables remain applications under `apps/`.
-- `core/common` currently contains foundational aliases and configuration constants, but the configuration story is not yet a clear swappable compile-time configuration architecture.
-- Runtime scenario files for applications should be treated as app inputs, not core configuration. The current `navkit_sim` JSON files should move toward an explicit input-bundle layout such as `inputs/navkit_sim/...` so product-core compile-time configuration cannot be confused with executable run inputs.
+- `core/config` contains shared product-core compile-time configuration vocabulary such as foundational scalar/time aliases and `NumericConfigPolicy`. Domain-specific configuration concepts live beside the domains that consume them, following the general pattern `include/navkit/<product-or-domain>/.../*ConfigPolicy.hpp`; estimator buffer and measurement-statistics configuration concepts are the first concrete examples.
+- Runtime scenario files for applications are treated as app inputs, not core configuration. Repository-provided configuration now lives under the root `config/` tree: `config/compiletime/...` for C++ compile-time configurations and `config/runtime/...` for JSON or other runtime inputs.
 - Debug and Release build flags are not yet treated as explicit engineering products. Release optimization settings, strict Debug diagnostics, and static-analysis expectations should be made deliberate before performance trends become meaningful.
 - `GnssPosModel`, `GnssVelModel`, and `BaroAltModel` exist, but only GNSS position is integrated into the current simulation. The barometer model currently selects the third position component; it is not yet a general ECEF-to-local-vertical altitude model.
 - The current trajectory generator supports only a simplistic stationary ECEF trajectory. It sets body rate to zero and therefore does not model Earth rotation correctly for stationary IMU truth.
@@ -144,13 +144,59 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Compile-time configuration architecture
 
-- [ ] Audit `include/navkit/core/common` and decide what belongs in foundational common types versus named configuration policies.
-- [ ] Replace ambiguous global-style constants with clear, swappable compile-time configuration types where that improves extension boundaries.
-- [ ] Define the first configuration-policy vocabulary for estimator, sensor-buffer, numeric-scalar, and logging/statistics choices.
-- [ ] Decide which configuration values are product-core compile-time policies, which are simulator/app runtime settings, and which belong in analysis only.
-- [ ] Rename or relocate `navkit_sim` runtime JSON files into an explicit app-input location such as `inputs/navkit_sim/...`, separate from product-core configuration.
-- [ ] Document configuration layering with examples that show how an embedded target, desktop simulation, and test fixture select different configurations.
-- [ ] Add compile-time tests that valid configurations satisfy the intended concepts and intentionally invalid configurations fail those concepts.
+### Pass 3.1a — Initial core configuration vocabulary
+
+- [x] Rename `include/navkit/core/common` to the explicit `include/navkit/core/config` product-core configuration domain.
+- [x] Introduce foundational scalar/time aliases separately from named configuration policies.
+- [x] Define the first narrow configuration concepts and a temporary `DefaultConfig` composition bundle for scalar/time aliases, sensor-buffer capacities, and measurement-statistics availability.
+- [x] Relocate `navkit_sim` runtime JSON files into an explicit app-input location, separate from product-core configuration.
+- [x] Add compile-time tests that valid configuration slices satisfy the intended concepts and intentionally invalid slices fail those concepts.
+
+### Pass 3.1b — Configuration ownership cleanup
+
+- [x] Keep `include/navkit/core/config` focused on configuration vocabulary shared broadly by product-core code, such as scalar/time types and any future truly cross-cutting core options.
+- [x] Move domain-specific configuration concepts beside the domains that consume them once the domain boundary is clear, following the general pattern `include/navkit/<product-or-domain>/.../*ConfigPolicy.hpp`; current examples include sensor buffer configuration near `core/estimation/sensor` and measurement-statistics configuration near `core/estimation/filter`.
+- [x] Remove or demote library-owned concrete `DefaultConfig` as the universal product configuration once repository-provided app/product configurations exist outside public NavKit headers.
+- [x] Document that concept policies distributed in domain folders define required capabilities, while concrete compile-time configurations are selected by applications or product builds.
+
+### Pass 3.1c — Configuration guide and example-contract documentation
+
+- [x] Add `docs/CONFIGURATION.md` as the human-facing map for the concept/policy configuration architecture.
+- [x] Explain the core mental model: domain config concepts define local requirements; concrete compile-time configs compose named slices; static assertions document the wiring; CMake selects one config per build tree; runtime inputs remain separate.
+- [x] Document the generic domain-specific policy location pattern, such as `include/navkit/<product-or-domain>/.../*ConfigPolicy.hpp`, rather than implying config concepts only live under estimation.
+- [x] Document that built-in concrete examples are the user-facing teaching surface, not a universal base class or internal default product configuration.
+- [x] Describe `MinimalConfig` as a deliberately small example that shows required composition shape without implying it is a production target.
+- [x] Require concrete compile-time config headers to include local `static_assert` checks for every concept slice they claim to satisfy.
+- [x] Point readers to `tests/test_config_policy.cpp` for rigorous positive and negative examples, including invalid cases expressed as `static_assert(!Concept<Bad>)`.
+- [x] Link `docs/CONFIGURATION.md` from `README.md`, `docs/SETUP.md`, `docs/ARCHITECTURE.md`, `docs/README.md`, and `AGENTS.md`.
+
+### Pass 3.1d — Root configuration tree
+
+- [x] Create a root `config/` tree as the obvious place for repository-provided selectable configuration.
+- [x] Add `config/compiletime/...` for C++ compile-time configuration headers that define complete app/product build configurations.
+- [x] Add `config/runtime/...` for JSON or other runtime inputs consumed by desktop applications, simulators, and demos.
+- [x] Move `navkit_sim` runtime JSON files to `config/runtime/navkit_sim/...` and update tools, apps, docs, and tests.
+- [x] Add at least one plug-and-play compile-time configuration for `navkit_sim`, such as `config/compiletime/navkit_sim/StationaryGnss.hpp`, so a fresh clone can build and run without user-authored configuration.
+- [x] Add README files or examples that show where new desktop, embedded-target, simulation, and test-fixture configurations should live.
+
+### Pass 3.1e — CMake selected-config path
+
+- [x] Add a CMake cache variable named `NAVKIT_CONFIG` for selecting exactly one compile-time configuration header per build tree.
+- [x] Provide a good default `-DNAVKIT_CONFIG` value, for example `navkit_sim/StationaryGnss.hpp` relative to `config/compiletime`, so ordinary clone/build/test workflows work without extra flags.
+- [x] Keep `NAVKIT_CONFIG` orthogonal to `CMAKE_BUILD_TYPE`; Debug/Release chooses compiler mode, while `NAVKIT_CONFIG` chooses the product/app configuration.
+- [x] Generate a build-local selected-config header, for example `build/generated/navkit/SelectedConfig.hpp`, from a CMake template so generic applications can include one stable header.
+- [x] Expose the selected compile-time configuration through a stable alias such as `navkit::selected_config::Config` or an equivalent clearly documented name.
+- [x] Ensure selected-config include paths are applied to app or product targets that need them, not forced into `navkit::core` as a dependency on repository app configuration.
+- [x] Update `navkit_sim` to remain config-agnostic in source and consume only the generated selected-config alias.
+
+### Pass 3.1f — Multiple configurations and developer UX
+
+- [x] Document the primary rule: one build tree selects one `NAVKIT_CONFIG`.
+- [x] Support multiple configurations by using multiple build directories or CMake presets, not by making one executable dynamically switch among compile-time configurations.
+- [x] Add CMake presets or documented wrapper examples that pair common build types and selected configs for convenience while keeping those axes independent.
+- [x] Add a `tools/build.py` option such as `--navkit-config navkit_sim/StationaryGnss.hpp` that forwards to `-DNAVKIT_CONFIG=...`.
+- [x] Document how to add a new compile-time config header, how to select it with CMake or the build wrapper, and how to pair it with a runtime JSON input when an application needs one.
+- [x] Reconcile `README.md`, `docs/SETUP.md`, `docs/ARCHITECTURE.md`, and `AGENTS.md` so the default selected config, root config tree, and one-config-per-build-tree rule stay discoverable.
 
 ## Compiler flags and static-analysis hardening
 

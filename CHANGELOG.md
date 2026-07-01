@@ -42,9 +42,16 @@ This project follows
 - Split root CMake orchestration from product-boundary target definitions, moved header-only/interface target definitions under `cmake/targets`, kept compiled simulator target metadata beside simulator sources, and removed the dummy source file by modeling header-only core code as an `INTERFACE` target.
 - Updated the documented development workflow to include changelog updates and README/SETUP reconciliation for user-facing behavior, layout, tooling, or workflow changes.
 - Added a current architecture document and moved detailed target-boundary, namespace, source-layout, and target-kind rationale out of setup-oriented documentation.
+- Added a dedicated configuration guide covering domain config concepts, concrete config slices, example config contracts, static-assert wiring, runtime-input separation, and the `NAVKIT_CONFIG` selection model.
 - Aligned public namespaces with the product-core folder structure through the stable domain level: `navkit::core::estimation`, `navkit::core::environment`, `navkit::core::frames`, `navkit::core::models`, `navkit::core::units`, and `navkit::core::containers`.
 - Elevated compile-time configuration cleanup, Release/Debug compiler-flag hardening, static-analysis posture, runtime profiling/resource evidence, and intentional coverage strategy into the next immediate roadmap phase.
-- Clarified the roadmap distinction between product-core compile-time configuration and runtime app input bundles such as future `inputs/navkit_sim/...` scenario files.
+- Clarified the roadmap distinction between product-core compile-time configuration and runtime app input bundles such as `config/runtime/navkit_sim/...` scenario files.
+- Replaced vague `core/common` configuration with explicit `core/config` headers for foundational types, narrow configuration capability concepts, and default configuration slices.
+- Moved estimator-specific configuration concepts for sensor buffer capacity and measurement-statistics availability beside the estimation domain while keeping `core/config` focused on shared scalar/time configuration vocabulary.
+- Moved concrete app/product compile-time configuration examples out of public NavKit headers and into `config/compiletime`.
+- Added `NAVKIT_CONFIG` CMake selection with a generated `navkit/SelectedConfig.hpp` alias and `tools/build.py --navkit-config` forwarding.
+- Added `tools/build.py --build-dir`, selected-config CMake presets, and stricter `NAVKIT_CONFIG` validation for multi-config development.
+- Moved `navkit_sim` runtime JSON inputs from `apps/navkit_sim/configs` to `config/runtime/navkit_sim`.
 
 ### Fixed
 

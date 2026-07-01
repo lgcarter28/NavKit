@@ -57,17 +57,39 @@ def find_conan_toolchain(build_dir: Path) -> Path:
     )
 
 
+def resolve_build_dir(root: Path, build_type: str, build_dir_arg: Path | None) -> Path:
+    if build_dir_arg is None:
+        return root / "build" / build_type
+
+    build_dir = build_dir_arg if build_dir_arg.is_absolute() else root / build_dir_arg
+    resolved = build_dir.resolve()
+    if not resolved.is_relative_to(root):
+        raise ValueError(f"--build-dir must stay inside the repository: {build_dir_arg}")
+    return resolved
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Configure and build NavKit.")
     parser.add_argument("--build-type", choices=["Release", "Debug"], default="Release")
+    parser.add_argument(
+        "--build-dir",
+        type=Path,
+        default=None,
+        help="Build directory. Defaults to build/<build-type>.",
+    )
     parser.add_argument("--clean", action="store_true")
     parser.add_argument("--skip-conan", action="store_true")
     parser.add_argument("--build-only", action="store_true")
     parser.add_argument("--jobs", "-j", type=int, default=None)
+    parser.add_argument(
+        "--navkit-config",
+        default=None,
+        help="Compile-time config header relative to config/compiletime.",
+    )
     args = parser.parse_args()
 
     root = repo_root()
-    build_dir = root / "build" / args.build_type
+    build_dir = resolve_build_dir(root, args.build_type, args.build_dir)
 
     if args.clean and build_dir.exists():
         shutil.rmtree(build_dir)
@@ -104,6 +126,7 @@ def main() -> int:
                 str(build_dir),
                 f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file}",
                 f"-DCMAKE_BUILD_TYPE={args.build_type}",
+                *([f"-DNAVKIT_CONFIG={args.navkit_config}"] if args.navkit_config else []),
             ],
             cwd=root,
         )

@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "navkit/core/common/Config.hpp"
+#include "navkit/core/config/Types.hpp"
 
 #include <Eigen/Dense>
 #include <ratio>

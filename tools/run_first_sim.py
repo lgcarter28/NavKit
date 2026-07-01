@@ -22,7 +22,9 @@ def default_exe(build_type: str) -> Path:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--build-type", choices=["Release", "Debug"], default="Release")
-    parser.add_argument("--config", type=Path, default=Path("apps/navkit_sim/configs/stationary_gnss.json"))
+    parser.add_argument(
+        "--config", type=Path, default=Path("config/runtime/navkit_sim/stationary_gnss.json")
+    )
     args = parser.parse_args()
     exe = default_exe(args.build_type)
     print(f"Running {exe} {args.config}")

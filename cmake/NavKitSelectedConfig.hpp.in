@@ -1,0 +1,13 @@
+// Copyright (c) 2026 William Gordon Carter.
+// All Rights Reserved.
+
+#pragma once
+
+#include "@NAVKIT_CONFIG@"
+
+namespace navkit::selected_config
+{
+
+using Config = navkit::config::SelectedConfig;
+
+} // namespace navkit::selected_config

@@ -306,6 +306,29 @@ python tools/build.py --build-type Release --clean
 
 In day-to-day development, `--build-only` is typically sufficient unless CMake configuration, Conan dependencies, or build-system files have changed.
 
+Select a compile-time configuration with `--navkit-config`. The value is
+relative to `config/compiletime`, and defaults to
+`navkit_sim/StationaryGnss.hpp`:
+
+```bash
+python tools/build.py --build-type Debug --skip-conan --navkit-config navkit_sim/StationaryGnss.hpp
+```
+
+Use a separate build directory for each selected compile-time configuration:
+
+```bash
+python tools/build.py --build-type Debug --build-dir build/debug-stationary-gnss --navkit-config navkit_sim/StationaryGnss.hpp
+```
+
+This keeps each generated `navkit/SelectedConfig.hpp` isolated. Debug/Release
+and `NAVKIT_CONFIG` are independent: build type chooses compiler mode, while
+`NAVKIT_CONFIG` chooses the product/app configuration.
+
+`CMakePresets.json` also contains example selected-config presets such as
+`debug-stationary-gnss` and `release-stationary-gnss`. As with any Conan-backed
+CMake preset, install dependencies into the preset binary directory before
+configuring if the toolchain file does not exist yet.
+
 ---
 
 ## CMake Target Layout
@@ -322,6 +345,10 @@ Applications should link only the product-boundary targets they need. For exampl
 
 For target boundaries, namespaces, and the header-only versus compiled-library
 rationale, see [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+For the compile-time configuration model, domain-specific config concepts,
+example config contracts, and the `NAVKIT_CONFIG` build selection flow, see
+[`CONFIGURATION.md`](CONFIGURATION.md).
 
 ---
 
@@ -345,6 +372,12 @@ Configure CMake manually:
 
 ```bash
 cmake -S . -B build/Debug -DCMAKE_TOOLCHAIN_FILE=build/Debug/build/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug
+```
+
+To select a compile-time config manually, add `-DNAVKIT_CONFIG=...`:
+
+```bash
+cmake -S . -B build/Debug -DCMAKE_TOOLCHAIN_FILE=build/Debug/build/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=navkit_sim/StationaryGnss.hpp
 ```
 
 Build manually:
@@ -406,19 +439,19 @@ Or manually, after building:
 Windows Debug:
 
 ```powershell
-build\Debug\apps\navkit_sim\Debug\navkit_sim.exe apps\navkit_sim\configs\stationary_gnss.json
+build\Debug\apps\navkit_sim\Debug\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
 ```
 
 Windows Release:
 
 ```powershell
-build\Release\apps\navkit_sim\Release\navkit_sim.exe apps\navkit_sim\configs\stationary_gnss.json
+build\Release\apps\navkit_sim\Release\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
 ```
 
 Linux Debug:
 
 ```bash
-build/Debug/apps/navkit_sim/navkit_sim apps/navkit_sim/configs/stationary_gnss.json
+build/Debug/apps/navkit_sim/navkit_sim config/runtime/navkit_sim/stationary_gnss.json
 ```
 
 The simulation generates logs under:
@@ -442,7 +475,10 @@ nav.meta.json
 run_manifest.json
 ```
 
-CSV is used for time-history logs. JSON is used for configuration, per-log metadata, and the hierarchical run manifest.
+CSV is used for time-history logs. JSON is used for runtime input bundles,
+per-log metadata, and the hierarchical run manifest. Runtime input bundles such
+as `config/runtime/navkit_sim/stationary_gnss.json` are executable inputs, not
+product-core compile-time configuration.
 
 ---
 

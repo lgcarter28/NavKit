@@ -31,7 +31,7 @@ src/sim/CMakeLists.txt           navkit_sim / navkit::sim
 ```text
 include/navkit/
   core/
-    common/
+    config/
     containers/
     estimation/
       state/
@@ -58,12 +58,20 @@ include/navkit/
   sim/
   io/
 
+config/
+  compiletime/
+    examples/
+    navkit_sim/
+  runtime/
+    navkit_sim/
+
 src/
   sim/
 ```
 
 `include/navkit/core` is the reusable product core, not a miscellaneous bucket.
-Simulation and desktop IO are intentionally outside the core boundary.
+Simulation, desktop IO, concrete app/product compile-time configurations, and
+executable runtime input bundles are intentionally outside the core boundary.
 
 ## Namespaces
 
@@ -76,7 +84,8 @@ currently contributes `navkit::core::environment::J2`, not
 
 | CMake target | Primary namespace | Notes |
 |---|---|---|
-| `navkit::core` | `navkit::core` | Common product-core API and foundational types such as `Config`, `Scalar_t`, and `Time_t` |
+| `navkit::core` | `navkit::core` | Common product-core foundational aliases such as `Scalar_t` and `Time_t` |
+| `navkit::core` | `navkit::core::config` | Shared product-core compile-time configuration vocabulary |
 | `navkit::core` | `navkit::core::containers` | Product-core containers |
 | `navkit::core` | `navkit::core::estimation` | State definitions, measurements, filters, sensors, navigators, and estimator policies |
 | `navkit::core` | `navkit::core::environment` | Planet and gravity policies |
@@ -86,10 +95,20 @@ currently contributes `navkit::core::environment::J2`, not
 | `navkit::sim` | `navkit::sim` | Simulation support |
 | `navkit::io` | `navkit::io` | Logging, CSV, JSON, and run manifests |
 
-This keeps common configuration in `navkit::core` for now while giving each
-other stable product-core domain an explicit namespace. It also avoids overly
-ceremonial names such as `navkit::core::environment::planet::Wgs84` until a
-leaf domain becomes independently meaningful.
+Shared compile-time product-core configuration vocabulary lives under
+`navkit::core::config`. Domain-specific configuration concepts live beside the
+domain that consumes them; for example, estimator sensor-buffer and
+measurement-statistics configuration concepts currently live under the
+`navkit::core::estimation` namespace.
+
+See [`CONFIGURATION.md`](CONFIGURATION.md) for the user-facing configuration
+mental model, example config contracts, and the selected-config build workflow.
+
+Runtime scenario inputs for executables live outside public headers, such as
+`config/runtime/navkit_sim`. This avoids mixing "what product are we compiling?"
+with "what scenario are we running today?" It also avoids overly ceremonial names
+such as `navkit::core::environment::planet::Wgs84` until a leaf domain becomes
+independently meaningful.
 
 ## Target kinds
 

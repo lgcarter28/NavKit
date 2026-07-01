@@ -9,6 +9,34 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(NAVKIT_BUILD_TESTS "Build NavKit tests" ON)
+set(NAVKIT_CONFIG "navkit_sim/StationaryGnss.hpp"
+    CACHE STRING "Compile-time NavKit config header relative to config/compiletime")
+
+set(NAVKIT_CONFIG_ROOT "${PROJECT_SOURCE_DIR}/config/compiletime")
+if(IS_ABSOLUTE "${NAVKIT_CONFIG}")
+    message(FATAL_ERROR "NAVKIT_CONFIG must be relative to ${NAVKIT_CONFIG_ROOT}")
+endif()
+
+if(NAVKIT_CONFIG MATCHES "\\\\")
+    message(FATAL_ERROR "NAVKIT_CONFIG must use forward slashes, for example navkit_sim/StationaryGnss.hpp")
+endif()
+
+if(NAVKIT_CONFIG MATCHES "(^|/)\\.\\.($|/)")
+    message(FATAL_ERROR "NAVKIT_CONFIG must not escape ${NAVKIT_CONFIG_ROOT}")
+endif()
+
+set(NAVKIT_CONFIG_PATH "${NAVKIT_CONFIG_ROOT}/${NAVKIT_CONFIG}")
+if(NOT EXISTS "${NAVKIT_CONFIG_PATH}")
+    message(FATAL_ERROR
+        "NAVKIT_CONFIG='${NAVKIT_CONFIG}' does not exist under ${NAVKIT_CONFIG_ROOT}")
+endif()
+
+set(NAVKIT_GENERATED_INCLUDE_DIR "${PROJECT_BINARY_DIR}/generated")
+configure_file(
+    "${PROJECT_SOURCE_DIR}/cmake/NavKitSelectedConfig.hpp.in"
+    "${NAVKIT_GENERATED_INCLUDE_DIR}/navkit/SelectedConfig.hpp"
+    @ONLY
+)
 
 find_package(Eigen3 REQUIRED CONFIG)
 find_package(nlohmann_json REQUIRED CONFIG)
