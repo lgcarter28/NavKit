@@ -3,13 +3,17 @@
 
 #pragma once
 
+#include "navkit/core/Config.hpp"
 #include "navkit/core/Segment.hpp"
+#include "navkit/core/StateDefPolicy.hpp"
 
 namespace navkit
 {
 
 struct InsStateDef
 {
+    using Scalar_t = navkit::Scalar_t;
+
     using Pos = Segment<0, 3>;
     using Vel = Segment<3, 3>;
     using Att = Segment<6, 3>;
@@ -23,6 +27,8 @@ struct InsStateDef
 
 struct GnssTcStateDef
 {
+    using Scalar_t = navkit::Scalar_t;
+
     using Pos = Segment<0, 3>;
     using Vel = Segment<3, 3>;
     using Att = Segment<6, 3>;
@@ -35,5 +41,8 @@ struct GnssTcStateDef
 
     static constexpr int N = 23;
 };
+
+static_assert(StateDefPolicy<InsStateDef>);
+static_assert(StateDefPolicy<GnssTcStateDef>);
 
 } // namespace navkit

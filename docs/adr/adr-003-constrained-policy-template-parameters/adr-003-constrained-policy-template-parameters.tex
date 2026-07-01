@@ -1,0 +1,515 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue,
+    citecolor=blue
+}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    columns=fullflexible,
+    showstringspaces=false
+}
+
+\title{ADR-003\\Constrained Policy Template Parameters}
+\author{William Gordon Carter}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Field} & \textbf{Value} \\
+\midrule
+ADR & 003 \\
+Title & Constrained Policy Template Parameters \\
+Status & Proposed \\
+Author & William Gordon Carter \\
+Created & \today \\
+Supersedes & None \\
+Superseded By & --- \\
+Depends On & ADR-001 Compile-Time Policy Architecture \\
+Related & ADR-002 Compile-Time Environment Policy Architecture \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\tableofcontents
+\newpage
+
+\section{Context}
+
+ADR-001 establishes NavKit's broad compile-time policy architecture:
+
+\begin{center}
+Concept $\rightarrow$ CRTP Base $\rightarrow$ Concrete Policy $\rightarrow$ Runtime Algorithm
+\end{center}
+
+As this architecture is extended into the estimator stack, class templates such as
+\texttt{KalmanFilter}, \texttt{Sensor}, and \texttt{Navigator} need to express
+their compile-time policy requirements clearly.
+
+The desired API should make template parameters read like architectural roles
+rather than unconstrained implementation types.
+
+\section{Decision}
+
+NavKit shall prefer constrained policy template parameters in public class and
+function template declarations.
+
+For unary concepts:
+
+\begin{lstlisting}[language=C++]
+template<planet::PlanetPolicy Planet>
+struct Spherical;
+\end{lstlisting}
+
+For concepts that depend on a previously declared template parameter, NavKit
+shall define the candidate type as the first concept parameter. This enables
+the clean constrained-parameter syntax:
+
+\begin{lstlisting}[language=C++]
+template<
+    StateDefPolicy StateDef,
+    InjectionPolicy<StateDef> Injection,
+    ResetPolicy<StateDef> Reset>
+class KalmanFilter;
+\end{lstlisting}
+
+This style is preferred over exposing unconstrained \texttt{typename}
+parameters with a separate \texttt{requires} clause when the constrained
+parameter syntax is available and readable.
+
+\section{C++ Concept Parameter Ordering}
+
+For constrained template parameter syntax to work cleanly, the candidate type
+must be the first template parameter of the concept.
+
+For example:
+
+\begin{lstlisting}[language=C++]
+template<typename T, StateDefPolicy StateDef>
+concept InjectionPolicy =
+    requires(State<StateDef>& x, State<StateDef>& dx)
+{
+    T::apply(x, dx);
+};
+\end{lstlisting}
+
+Then this declaration:
+
+\begin{lstlisting}[language=C++]
+template<
+    StateDefPolicy StateDef,
+    InjectionPolicy<StateDef> Injection>
+class Example;
+\end{lstlisting}
+
+is interpreted as:
+
+\begin{lstlisting}[language=C++]
+template<
+    typename StateDef,
+    typename Injection>
+requires StateDefPolicy<StateDef> &&
+         InjectionPolicy<Injection, StateDef>
+class Example;
+\end{lstlisting}
+
+The constrained parameter \texttt{Injection} is implicitly inserted as the
+first argument to the concept.
+
+Therefore, NavKit concepts intended for constrained template parameter syntax
+shall follow this ordering:
+
+\begin{lstlisting}[language=C++]
+template<typename Candidate, typename Context>
+concept SomePolicy = ...;
+\end{lstlisting}
+
+not:
+
+\begin{lstlisting}[language=C++]
+template<typename Context, typename Candidate>
+concept SomePolicy = ...;
+\end{lstlisting}
+
+\section{Design Rationale}
+
+\subsection{Readable Architecture}
+
+The preferred form:
+
+\begin{lstlisting}[language=C++]
+template<
+    StateDefPolicy StateDef,
+    InjectionPolicy<StateDef> Injection,
+    ResetPolicy<StateDef> Reset>
+class KalmanFilter;
+\end{lstlisting}
+
+reads like an architectural declaration:
+
+\begin{quote}
+A Kalman filter is parameterized by a state definition, an injection policy
+compatible with that state definition, and a reset policy compatible with that
+state definition.
+\end{quote}
+
+This is more expressive than:
+
+\begin{lstlisting}[language=C++]
+template<
+    typename StateDef,
+    typename Injection,
+    typename Reset>
+requires StateDefPolicy<StateDef> &&
+         InjectionPolicy<Injection, StateDef> &&
+         ResetPolicy<Reset, StateDef>
+class KalmanFilter;
+\end{lstlisting}
+
+Both are valid. The constrained-parameter form is preferred when it remains
+clear.
+
+\subsection{Concepts as Policy Interfaces}
+
+Concepts define the compile-time policy interface. A concrete policy does not
+explicitly declare that it implements a concept. Instead, the compiler checks
+whether the concrete policy satisfies the required expressions.
+
+For example:
+
+\begin{lstlisting}[language=C++]
+struct AdditiveInjection
+{
+    static void apply(State<MyStateDef>& x, State<MyStateDef>& dx);
+};
+\end{lstlisting}
+
+satisfies \texttt{InjectionPolicy<AdditiveInjection, MyStateDef>} if the
+required \texttt{apply} expression is valid.
+
+\subsection{Compatibility is Part of the Policy Concept}
+
+For state-dependent policies, compatibility with the selected state definition
+is part of the policy concept itself.
+
+That is, \texttt{InjectionPolicy<Injection, StateDef>} means both:
+
+\begin{enumerate}
+    \item \texttt{Injection} has the required injection-policy interface.
+    \item \texttt{Injection} can operate on \texttt{State<StateDef>}.
+\end{enumerate}
+
+A separate \texttt{CompatibleInjectionPolicy} concept may be introduced later
+if needed, but it is not required for the initial estimator refactor.
+
+\section{Kalman Filter Target Architecture}
+
+The target Kalman filter declaration is:
+
+\begin{lstlisting}[language=C++]
+template<
+    StateDefPolicy StateDef,
+    InjectionPolicy<StateDef> Injection,
+    ResetPolicy<StateDef> Reset>
+class KalmanFilter;
+\end{lstlisting}
+
+The filter remains a runtime algorithm. It is not itself a policy.
+
+Its template parameters are compile-time policies that configure the runtime
+algorithm.
+
+\section{Injection Policy}
+
+An injection policy defines how the accumulated error state is injected into
+the nominal state.
+
+Example concept:
+
+\begin{lstlisting}[language=C++]
+template<typename T, StateDefPolicy StateDef>
+concept InjectionPolicy =
+    requires(State<StateDef>& x, State<StateDef>& dx)
+{
+    T::apply(x, dx);
+};
+\end{lstlisting}
+
+Example concrete policy:
+
+\begin{lstlisting}[language=C++]
+struct AdditiveInjection
+{
+    static void apply(State<MyStateDef>& x, State<MyStateDef>& dx)
+    {
+        x.vector() -= dx.vector();
+    }
+};
+\end{lstlisting}
+
+If an injection policy is only valid for a particular configured state
+definition, that constraint should be expressed by the function signature or by
+requires-clauses inside the policy.
+
+\section{Reset Policy}
+
+A reset policy defines how the error state and covariance are reset after
+injection.
+
+Example concept:
+
+\begin{lstlisting}[language=C++]
+template<typename T, StateDefPolicy StateDef>
+concept ResetPolicy =
+    requires(State<StateDef>& x,
+             State<StateDef>& dx,
+             StateCov<StateDef>& P)
+{
+    T::reset_dx(dx);
+    T::reset_covariance(x, dx, P);
+};
+\end{lstlisting}
+
+Example target use:
+
+\begin{lstlisting}[language=C++]
+using Filter = KalmanFilter<
+    NavStateDef,
+    AdditiveInjection,
+    DefaultReset>;
+\end{lstlisting}
+
+\section{Measurement Policy}
+
+Measurement policies should follow the same ordering rule.
+
+Example:
+
+\begin{lstlisting}[language=C++]
+template<typename T, StateDefPolicy StateDef>
+concept MeasurementPolicy =
+    requires(State<StateDef>& x, typename T::NoiseContext& ctx)
+{
+    T::M;
+    typename T::O_t;
+    typename T::R_t;
+    typename T::H_t;
+    typename T::NoiseContext;
+
+    T::obs(x);
+    T::compute_h(x);
+    T::compute_r(ctx);
+};
+\end{lstlisting}
+
+This enables declarations such as:
+
+\begin{lstlisting}[language=C++]
+template<
+    StateDefPolicy StateDef,
+    MeasurementPolicy<StateDef> Measurement>
+void observation_update(...);
+\end{lstlisting}
+
+\section{Sensor and Noise Policies}
+
+Sensor and noise policies may also depend on measurement and state definition
+policies.
+
+For example:
+
+\begin{lstlisting}[language=C++]
+template<typename T, typename Measurement, StateDefPolicy StateDef>
+concept NoisePolicy =
+    MeasurementPolicy<Measurement, StateDef> &&
+    requires(...)
+{
+    T::compute_r(...);
+};
+\end{lstlisting}
+
+Where the constrained-parameter syntax becomes unclear, NavKit may use a
+standard \texttt{requires} clause. Readability is the guiding criterion.
+
+\section{Navigator Target Architecture}
+
+The Navigator should remain an orchestration runtime algorithm.
+
+A future target declaration is:
+
+\begin{lstlisting}[language=C++]
+template<
+    FilterPolicy Filter,
+    SensorCollectionPolicy Sensors,
+    PropagationPolicy Propagation,
+    UpdatePolicy Update>
+class Navigator;
+\end{lstlisting}
+
+The Navigator is not directly parameterized by planet, gravity, or frame
+policies. Those are expected to be encoded inside the selected propagation or
+mechanization policy.
+
+For example:
+
+\begin{lstlisting}[language=C++]
+using Planet = planet::Wgs84;
+using Gravity = gravity::J2<Planet>;
+using Propagation = mechanization::Pcpf<Planet, Gravity>;
+
+using Nav = Navigator<
+    Filter,
+    Sensors,
+    Propagation,
+    UpdatePolicy>;
+\end{lstlisting}
+
+The concrete \texttt{Navigator} type indirectly encodes the environment, but
+the Navigator interface only depends on the propagation policy concept.
+
+\section{Static Assertions and Compile-Time Tests}
+
+Every compile-time policy architecture should have compile-time unit tests that
+demonstrate both valid and invalid configurations.
+
+Example:
+
+\begin{lstlisting}[language=C++]
+static_assert(StateDefPolicy<NavStateDef>);
+static_assert(InjectionPolicy<AdditiveInjection, NavStateDef>);
+static_assert(ResetPolicy<DefaultReset, NavStateDef>);
+
+static_assert(!InjectionPolicy<BadInjection, NavStateDef>);
+\end{lstlisting}
+
+Negative compile-time tests should generally use \texttt{static\_assert(!...)}
+rather than intentionally creating code that fails to compile.
+
+This allows the test suite to document invalid configurations while still
+compiling successfully.
+
+\section{Boundary Checks}
+
+Concepts and \texttt{static\_assert}s should be used at policy boundaries,
+where user-selected or framework-selected template types first enter an
+algorithm.
+
+Examples:
+
+\begin{itemize}
+    \item \texttt{KalmanFilter} checks \texttt{StateDefPolicy},
+    \texttt{InjectionPolicy}, and \texttt{ResetPolicy}.
+    \item \texttt{MechanizationPcpf} checks \texttt{PlanetPolicy},
+    \texttt{GravityPolicy}, and propagation requirements.
+    \item \texttt{Sensor} checks measurement and noise policies.
+\end{itemize}
+
+The goal is to produce clear diagnostics at the architectural boundary rather
+than allowing invalid types to fail deep inside matrix operations or nested
+template instantiations.
+
+\section{Naming Convention}
+
+NavKit shall use the following naming convention:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Construct} & \textbf{Name Pattern} \\
+\midrule
+Concept & \texttt{<Domain>Policy} \\
+CRTP base & \texttt{<Domain>PolicyBase} \\
+Concrete policy & Descriptive implementation name \\
+Runtime algorithm & Descriptive algorithm name \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Examples:
+
+\begin{itemize}
+    \item \texttt{PlanetPolicy}
+    \item \texttt{PlanetPolicyBase}
+    \item \texttt{Wgs84}
+    \item \texttt{GravityPolicy}
+    \item \texttt{GravityPolicyBase}
+    \item \texttt{J2}
+    \item \texttt{InjectionPolicy}
+    \item \texttt{AdditiveInjection}
+\end{itemize}
+
+The term \texttt{Concept} shall not be used in type names. The concept
+represents the policy interface, so the domain role is the important name.
+
+\section{Alternatives Considered}
+
+\subsection{Unconstrained Template Parameters}
+
+Using \texttt{typename} for every template parameter was rejected as the
+primary style because it hides policy requirements from the declaration and
+produces poorer diagnostics.
+
+\subsection{Requires Clauses Everywhere}
+
+Explicit \texttt{requires} clauses are valid and sometimes necessary. However,
+when constrained-parameter syntax is readable, it better communicates the
+architecture.
+
+\subsection{Separate Compatibility Concepts}
+
+Separate compatibility concepts may be useful for complex relationships, but
+they are not required for the initial Kalman filter and Navigator refactor.
+For now, state compatibility is part of the binary policy concept.
+
+\section{Consequences}
+
+\subsection{Benefits}
+
+\begin{itemize}
+    \item Template declarations read like architecture.
+    \item Compiler diagnostics improve.
+    \item Policy requirements are visible at API boundaries.
+    \item Invalid configurations can be tested with \texttt{static\_assert}.
+    \item The estimator stack aligns with ADR-001.
+\end{itemize}
+
+\subsection{Costs}
+
+\begin{itemize}
+    \item Concepts must be carefully ordered with candidate type first.
+    \item Some complex constraints may still require explicit \texttt{requires} clauses.
+    \item Refactoring existing unconstrained templates requires care.
+\end{itemize}
+
+\section{Decision Summary}
+
+NavKit shall use constrained policy template parameters wherever practical.
+Concept definitions shall place the candidate policy type first so dependent
+concept syntax such as \texttt{InjectionPolicy<StateDef> Injection} can be used
+in class and function template declarations.
+
+This ADR establishes the template declaration style for the Kalman filter,
+sensor, measurement, reset, injection, propagation, and Navigator architecture
+refactors that precede full INS mechanization.
+
+\end{document}
