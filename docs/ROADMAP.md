@@ -24,6 +24,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - Public headers are organized by product boundary first, then engineering domain. `include/navkit/core` is the reusable product core, with estimation/navigation domains under `core/estimation`, environment models under `core/environment`, and reusable support domains such as `common`, `containers`, `frames`, `units`, and `models` also under `core`. Desktop simulation support remains under `include/navkit/sim`; desktop logging/file/JSON support remains under `include/navkit/io`.
 - CMake targets now separate product boundaries: `navkit_core`/`navkit::core` is the reusable product-core interface library, `navkit_sim`/`navkit::sim` is the compiled simulator support library, `navkit_io`/`navkit::io` is the desktop logging/file/JSON interface library, and runnable executables remain applications under `apps/`.
 - `core/common` currently contains foundational aliases and configuration constants, but the configuration story is not yet a clear swappable compile-time configuration architecture.
+- Runtime scenario files for applications should be treated as app inputs, not core configuration. The current `navkit_sim` JSON files should move toward an explicit input-bundle layout such as `inputs/navkit_sim/...` so product-core compile-time configuration cannot be confused with executable run inputs.
 - Debug and Release build flags are not yet treated as explicit engineering products. Release optimization settings, strict Debug diagnostics, and static-analysis expectations should be made deliberate before performance trends become meaningful.
 - `GnssPosModel`, `GnssVelModel`, and `BaroAltModel` exist, but only GNSS position is integrated into the current simulation. The barometer model currently selects the third position component; it is not yet a general ECEF-to-local-vertical altitude model.
 - The current trajectory generator supports only a simplistic stationary ECEF trajectory. It sets body rate to zero and therefore does not model Earth rotation correctly for stationary IMU truth.
@@ -147,6 +148,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [ ] Replace ambiguous global-style constants with clear, swappable compile-time configuration types where that improves extension boundaries.
 - [ ] Define the first configuration-policy vocabulary for estimator, sensor-buffer, numeric-scalar, and logging/statistics choices.
 - [ ] Decide which configuration values are product-core compile-time policies, which are simulator/app runtime settings, and which belong in analysis only.
+- [ ] Rename or relocate `navkit_sim` runtime JSON files into an explicit app-input location such as `inputs/navkit_sim/...`, separate from product-core configuration.
 - [ ] Document configuration layering with examples that show how an embedded target, desktop simulation, and test fixture select different configurations.
 - [ ] Add compile-time tests that valid configurations satisfy the intended concepts and intentionally invalid configurations fail those concepts.
 
