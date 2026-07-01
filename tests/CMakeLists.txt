@@ -16,6 +16,7 @@ add_executable(navkit_tests
     test_environment_policies.cpp
     test_gnss_pos_update.cpp
     test_navigator_compile.cpp
+    test_navigator_policy.cpp
 )
 
 target_link_libraries(navkit_tests PRIVATE navkit::core doctest::doctest)

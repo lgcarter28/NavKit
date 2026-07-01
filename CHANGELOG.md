@@ -20,6 +20,7 @@ This project follows
 - Candidate-first `InjectionPolicy` and `ResetPolicy` concepts with positive and negative compile-time tests.
 - Candidate-first `MeasurementPolicy` concept with positive coverage for GNSS position, GNSS velocity, and barometer models plus negative compile-time tests.
 - Candidate-first `NoisePolicy` concept with positive and negative compile-time tests.
+- First-pass `FilterPolicy`, `SensorCollectionPolicy`, and `UpdatePolicy` concepts for Navigator orchestration boundaries.
 - Measurement-statistics regression tests for accepted and rejected measurement updates.
 
 ### Changed
@@ -33,6 +34,7 @@ This project follows
 - Constrained `KalmanFilter` observation-update and measurement-statistics methods on measurement-model policy compatibility.
 - Constrained `Sensor<Model, BufferSize, NoisePolicy>` on noise-policy compatibility while preserving fixed-capacity buffering.
 - Completed the Phase 2 estimator-boundary refactor scope and explicitly deferred `SensorPolicy` until a Navigator-facing capability boundary exists.
+- Constrained `Navigator` on current filter, sensor-collection, and update-policy capabilities.
 - Clarified ADR-003 and agent guidance around valid C++ concept-definition syntax versus constrained template-parameter syntax.
 
 ### Fixed
