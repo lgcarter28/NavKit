@@ -67,6 +67,12 @@ data/       Generated logs and datasets
 
 Follow [docs/SETUP.md](docs/SETUP.md) for prerequisites and initial setup. The repository's Python wrappers are the primary developer interface.
 
+Fresh local or cloud environment:
+
+```text
+python tools/bootstrap.py
+```
+
 First or clean Debug build:
 
 ```text
@@ -76,7 +82,10 @@ python tools/build.py --build-type Debug --clean
 Normal edit/build/test cycle:
 
 ```text
+python tools/copyright.py --write
 python tools/format.py
+python tools/copyright.py --check
+python tools/format.py --check
 python tools/build.py --build-type Debug --build-only
 python tools/run_tests.py --build-type Debug
 ```

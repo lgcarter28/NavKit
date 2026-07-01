@@ -16,11 +16,14 @@ This project follows
 
 - A canonical current-state handoff and master roadmap.
 - Repository-wide agent guidance and documentation indexes.
+- Cross-platform environment bootstrap tooling and Linux/Windows GitHub Actions CI.
 
 ### Changed
 
 - Reconciled README and setup documentation with the current implementation and build configuration.
 - Updated the configured C++ language standard from C++20 to C++23.
+- Registered the StateDef policy tests in the configured test executable.
+- Ordered source mutation/checks before build and test verification.
 - Consolidated superseded TODO lists and early core design notes into the canonical roadmap before removing them.
 
 ### Fixed

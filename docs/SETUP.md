@@ -102,7 +102,15 @@ python3 --version
 
 ## Create a Python Virtual Environment
 
-A dedicated virtual environment is recommended to isolate Conan and Python analysis dependencies.
+A dedicated virtual environment is recommended to isolate Conan and Python analysis dependencies. The preferred setup is the idempotent repository bootstrap command:
+
+```bash
+python tools/bootstrap.py
+```
+
+It creates `.venv`, upgrades pip, installs Conan and the local analysis package with its declared dependencies, and detects a default Conan profile when one does not exist. This is also the setup command for Codex cloud environments and CI.
+
+The equivalent manual steps follow for troubleshooting.
 
 From the repository root:
 
@@ -239,16 +247,10 @@ clang-tidy --version
 
 ## Install Python Analysis Dependencies
 
-Install the Python analysis packages:
+The bootstrap script installs the analysis package and its declared dependencies from `python/pyproject.toml`. To do so manually:
 
 ```bash
-pip install numpy pandas matplotlib scipy plotly pyarrow
-```
-
-Eventually these may be managed directly from:
-
-```text
-python/pyproject.toml
+pip install -e python
 ```
 
 ---
@@ -585,8 +587,10 @@ git pull
 activate virtual environment
 
 python tools/copyright.py --write
-
 python tools/format.py
+
+python tools/copyright.py --check
+python tools/format.py --check
 
 python tools/build.py --build-type Debug --build-only
 
@@ -600,6 +604,29 @@ git status
 git add ...
 git commit
 ```
+
+All source-mutating copyright and formatting steps occur before the final build and tests. CI runs only the check forms, then builds and tests the exact checked source.
+
+---
+
+## Codex Cloud and CI
+
+For a fresh Codex cloud environment, use this setup command:
+
+```bash
+python tools/bootstrap.py
+```
+
+Do not rely on dependencies persisting between independent cloud tasks. The bootstrap command is safe to rerun, while CI caches pip downloads and the Conan cache to reduce cold-start time.
+
+The GitHub Actions workflow in `.github/workflows/ci.yml` enforces this order:
+
+1. Copyright and formatting checks on Linux.
+2. C++23 Debug builds on Linux and Windows.
+3. Unit tests on both platforms.
+4. Stationary simulation and headless analysis smoke tests on both platforms.
+
+The build/test jobs wait for source checks, ensuring CI never tests code that would subsequently be changed by formatting.
 
 ### Common Build Scenarios
 

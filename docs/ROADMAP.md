@@ -25,7 +25,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - `ImuSimulator` and `BaroSimulator` are empty shells, and the IMU process model is a placeholder.
 - Analysis already provides position error/covariance, innovation, NIS, p-value, mean p-value, and innovation histogram plots. More formal statistics and consistency tests remain future work.
 - The documented and configured language standard is C++23.
-- `tests/test_state_def_policy.cpp` exists but is not included in `tests/CMakeLists.txt`; its assertions are not currently compiled by the configured test target.
+- `tests/test_state_def_policy.cpp` is included in the configured test target, so its positive and negative concept assertions compile in local and CI builds.
 
 ## Current verified baseline
 
@@ -64,8 +64,8 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Build and test integrity
 
-- [ ] Add `tests/test_state_def_policy.cpp` to `navkit_tests` and verify its positive and negative assertions compile.
-- [ ] Audit test sources against `tests/CMakeLists.txt` so every intended test is built.
+- [x] Add `tests/test_state_def_policy.cpp` to `navkit_tests` and verify its positive and negative assertions compile.
+- [x] Audit test sources against `tests/CMakeLists.txt` so every intended test is built.
 - [ ] Add a regression command/check for the stationary GNSS simulation and analysis pipeline.
 - [x] Configure C++23 consistently in CMake, README, setup, and contributor guidance; verify the supported Debug toolchain.
 - [ ] Establish a numerical baseline for stationary GNSS output or selected metrics so refactors can demonstrate unchanged behavior.
@@ -78,8 +78,8 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Automation
 
-- [ ] Add CI for Debug build and tests on the primary supported platform.
-- [ ] Add formatting and copyright checks to CI.
+- [x] Add ordered Linux and Windows CI for source checks, C++23 Debug builds, tests, simulation, and headless analysis.
+- [ ] Confirm the first hosted GitHub Actions run passes on both platforms.
 - [ ] Add clang-tidy selectively after the baseline build is stable.
 - [ ] Add coverage reporting after the test target accurately represents the suite.
 

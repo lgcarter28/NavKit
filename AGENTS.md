@@ -45,11 +45,23 @@ Concepts express capabilities; CRTP bases share implementation and are not manda
 ## Tests and verification
 
 - Add compile-time coverage with each new concept: positive `static_assert(Concept<Good>)` and negative `static_assert(!Concept<Bad>)`. Do not add intentionally uncompilable test targets for negative cases.
-- Add every new test source to `tests/CMakeLists.txt`; merely placing a file in `tests/` does not compile or run it. In particular, `tests/test_state_def_policy.cpp` currently exists but is omitted from `navkit_tests`.
+- Add every new test source to `tests/CMakeLists.txt`; merely placing a file in `tests/` does not compile or run it.
 - Add runtime tests when behavior changes; compile-time assertions do not replace numerical or orchestration tests.
 - Dependencies are managed by Conan 2 (`Eigen`, `nlohmann_json`, and `doctest`) and builds are driven by CMake.
 - Use Python 3.10 or newer and activate the repository `.venv` when available. Conan and the analysis dependencies are intended to live in that virtual environment.
 - Prefer the repository's Python tools for normal work. They are the cross-platform developer interface and handle Conan, CMake, generator, and build-directory details. Use raw Conan/CMake/CTest commands mainly for diagnosis or when a wrapper cannot express the needed operation.
+- On a fresh local or cloud machine, run `python tools/bootstrap.py`. It creates `.venv`, installs Conan and the analysis package, and detects the default Conan profile. The script is idempotent and safe to rerun; do not assume separate cloud tasks share an installed environment.
+
+After editing source, apply all source mutations before collecting build/test evidence:
+
+```powershell
+python tools/copyright.py --write
+python tools/format.py
+python tools/copyright.py --check
+python tools/format.py --check
+```
+
+Only after those commands pass should the final build and tests run. CI uses check-only commands and must never modify source.
 
 For the first Debug build, or when a genuinely clean rebuild is needed:
 
@@ -57,7 +69,7 @@ For the first Debug build, or when a genuinely clean rebuild is needed:
 python tools/build.py --build-type Debug --clean
 ```
 
-For normal source-code iteration, use the fast rebuild path:
+For normal source-code iteration, after formatting and copyright checks, use the fast rebuild path:
 
 ```powershell
 python tools/build.py --build-type Debug --build-only
@@ -81,13 +93,6 @@ python tools/run_analysis.py data/logs/stationary_gnss_demo --show
 
 Simulation logs belong under `data/logs/<run_name>/`. The analysis package is deliberately separate from the embedded C++ library.
 
-Before handing off source changes, use the repository checks that apply:
-
-```powershell
-python tools/copyright.py --check
-python tools/format.py --check
-```
-
 Use `python tools/format.py` to apply formatting. Use `python tools/format.py --tidy` when static analysis is relevant and LLVM tooling is available. Do not apply automatic tidy fixes broadly without reviewing their scope.
 
 VS Code launch configurations assume that a Debug build already exists; they do not build automatically. Build with the wrapper before starting a debugging session.
@@ -95,7 +100,7 @@ VS Code launch configurations assume that a Debug build already exists; they do 
 ## Change discipline
 
 - For architectural work, use the sequence: inspect relevant ADRs and code, define a small pass, implement it, add compile-time and runtime tests, build, test, and reconcile documentation.
-- A normal development pass is: activate `.venv`, edit, update copyright if needed, format, rebuild with `--build-only`, run tests, run simulation/analysis when behavior is affected, inspect `git status`, and then prepare the change for review.
+- A normal development pass is: bootstrap or activate `.venv`, edit, apply copyright headers, format, run copyright/format checks, build, run tests, run simulation/analysis when behavior is affected, inspect `git status`, and then prepare the change for review.
 - Prefer small, reviewable changes. Avoid mixing mechanization work, estimator policy refactors, and unrelated cleanup.
 - Keep existing public behavior and matrix sign conventions unless the task explicitly changes them; verify estimation changes numerically.
 - Do not present planned types or directories from the ADRs as existing code. Future items include propagation/mechanization policies, coordinates, atmosphere, magnetic, and geoid support.

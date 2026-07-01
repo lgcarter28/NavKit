@@ -23,10 +23,15 @@ def run(cmd: list[str], cwd: Path) -> None:
 
 
 def find_executable_near_python(name: str) -> str:
-    scripts_dir = Path(__file__).resolve().parents[1] / ".venv" / "Scripts"
-    exe = scripts_dir / f"{name}.exe"
-    if exe.exists():
-        return str(exe)
+    venv_dir = Path(__file__).resolve().parents[1] / ".venv"
+    candidates = [
+        venv_dir / "Scripts" / f"{name}.exe",
+        venv_dir / "bin" / name,
+    ]
+
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
 
     found = shutil.which(name)
     if found:
