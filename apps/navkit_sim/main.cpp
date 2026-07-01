@@ -1,15 +1,15 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/common/Config.hpp"
-#include "navkit/core/filter/KalmanFilter.hpp"
-#include "navkit/core/navigator/Navigator.hpp"
-#include "navkit/core/navigator/update/UpdatePolicies.hpp"
-#include "navkit/core/sensor/Sensor.hpp"
-#include "navkit/core/sensor/noise/NoisePolicies.hpp"
-#include "navkit/core/state/StateDefs.hpp"
+#include "navkit/core/common/Config.hpp"
+#include "navkit/core/estimation/filter/KalmanFilter.hpp"
+#include "navkit/core/estimation/navigator/Navigator.hpp"
+#include "navkit/core/estimation/navigator/update/UpdatePolicies.hpp"
+#include "navkit/core/estimation/sensor/Sensor.hpp"
+#include "navkit/core/estimation/sensor/noise/NoisePolicies.hpp"
+#include "navkit/core/estimation/state/StateDefs.hpp"
+#include "navkit/core/models/GnssPosModel.hpp"
 #include "navkit/io/RunLogger.hpp"
-#include "navkit/models/GnssPosModel.hpp"
 #include "navkit/sim/GnssSimulator.hpp"
 #include "navkit/sim/TrajectoryGenerator.hpp"
 
@@ -31,8 +31,8 @@ template<typename Vec3>
 Vec3 vec3_from_json(const json& j)
 {
     Vec3 v;
-    v << j.at(0).get<navkit::Scalar_t>(), j.at(1).get<navkit::Scalar_t>(),
-        j.at(2).get<navkit::Scalar_t>();
+    v << j.at(0).get<navkit::core::Scalar_t>(), j.at(1).get<navkit::core::Scalar_t>(),
+        j.at(2).get<navkit::core::Scalar_t>();
     return v;
 }
 
@@ -59,7 +59,7 @@ int main(int argc, char** argv)
         traj_cfg.duration_s = cfg["trajectory"].value("duration_s", 60.0);
         traj_cfg.dt_s = cfg["trajectory"].value("dt_s", 1.0);
         traj_cfg.p_e =
-            vec3_from_json<Eigen::Matrix<navkit::Scalar_t, 3, 1>>(cfg["trajectory"]["p_e_m"]);
+            vec3_from_json<Eigen::Matrix<navkit::core::Scalar_t, 3, 1>>(cfg["trajectory"]["p_e_m"]);
 
         navkit::sim::GnssSimulatorConfig gnss_cfg;
         gnss_cfg.dt_s = cfg["gnss"].value("dt_s", 1.0);
@@ -70,17 +70,21 @@ int main(int argc, char** argv)
         const auto truth = navkit::sim::TrajectoryGenerator::stationary(traj_cfg);
         navkit::sim::GnssSimulator gnss_sim(gnss_cfg);
 
-        using StateDef = navkit::InsStateDef;
-        using GnssModel = navkit::GnssPosModel<StateDef>;
+        using StateDef = navkit::core::estimation::InsStateDef;
+        using GnssModel = navkit::core::models::GnssPosModel<StateDef>;
         using GnssSensor =
-            navkit::Sensor<GnssModel, navkit::Config::GNSS_BUFF_SIZE, navkit::GnssFixedNoisePolicy>;
+            navkit::core::estimation::Sensor<GnssModel,
+                                             navkit::core::Config::GNSS_BUFF_SIZE,
+                                             navkit::core::estimation::GnssFixedNoisePolicy>;
         using Sensors = std::tuple<GnssSensor>;
         using MeasurementModels = std::tuple<GnssModel>;
-        using Filter = navkit::KalmanFilter<StateDef,
-                                            navkit::DefaultInjectionPolicy<StateDef>,
-                                            navkit::DefaultResetPolicy<StateDef>,
-                                            MeasurementModels>;
-        using Navigator = navkit::Navigator<Filter, Sensors, navkit::UpdatePostFilter>;
+        using Filter = navkit::core::estimation::KalmanFilter<
+            StateDef,
+            navkit::core::estimation::DefaultInjectionPolicy<StateDef>,
+            navkit::core::estimation::DefaultResetPolicy<StateDef>,
+            MeasurementModels>;
+        using Navigator = navkit::core::estimation::
+            Navigator<Filter, Sensors, navkit::core::estimation::UpdatePostFilter>;
 
         Navigator navigator;
         auto& filter = navigator.filter();
@@ -90,18 +94,18 @@ int main(int argc, char** argv)
 
         if (cfg.contains("filter") && cfg["filter"].contains("initial_position_offset_m")) {
             x0.template segment<3>(StateDef::Pos::i) +=
-                vec3_from_json<Eigen::Matrix<navkit::Scalar_t, 3, 1>>(
+                vec3_from_json<Eigen::Matrix<navkit::core::Scalar_t, 3, 1>>(
                     cfg["filter"]["initial_position_offset_m"]);
         }
 
         filter.set_state(x0);
 
         Filter::P_t P0 = Filter::P_t::Identity();
-        const navkit::Scalar_t sigma_p0 =
+        const navkit::core::Scalar_t sigma_p0 =
             cfg.value("filter", json::object()).value("initial_position_sigma_m", 100.0);
         P0 *= 1.0e-6;
         P0.template block<3, 3>(StateDef::Pos::i, StateDef::Pos::i) =
-            (sigma_p0 * sigma_p0) * Eigen::Matrix<navkit::Scalar_t, 3, 3>::Identity();
+            (sigma_p0 * sigma_p0) * Eigen::Matrix<navkit::core::Scalar_t, 3, 3>::Identity();
         filter.set_covariance(P0);
 
         auto& gnss_sensor = navigator.template sensor<0>();

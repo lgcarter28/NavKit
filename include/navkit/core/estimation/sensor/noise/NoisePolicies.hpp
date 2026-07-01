@@ -1,0 +1,27 @@
+// Copyright (c) 2026 William Gordon Carter.
+// All Rights Reserved.
+
+#pragma once
+
+namespace navkit::core::estimation
+{
+
+struct DefaultNoisePolicy
+{
+    template<typename NoiseContext, typename Measurement>
+    static void update(NoiseContext&, const Measurement&)
+    {
+        // default: do nothing
+    }
+};
+
+struct GnssFixedNoisePolicy
+{
+    template<typename NoiseContext, typename Measurement>
+    static void update(NoiseContext&, const Measurement&)
+    {
+        // GNSS noise is fixed by the model's default NoiseContext in this first draft.
+    }
+};
+
+} // namespace navkit::core::estimation

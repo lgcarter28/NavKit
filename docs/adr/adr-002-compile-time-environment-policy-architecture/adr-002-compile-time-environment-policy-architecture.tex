@@ -204,14 +204,14 @@ provide high-fidelity fields.
 For example:
 
 \begin{lstlisting}[language=C++]
-using Gravity = gravity::Spherical<planet::SimpleMoon>;
+using Gravity = environment::Spherical<environment::SimpleMoon>;
 \end{lstlisting}
 
 may compile if \texttt{SimpleMoon} provides only \texttt{mu\_m3\_s2} and frame
 types, while:
 
 \begin{lstlisting}[language=C++]
-using Gravity = gravity::J2<planet::SimpleMoon>;
+using Gravity = environment::J2<environment::SimpleMoon>;
 \end{lstlisting}
 
 will fail at compile time if \texttt{SimpleMoon} does not satisfy
@@ -258,8 +258,8 @@ navigation stack.
 Example:
 
 \begin{lstlisting}[language=C++]
-using Planet = planet::Wgs84;
-using Gravity = gravity::J2<Planet>;
+using Planet = environment::Wgs84;
+using Gravity = environment::J2<Planet>;
 using Propagation = nav::MechanizationPcpf<Planet, Gravity>;
 using Nav = Navigator<Filter, Sensors, Propagation, UpdatePolicy>;
 \end{lstlisting}

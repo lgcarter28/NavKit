@@ -5,7 +5,7 @@
 This file applies to the entire repository.
 
 - Treat the checked-in implementation and build configuration as the source of truth for current behavior.
-- Read `docs/README.md` for the documentation map and `docs/ROADMAP.md` for verified status, priorities, and product direction. Confirm status claims against the repository before acting on them.
+- Read `docs/README.md` for the documentation map, `docs/ARCHITECTURE.md` for current architecture, and `docs/ROADMAP.md` for verified status, priorities, and product direction. Confirm status claims against the repository before acting on them.
 - Read ADR-001, ADR-002, and ADR-003 before architectural work. They document the intended compile-time policy direction, but all three are currently marked **Proposed**, not accepted or fully implemented.
 - Preserve runtime behavior unless the task explicitly changes it. Do not turn roadmap language into implementation requirements without confirming it against the current task and code.
 
@@ -28,6 +28,7 @@ Concepts express capabilities; CRTP bases share implementation and are not manda
 - `KalmanFilter` performs measurement updates, stores optional per-model statistics, and delegates injection/reset. The default injection is INS-specific; the default covariance reset is intentionally a no-op.
 - `Navigator` processes a tuple-like sensor collection and applies an update policy. It has no propagation/mechanization policy yet.
 - INS propagation is not implemented; `ImuProcessModelPlaceholder` is only a placeholder.
+- The reusable product-core CMake target is `navkit_core` with alias `navkit::core`. It is currently an `INTERFACE` target because the core is header-only/template-heavy. Desktop simulation support is built as the compiled `navkit_sim` target with alias `navkit::sim`, and desktop logging/file/JSON support is exposed through `navkit_io` with alias `navkit::io`. Executables remain applications under `apps/` and link against the libraries they need.
 - Runtime virtual dispatch is avoided in embedded-facing algorithms, but it is not globally prohibited: simulation infrastructure currently uses a virtual `SensorSimulatorBase` interface.
 - Python analysis is modularized under `python/navkit_analysis`; `tools/run_analysis.py` is the entry point.
 
@@ -35,8 +36,11 @@ Concepts express capabilities; CRTP bases share implementation and are not manda
 
 - Prefer compile-time polymorphism in embedded-facing and performance-sensitive code. Introduce runtime polymorphism only with a concrete need, especially outside critical paths.
 - Keep runtime algorithms focused on orchestration; place planet, gravity, frames, and future mechanization details in the relevant policies.
-- Organize code by engineering domain, not in a generic catch-all directory. The structured `core` tree owns the core estimation/navigation framework domains: `core/state`, `core/measurement`, `core/filter`, `core/sensor`, and `core/navigator`. Physical environment models live under `environment` domains such as `environment/planet` and `environment/gravity`. Cross-cutting support remains in specific top-level domains such as `common`, `containers`, `frames`, `units`, `models`, `sim`, and `io`.
-- Keep concepts, optional CRTP bases, and concrete policy implementations in the domain that owns the abstraction. For example, filter injection/reset policies belong under `core/filter`, sensor noise policies under `core/sensor`, Navigator update/propagation policies under `core/navigator`, and planet/gravity policies under `environment`.
+- Organize code by product boundary first, then engineering domain. `include/navkit/core` is the reusable product core, not a miscellaneous bucket. Estimation/navigation framework domains live under `core/estimation` (`state`, `measurement`, `filter`, `sensor`, and `navigator`), product-core support lives under `core/common` and `core/containers`, physical environment models live under `core/environment`, and reusable `frames`, `units`, and `models` also live under `core`. Desktop simulation support stays under `include/navkit/sim`; desktop logging/file/JSON support stays under `include/navkit/io`.
+- Keep concepts, optional CRTP bases, and concrete policy implementations in the domain that owns the abstraction. For example, filter injection/reset policies belong under `core/estimation/filter`, sensor noise policies under `core/estimation/sensor`, Navigator update/propagation policies under `core/estimation/navigator`, and planet/gravity policies under `core/environment`.
+- Keep CMake targets aligned with product boundaries: `navkit::core` is the reusable product-core boundary, `navkit::sim` is simulator infrastructure, and `navkit::io` is desktop logging/file/JSON infrastructure. Application executables should stay under `apps/`. Do not add desktop-only simulation or IO behavior to `navkit::core` unless the product-core boundary decision is deliberately revisited.
+- Keep CMake target kinds honest: use `INTERFACE` for header-only/template-heavy libraries, and use compiled/static libraries only when a component owns meaningful `.cpp` implementation. Do not add dummy source files just to force a static archive.
+- Public namespaces mirror the folder structure through the stable domain level. Deeper leaf folders may organize implementation and policy families without adding additional namespaces unless that subdomain becomes independently meaningful. `core/common` currently remains in `namespace navkit::core`; other reusable product-core domains use `navkit::core::containers`, `navkit::core::estimation`, `navkit::core::environment`, `navkit::core::frames`, `navkit::core::models`, and `navkit::core::units`. Simulation and IO remain in `namespace navkit::sim` and `namespace navkit::io`.
 - Name concepts `<Domain>Policy`, optional CRTP bases `<Domain>PolicyBase`, and concrete policies descriptively. Do not append `Concept` to concept names.
 - For a context-dependent concept intended for constrained-parameter syntax, put the candidate type first, but keep the concept definition parameters themselves unconstrained. For example, define `template<typename Candidate, typename StateDef> concept InjectionPolicy = StateDefPolicy<StateDef> && ...`, then use it at public template boundaries as `template<StateDefPolicy StateDef, InjectionPolicy<StateDef> Injection>`.
 - Use constrained public template declarations when the constraint exists and improves diagnostics. Do not claim a template boundary is policy-constrained until the concept is actually implemented there.
@@ -100,8 +104,8 @@ VS Code launch configurations assume that a Debug build already exists; they do 
 
 ## Change discipline
 
-- For architectural work, use the sequence: inspect relevant ADRs and code, define a small pass, implement it, add compile-time and runtime tests, build, test, and reconcile documentation.
-- A normal development pass is: bootstrap or activate `.venv`, edit, apply copyright headers, format, run copyright/format checks, build, run tests, run simulation/analysis when behavior is affected, inspect `git status`, and then prepare the change for review.
+- For architectural work, use the sequence: inspect relevant ADRs and code, define a small pass, implement it, add compile-time and runtime tests, build, test, update the changelog, and reconcile documentation.
+- A normal development pass is: bootstrap or activate `.venv`, edit, update `CHANGELOG.md` for changes worth tracking, reconcile `README.md` and `docs/SETUP.md` when user-facing behavior/layout/tooling/workflow changes, apply copyright headers, format, run copyright/format checks, build, run tests, run simulation/analysis when behavior is affected, inspect `git status`, and then prepare the change for review.
 - Prefer small, reviewable changes. Avoid mixing mechanization work, estimator policy refactors, and unrelated cleanup.
 - Keep existing public behavior and matrix sign conventions unless the task explicitly changes them; verify estimation changes numerically.
 - Do not present planned types or directories from the ADRs as existing code. Future items include propagation/mechanization policies, coordinates, atmosphere, magnetic, and geoid support.

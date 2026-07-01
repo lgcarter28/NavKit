@@ -5,6 +5,7 @@ This index identifies each document's role and authority.
 ## Start here
 
 - [`SETUP.md`](SETUP.md): prerequisites, environment setup, build/test commands, simulation, analysis, and the intended developer workflow.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md): current source layout, CMake target boundaries, namespaces, and data flow.
 - [`ROADMAP.md`](ROADMAP.md): canonical current-state handoff, working roadmap, and dependency order.
 - [`NAMING_CONVENTIONS.md`](NAMING_CONVENTIONS.md): navigation variable, frame, and unit naming.
 - [`FOUNDING.md`](FOUNDING.md): stable mission and design values.

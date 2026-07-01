@@ -3,13 +3,17 @@
 
 #pragma once
 
-#include "navkit/core/measurement/Measurement.hpp"
+#include "navkit/core/estimation/measurement/Measurement.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
 #include <random>
 
 namespace navkit::sim
 {
+
+using navkit::core::Scalar_t;
+using navkit::core::Time_t;
+using navkit::core::estimation::Measurement;
 
 struct GnssSimulatorConfig
 {

@@ -1,18 +1,18 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/core/filter/KalmanFilter.hpp"
-#include "navkit/core/measurement/MeasurementPolicy.hpp"
-#include "navkit/core/state/StateDefs.hpp"
-#include "navkit/models/BaroAltModel.hpp"
-#include "navkit/models/GnssPosModel.hpp"
-#include "navkit/models/GnssVelModel.hpp"
+#include "navkit/core/estimation/filter/KalmanFilter.hpp"
+#include "navkit/core/estimation/measurement/MeasurementPolicy.hpp"
+#include "navkit/core/estimation/state/StateDefs.hpp"
+#include "navkit/core/models/BaroAltModel.hpp"
+#include "navkit/core/models/GnssPosModel.hpp"
+#include "navkit/core/models/GnssVelModel.hpp"
 
 #include <doctest/doctest.h>
 #include <tuple>
 #include <type_traits>
 
-namespace navkit::test
+namespace navkit::core::estimation::test
 {
 
 struct MeasurementPolicyTestStateDef
@@ -136,9 +136,9 @@ struct WrongGainDimensions
 TEST_CASE("MeasurementPolicy accepts compatible measurement models")
 {
     static_assert(MeasurementPolicy<ValidMeasurement, MeasurementPolicyTestStateDef>);
-    static_assert(MeasurementPolicy<GnssPosModel<InsStateDef>, InsStateDef>);
-    static_assert(MeasurementPolicy<GnssVelModel<InsStateDef>, InsStateDef>);
-    static_assert(MeasurementPolicy<BaroAltModel<InsStateDef>, InsStateDef>);
+    static_assert(MeasurementPolicy<navkit::core::models::GnssPosModel<InsStateDef>, InsStateDef>);
+    static_assert(MeasurementPolicy<navkit::core::models::GnssVelModel<InsStateDef>, InsStateDef>);
+    static_assert(MeasurementPolicy<navkit::core::models::BaroAltModel<InsStateDef>, InsStateDef>);
 
     CHECK(true);
 }
@@ -149,7 +149,8 @@ TEST_CASE("MeasurementPolicy rejects incomplete or incompatible models")
     static_assert(!MeasurementPolicy<MissingGainType, MeasurementPolicyTestStateDef>);
     static_assert(!MeasurementPolicy<BadObservationReturn, MeasurementPolicyTestStateDef>);
     static_assert(!MeasurementPolicy<WrongGainDimensions, MeasurementPolicyTestStateDef>);
-    static_assert(!MeasurementPolicy<GnssPosModel<InsStateDef>, MeasurementPolicyTestStateDef>);
+    static_assert(!MeasurementPolicy<navkit::core::models::GnssPosModel<InsStateDef>,
+                                     MeasurementPolicyTestStateDef>);
 
     CHECK(true);
 }
@@ -169,4 +170,4 @@ TEST_CASE("KalmanFilter accepts constrained measurement models at observation bo
     CHECK(filter.has_measurement_statistics<ValidMeasurement>());
 }
 
-} // namespace navkit::test
+} // namespace navkit::core::estimation::test

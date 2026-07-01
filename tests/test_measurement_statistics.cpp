@@ -1,21 +1,21 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/core/filter/KalmanFilter.hpp"
-#include "navkit/core/state/StateDefs.hpp"
-#include "navkit/models/GnssPosModel.hpp"
+#include "navkit/core/estimation/filter/KalmanFilter.hpp"
+#include "navkit/core/estimation/state/StateDefs.hpp"
+#include "navkit/core/models/GnssPosModel.hpp"
 #include "test_main.hpp"
 
 #include <tuple>
 
-namespace navkit::test
+namespace navkit::core::estimation::test
 {
 
 namespace
 {
 
 using StateDef = InsStateDef;
-using Model = GnssPosModel<StateDef>;
+using Model = navkit::core::models::GnssPosModel<StateDef>;
 using Filter = KalmanFilter<StateDef,
                             DefaultInjectionPolicy<StateDef>,
                             DefaultResetPolicy<StateDef>,
@@ -128,4 +128,4 @@ TEST_CASE("rejected measurement update records statistics without updating filte
     CHECK(fixture.filter.covariance().isApprox(fixture.initial_covariance, 1.0e-12));
 }
 
-} // namespace navkit::test
+} // namespace navkit::core::estimation::test

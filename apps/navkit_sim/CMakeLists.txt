@@ -1,5 +1,6 @@
 # Copyright (c) 2026 William Gordon Carter.
 # All Rights Reserved.
 
-add_executable(navkit_sim main.cpp)
-target_link_libraries(navkit_sim PRIVATE navkit::navkit)
+add_executable(navkit_sim_app main.cpp)
+set_target_properties(navkit_sim_app PROPERTIES OUTPUT_NAME navkit_sim)
+target_link_libraries(navkit_sim_app PRIVATE navkit::core navkit::sim navkit::io)

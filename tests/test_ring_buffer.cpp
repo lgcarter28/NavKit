@@ -1,12 +1,12 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/containers/RingBuffer.hpp"
+#include "navkit/core/containers/RingBuffer.hpp"
 #include "test_main.hpp"
 
 TEST_CASE("RingBuffer push/pop order")
 {
-    navkit::RingBuffer<int, 3> rb;
+    navkit::core::containers::RingBuffer<int, 3> rb;
     CHECK(rb.empty());
     CHECK(rb.push(1));
     CHECK(rb.push(2));
@@ -20,7 +20,7 @@ TEST_CASE("RingBuffer push/pop order")
 
 TEST_CASE("RingBuffer rejects overflow by default")
 {
-    navkit::RingBuffer<int, 2> rb;
+    navkit::core::containers::RingBuffer<int, 2> rb;
     CHECK(rb.push(1));
     CHECK(rb.push(2));
     CHECK_FALSE(rb.push(3));

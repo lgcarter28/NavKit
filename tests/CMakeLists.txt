@@ -19,6 +19,6 @@ add_executable(navkit_tests
     test_navigator_policy.cpp
 )
 
-target_link_libraries(navkit_tests PRIVATE navkit::navkit doctest::doctest)
+target_link_libraries(navkit_tests PRIVATE navkit::core navkit::sim doctest::doctest)
 
 add_test(NAME navkit_tests COMMAND navkit_tests)

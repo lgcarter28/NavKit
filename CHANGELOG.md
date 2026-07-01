@@ -36,7 +36,13 @@ This project follows
 - Completed the Phase 2 estimator-boundary refactor scope and explicitly deferred `SensorPolicy` until a Navigator-facing capability boundary exists.
 - Constrained `Navigator` on current filter, sensor-collection, and update-policy capabilities.
 - Clarified ADR-003 and agent guidance around valid C++ concept-definition syntax versus constrained template-parameter syntax.
-- Reorganized public headers from the generic flat `core` bucket into structured `core` and `environment` domain folders, and renamed the internal CMake target alias from `navkit::core` to `navkit::navkit`.
+- Reorganized public headers from the generic flat `core` bucket into structured product-core domain folders.
+- Reorganized public headers under `include/navkit/core` as the reusable product-core boundary, with estimation domains under `core/estimation`, environment under `core/environment`, and simulation/IO kept outside core.
+- Split the monolithic CMake library into `navkit_core`/`navkit::core` for reusable product-core code, `navkit_sim`/`navkit::sim` for simulator support, and `navkit_io`/`navkit::io` for desktop logging/file/JSON support, while keeping runnable executables under `apps/`.
+- Split root CMake orchestration from product-boundary target definitions, moved header-only/interface target definitions under `cmake/targets`, kept compiled simulator target metadata beside simulator sources, and removed the dummy source file by modeling header-only core code as an `INTERFACE` target.
+- Updated the documented development workflow to include changelog updates and README/SETUP reconciliation for user-facing behavior, layout, tooling, or workflow changes.
+- Added a current architecture document and moved detailed target-boundary, namespace, source-layout, and target-kind rationale out of setup-oriented documentation.
+- Aligned public namespaces with the product-core folder structure through the stable domain level: `navkit::core::estimation`, `navkit::core::environment`, `navkit::core::frames`, `navkit::core::models`, `navkit::core::units`, and `navkit::core::containers`.
 
 ### Fixed
 

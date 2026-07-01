@@ -1,23 +1,23 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/core/filter/FilterPolicy.hpp"
-#include "navkit/core/navigator/Navigator.hpp"
-#include "navkit/core/navigator/SensorCollectionPolicy.hpp"
-#include "navkit/core/navigator/update/UpdatePolicy.hpp"
-#include "navkit/core/sensor/Sensor.hpp"
-#include "navkit/core/state/StateDefs.hpp"
-#include "navkit/models/GnssPosModel.hpp"
+#include "navkit/core/estimation/filter/FilterPolicy.hpp"
+#include "navkit/core/estimation/navigator/Navigator.hpp"
+#include "navkit/core/estimation/navigator/SensorCollectionPolicy.hpp"
+#include "navkit/core/estimation/navigator/update/UpdatePolicy.hpp"
+#include "navkit/core/estimation/sensor/Sensor.hpp"
+#include "navkit/core/estimation/state/StateDefs.hpp"
+#include "navkit/core/models/GnssPosModel.hpp"
 #include "test_main.hpp"
 
 #include <tuple>
 #include <type_traits>
 
-namespace navkit::test
+namespace navkit::core::estimation::test
 {
 
 using NavigatorPolicyStateDef = InsStateDef;
-using NavigatorPolicyModel = GnssPosModel<NavigatorPolicyStateDef>;
+using NavigatorPolicyModel = navkit::core::models::GnssPosModel<NavigatorPolicyStateDef>;
 using NavigatorPolicySensor = Sensor<NavigatorPolicyModel, 4>;
 using NavigatorPolicyFilter = KalmanFilter<NavigatorPolicyStateDef>;
 using NavigatorPolicySensors = std::tuple<NavigatorPolicySensor>;
@@ -86,4 +86,4 @@ TEST_CASE("Navigator is constrained by filter, sensor collection, and update bou
     CHECK(true);
 }
 
-} // namespace navkit::test
+} // namespace navkit::core::estimation::test

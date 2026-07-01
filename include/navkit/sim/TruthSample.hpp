@@ -3,13 +3,16 @@
 
 #pragma once
 
-#include "navkit/common/Config.hpp"
+#include "navkit/core/common/Config.hpp"
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
 namespace navkit::sim
 {
+
+using navkit::core::Scalar_t;
+using navkit::core::Time_t;
 
 struct TruthSample
 {

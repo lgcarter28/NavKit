@@ -77,7 +77,7 @@ function template declarations.
 For unary concepts:
 
 \begin{lstlisting}[language=C++]
-template<planet::PlanetPolicy Planet>
+template<environment::PlanetPolicy Planet>
 struct Spherical;
 \end{lstlisting}
 
@@ -426,8 +426,8 @@ mechanization policy.
 For example:
 
 \begin{lstlisting}[language=C++]
-using Planet = planet::Wgs84;
-using Gravity = gravity::J2<Planet>;
+using Planet = environment::Wgs84;
+using Gravity = environment::J2<Planet>;
 using Propagation = mechanization::Pcpf<Planet, Gravity>;
 
 using Nav = Navigator<

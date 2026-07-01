@@ -10,6 +10,9 @@
 namespace navkit::sim
 {
 
+using navkit::core::Scalar_t;
+using navkit::core::Time_t;
+
 struct StationaryTrajectoryConfig
 {
     Time_t duration_s{60.0};

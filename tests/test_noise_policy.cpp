@@ -1,20 +1,20 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/core/measurement/Measurement.hpp"
-#include "navkit/core/sensor/Sensor.hpp"
-#include "navkit/core/sensor/noise/NoisePolicies.hpp"
-#include "navkit/core/sensor/noise/NoisePolicy.hpp"
-#include "navkit/core/state/StateDefs.hpp"
-#include "navkit/models/GnssPosModel.hpp"
+#include "navkit/core/estimation/measurement/Measurement.hpp"
+#include "navkit/core/estimation/sensor/Sensor.hpp"
+#include "navkit/core/estimation/sensor/noise/NoisePolicies.hpp"
+#include "navkit/core/estimation/sensor/noise/NoisePolicy.hpp"
+#include "navkit/core/estimation/state/StateDefs.hpp"
+#include "navkit/core/models/GnssPosModel.hpp"
 
 #include <doctest/doctest.h>
 #include <type_traits>
 
-namespace navkit::test
+namespace navkit::core::estimation::test
 {
 
-using NoiseTestModel = GnssPosModel<InsStateDef>;
+using NoiseTestModel = navkit::core::models::GnssPosModel<InsStateDef>;
 using NoiseTestMeasurement = Measurement<NoiseTestModel::M>;
 
 struct ExactNoisePolicy
@@ -85,4 +85,4 @@ TEST_CASE("Sensor accepts constrained noise policy and preserves fixed capacity"
     CHECK(sensor.noise_context().sigma_v == doctest::Approx(6.0));
 }
 
-} // namespace navkit::test
+} // namespace navkit::core::estimation::test

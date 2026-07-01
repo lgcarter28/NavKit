@@ -344,8 +344,8 @@ Template types may indirectly encode lower-level policies. This is acceptable.
 Example:
 
 \begin{lstlisting}[language=C++]
-using Planet = planet::Wgs84;
-using Gravity = gravity::J2<Planet>;
+using Planet = environment::Wgs84;
+using Gravity = environment::J2<Planet>;
 using Propagation = nav::MechanizationPcpf<Planet, Gravity>;
 using Nav = Navigator<Filter, Sensors, Propagation, UpdatePolicy>;
 \end{lstlisting}

@@ -53,15 +53,45 @@ Target data flow adds multi-rate sensor simulation, mechanization/prediction, an
 ## Repository layout
 
 ```text
-include/    Public C++ headers
-src/        Library and simulation implementation
-apps/       Simulation and replay applications
-tests/      Doctest unit and compile-time tests
-python/     Offline analysis package
-tools/      Cross-platform developer commands
-docs/       Setup, architecture, ADRs, roadmap, and reference material
-data/       Generated logs and datasets
+include/navkit/core/  Reusable product-core public headers
+include/navkit/sim/   Simulation support public headers
+include/navkit/io/    Desktop logging/file/JSON public headers
+cmake/targets/        Header-only/interface CMake target definitions
+src/sim/              Compiled simulator implementation
+apps/                 Simulation and replay applications
+tests/                Doctest unit and compile-time tests
+python/               Offline analysis package
+tools/                Cross-platform developer commands
+docs/                 Setup, architecture, ADRs, roadmap, and reference material
+data/                 Generated logs and datasets
 ```
+
+The reusable product core is currently header-only/template-heavy and is modeled
+as the `navkit::core` CMake `INTERFACE` target. Simulator implementation is
+compiled into `navkit::sim`, while desktop logging/file/JSON support is exposed
+through `navkit::io`.
+
+## Namespaces and targets
+
+| CMake target | Namespace | Role |
+|---|---|---|
+| `navkit::core` | `navkit::core` | Reusable product-core common API and foundational types |
+| `navkit::core` | `navkit::core::containers` | Product-core containers |
+| `navkit::core` | `navkit::core::estimation` | State definitions, measurements, filters, sensors, navigators, and estimator policies |
+| `navkit::core` | `navkit::core::environment` | Planet and gravity policies |
+| `navkit::core` | `navkit::core::frames` | Frame tags and frame-typed helpers |
+| `navkit::core` | `navkit::core::models` | Reusable product-core measurement and process models |
+| `navkit::core` | `navkit::core::units` | Unit and frame helper types |
+| `navkit::sim` | `navkit::sim` | Simulation support |
+| `navkit::io` | `navkit::io` | Desktop logging, file, CSV, and JSON support |
+
+Public namespaces mirror the folder structure through the stable domain level.
+Deeper leaf folders may organize implementation and policy families without
+adding additional namespaces unless that subdomain becomes independently
+meaningful.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for target-boundary,
+namespace, and source-layout rationale.
 
 ## Getting started
 
@@ -90,6 +120,10 @@ python tools/build.py --build-type Debug --build-only
 python tools/run_tests.py --build-type Debug
 ```
 
+For changes worth tracking, update `CHANGELOG.md`. If behavior, layout,
+tooling, or workflow changes, also reconcile `README.md` and `docs/SETUP.md`
+before the final checks.
+
 Run the working demonstration and analysis:
 
 ```text
@@ -100,6 +134,7 @@ python tools/run_analysis.py data/logs/stationary_gnss_demo --show
 ## Documentation
 
 - [Documentation index](docs/README.md)
+- [Current architecture](docs/ARCHITECTURE.md)
 - [Development setup and workflow](docs/SETUP.md)
 - [Master roadmap and current-state handoff](docs/ROADMAP.md)
 - [Naming conventions](docs/NAMING_CONVENTIONS.md)

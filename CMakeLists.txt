@@ -13,31 +13,9 @@ option(NAVKIT_BUILD_TESTS "Build NavKit tests" ON)
 find_package(Eigen3 REQUIRED CONFIG)
 find_package(nlohmann_json REQUIRED CONFIG)
 
-add_library(navkit
-    src/navkit/dummy.cpp
-    src/sim/TrajectoryGenerator.cpp
-    src/sim/GnssSimulator.cpp
-    src/sim/ImuSimulator.cpp
-)
-
-add_library(navkit::navkit ALIAS navkit)
-
-target_include_directories(navkit
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
-)
-
-target_link_libraries(navkit
-    PUBLIC
-        Eigen3::Eigen
-        nlohmann_json::nlohmann_json
-)
-
-target_compile_options(navkit PRIVATE
-    $<$<CXX_COMPILER_ID:MSVC>:/W4>
-    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>
-)
+include(cmake/targets/NavKitCore.cmake)
+include(cmake/targets/NavKitIo.cmake)
+add_subdirectory(src/sim)
 
 add_subdirectory(apps/navkit_sim)
 add_subdirectory(apps/navkit_replay)

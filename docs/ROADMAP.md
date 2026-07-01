@@ -17,10 +17,11 @@ The roadmap separates near-term, dependency-ordered engineering from longer-term
 
 These decisions record conflicts and stale assumptions resolved during roadmap consolidation:
 
-- The task to move WGS-84 constants into `Earth.hpp` is superseded. The implemented direction is the generic `planet::Wgs84` policy under `include/navkit/environment/planet`, consistent with ADR-002.
+- The task to move WGS-84 constants into `Earth.hpp` is superseded. The implemented direction is the generic `navkit::core::environment::Wgs84` policy under `include/navkit/core/environment/planet`, consistent with ADR-002.
 - Environment-policy Pass 1 is substantially implemented: planet/gravity concepts, CRTP bases, frame tags, WGS-84, Moon, Mars, spherical gravity, J2 gravity, and environment tests exist.
 - The estimator policy refactor is partially complete. `StateDefPolicy`, `InjectionPolicy`, `ResetPolicy`, `MeasurementPolicy`, `NoisePolicy`, `FilterPolicy`, `SensorCollectionPolicy`, and `UpdatePolicy` exist. `KalmanFilter` is constrained on state, injection, reset, and measurement-model boundaries; `Sensor` is constrained on noise-policy compatibility; and `Navigator` is constrained on current filter, sensor-collection, and update-policy boundaries. Propagation remains future work.
-- Public headers are organized by engineering domain. The structured `core` tree contains the core estimation/navigation framework domains (`state`, `measurement`, `filter`, `sensor`, and `navigator`), while physical environment models live under `environment` (`planet`, `gravity`, and future atmosphere/magnetic/geoid/terrain domains). Cross-cutting and support domains such as `common`, `containers`, `frames`, `units`, `models`, `sim`, and `io` remain top-level.
+- Public headers are organized by product boundary first, then engineering domain. `include/navkit/core` is the reusable product core, with estimation/navigation domains under `core/estimation`, environment models under `core/environment`, and reusable support domains such as `common`, `containers`, `frames`, `units`, and `models` also under `core`. Desktop simulation support remains under `include/navkit/sim`; desktop logging/file/JSON support remains under `include/navkit/io`.
+- CMake targets now separate product boundaries: `navkit_core`/`navkit::core` is the reusable product-core interface library, `navkit_sim`/`navkit::sim` is the compiled simulator support library, `navkit_io`/`navkit::io` is the desktop logging/file/JSON interface library, and runnable executables remain applications under `apps/`.
 - `GnssPosModel`, `GnssVelModel`, and `BaroAltModel` exist, but only GNSS position is integrated into the current simulation. The barometer model currently selects the third position component; it is not yet a general ECEF-to-local-vertical altitude model.
 - The current trajectory generator supports only a simplistic stationary ECEF trajectory. It sets body rate to zero and therefore does not model Earth rotation correctly for stationary IMU truth.
 - `ImuSimulator` and `BaroSimulator` are empty shells, and the IMU process model is a placeholder.
@@ -34,12 +35,14 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Python wrappers support build, test, stationary simulation, analysis, formatting, and copyright checks.
 - [x] Fixed-capacity `RingBuffer`, fixed-size state/covariance aliases, and named state segments exist.
 - [x] Generic measurement update, Joseph-form covariance update, injection/reset hooks, sensor queues, Navigator orchestration, and measurement statistics exist.
-- [x] Public headers use structured domain-first organization with no flat `include/navkit/core` catch-all.
+- [x] Public headers use structured product-boundary/domain organization with no flat `include/navkit/core` catch-all.
+- [x] Reusable product-core, simulator support, IO support, and app executable targets are separated as `navkit::core`, `navkit::sim`, `navkit::io`, and `apps/*`; header-only/template-heavy targets are modeled as `INTERFACE`.
 - [x] Stationary GNSS-position simulation writes truth, measurement, navigation, metadata, manifest, and update-statistics logs.
 - [x] Offline plotting is separated from the embedded C++ library.
 - [x] Planet, gravity, frame, and basic unit/frame infrastructure exists.
 - [x] ADRs document the proposed compile-time policy architecture.
 - [x] ADR-003 documents the C++ syntax distinction between unconstrained concept definitions and constrained public template parameters.
+- [x] Current architecture overview documents implemented product boundaries, namespaces, target kinds, and current data flow.
 - [x] Repository setup, naming, founding, licensing, changelog, and copyright documentation exists.
 
 ---
@@ -75,7 +78,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Architecture records
 
-- [ ] Write a concise current architecture overview that distinguishes implemented code from target architecture.
+- [x] Write a concise current architecture overview that distinguishes implemented code from target architecture.
 - [ ] Review ADR-001 through ADR-003 and either accept them, revise them, or keep them Proposed with explicit unresolved questions.
 - [ ] Reconcile README, `SETUP.md`, and this roadmap after those decisions.
 
@@ -156,7 +159,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 - [ ] Define the minimum coordinate operations needed by PCPF/ECEF mechanization and local-vertical measurements.
 - [ ] Confirm position, velocity, attitude, angular-rate, and specific-force frame conventions in code and documentation.
-- [ ] Integrate `planet::Wgs84` and the selected gravity policy into physics code without adding an Earth-specific framework layer.
+- [ ] Integrate `environment::Wgs84` and the selected gravity policy into physics code without adding an Earth-specific framework layer.
 - [ ] Add tested helpers for required ECEF/geodetic/local-vertical conversions.
 
 ## Truth generation
@@ -291,7 +294,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 ## Embedded deployment
 
 - [ ] Define allocation, exception, RTTI, logging, and timing constraints for supported embedded profiles.
-- [ ] Separate desktop simulation dependencies from the flight-capable library boundary.
+- [x] Separate desktop simulation and IO source from the reusable product-core boundary with `navkit::core`, `navkit::sim`, and `navkit::io` targets.
 - [ ] Add embedded toolchain profiles and a hardware abstraction boundary when a target is selected.
 - [ ] Add runtime and memory budgets to CI or target qualification tests.
 

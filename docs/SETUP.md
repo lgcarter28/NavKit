@@ -308,6 +308,23 @@ In day-to-day development, `--build-only` is typically sufficient unless CMake c
 
 ---
 
+## CMake Target Layout
+
+The root `CMakeLists.txt` is intentionally an orchestration layer. Header-only/interface target definitions live under `cmake/targets/`, while compiled source targets stay with their sources:
+
+```text
+cmake/targets/NavKitCore.cmake   navkit_core / navkit::core
+cmake/targets/NavKitIo.cmake     navkit_io / navkit::io
+src/sim/CMakeLists.txt           navkit_sim / navkit::sim
+```
+
+Applications should link only the product-boundary targets they need. For example, `apps/navkit_sim` links `navkit::core`, `navkit::sim`, and `navkit::io`, while `apps/navkit_replay` currently links only `navkit::core`.
+
+For target boundaries, namespaces, and the header-only versus compiled-library
+rationale, see [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+---
+
 ## Build NavKit Manually with Conan and CMake
 
 The Python wrapper is preferred, but the raw commands are useful for debugging.
@@ -446,7 +463,7 @@ Future plotting utilities will include:
 
 - Truth vs estimate
 - Position error
-- 3σ covariance bounds
+- 3-sigma covariance bounds
 - Innovation history
 - NEES
 - NIS
@@ -550,11 +567,11 @@ Useful first breakpoints:
 ```text
 apps/navkit_sim/main.cpp
 
-include/navkit/core/navigator/Navigator.hpp
-include/navkit/core/filter/KalmanFilter.hpp
-include/navkit/core/sensor/Sensor.hpp
-include/navkit/models/GnssPosModel.hpp
-include/navkit/core/filter/injection/InjectionPolicies.hpp
+include/navkit/core/estimation/navigator/Navigator.hpp
+include/navkit/core/estimation/filter/KalmanFilter.hpp
+include/navkit/core/estimation/sensor/Sensor.hpp
+include/navkit/core/models/GnssPosModel.hpp
+include/navkit/core/estimation/filter/injection/InjectionPolicies.hpp
 ```
 
 Useful call path for the first simulation:
@@ -600,12 +617,17 @@ python tools/run_first_sim.py --build-type Debug
 
 python tools/run_analysis.py data/logs/stationary_gnss_demo --show
 
+update CHANGELOG.md for changes worth tracking
+
+reconcile README.md and docs/SETUP.md when user-facing behavior, layout,
+tooling, or workflow changes
+
 git status
 git add ...
 git commit
 ```
 
-All source-mutating copyright and formatting steps occur before the final build and tests. CI runs only the check forms, then builds and tests the exact checked source.
+All source-mutating copyright and formatting steps occur before the final build and tests. Changelog and documentation reconciliation should happen before the final checks so the reviewed change includes code, build metadata, and user-facing guidance together. CI runs only the check forms, then builds and tests the exact checked source.
 
 ---
 

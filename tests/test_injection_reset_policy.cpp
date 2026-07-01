@@ -1,15 +1,15 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/core/filter/KalmanFilter.hpp"
-#include "navkit/core/filter/injection/InjectionPolicy.hpp"
-#include "navkit/core/filter/reset/ResetPolicy.hpp"
-#include "navkit/core/state/StateDefs.hpp"
+#include "navkit/core/estimation/filter/KalmanFilter.hpp"
+#include "navkit/core/estimation/filter/injection/InjectionPolicy.hpp"
+#include "navkit/core/estimation/filter/reset/ResetPolicy.hpp"
+#include "navkit/core/estimation/state/StateDefs.hpp"
 
 #include <doctest/doctest.h>
 #include <type_traits>
 
-namespace navkit::test
+namespace navkit::core::estimation::test
 {
 
 struct PolicyTestStateDef
@@ -104,4 +104,4 @@ TEST_CASE("KalmanFilter accepts constrained injection and reset policies")
     CHECK(filter.state().isZero());
 }
 
-} // namespace navkit::test
+} // namespace navkit::core::estimation::test

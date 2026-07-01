@@ -1,14 +1,14 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/core/state/State.hpp"
-#include "navkit/core/state/StateDefPolicy.hpp"
-#include "navkit/core/state/StateDefs.hpp"
+#include "navkit/core/estimation/state/State.hpp"
+#include "navkit/core/estimation/state/StateDefPolicy.hpp"
+#include "navkit/core/estimation/state/StateDefs.hpp"
 
 #include <doctest/doctest.h>
 #include <type_traits>
 
-namespace navkit::test
+namespace navkit::core::estimation::test
 {
 
 struct ValidStateDef
@@ -115,4 +115,4 @@ TEST_CASE("State and StateCov use StateDefPolicy-constrained fixed sizes")
     CHECK(p.cols() == ValidStateDef::N);
 }
 
-} // namespace navkit::test
+} // namespace navkit::core::estimation::test
