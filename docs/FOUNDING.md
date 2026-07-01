@@ -19,7 +19,7 @@ Core principles:
 - Strong typing, compile-time safety, and determinism.
 - Desktop-first development with embedded deployment.
 - Long-term maintainability.
-- Modern C++23.
+- Modern C++, with C++23 as the intended target and C++20 as the currently configured build standard.
 - Platform agnosticism.
 
 ## Scope

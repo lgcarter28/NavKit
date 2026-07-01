@@ -14,15 +14,17 @@ This project follows
 
 ### Added
 
-- Placeholder for upcoming development.
+- A canonical current-state handoff and master roadmap.
+- Repository-wide agent guidance and documentation indexes.
 
 ### Changed
 
-- Placeholder for upcoming development.
+- Reconciled README and setup documentation with the current implementation and build configuration.
+- Consolidated superseded TODO lists and early core design notes into the canonical roadmap before removing them.
 
 ### Fixed
 
-- Placeholder for upcoming development.
+- Removed stale feature-status claims and clarified the current C++20 versus target C++23 mismatch.
 
 ---
 

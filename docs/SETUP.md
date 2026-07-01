@@ -10,7 +10,7 @@ NavKit is developed using modern C++, CMake, Conan, Python, and VS Code. The bui
 
 NavKit currently expects:
 
-- C++23-capable compiler
+- C++20-capable compiler (C++23-capable recommended for the planned language-target migration)
 - CMake 3.23 or newer
 - Conan 2.x
 - Python 3.10 or newer
@@ -54,7 +54,7 @@ Verify CMake is available:
 cmake --version
 ```
 
-NavKit targets **C++23**, and the latest Visual Studio 2026 MSVC toolset should support the language features used throughout the project.
+NavKit's documented target is **C++23**, but the active CMake configuration currently sets `CMAKE_CXX_STANDARD` to 20. Use a C++23-capable toolchain so the repository can migrate deliberately; current builds must continue to work with the configured C++20 standard until that roadmap item is completed.
 
 ---
 
@@ -379,7 +379,7 @@ ctest --test-dir build/Release --output-on-failure -C Release
 Run the first GNSS-only stationary simulation:
 
 ```bash
-python tools/run_first_sim.py
+python tools/run_first_sim.py --build-type Debug
 ```
 
 Or manually, after building:
@@ -592,7 +592,7 @@ python tools/build.py --build-type Debug --build-only
 
 python tools/run_tests.py --build-type Debug
 
-python tools/run_first_sim.py
+python tools/run_first_sim.py --build-type Debug
 
 python tools/run_analysis.py data/logs/stationary_gnss_demo --show
 

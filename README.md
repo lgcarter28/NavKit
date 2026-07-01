@@ -1,181 +1,103 @@
-
 # NavKit
 
-> **A modular estimation and navigation development platform for embedded aerospace systems.**
+> A modular estimation and navigation development platform for embedded aerospace systems.
 
-[![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)]()
-[![CMake](https://img.shields.io/badge/CMake-3.25+-brightgreen.svg)]()
-[![Conan](https://img.shields.io/badge/Conan-2.x-orange.svg)]()
-[![Python](https://img.shields.io/badge/Python-3.11+-yellow.svg)]()
-![Status](https://img.shields.io/badge/Status-Active_Development-blue)
+![C++](https://img.shields.io/badge/C%2B%2B-20%20current%20%7C%2023%20target-blue)
+![CMake](https://img.shields.io/badge/CMake-3.23%2B-brightgreen)
+![Conan](https://img.shields.io/badge/Conan-2.x-orange)
+![Python](https://img.shields.io/badge/Python-3.10%2B-yellow)
+![Status](https://img.shields.io/badge/status-active%20development-blue)
 
-NavKit is a modular C++ estimation and navigation development platform for embedded aerospace systems.
+NavKit is a C++ estimation and navigation framework aimed at embedded aerospace systems. It combines fixed-size estimation infrastructure with simulation, logging, and offline analysis so navigation algorithms can be developed and validated in one repository.
 
-Rather than being a single navigation filter implementation, NavKit provides reusable infrastructure for developing, simulating, validating, analyzing, and ultimately deploying modern navigation and sensor-fusion algorithms. Although the initial focus is strapdown inertial navigation, the architecture is intentionally general enough to support future GNSS, vision, LiDAR, radar, celestial, and other aiding sources.
+The current working demonstration is a stationary GNSS-position estimator. The longer-term objective is a reusable, embedded-ready INS/GNSS platform with additional mechanizations, aiding sources, environments, and validation workflows.
 
-The long-term objective is to evolve NavKit into a commercial-grade engineering platform for developing and validating embedded autonomy and navigation software.
-
----
-
-# Why NavKit?
-
-Most navigation software falls into one of two categories:
-
-- Research code that is difficult to maintain and extend.
-- Flight code that is highly specialized to a single vehicle or program.
-
-NavKit is intended to bridge that gap by providing reusable engineering infrastructure that supports the entire development lifecycle:
-
-- Algorithm development
-- High-fidelity simulation
-- Sensor modeling
-- Estimator validation
-- Statistical consistency analysis
-- Embedded deployment
-
-The emphasis is on **reusable architecture**, **professional validation**, and **long-term maintainability**.
-
----
-
-# Feature Matrix
+## Current status
 
 | Capability | Status |
-|------------|:------:|
-| Generic Error-State Extended Kalman Filter | ✅ |
-| Compile-Time State Definitions | ✅ |
-| Generic Measurement Framework | ✅ |
-| Policy-Based Filter Architecture | ✅ |
-| Ring Buffers & Segments | ✅ |
-| JSON Configuration | ✅ |
-| CSV Logging | ✅ |
-| Professional Plotting & Analysis | ✅ |
-| Innovation Logging | ✅ |
-| NIS & p-Value Analysis | ✅ |
-| Strapdown INS Mechanization | 🚧 |
-| IMU Simulator | 🚧 |
-| GNSS Velocity | 🚧 |
-| Monte Carlo Framework | 📋 |
-| Latency Compensation | 📋 |
-| RTS Smoothing | 📋 |
-| Vision Aiding | 🔮 |
+|---|---|
+| Fixed-size error-state Kalman filter | Implemented |
+| Compile-time state definitions and segments | Implemented |
+| Measurement models, sensor queues, and update statistics | Implemented |
+| Planet, gravity, and frame policies | Implemented |
+| Stationary GNSS-position simulation and logging | Implemented |
+| Covariance, innovation, NIS, p-value, and histogram analysis | Implemented |
+| Fully constrained estimator policy architecture | In progress |
+| GNSS velocity and barometer integration | Planned; model classes exist |
+| Propagation policy and strapdown INS mechanization | Planned |
+| IMU and barometer simulation | Planned; shells exist |
+| Monte Carlo and automatic validation reports | Planned |
 
-Legend: ✅ Complete · 🚧 In Progress · 📋 Planned · 🔮 Long-Term
+The documented language target is C++23; the active CMake configuration currently builds as C++20. Resolving and validating that migration is tracked in the [master roadmap](docs/ROADMAP.md).
 
----
+## Architecture direction
 
-# Architecture
-
-> **Placeholder:** add `docs/images/navkit_architecture.svg`
+NavKit favors compile-time capability checks, policy-based composition, fixed-size Eigen types, and runtime algorithms that focus on orchestration. The proposed architectural pattern is:
 
 ```text
-Truth Generator
-        │
-        ▼
- Sensor Simulators
-        │
-        ▼
-  Navigator
- ├── Mechanization
- ├── Prediction
- └── Measurement Updates
-        │
-        ▼
- Measurement Statistics
-        │
-        ▼
- CSV Logs + Manifest
-        │
-        ▼
- Python Analysis
- ├── Covariance
- ├── Innovations
- ├── NIS
- ├── p-Values
- └── Monte Carlo
+concept -> optional CRTP base -> concrete policy -> runtime algorithm
 ```
 
----
+Today, the environment policies most fully realize this pattern. The estimator is partway through the same refactor, and Navigator does not yet have a propagation/mechanization policy.
 
-# Analysis Pipeline
-
-> **Placeholder:** Add plots of:
->
-> - Position Error ±3σ
-> - Innovation Plots
-> - NIS / p-Value Consistency
-> - Innovation Histograms
-
-These figures are automatically generated by the Python analysis tools and are intended to provide professional-grade estimator validation.
-
----
-
-# Repository Layout
+Current data flow:
 
 ```text
-include/      Public headers
-src/          Library implementation
-apps/         Applications
-tests/        Unit tests
-python/       Analysis tools
-tools/        Developer tooling
-docs/         Documentation
-examples/     Example projects
-data/         Logs and datasets
+stationary truth -> GNSS simulator -> Sensor queue -> Navigator
+    -> KalmanFilter measurement update -> measurement statistics
+    -> CSV/JSON logs -> Python analysis
 ```
 
----
+Target data flow adds multi-rate sensor simulation, mechanization/prediction, and broader validation; it should not be mistaken for current functionality.
 
-# Design Philosophy
-
-See [docs/FOUNDING.md](docs/FOUNDING.md) for more details on the philosophy behind this project.
-
----
-
-# Getting Started
-
-See **docs/SETUP.md** for complete installation and development setup.
-
-Typical development workflow:
+## Repository layout
 
 ```text
-python tools/copyright.py --write
+include/    Public C++ headers
+src/        Library and simulation implementation
+apps/       Simulation and replay applications
+tests/      Doctest unit and compile-time tests
+python/     Offline analysis package
+tools/      Cross-platform developer commands
+docs/       Setup, architecture, ADRs, roadmap, and reference material
+data/       Generated logs and datasets
+```
+
+## Getting started
+
+Follow [docs/SETUP.md](docs/SETUP.md) for prerequisites and initial setup. The repository's Python wrappers are the primary developer interface.
+
+First or clean Debug build:
+
+```text
+python tools/build.py --build-type Debug --clean
+```
+
+Normal edit/build/test cycle:
+
+```text
 python tools/format.py
 python tools/build.py --build-type Debug --build-only
-python tools/run_tests.py
-python tools/run_first_sim.py
+python tools/run_tests.py --build-type Debug
+```
+
+Run the working demonstration and analysis:
+
+```text
+python tools/run_first_sim.py --build-type Debug
 python tools/run_analysis.py data/logs/stationary_gnss_demo --show
 ```
 
----
+## Documentation
 
-# Milestone Roadmap
+- [Documentation index](docs/README.md)
+- [Development setup and workflow](docs/SETUP.md)
+- [Master roadmap and current-state handoff](docs/ROADMAP.md)
+- [Naming conventions](docs/NAMING_CONVENTIONS.md)
+- [Founding principles](docs/FOUNDING.md)
+- [Architecture decision records](docs/adr/)
+- [Navigation reference](docs/navigation_reference/README.md)
 
-| Milestone | Goal |
-|-----------|------|
-| Foundation | Generic estimation framework, logging, analysis |
-| Milestone 1 | Complete ECEF Strapdown INS |
-| Milestone 2 | Professional Navigation Toolkit |
-| Milestone 3 | Advanced Multi-Sensor Navigation |
+## License
 
-See `CHANGELOG.md` and the project roadmap for current progress.
-
----
-
-# Documentation
-
-- docs/SETUP.md
-- docs/NAMING_CONVENTIONS.md
-- docs/FOUNDING.md
-- docs/ARCHITECTURE.md *(planned)*
-
----
-
-# License
-
-NavKit is proprietary software.
-
-See:
-
-- LICENSE
-- COPYRIGHT.md
-- CHANGELOG.md
+NavKit is proprietary software. See [LICENSE](LICENSE) and [COPYRIGHT.md](COPYRIGHT.md).
