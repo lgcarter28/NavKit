@@ -5,6 +5,7 @@ find_package(doctest REQUIRED CONFIG)
 
 add_executable(navkit_tests
     test_main.cpp
+    test_injection_reset_policy.cpp
     test_ring_buffer.cpp
     test_segment.cpp
     test_state_def_policy.cpp

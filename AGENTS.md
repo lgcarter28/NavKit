@@ -24,7 +24,7 @@ Concepts express capabilities; CRTP bases share implementation and are not manda
 - The project requires **C++23** (`CMAKE_CXX_STANDARD 23`). Keep public code and supported toolchains compatible with that configured standard.
 - Environment policies are the most complete realization of the target architecture: planet and gravity concepts, CRTP bases, concrete WGS84/Moon/Mars and spherical/J2 implementations, plus frame tags.
 - `StateDefPolicy` and `SegmentPolicy` exist. `State<StateDef>` and `StateCov<StateDef>` are fixed-size Eigen aliases, and `InsStateDef`/`GnssTcStateDef` provide named segments.
-- The estimator refactor is only partial. `KalmanFilter`, `Sensor`, and `Navigator` have policy-shaped template parameters, but most are unconstrained `typename` parameters. Concepts for injection, reset, measurement, noise, filter, sensor collection, propagation, and update policies are not yet implemented.
+- The estimator refactor is only partial. `InjectionPolicy` and `ResetPolicy` exist, and `KalmanFilter` is constrained on `StateDefPolicy`, injection, and reset policies. `Sensor`, `Navigator`, measurement models, noise policies, filter boundaries, sensor collections, propagation, and update policies still need concept coverage.
 - `KalmanFilter` performs measurement updates, stores optional per-model statistics, and delegates injection/reset. The default injection is INS-specific; the default covariance reset is intentionally a no-op.
 - `Navigator` processes a tuple of sensors and applies an update policy. It has no propagation/mechanization policy yet.
 - INS propagation is not implemented; `ImuProcessModelPlaceholder` is only a placeholder.
@@ -37,7 +37,7 @@ Concepts express capabilities; CRTP bases share implementation and are not manda
 - Keep runtime algorithms focused on orchestration; place planet, gravity, frames, and future mechanization details in the relevant policies.
 - Organize code by engineering domain (`planet`, `gravity`, `frames`, `core`, `models`, `sim`, etc.), not in a generic catch-all directory.
 - Name concepts `<Domain>Policy`, optional CRTP bases `<Domain>PolicyBase`, and concrete policies descriptively. Do not append `Concept` to concept names.
-- For a context-dependent concept intended for constrained-parameter syntax, put the candidate type first, for example `template<typename Candidate, StateDefPolicy StateDef> concept InjectionPolicy = ...`.
+- For a context-dependent concept intended for constrained-parameter syntax, put the candidate type first, but keep the concept definition parameters themselves unconstrained. For example, define `template<typename Candidate, typename StateDef> concept InjectionPolicy = StateDefPolicy<StateDef> && ...`, then use it at public template boundaries as `template<StateDefPolicy StateDef, InjectionPolicy<StateDef> Injection>`.
 - Use constrained public template declarations when the constraint exists and improves diagnostics. Do not claim a template boundary is policy-constrained until the concept is actually implemented there.
 - Follow `docs/NAMING_CONVENTIONS.md` for navigation variables: Groves-style frame notation, `p` for position, and unit suffixes in CSV headers.
 - New source files should retain the repository copyright header and All Rights Reserved notice.

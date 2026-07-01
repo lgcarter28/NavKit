@@ -105,13 +105,27 @@ must be the first template parameter of the concept.
 For example:
 
 \begin{lstlisting}[language=C++]
-template<typename T, StateDefPolicy StateDef>
+template<typename T, typename StateDef>
 concept InjectionPolicy =
-    requires(State<StateDef>& x, State<StateDef>& dx)
+    StateDefPolicy<StateDef> &&
+    requires(State<StateDef>& x, const State<StateDef>& dx)
 {
-    T::apply(x, dx);
+    { T::apply(x, dx) } -> std::same_as<void>;
 };
 \end{lstlisting}
+
+The concept definition itself uses unconstrained \texttt{typename} parameters
+and composes any prerequisite concepts in the concept body. In standard C++,
+concept definitions cannot have associated constraints on their own template
+parameter list. For example, this tempting spelling is invalid:
+
+\begin{lstlisting}[language=C++]
+template<typename T, StateDefPolicy StateDef>
+concept InjectionPolicy = ...; // invalid concept definition syntax
+\end{lstlisting}
+
+The constrained-parameter syntax is reserved for templates that consume the
+concept, not for the definition of the concept itself.
 
 Then this declaration:
 
@@ -148,6 +162,13 @@ not:
 
 \begin{lstlisting}[language=C++]
 template<typename Context, typename Candidate>
+concept SomePolicy = ...;
+\end{lstlisting}
+
+and not:
+
+\begin{lstlisting}[language=C++]
+template<typename Candidate, SomeOtherPolicy Context>
 concept SomePolicy = ...;
 \end{lstlisting}
 
@@ -200,7 +221,7 @@ For example:
 \begin{lstlisting}[language=C++]
 struct AdditiveInjection
 {
-    static void apply(State<MyStateDef>& x, State<MyStateDef>& dx);
+    static void apply(State<MyStateDef>& x, const State<MyStateDef>& dx);
 };
 \end{lstlisting}
 
@@ -247,11 +268,12 @@ the nominal state.
 Example concept:
 
 \begin{lstlisting}[language=C++]
-template<typename T, StateDefPolicy StateDef>
+template<typename T, typename StateDef>
 concept InjectionPolicy =
-    requires(State<StateDef>& x, State<StateDef>& dx)
+    StateDefPolicy<StateDef> &&
+    requires(State<StateDef>& x, const State<StateDef>& dx)
 {
-    T::apply(x, dx);
+    { T::apply(x, dx) } -> std::same_as<void>;
 };
 \end{lstlisting}
 
@@ -260,7 +282,7 @@ Example concrete policy:
 \begin{lstlisting}[language=C++]
 struct AdditiveInjection
 {
-    static void apply(State<MyStateDef>& x, State<MyStateDef>& dx)
+    static void apply(State<MyStateDef>& x, const State<MyStateDef>& dx)
     {
         x.vector() -= dx.vector();
     }
@@ -279,14 +301,15 @@ injection.
 Example concept:
 
 \begin{lstlisting}[language=C++]
-template<typename T, StateDefPolicy StateDef>
+template<typename T, typename StateDef>
 concept ResetPolicy =
+    StateDefPolicy<StateDef> &&
     requires(State<StateDef>& x,
              State<StateDef>& dx,
              StateCov<StateDef>& P)
 {
-    T::reset_dx(dx);
-    T::reset_covariance(x, dx, P);
+    { T::reset_dx(dx) } -> std::same_as<void>;
+    { T::reset_covariance(x, dx, P) } -> std::same_as<void>;
 };
 \end{lstlisting}
 
@@ -306,8 +329,9 @@ Measurement policies should follow the same ordering rule.
 Example:
 
 \begin{lstlisting}[language=C++]
-template<typename T, StateDefPolicy StateDef>
+template<typename T, typename StateDef>
 concept MeasurementPolicy =
+    StateDefPolicy<StateDef> &&
     requires(State<StateDef>& x, typename T::NoiseContext& ctx)
 {
     T::M;
@@ -339,8 +363,9 @@ policies.
 For example:
 
 \begin{lstlisting}[language=C++]
-template<typename T, typename Measurement, StateDefPolicy StateDef>
+template<typename T, typename Measurement, typename StateDef>
 concept NoisePolicy =
+    StateDefPolicy<StateDef> &&
     MeasurementPolicy<Measurement, StateDef> &&
     requires(...)
 {

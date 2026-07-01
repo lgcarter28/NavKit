@@ -3,7 +3,9 @@
 
 #pragma once
 
+#include "navkit/core/InjectionPolicy.hpp"
 #include "navkit/core/MeasurementStatistics.hpp"
+#include "navkit/core/ResetPolicy.hpp"
 #include "navkit/core/State.hpp"
 #include "navkit/core/policies/InjectionPolicies.hpp"
 #include "navkit/core/policies/ResetPolicies.hpp"
@@ -14,9 +16,9 @@
 namespace navkit
 {
 
-template<typename StateDef,
-         typename InjectionPolicy = DefaultInjectionPolicy<StateDef>,
-         typename ResetPolicy = DefaultResetPolicy<StateDef>,
+template<StateDefPolicy StateDef,
+         InjectionPolicy<StateDef> Injection = DefaultInjectionPolicy<StateDef>,
+         ResetPolicy<StateDef> Reset = DefaultResetPolicy<StateDef>,
          typename MeasurementModels = std::tuple<>>
 class KalmanFilter
 {
@@ -172,13 +174,13 @@ public:
 
     void inject()
     {
-        InjectionPolicy::apply(m_x, m_dx);
+        Injection::apply(m_x, m_dx);
     }
 
     void reset()
     {
-        ResetPolicy::reset_covariance(m_x, m_dx, m_P);
-        ResetPolicy::reset_dx(m_dx);
+        Reset::reset_covariance(m_x, m_dx, m_P);
+        Reset::reset_dx(m_dx);
     }
 
 private:

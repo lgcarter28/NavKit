@@ -19,7 +19,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 - The task to move WGS-84 constants into `Earth.hpp` is superseded. The implemented direction is the generic `planet::Wgs84` policy under `include/navkit/planet`, consistent with ADR-002.
 - Environment-policy Pass 1 is substantially implemented: planet/gravity concepts, CRTP bases, frame tags, WGS-84, Moon, Mars, spherical gravity, J2 gravity, and environment tests exist.
-- The estimator policy refactor is only partially complete. `StateDefPolicy` exists, but injection, reset, measurement, noise, filter, propagation, sensor-collection, and update concepts do not.
+- The estimator policy refactor is only partially complete. `StateDefPolicy`, `InjectionPolicy`, and `ResetPolicy` exist, and `KalmanFilter` is constrained on those boundaries. Measurement, noise, filter, propagation, sensor-collection, and update concepts remain future work.
 - `GnssPosModel`, `GnssVelModel`, and `BaroAltModel` exist, but only GNSS position is integrated into the current simulation. The barometer model currently selects the third position component; it is not yet a general ECEF-to-local-vertical altitude model.
 - The current trajectory generator supports only a simplistic stationary ECEF trajectory. It sets body rate to zero and therefore does not model Earth rotation correctly for stationary IMU truth.
 - `ImuSimulator` and `BaroSimulator` are empty shells, and the IMU process model is a placeholder.
@@ -37,6 +37,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Offline plotting is separated from the embedded C++ library.
 - [x] Planet, gravity, frame, and basic unit/frame infrastructure exists.
 - [x] ADRs document the proposed compile-time policy architecture.
+- [x] ADR-003 documents the C++ syntax distinction between unconstrained concept definitions and constrained public template parameters.
 - [x] Repository setup, naming, founding, licensing, changelog, and copyright documentation exists.
 
 ---
@@ -93,12 +94,12 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Injection and reset
 
-- [ ] Define candidate-first `InjectionPolicy<Candidate, StateDef>`.
-- [ ] Define candidate-first `ResetPolicy<Candidate, StateDef>`.
-- [ ] Constrain `KalmanFilter` on `StateDefPolicy`, injection, and reset policies.
-- [ ] Preserve the current INS additive-injection sign convention and zero-error reset behavior.
-- [ ] Keep covariance reset explicitly a no-op until attitude-aware reset is designed.
-- [ ] Add valid and invalid compile-time policy tests.
+- [x] Define candidate-first `InjectionPolicy<Candidate, StateDef>`.
+- [x] Define candidate-first `ResetPolicy<Candidate, StateDef>`.
+- [x] Constrain `KalmanFilter` on `StateDefPolicy`, injection, and reset policies.
+- [x] Preserve the current INS additive-injection sign convention and zero-error reset behavior.
+- [x] Keep covariance reset explicitly a no-op until attitude-aware reset is designed.
+- [x] Add valid and invalid compile-time policy tests.
 
 ## Measurement models
 
