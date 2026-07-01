@@ -11,6 +11,7 @@ The roadmap separates near-term, dependency-ordered engineering from longer-term
 - Treat ADR-001, ADR-002, and ADR-003 as proposed architectural direction. Update their status or content when the implementation decision is actually accepted.
 - Before starting a phase, turn it into a small implementation plan with named files, tests, and acceptance evidence.
 - Mark an item complete only after its tests and documentation are part of the configured build or workflow.
+- Treat configuration clarity, compiler/toolchain hardening, performance instrumentation, and intentional test coverage as first-class architecture work, not cleanup to defer until late embedded qualification.
 - Keep owner-only legal, employment, account, release, and backup actions separate from engineering work.
 
 ## Reconciliation decisions
@@ -22,10 +23,13 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - The estimator policy refactor is partially complete. `StateDefPolicy`, `InjectionPolicy`, `ResetPolicy`, `MeasurementPolicy`, `NoisePolicy`, `FilterPolicy`, `SensorCollectionPolicy`, and `UpdatePolicy` exist. `KalmanFilter` is constrained on state, injection, reset, and measurement-model boundaries; `Sensor` is constrained on noise-policy compatibility; and `Navigator` is constrained on current filter, sensor-collection, and update-policy boundaries. Propagation remains future work.
 - Public headers are organized by product boundary first, then engineering domain. `include/navkit/core` is the reusable product core, with estimation/navigation domains under `core/estimation`, environment models under `core/environment`, and reusable support domains such as `common`, `containers`, `frames`, `units`, and `models` also under `core`. Desktop simulation support remains under `include/navkit/sim`; desktop logging/file/JSON support remains under `include/navkit/io`.
 - CMake targets now separate product boundaries: `navkit_core`/`navkit::core` is the reusable product-core interface library, `navkit_sim`/`navkit::sim` is the compiled simulator support library, `navkit_io`/`navkit::io` is the desktop logging/file/JSON interface library, and runnable executables remain applications under `apps/`.
+- `core/common` currently contains foundational aliases and configuration constants, but the configuration story is not yet a clear swappable compile-time configuration architecture.
+- Debug and Release build flags are not yet treated as explicit engineering products. Release optimization settings, strict Debug diagnostics, and static-analysis expectations should be made deliberate before performance trends become meaningful.
 - `GnssPosModel`, `GnssVelModel`, and `BaroAltModel` exist, but only GNSS position is integrated into the current simulation. The barometer model currently selects the third position component; it is not yet a general ECEF-to-local-vertical altitude model.
 - The current trajectory generator supports only a simplistic stationary ECEF trajectory. It sets body rate to zero and therefore does not model Earth rotation correctly for stationary IMU truth.
 - `ImuSimulator` and `BaroSimulator` are empty shells, and the IMU process model is a placeholder.
 - Analysis already provides position error/covariance, innovation, NIS, p-value, mean p-value, and innovation histogram plots. More formal statistics and consistency tests remain future work.
+- Runtime timing, profiling, and memory/resource tracking are not yet first-class outputs of the build, test, simulation, or analysis workflow.
 - The documented and configured language standard is C++23.
 - `tests/test_state_def_policy.cpp` is included in the configured test target, so its positive and negative concept assertions compile in local and CI builds.
 
@@ -87,7 +91,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Add ordered Linux and Windows CI for source checks, C++23 Debug builds, tests, simulation, and headless analysis.
 - [ ] Confirm the first hosted GitHub Actions run passes on both platforms.
 - [ ] Add clang-tidy selectively after the baseline build is stable.
-- [ ] Add coverage reporting after the test target accurately represents the suite.
+- [ ] Add basic coverage reporting after the test target accurately represents the suite; Phase 3 will turn coverage into a design-intent standard.
 
 **Exit criteria:** all intended tests are configured, the baseline build/test/simulation workflow is reproducible, language-standard intent is explicit, and architecture documents no longer overstate implementation status.
 
@@ -127,13 +131,57 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Preserve innovation, innovation covariance, measurement covariance, Jacobian, gain, NIS, timestamp, validity, and acceptance logging.
 - [x] Add runtime regression tests for accepted/rejected update behavior and statistics.
 
-**Exit evidence:** estimator templates are constrained at meaningful current public boundaries: state definition, injection, reset, measurement model, and sensor noise compatibility. Positive and negative concept tests are part of the configured `navkit_tests` target. Accepted and rejected measurement-statistics behavior has runtime regression coverage. `SensorPolicy` is intentionally deferred because no current generic consumer needs a dedicated sensor capability concept; Phase 3 will define the actual Navigator-facing sensor collection boundary. The stationary GNSS Debug build, tests, simulation, logs, and headless analysis were verified during the Phase 2 passes.
+**Exit evidence:** estimator templates are constrained at meaningful current public boundaries: state definition, injection, reset, measurement model, and sensor noise compatibility. Positive and negative concept tests are part of the configured `navkit_tests` target. Accepted and rejected measurement-statistics behavior has runtime regression coverage. `SensorPolicy` is intentionally deferred because no current generic consumer needs a dedicated sensor capability concept; Phase 4 will define the actual Navigator-facing sensor collection boundary. The stationary GNSS Debug build, tests, simulation, logs, and headless analysis were verified during the Phase 2 passes.
 
-**Status:** complete for the current estimator-boundary refactor scope. Remaining filter, sensor collection, propagation, and update concepts move to Phase 3.
+**Status:** complete for the current estimator-boundary refactor scope. Remaining propagation and Navigator orchestration work moves to Phase 4 after the configuration, compiler-flag, test-coverage, and profiling foundation in Phase 3.
 
 ---
 
-# Phase 3 — Navigator and propagation seam
+# Phase 3 — Configuration, compiler flags, tests, and runtime profiling
+
+**Goal:** Make the product-core configuration model, compiler/tooling posture, coverage strategy, and performance evidence explicit before adding more navigation physics and orchestration complexity.
+
+## Compile-time configuration architecture
+
+- [ ] Audit `include/navkit/core/common` and decide what belongs in foundational common types versus named configuration policies.
+- [ ] Replace ambiguous global-style constants with clear, swappable compile-time configuration types where that improves extension boundaries.
+- [ ] Define the first configuration-policy vocabulary for estimator, sensor-buffer, numeric-scalar, and logging/statistics choices.
+- [ ] Decide which configuration values are product-core compile-time policies, which are simulator/app runtime settings, and which belong in analysis only.
+- [ ] Document configuration layering with examples that show how an embedded target, desktop simulation, and test fixture select different configurations.
+- [ ] Add compile-time tests that valid configurations satisfy the intended concepts and intentionally invalid configurations fail those concepts.
+
+## Compiler flags and static-analysis hardening
+
+- [ ] Audit current Debug, Release, and CI compiler flags for MSVC, Clang, and GCC where supported.
+- [ ] Define strict Debug diagnostics that catch likely correctness issues early without creating unreviewable warning noise.
+- [ ] Define Release optimization flags deliberately and document which optimization profile is used for performance evidence.
+- [ ] Add a Release build verification path to the normal workflow or CI once flags are stable.
+- [ ] Decide how clang-tidy, compiler warnings-as-errors, sanitizers, and platform-specific analysis tools fit into local and CI workflows.
+- [ ] Keep target-specific embedded flags separate from desktop development flags until an embedded toolchain/profile is selected.
+
+## Coverage and design-intent tests
+
+- [ ] Review current test coverage by domain and identify meaningful gaps, not just line-count gaps.
+- [ ] Add coverage reporting once the configured test target accurately represents the intended suite.
+- [ ] Add tests that demonstrate intended extension usage for configuration, policies, models, sensors, filters, and Navigator orchestration.
+- [ ] Continue positive and negative compile-time concept tests for each public policy boundary.
+- [ ] Add runtime tests for important incorrect-input or rejected-operation behavior where failure is expected and should be stable.
+- [ ] Document the testing standard: completeness, clarity, and design intent matter more than tests for tests' sake.
+
+## Runtime profiling and resource evidence
+
+- [ ] Add a minimal timing/profiling facility that can measure build/test/demo-relevant scopes without forcing desktop-only dependencies into `navkit::core`.
+- [ ] Record timing for the stationary simulation and key estimator update path in a machine-readable artifact.
+- [ ] Decide how memory/resource evidence should be collected on desktop now and mapped to embedded targets later.
+- [ ] Add allocation/resource checks where practical for fixed-capacity core paths, especially sensor queues and estimator update operations.
+- [ ] Add CI or tool-wrapper hooks that preserve performance/resource artifacts without making stochastic or machine-dependent values brittle pass/fail gates.
+- [ ] Document the performance philosophy: track trends early, set hard embedded budgets only when target profiles exist.
+
+**Exit criteria:** configuration extension points are named and concept-tested; Debug/Release compiler flags and static-analysis expectations are documented and exercised by repository tooling; the test suite has an explicit coverage/design-intent baseline; and desktop timing/resource evidence is generated by repository tooling before the next major propagation/mechanization expansion.
+
+---
+
+# Phase 4 — Navigator and propagation seam
 
 **Goal:** Introduce propagation as an orchestration capability without implementing full INS mechanization yet.
 
@@ -151,7 +199,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ---
 
-# Phase 4 — Navigation physics and simulation contracts
+# Phase 5 — Navigation physics and simulation contracts
 
 **Goal:** Establish correct truth and sensor contracts before trusting an INS implementation.
 
@@ -183,7 +231,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ---
 
-# Phase 5 — First complete PCPF/ECEF INS
+# Phase 6 — First complete PCPF/ECEF INS
 
 **Goal:** Cross from a measurement-only estimator to a validated strapdown INS/GNSS navigation system.
 
@@ -225,7 +273,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ---
 
-# Phase 6 — Estimator validation and consistency
+# Phase 7 — Estimator validation and consistency
 
 **Goal:** Turn plots into repeatable engineering evidence.
 
@@ -250,7 +298,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ---
 
-# Phase 7 — Monte Carlo, logging, and performance
+# Phase 8 — Monte Carlo, logging, and performance
 
 **Goal:** Support trade studies and quantify estimator behavior across randomized runs.
 
@@ -264,15 +312,15 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 ## Logging
 
 - [ ] Add log/schema version metadata and compatibility checks.
-- [ ] Add optional runtime performance measurements.
-- [ ] Add memory/high-water statistics suitable for embedded evaluation.
+- [ ] Extend the Phase 3 timing/resource artifacts into Monte Carlo aggregate reports.
+- [ ] Add memory/high-water statistics suitable for embedded evaluation once target/resource APIs are defined.
 - [ ] Consider an optional binary backend only after CSV/JSON throughput becomes a demonstrated bottleneck.
 
 **Exit criteria:** a repeatable batch command produces deterministic aggregate results and records enough version/configuration metadata to reproduce them.
 
 ---
 
-# Phase 8 — Robust estimator and embedded readiness
+# Phase 9 — Robust estimator and embedded readiness
 
 **Goal:** Mature the framework after the first INS is demonstrably correct.
 
@@ -345,9 +393,10 @@ These are not scheduled until the first INS, validation pipeline, and extension 
 
 1. **Trusted baseline:** configured tests, CI, numerical baseline, aligned documentation.
 2. **Constrained estimator:** estimator and diagnostic policy boundaries implemented and tested.
-3. **Propagation-ready Navigator:** no-op propagation preserves GNSS-only behavior.
-4. **Physics-ready simulation:** correct truth, IMU contracts, and multi-rate ideal sensors.
-5. **Complete first INS:** PCPF/ECEF mechanization, covariance prediction, and GNSS/barometer aiding.
-6. **Professional validation:** consistency metrics, Monte Carlo, and reproducible reports.
-7. **Embedded-ready toolkit:** robustness, type safety, resource budgets, and target profiles.
-8. **Advanced navigation platform:** new aiding modes, mechanizations, and estimator backends.
+3. **Configurable, hardened, measurable core:** clear compile-time configuration, deliberate compiler/static-analysis posture, early timing/resource evidence, and intentional coverage standards.
+4. **Propagation-ready Navigator:** no-op propagation preserves GNSS-only behavior.
+5. **Physics-ready simulation:** correct truth, IMU contracts, and multi-rate ideal sensors.
+6. **Complete first INS:** PCPF/ECEF mechanization, covariance prediction, and GNSS/barometer aiding.
+7. **Professional validation:** consistency metrics, Monte Carlo, and reproducible reports.
+8. **Embedded-ready toolkit:** robustness, type safety, resource budgets, and target profiles.
+9. **Advanced navigation platform:** new aiding modes, mechanizations, and estimator backends.

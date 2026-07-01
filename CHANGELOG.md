@@ -43,6 +43,7 @@ This project follows
 - Updated the documented development workflow to include changelog updates and README/SETUP reconciliation for user-facing behavior, layout, tooling, or workflow changes.
 - Added a current architecture document and moved detailed target-boundary, namespace, source-layout, and target-kind rationale out of setup-oriented documentation.
 - Aligned public namespaces with the product-core folder structure through the stable domain level: `navkit::core::estimation`, `navkit::core::environment`, `navkit::core::frames`, `navkit::core::models`, `navkit::core::units`, and `navkit::core::containers`.
+- Elevated compile-time configuration cleanup, Release/Debug compiler-flag hardening, static-analysis posture, runtime profiling/resource evidence, and intentional coverage strategy into the next immediate roadmap phase.
 
 ### Fixed
 
