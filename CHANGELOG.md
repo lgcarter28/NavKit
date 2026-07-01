@@ -20,11 +20,12 @@ This project follows
 ### Changed
 
 - Reconciled README and setup documentation with the current implementation and build configuration.
+- Updated the configured C++ language standard from C++20 to C++23.
 - Consolidated superseded TODO lists and early core design notes into the canonical roadmap before removing them.
 
 ### Fixed
 
-- Removed stale feature-status claims and clarified the current C++20 versus target C++23 mismatch.
+- Removed stale feature-status claims and resolved the C++20/C++23 documentation mismatch.
 
 ---
 

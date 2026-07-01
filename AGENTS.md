@@ -21,7 +21,7 @@ Concepts express capabilities; CRTP bases share implementation and are not manda
 
 ## Current implementation reality
 
-- The documented project intent is **C++23** (`README.md` and `docs/SETUP.md`), but the active CMake configuration currently requires **C++20** (`CMAKE_CXX_STANDARD 20`). Treat this as an unresolved implementation/documentation mismatch: use the configured standard for current builds, and do not silently change either side while working on an unrelated task.
+- The project requires **C++23** (`CMAKE_CXX_STANDARD 23`). Keep public code and supported toolchains compatible with that configured standard.
 - Environment policies are the most complete realization of the target architecture: planet and gravity concepts, CRTP bases, concrete WGS84/Moon/Mars and spherical/J2 implementations, plus frame tags.
 - `StateDefPolicy` and `SegmentPolicy` exist. `State<StateDef>` and `StateCov<StateDef>` are fixed-size Eigen aliases, and `InsStateDef`/`GnssTcStateDef` provide named segments.
 - The estimator refactor is only partial. `KalmanFilter`, `Sensor`, and `Navigator` have policy-shaped template parameters, but most are unconstrained `typename` parameters. Concepts for injection, reset, measurement, noise, filter, sensor collection, propagation, and update policies are not yet implemented.

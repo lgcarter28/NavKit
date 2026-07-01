@@ -24,7 +24,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - The current trajectory generator supports only a simplistic stationary ECEF trajectory. It sets body rate to zero and therefore does not model Earth rotation correctly for stationary IMU truth.
 - `ImuSimulator` and `BaroSimulator` are empty shells, and the IMU process model is a placeholder.
 - Analysis already provides position error/covariance, innovation, NIS, p-value, mean p-value, and innovation histogram plots. More formal statistics and consistency tests remain future work.
-- The documented language target is C++23, while CMake currently configures C++20. Resolve this deliberately rather than treating either statement as silently authoritative.
+- The documented and configured language standard is C++23.
 - `tests/test_state_def_policy.cpp` exists but is not included in `tests/CMakeLists.txt`; its assertions are not currently compiled by the configured test target.
 
 ## Current verified baseline
@@ -67,9 +67,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [ ] Add `tests/test_state_def_policy.cpp` to `navkit_tests` and verify its positive and negative assertions compile.
 - [ ] Audit test sources against `tests/CMakeLists.txt` so every intended test is built.
 - [ ] Add a regression command/check for the stationary GNSS simulation and analysis pipeline.
-- [ ] Decide whether C++23 is required now.
-  - [ ] If yes, update CMake and verify supported compilers/toolchains.
-  - [ ] If no, update the README and setup documentation to describe the staged language target.
+- [x] Configure C++23 consistently in CMake, README, setup, and contributor guidance; verify the supported Debug toolchain.
 - [ ] Establish a numerical baseline for stationary GNSS output or selected metrics so refactors can demonstrate unchanged behavior.
 
 ## Architecture records

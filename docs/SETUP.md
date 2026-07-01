@@ -10,7 +10,7 @@ NavKit is developed using modern C++, CMake, Conan, Python, and VS Code. The bui
 
 NavKit currently expects:
 
-- C++20-capable compiler (C++23-capable recommended for the planned language-target migration)
+- C++23-capable compiler
 - CMake 3.23 or newer
 - Conan 2.x
 - Python 3.10 or newer
@@ -54,7 +54,7 @@ Verify CMake is available:
 cmake --version
 ```
 
-NavKit's documented target is **C++23**, but the active CMake configuration currently sets `CMAKE_CXX_STANDARD` to 20. Use a C++23-capable toolchain so the repository can migrate deliberately; current builds must continue to work with the configured C++20 standard until that roadmap item is completed.
+NavKit requires **C++23**, and the active CMake configuration sets `CMAKE_CXX_STANDARD` to 23.
 
 ---
 

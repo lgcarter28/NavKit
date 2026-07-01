@@ -2,7 +2,7 @@
 
 > A modular estimation and navigation development platform for embedded aerospace systems.
 
-![C++](https://img.shields.io/badge/C%2B%2B-20%20current%20%7C%2023%20target-blue)
+![C++](https://img.shields.io/badge/C%2B%2B-23-blue)
 ![CMake](https://img.shields.io/badge/CMake-3.23%2B-brightgreen)
 ![Conan](https://img.shields.io/badge/Conan-2.x-orange)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-yellow)
@@ -28,7 +28,7 @@ The current working demonstration is a stationary GNSS-position estimator. The l
 | IMU and barometer simulation | Planned; shells exist |
 | Monte Carlo and automatic validation reports | Planned |
 
-The documented language target is C++23; the active CMake configuration currently builds as C++20. Resolving and validating that migration is tracked in the [master roadmap](docs/ROADMAP.md).
+NavKit requires C++23.
 
 ## Architecture direction
 
