@@ -11,7 +11,7 @@ namespace navkit
 {
 
 template<typename Derived, typename StateDef, int M_>
-class SensorModelBase
+class MeasurementModelBase
 {
 public:
     static constexpr int M = M_;

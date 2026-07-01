@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "navkit/core/measurement/SensorModelBase.hpp"
+#include "navkit/core/measurement/MeasurementModelBase.hpp"
 #include "navkit/core/state/Segment.hpp"
 
 #include <string_view>
@@ -12,12 +12,12 @@ namespace navkit
 {
 
 template<typename StateDef>
-class GnssPosModel : public SensorModelBase<GnssPosModel<StateDef>, StateDef, 3>
+class GnssPosModel : public MeasurementModelBase<GnssPosModel<StateDef>, StateDef, 3>
 {
 public:
     static constexpr std::string_view Name = "gnss_pos";
 
-    using Base = SensorModelBase<GnssPosModel<StateDef>, StateDef, 3>;
+    using Base = MeasurementModelBase<GnssPosModel<StateDef>, StateDef, 3>;
     using State_t = typename Base::State_t;
     using H_t = typename Base::H_t;
     using R_t = typename Base::R_t;

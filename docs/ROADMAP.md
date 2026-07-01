@@ -106,7 +106,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 ## Measurement models
 
 - [x] Define `MeasurementPolicy<Candidate, StateDef>` around dimension, fixed-size matrix types, noise context, observation, Jacobian, covariance, and Kalman-gain operations.
-- [x] Decide whether `SensorModelBase` provides enough shared implementation to justify retaining the CRTP base.
+- [x] Decide whether `MeasurementModelBase` provides enough shared implementation to justify retaining the CRTP base.
 - [x] Constrain `KalmanFilter::observation_update` and measurement-statistics storage at the public policy boundary.
 - [x] Verify GNSS position, GNSS velocity, and barometer model conformance.
 - [x] Add negative compile-time tests for missing types and operations.

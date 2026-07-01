@@ -3,19 +3,19 @@
 
 #pragma once
 
-#include "navkit/core/measurement/SensorModelBase.hpp"
+#include "navkit/core/measurement/MeasurementModelBase.hpp"
 
 #include <string_view>
 
 namespace navkit
 {
 template<typename StateDef>
-class BaroAltModel : public SensorModelBase<BaroAltModel<StateDef>, StateDef, 1>
+class BaroAltModel : public MeasurementModelBase<BaroAltModel<StateDef>, StateDef, 1>
 {
 public:
     static constexpr std::string_view Name = "baro_alt";
 
-    using Base = SensorModelBase<BaroAltModel<StateDef>, StateDef, 1>;
+    using Base = MeasurementModelBase<BaroAltModel<StateDef>, StateDef, 1>;
     using State_t = typename Base::State_t;
     using H_t = typename Base::H_t;
     using R_t = typename Base::R_t;
