@@ -13,6 +13,7 @@ NavKit is split by product boundary first, then by engineering domain.
 | Product core | `navkit::core` | `include/navkit/core` | Reusable estimation/navigation framework and domain models |
 | Simulation support | `navkit::sim` | `include/navkit/sim` | Desktop simulation infrastructure and generated measurements |
 | IO support | `navkit::io` | `include/navkit/io` | Desktop logging, files, CSV, JSON, and run manifests |
+| Application support | `navkit::app_support` | `include/navkit/app_support` | Header-only executable support helpers for JSON inputs, selected-config description, runtime-input validation, estimator aliases, and profile export |
 | Applications | app targets under `apps/` | `apps/` | Executable entry points that compose the libraries they need |
 | Analysis | Python package under `python/` | `python/navkit_analysis` | Offline plots and validation analysis |
 
@@ -24,6 +25,7 @@ targets live next to the source files they build:
 cmake/targets/NavKitCore.cmake   navkit_core / navkit::core
 cmake/targets/NavKitIo.cmake     navkit_io / navkit::io
 src/sim/CMakeLists.txt           navkit_sim / navkit::sim
+src/app_support/CMakeLists.txt   navkit_app_support / navkit::app_support
 ```
 
 ## Header and source layout
@@ -54,16 +56,19 @@ include/navkit/
 
   sim/
   io/
+  app_support/
 
 config/
   compiletime/
-    examples/
-    navkit_sim/
+    navkit/
+    apps/
+      navkit_sim/
   runtime/
     navkit_sim/
 
 src/
   sim/
+  app_support/
 ```
 
 `include/navkit/core` is the reusable product core, not a miscellaneous bucket.
@@ -95,6 +100,7 @@ currently contributes `navkit::core::environment::J2`, not
 | `navkit::core` | `navkit::core::units` | Unit and frame helper types |
 | `navkit::sim` | `navkit::sim` | Simulation support |
 | `navkit::io` | `navkit::io` | Logging, CSV, JSON, and run manifests |
+| `navkit::app_support` | `navkit::app_support` | Shared executable support templates that are not product-core API |
 
 Shared compile-time product-core configuration vocabulary lives under
 `navkit::core::config`. Domain-specific configuration concepts live beside the
@@ -122,6 +128,11 @@ Use CMake target kinds honestly:
   header-only. It carries the desktop JSON dependency.
 - `navkit::sim` is a compiled library because simulator implementation sources
   live in `src/sim/*.cpp`.
+- `navkit::app_support` is currently an `INTERFACE` target because its reusable
+  support is template-heavy and selected-config dependent. It provides C++
+  helpers for JSON runtime inputs, compiled configuration description, repeated
+  estimator aliases, and profile export. Concrete application business logic
+  remains in the relevant application entry point.
 
 Do not add dummy `.cpp` files merely to force a static archive. Convert an
 `INTERFACE` target to a compiled/static library when the component owns
@@ -130,7 +141,28 @@ meaningful `.cpp` implementation.
 Target-definition placement follows the same rule. Header-only/interface target
 definitions belong under `cmake/targets/` because they do not own local source
 files. Compiled targets belong beside their implementation sources, such as
-`src/sim/CMakeLists.txt`.
+`src/sim/CMakeLists.txt`. The app-support target definition currently lives
+under `src/app_support/CMakeLists.txt` to keep that boundary visible; it can
+move under `cmake/targets/` if it remains purely header-only.
+
+## Manifest ownership
+
+Python tooling currently orchestrates build commands and writes the outer
+`navkit_build_manifest.json` because it knows wrapper-level facts such as build
+type, selected build directory, elapsed build time, and resource reports. The
+selected-config portion of that manifest comes from C++: after building,
+`tools/build.py` asks the executable to describe its compiled config. Runtime
+application manifests and log metadata are written by C++ application/IO code.
+Application entry points should stay selected-config generic where practical.
+The selected app config composes a reusable NavKit library config with an app
+composition, while `navkit::app_support` owns reusable JSON-input,
+runtime-validation, config-description, estimator-alias, selected-app runner,
+and profile-export plumbing.
+
+This boundary avoids checked-in sidecar metadata that can drift from the actual
+compiled configuration. If build-manifest writing moves fully into C++ later,
+preserve that rule: compiled C++ should be the source of truth for compiled
+configuration facts.
 
 ## Current data flow
 

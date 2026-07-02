@@ -13,6 +13,7 @@ class ProfileScope
 {
 public:
     using Tick = typename Clock::Tick;
+    using Record = ProfileSinkRecord_t<Sink, Clock>;
 
     explicit ProfileScope(ProfilePoint point)
         : m_point(point)
@@ -55,7 +56,7 @@ private:
         }
 
         const Tick end_tick = Clock::now();
-        Sink::record(ProfileRecord<Tick>{
+        Sink::record(Record{
             .point = m_point,
             .start_tick = m_start_tick,
             .elapsed_ticks = end_tick - m_start_tick,

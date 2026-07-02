@@ -29,7 +29,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/presets/debug-stationary-gnss/build/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "navkit_sim/StationaryGnss.hpp"
+        "NAVKIT_CONFIG": "apps/navkit_sim/StationaryGnss.hpp"
       }
     },
     {
@@ -40,7 +40,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/presets/debug-profiled-stationary-gnss/build/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "navkit_sim/ProfiledStationaryGnss.hpp"
+        "NAVKIT_CONFIG": "apps/navkit_sim/ProfiledStationaryGnss.hpp"
       }
     },
     {
@@ -51,7 +51,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/presets/release-stationary-gnss/build/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "navkit_sim/StationaryGnss.hpp"
+        "NAVKIT_CONFIG": "apps/navkit_sim/StationaryGnss.hpp"
       }
     },
     {
@@ -62,7 +62,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/presets/release-profiled-stationary-gnss/build/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "navkit_sim/ProfiledStationaryGnss.hpp"
+        "NAVKIT_CONFIG": "apps/navkit_sim/ProfiledStationaryGnss.hpp"
       }
     }
   ],

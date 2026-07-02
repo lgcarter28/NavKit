@@ -27,7 +27,9 @@ The current implementation has the first pieces of the configuration model:
   - `include/navkit/core/estimation/sensor/SensorConfigPolicy.hpp`
   - `include/navkit/core/estimation/filter/FilterConfigPolicy.hpp`
 - Concrete repository-provided compile-time configs live under
-  `config/compiletime`.
+  `config/compiletime`. NavKit library/core configs live under
+  `config/compiletime/navkit`, while top-level executable composition configs
+  live under `config/compiletime/apps`.
 - Runtime inputs live under `config/runtime`.
 - CMake selects one compile-time configuration per build tree with
   `NAVKIT_CONFIG`.
@@ -69,10 +71,10 @@ static_assert(navkit::core::estimation::BufferConfigPolicy<GnssBufferConfig>);
 The `static_assert` is intentional documentation. It tells users and the
 compiler which contract the slice claims to satisfy.
 
-### 3. Composed configs collect slices for an app or product
+### 3. NavKit configs collect reusable library slices
 
-A composed compile-time config names the slices a particular application,
-simulation, product target, or test fixture uses.
+A NavKit library/core config names reusable slices for the navigation library
+itself. It should not know which executable will consume it.
 
 For example:
 
@@ -90,7 +92,36 @@ static_assert(navkit::core::estimation::BufferConfigPolicy<MinimalConfig::GnssBu
 `MinimalConfig` is intended as a teaching/example shape, not a universal
 production target and not a base class.
 
-### 4. Consumers validate only the slices they need
+### 4. App configs compose a NavKit config with an executable
+
+An application-level config is the usual `NAVKIT_CONFIG` selection for runnable
+executables. It consumes a reusable NavKit config and names the app composition
+being built:
+
+```cpp
+struct StationaryGnssAppConfig
+{
+    using NavKit = navkit::config::navkit::StationaryGnssConfig;
+    using App = navkit::app_support::StationaryGnssApp<StationaryGnssAppConfig>;
+};
+```
+
+This keeps the NavKit library config reusable across apps while still allowing
+one build tree to select one concrete executable composition.
+
+The app and NavKit config trees are deliberately separate:
+
+```text
+config/compiletime/navkit/StationaryGnss.hpp
+config/compiletime/apps/navkit_sim/StationaryGnss.hpp
+```
+
+Using the same descriptive file name in both places is fine because the
+directories communicate ownership. The `navkit/` header is reusable library
+configuration. The `apps/navkit_sim/` header is the selected executable
+composition that links a library config to an app runner.
+
+### 5. Consumers validate only the slices they need
 
 NavKit should avoid a universal config concept that requires every possible
 sensor, filter, logger, simulator, and target option. A GNSS-only application
@@ -100,12 +131,12 @@ settings merely to satisfy a central type.
 Instead, each app, algorithm, or target should validate the slices it actually
 uses.
 
-### 5. Build selection is separate from runtime inputs
+### 6. Build selection is separate from runtime inputs
 
 Compile-time config answers:
 
 ```text
-What product/app/target are we compiling?
+What top-level app, target, or NavKit library configuration are we compiling?
 ```
 
 Runtime input answers:
@@ -119,8 +150,9 @@ Those are deliberately separate. The current layout is:
 ```text
 config/
   compiletime/
-    examples/
-    navkit_sim/
+    navkit/
+    apps/
+      navkit_sim/
     targets/          # planned
   runtime/
     navkit_sim/
@@ -139,34 +171,42 @@ using AppConfig = navkit::selected_config::Config;
 The CMake model is one compile-time configuration per build tree:
 
 ```text
-cmake -S . -B build/Debug -DNAVKIT_CONFIG=navkit_sim/StationaryGnss.hpp
+cmake -S . -B build/Debug -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
 ```
 
 `NAVKIT_CONFIG` is a CMake cache variable relative to `config/compiletime`. It
 has a useful default:
 
 ```text
-navkit_sim/StationaryGnss.hpp
+apps/navkit_sim/StationaryGnss.hpp
 ```
 
 Debug/Release and `NAVKIT_CONFIG` are separate axes:
 
 - `CMAKE_BUILD_TYPE` or `--config` selects compiler/build mode.
-- `NAVKIT_CONFIG` selects the product/app compile-time configuration.
+- `NAVKIT_CONFIG` selects the top-level compile-time build configuration,
+  usually an app config for executables.
 
 Multiple configurations should use multiple build directories or CMake presets,
 not a single executable that dynamically switches among compile-time configs.
 
+Runtime JSON is still checked against the compiled app composition. For example,
+the stationary GNSS sim config currently requires `trajectory` and `gnss`
+sections, rejects unsupported `imu` and `baro` sections, and validates common
+numeric/vector fields before the simulation loop starts. This validation lives
+in `navkit::app_support` because it is app/runtime-input glue, not reusable
+product-core NavKit configuration.
+
 The Python build wrapper forwards the same selection:
 
 ```text
-python tools/build.py --build-type Debug --skip-conan --navkit-config navkit_sim/StationaryGnss.hpp
+python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/StationaryGnss.hpp
 ```
 
 Use `--build-dir` when keeping more than one selected config locally:
 
 ```text
-python tools/build.py --build-type Debug --build-dir build/debug-stationary-gnss --navkit-config navkit_sim/StationaryGnss.hpp
+python tools/build.py --build-type Debug --build-dir build/debug-stationary-gnss --navkit-config apps/navkit_sim/StationaryGnss.hpp
 ```
 
 Each build directory has its own generated `navkit/SelectedConfig.hpp`, so two
@@ -180,13 +220,18 @@ that pattern; they do not make Debug/Release part of the config itself.
 
 The expected workflow is:
 
-1. Copy the nearest example, such as `config/compiletime/examples/MinimalConfig.hpp`.
+1. Copy the nearest example, such as `config/compiletime/navkit/MinimalConfig.hpp`.
 2. Rename the config type.
-3. Adjust or add the config slices your application needs.
+3. Adjust or add the NavKit config slices your library/application needs.
 4. Add `static_assert` checks for each concept slice the config claims to satisfy.
-5. Expose the selected type as `navkit::config::SelectedConfig`.
-6. Select it with CMake or the build wrapper using `NAVKIT_CONFIG`.
-7. Pair it with a runtime input file only if the application needs one.
+5. For executables, add or update an app config under `config/compiletime/apps`
+   that names `using NavKit = ...` and `using App = ...`.
+6. Expose the selected app or library type as `navkit::config::SelectedConfig`.
+7. Add or update app-support runtime validation when the executable consumes
+   JSON or other runtime inputs whose shape depends on the compiled app/NavKit
+   capabilities.
+8. Select it with CMake or the build wrapper using `NAVKIT_CONFIG`.
+9. Pair it with a runtime input file only if the application needs one.
 
 If the new config should be easy to discover, add a preset or documented wrapper
 example that selects it in a separate build directory.

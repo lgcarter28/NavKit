@@ -214,6 +214,11 @@ TEST_CASE("ProfileRecord carries optional visualization metadata")
     CHECK(record.flags == ProfileRecordFlags::DroppedBefore);
     CHECK(has_profile_record_flag(record.flags, ProfileRecordFlags::DroppedBefore));
     CHECK(!has_profile_record_flag(record.flags, ProfileRecordFlags::Incomplete));
+
+    using CompactRecord = ProfileRecord<std::uint32_t, std::uint16_t, std::uint8_t>;
+    static_assert(std::is_same_v<CompactRecord::Tick_t, std::uint32_t>);
+    static_assert(std::is_same_v<CompactRecord::Sequence_t, std::uint16_t>);
+    static_assert(std::is_same_v<CompactRecord::Depth_t, std::uint8_t>);
 }
 
 TEST_CASE("NullProfiler satisfies the profiler contract without recording")

@@ -10,7 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(NAVKIT_BUILD_TESTS "Build NavKit tests" ON)
-set(NAVKIT_CONFIG "navkit_sim/StationaryGnss.hpp"
+set(NAVKIT_CONFIG "apps/navkit_sim/StationaryGnss.hpp"
     CACHE STRING "Compile-time NavKit config header relative to config/compiletime")
 
 set(NAVKIT_CONFIG_ROOT "${PROJECT_SOURCE_DIR}/config/compiletime")
@@ -19,7 +19,7 @@ if(IS_ABSOLUTE "${NAVKIT_CONFIG}")
 endif()
 
 if(NAVKIT_CONFIG MATCHES "\\\\")
-    message(FATAL_ERROR "NAVKIT_CONFIG must use forward slashes, for example navkit_sim/StationaryGnss.hpp")
+    message(FATAL_ERROR "NAVKIT_CONFIG must use forward slashes, for example apps/navkit_sim/StationaryGnss.hpp")
 endif()
 
 if(NAVKIT_CONFIG MATCHES "(^|/)\\.\\.($|/)")
@@ -46,6 +46,7 @@ include(cmake/NavKitWarnings.cmake)
 include(cmake/targets/NavKitCore.cmake)
 include(cmake/targets/NavKitIo.cmake)
 add_subdirectory(src/sim)
+add_subdirectory(src/app_support)
 
 add_subdirectory(apps/navkit_sim)
 add_subdirectory(apps/navkit_replay)

@@ -16,6 +16,8 @@ from typing import Iterable
 
 
 PROFILE_SCHEMA = "navkit.profile.v1"
+PROFILE_RUN_MANIFEST_SCHEMA = "navkit.profile_run_manifest.v1"
+BUILD_MANIFEST_SCHEMA = "navkit.build_manifest.v1"
 
 
 @dataclass(frozen=True)
@@ -28,6 +30,26 @@ class ProfileRecord:
     parent_sequence: int
     depth: int
     flags: int
+
+
+def default_profile_run_manifest_path(csv_path: Path) -> Path:
+    return csv_path.with_name("profile_run_manifest.json")
+
+
+def load_json_manifest(path: Path, expected_schema: str, label: str) -> dict[str, object]:
+    document = json.loads(path.read_text(encoding="utf-8"))
+    schema = document.get("schema", "")
+    if schema != expected_schema:
+        raise ValueError(f"Unsupported {label} schema '{schema}' in {path}")
+    return document
+
+
+def load_profile_run_manifest(path: Path) -> dict[str, object]:
+    return load_json_manifest(path, PROFILE_RUN_MANIFEST_SCHEMA, "profile run manifest")
+
+
+def load_build_manifest(path: Path) -> dict[str, object]:
+    return load_json_manifest(path, BUILD_MANIFEST_SCHEMA, "build manifest")
 
 
 def load_profile_csv(path: Path) -> list[ProfileRecord]:
@@ -54,6 +76,30 @@ def load_profile_csv(path: Path) -> list[ProfileRecord]:
             )
 
     return records
+
+
+def profiling_metadata(build_manifest: dict[str, object]) -> dict[str, object]:
+    metadata = build_manifest.get("compiletime_config_metadata", {})
+    if not isinstance(metadata, dict):
+        return {}
+    profiling = metadata.get("profiling", {})
+    if not isinstance(profiling, dict):
+        return {}
+    return profiling
+
+
+def resolve_tick_period_us(build_manifest: dict[str, object], override: float | None) -> float:
+    if override is not None:
+        return override
+
+    tick_period = profiling_metadata(build_manifest).get("tick_period_us")
+    if isinstance(tick_period, (int, float)):
+        return float(tick_period)
+
+    raise ValueError(
+        "Profile trace export requires profiling.tick_period_us in navkit_build_manifest.json "
+        "or an explicit --tick-period-us diagnostic override."
+    )
 
 
 def percentile(values: list[int], percent: float) -> float:
@@ -106,7 +152,14 @@ def print_summary(rows: Iterable[dict[str, float | int | str]]) -> None:
         )
 
 
-def write_chrome_trace(records: Iterable[ProfileRecord], path: Path, tick_period_us: float) -> None:
+def write_chrome_trace(
+    records: Iterable[ProfileRecord],
+    path: Path,
+    tick_period_us: float,
+    build_manifest: dict[str, object],
+    run_manifest: dict[str, object],
+) -> None:
+    profiling = profiling_metadata(build_manifest)
     events = []
     for record in records:
         events.append(
@@ -137,7 +190,15 @@ def write_chrome_trace(records: Iterable[ProfileRecord], path: Path, tick_period
                 "displayTimeUnit": "us",
                 "metadata": {
                     "schema": PROFILE_SCHEMA,
+                    "build_manifest_schema": build_manifest.get("schema"),
+                    "profile_run_manifest_schema": run_manifest.get("schema"),
+                    "selected_config": build_manifest.get("navkit_config"),
+                    "clock_source": profiling.get("clock_source"),
                     "tick_period_us": tick_period_us,
+                    "record_count": run_manifest.get("record_count"),
+                    "dropped_record_count": run_manifest.get("dropped_record_count"),
+                    "sink_capacity": profiling.get("sink_capacity"),
+                    "sink_overflow_policy": profiling.get("sink_overflow_policy"),
                 },
             },
             indent=2,
@@ -150,12 +211,24 @@ def write_chrome_trace(records: Iterable[ProfileRecord], path: Path, tick_period
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("csv", type=Path, help="NavKit profile CSV export")
+    parser.add_argument(
+        "--profile-run-manifest",
+        type=Path,
+        default=None,
+        help="Profile run manifest JSON. Defaults to profile_run_manifest.json beside the CSV.",
+    )
+    parser.add_argument(
+        "--build-manifest",
+        type=Path,
+        required=False,
+        help="Build manifest JSON containing compile-time profiling metadata.",
+    )
     parser.add_argument("--chrome-trace", type=Path, help="Write Chrome Trace / Perfetto JSON")
     parser.add_argument(
         "--tick-period-us",
         type=float,
-        default=1.0,
-        help="Tick-to-microsecond conversion for trace output; defaults to 1 tick = 1 us",
+        default=None,
+        help="Override manifest tick-to-microsecond conversion for trace output.",
     )
     parser.add_argument("--no-summary", action="store_true", help="Do not print the text summary")
     return parser.parse_args()
@@ -169,7 +242,14 @@ def main() -> int:
         print_summary(summarize(records))
 
     if args.chrome_trace is not None:
-        write_chrome_trace(records, args.chrome_trace, args.tick_period_us)
+        profile_run_manifest_path = args.profile_run_manifest or default_profile_run_manifest_path(args.csv)
+        if args.build_manifest is None:
+            raise ValueError("--build-manifest is required when writing Chrome Trace JSON.")
+
+        build_manifest = load_build_manifest(args.build_manifest)
+        run_manifest = load_profile_run_manifest(profile_run_manifest_path)
+        tick_period_us = resolve_tick_period_us(build_manifest, args.tick_period_us)
+        write_chrome_trace(records, args.chrome_trace, tick_period_us, build_manifest, run_manifest)
         print(f"Wrote Chrome Trace JSON: {args.chrome_trace}")
 
     return 0

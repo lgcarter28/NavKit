@@ -14,7 +14,16 @@ from perf_artifacts import (
     print_command_timing,
     update_timing_artifact,
 )
-from profile_report import load_profile_csv, print_summary, summarize, write_chrome_trace
+from profile_report import (
+    default_profile_run_manifest_path,
+    load_build_manifest as load_profile_build_manifest,
+    load_profile_csv,
+    load_profile_run_manifest,
+    print_summary,
+    resolve_tick_period_us,
+    summarize,
+    write_chrome_trace,
+)
 
 
 def default_build_dir(build_type: str) -> Path:
@@ -36,6 +45,30 @@ def load_build_manifest(build_dir: Path) -> dict[str, object]:
     if not manifest_path.exists():
         return {}
     return json.loads(manifest_path.read_text(encoding="utf-8"))
+
+
+def build_manifest_path(build_dir: Path) -> Path:
+    return build_dir / "navkit_build_manifest.json"
+
+
+def remove_stale_profile_artifacts(output_dir: Path) -> bool:
+    ok = True
+    for generated_profile_artifact in (
+        output_dir / "profile.csv",
+        output_dir / "profile.trace.json",
+        output_dir / "profile_run_manifest.json",
+    ):
+        if not generated_profile_artifact.exists():
+            continue
+        try:
+            generated_profile_artifact.unlink()
+        except PermissionError:
+            print(
+                "Profile artifact is locked; close viewers/editors before rerunning: "
+                f"{generated_profile_artifact}"
+            )
+            ok = False
+    return ok
 
 
 def main() -> int:
@@ -76,9 +109,8 @@ def main() -> int:
     output_dir = Path(runtime_config.get("output_dir", f"data/logs/{run_name}"))
     timing_path = output_dir / "timing.json"
 
-    for generated_profile_artifact in (output_dir / "profile.csv", output_dir / "profile.trace.json"):
-        if generated_profile_artifact.exists():
-            generated_profile_artifact.unlink()
+    if not remove_stale_profile_artifacts(output_dir):
+        return 1
 
     exe = default_exe(build_dir, args.build_type)
     command = [str(exe), str(args.config)]
@@ -104,6 +136,8 @@ def main() -> int:
     profile_path = output_dir / "profile.csv"
     if return_code == 0 and profile_path.exists():
         records = load_profile_csv(profile_path)
+        run_manifest = load_profile_run_manifest(default_profile_run_manifest_path(profile_path))
+        profile_build_manifest = load_profile_build_manifest(build_manifest_path(build_dir))
 
         if not args.no_profile_report:
             print()
@@ -111,7 +145,10 @@ def main() -> int:
 
         if not args.no_profile_trace:
             trace_path = output_dir / "profile.trace.json"
-            write_chrome_trace(records, trace_path, tick_period_us=1.0)
+            tick_period_us = resolve_tick_period_us(profile_build_manifest, override=None)
+            write_chrome_trace(
+                records, trace_path, tick_period_us, profile_build_manifest, run_manifest
+            )
             print(f"Wrote Chrome Trace JSON: {trace_path}")
     return return_code
 

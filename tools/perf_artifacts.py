@@ -15,7 +15,7 @@ RESOURCE_SCHEMA = "navkit.resources.v1"
 DEFAULT_TIMING_PATH = Path("data/logs/stationary_gnss_demo/timing.json")
 DEFAULT_RESOURCE_DIR = Path("data/logs/stationary_gnss_demo")
 DEFAULT_RUN_NAME = "stationary_gnss_demo"
-DEFAULT_NAVKIT_CONFIG = "navkit_sim/StationaryGnss.hpp"
+DEFAULT_NAVKIT_CONFIG = "apps/navkit_sim/StationaryGnss.hpp"
 
 
 def utc_now() -> str:

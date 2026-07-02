@@ -56,6 +56,8 @@ Target data flow adds multi-rate sensor simulation, mechanization/prediction, an
 include/navkit/core/  Reusable product-core public headers
 include/navkit/sim/   Simulation support public headers
 include/navkit/io/    Desktop logging/file/JSON public headers
+include/navkit/app_support/
+                       Header-only executable support helpers
 config/               Compile-time configurations and runtime input bundles
 cmake/targets/        Header-only/interface CMake target definitions
 src/sim/              Compiled simulator implementation
@@ -86,6 +88,7 @@ through `navkit::io`.
 | `navkit::core` | `navkit::core::units` | Unit and frame helper types |
 | `navkit::sim` | `navkit::sim` | Simulation support |
 | `navkit::io` | `navkit::io` | Desktop logging, file, CSV, and JSON support |
+| `navkit::app_support` | `navkit::app_support` | Selected-config app runner, JSON input, config description, and profile export helpers |
 
 Public namespaces mirror the folder structure through the stable domain level.
 Deeper leaf folders may organize implementation and policy families without
@@ -98,8 +101,12 @@ configuration concepts, such as sensor buffer capacity and measurement
 statistics availability, live with the estimation domain.
 
 Concrete compile-time configurations live under `config/compiletime` and are
-selected per build tree with `NAVKIT_CONFIG`; runtime scenario inputs live under
-`config/runtime`.
+selected per build tree with `NAVKIT_CONFIG`. Reusable NavKit library configs
+live under `config/compiletime/navkit`; executable composition configs live
+under `config/compiletime/apps`. Runtime scenario inputs live under
+`config/runtime`. App-support code validates runtime inputs against the selected
+compile-time app composition before running, so missing scenario sections or
+unsupported sensor/emulator sections fail early with clear diagnostics.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for target-boundary,
 namespace, and source-layout rationale.

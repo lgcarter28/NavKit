@@ -20,11 +20,13 @@ struct NullProfileSink
 
 template<typename Tick,
          std::size_t Capacity,
-         containers::OverflowPolicy Policy = containers::OverflowPolicy::Reject>
+         containers::OverflowPolicy Policy = containers::OverflowPolicy::Reject,
+         typename Sequence = std::uint32_t,
+         typename Depth = std::uint16_t>
 class RingBufferProfileSink
 {
 public:
-    using Record = ProfileRecord<Tick>;
+    using Record = ProfileRecord<Tick, Sequence, Depth>;
 
     static_assert(Capacity > 0U, "RingBufferProfileSink capacity must be greater than zero");
 
@@ -72,6 +74,11 @@ public:
     [[nodiscard]] static constexpr std::size_t capacity()
     {
         return Capacity;
+    }
+
+    [[nodiscard]] static constexpr containers::OverflowPolicy overflow_policy()
+    {
+        return Policy;
     }
 
     [[nodiscard]] static std::size_t dropped_count()

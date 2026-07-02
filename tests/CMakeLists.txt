@@ -14,6 +14,7 @@ add_executable(navkit_tests
     test_profiling_policy.cpp
     test_ring_buffer.cpp
     test_ring_buffer_policies.cpp
+    test_runtime_config_validation.cpp
     test_sensor_behavior.cpp
     test_segment.cpp
     test_state_def_policy.cpp

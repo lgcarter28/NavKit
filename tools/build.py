@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import platform
 import shutil
 import subprocess
 import sys
@@ -117,11 +118,42 @@ def selected_navkit_config(build_dir: Path, navkit_config_arg: str | None) -> st
     return DEFAULT_NAVKIT_CONFIG
 
 
+def navkit_sim_executable(build_dir: Path, build_type: str) -> Path:
+    base = build_dir / "apps" / "navkit_sim"
+    if platform.system() == "Windows":
+        candidate = base / build_type / "navkit_sim.exe"
+        if candidate.exists():
+            return candidate
+        return base / "navkit_sim.exe"
+    return base / "navkit_sim"
+
+
+def query_compiletime_config_metadata(build_dir: Path, build_type: str) -> dict[str, object]:
+    executable = navkit_sim_executable(build_dir, build_type)
+    if not executable.exists():
+        return {}
+
+    result = subprocess.run(
+        [str(executable), "--describe-config"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    document = json.loads(result.stdout)
+    schema = document.get("schema", "")
+    if schema != "navkit.compiletime_config_metadata.v1":
+        raise ValueError(
+            f"Unsupported compile-time config metadata schema '{schema}' from {executable}"
+        )
+    return document
+
+
 def write_build_manifest(
     build_dir: Path,
     *,
     build_type: str,
     navkit_config: str,
+    compiletime_config_metadata: dict[str, object],
     tests_enabled: bool,
     warnings_as_errors: bool,
     coverage_enabled: bool,
@@ -131,6 +163,7 @@ def write_build_manifest(
         "schema": "navkit.build_manifest.v1",
         "build_type": build_type,
         "navkit_config": navkit_config,
+        "compiletime_config_metadata": compiletime_config_metadata,
         "tests_enabled": tests_enabled,
         "warnings_as_errors": warnings_as_errors,
         "coverage_enabled": coverage_enabled,
@@ -264,10 +297,12 @@ def main() -> int:
 
     run(build_cmd, cwd=root)
     navkit_config = selected_navkit_config(build_dir, args.navkit_config)
+    compiletime_config_metadata = query_compiletime_config_metadata(build_dir, args.build_type)
     write_build_manifest(
         build_dir,
         build_type=args.build_type,
         navkit_config=navkit_config,
+        compiletime_config_metadata=compiletime_config_metadata,
         tests_enabled=not args.without_tests,
         warnings_as_errors=args.warnings_as_errors,
         coverage_enabled=args.coverage,

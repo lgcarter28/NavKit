@@ -314,17 +314,27 @@ In day-to-day development, `--build-only` is typically sufficient unless CMake c
 
 Select a compile-time configuration with `--navkit-config`. The value is
 relative to `config/compiletime`, and defaults to
-`navkit_sim/StationaryGnss.hpp`:
+`apps/navkit_sim/StationaryGnss.hpp`:
 
 ```bash
-python tools/build.py --build-type Debug --skip-conan --navkit-config navkit_sim/StationaryGnss.hpp
+python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/StationaryGnss.hpp
 ```
+
+That app-level selection composes:
+
+```text
+config/compiletime/apps/navkit_sim/StationaryGnss.hpp
+    -> config/compiletime/navkit/StationaryGnss.hpp
+```
+
+The app config is the executable composition selected by CMake. The NavKit
+config is the reusable library configuration consumed by that app.
 
 To run the same stationary GNSS scenario with the embedded-style profiling
 configuration:
 
 ```bash
-python tools/build.py --build-type Debug --skip-conan --navkit-config navkit_sim/ProfiledStationaryGnss.hpp
+python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/ProfiledStationaryGnss.hpp
 python tools/run_first_sim.py --build-type Debug
 ```
 
@@ -337,12 +347,12 @@ you want only the compact CSV profile export.
 Use a separate build directory for each selected compile-time configuration:
 
 ```bash
-python tools/build.py --build-type Debug --build-dir build/debug-stationary-gnss --navkit-config navkit_sim/StationaryGnss.hpp
+python tools/build.py --build-type Debug --build-dir build/debug-stationary-gnss --navkit-config apps/navkit_sim/StationaryGnss.hpp
 ```
 
 This keeps each generated `navkit/SelectedConfig.hpp` isolated. Debug/Release
 and `NAVKIT_CONFIG` are independent: build type chooses compiler mode, while
-`NAVKIT_CONFIG` chooses the product/app configuration.
+`NAVKIT_CONFIG` chooses the top-level compile-time build configuration.
 
 Run wrappers use `--build-type` to choose the Debug or Release executable from
 the default build tree. When you intentionally keep multiple build trees for
@@ -364,9 +374,14 @@ The root `CMakeLists.txt` is intentionally an orchestration layer. Header-only/i
 cmake/targets/NavKitCore.cmake   navkit_core / navkit::core
 cmake/targets/NavKitIo.cmake     navkit_io / navkit::io
 src/sim/CMakeLists.txt           navkit_sim / navkit::sim
+src/app_support/CMakeLists.txt   navkit_app_support / navkit::app_support
 ```
 
-Applications should link only the product-boundary targets they need. For example, `apps/navkit_sim` links `navkit::core`, `navkit::sim`, and `navkit::io`, while `apps/navkit_replay` currently links only `navkit::core`.
+Applications should link only the product-boundary targets they need. For
+example, `apps/navkit_sim` links `navkit::app_support` for selected-config
+description, JSON-input, runtime-validation, estimator-alias, and profile-export
+helpers, while its `main.cpp` remains a thin selected-config entry point.
+`apps/navkit_replay` currently links only `navkit::core`.
 
 For target boundaries, namespaces, and the header-only versus compiled-library
 rationale, see [`ARCHITECTURE.md`](ARCHITECTURE.md).
@@ -402,7 +417,7 @@ cmake -S . -B build/Debug -DCMAKE_TOOLCHAIN_FILE=build/Debug/build/generators/co
 To select a compile-time config manually, add `-DNAVKIT_CONFIG=...`:
 
 ```bash
-cmake -S . -B build/Debug -DCMAKE_TOOLCHAIN_FILE=build/Debug/build/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=navkit_sim/StationaryGnss.hpp
+cmake -S . -B build/Debug -DCMAKE_TOOLCHAIN_FILE=build/Debug/build/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
 ```
 
 Build manually:
@@ -505,7 +520,11 @@ CSV is used for time-history logs. JSON is used for runtime input bundles,
 per-log metadata, the hierarchical run manifest, and lightweight workflow
 timing artifacts. Runtime input bundles such as
 `config/runtime/navkit_sim/stationary_gnss.json` are executable inputs, not
-product-core compile-time configuration.
+NavKit library compile-time configuration. The selected app validates the
+runtime JSON before running; for the stationary GNSS app, that means required
+`trajectory` and `gnss` sections must exist, unsupported `imu` or `baro`
+sections are rejected, and common vector/numeric fields must have the expected
+shape.
 
 ---
 

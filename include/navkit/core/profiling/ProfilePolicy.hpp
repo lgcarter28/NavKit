@@ -7,9 +7,25 @@
 #include "navkit/core/profiling/ProfileRecord.hpp"
 
 #include <concepts>
+#include <type_traits>
 
 namespace navkit::core::profiling
 {
+
+template<typename Sink, typename Clock, typename = void>
+struct ProfileSinkRecord
+{
+    using type = ProfileRecord<typename Clock::Tick>;
+};
+
+template<typename Sink, typename Clock>
+struct ProfileSinkRecord<Sink, Clock, std::void_t<typename Sink::Record>>
+{
+    using type = typename Sink::Record;
+};
+
+template<typename Sink, typename Clock>
+using ProfileSinkRecord_t = typename ProfileSinkRecord<Sink, Clock>::type;
 
 template<typename Candidate>
 concept ClockPolicy = requires(typename Candidate::Tick start, typename Candidate::Tick end) {
@@ -21,7 +37,11 @@ concept ClockPolicy = requires(typename Candidate::Tick start, typename Candidat
 
 template<typename Candidate, typename Clock>
 concept ProfileSinkPolicy =
-    ClockPolicy<Clock> && requires(ProfileRecord<typename Clock::Tick> record) {
+    ClockPolicy<Clock> && requires(ProfileSinkRecord_t<Candidate, Clock> record) {
+        typename ProfileSinkRecord_t<Candidate, Clock>::Tick_t;
+
+        requires std::same_as<typename ProfileSinkRecord_t<Candidate, Clock>::Tick_t,
+                              typename Clock::Tick>;
         { Candidate::record(record) } -> std::same_as<void>;
     };
 

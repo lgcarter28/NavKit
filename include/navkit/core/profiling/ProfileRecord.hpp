@@ -37,15 +37,19 @@ enum class ProfileRecordFlags : std::uint16_t
     return (flags & flag) != ProfileRecordFlags::None;
 }
 
-template<typename Tick>
+template<typename Tick, typename Sequence = std::uint32_t, typename Depth = std::uint16_t>
 struct ProfileRecord
 {
+    using Tick_t = Tick;
+    using Sequence_t = Sequence;
+    using Depth_t = Depth;
+
     ProfilePoint point{};
     Tick start_tick{};
     Tick elapsed_ticks{};
-    std::uint32_t sequence{};
-    std::uint32_t parent_sequence{};
-    std::uint16_t depth{};
+    Sequence sequence{};
+    Sequence parent_sequence{};
+    Depth depth{};
     ProfileRecordFlags flags{ProfileRecordFlags::None};
 };
 

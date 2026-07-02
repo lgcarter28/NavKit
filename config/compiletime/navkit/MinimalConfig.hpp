@@ -9,13 +9,13 @@
 
 #include <cstddef>
 
-namespace navkit::config::examples
+namespace navkit::config::navkit
 {
 
 struct MinimalNumericConfig
 {
-    using Scalar_t = navkit::core::Scalar_t;
-    using Time_t = navkit::core::Time_t;
+    using Scalar_t = core::Scalar_t;
+    using Time_t = core::Time_t;
 };
 
 struct MinimalGnssBufferConfig
@@ -29,9 +29,9 @@ struct MinimalConfig
     using GnssBuffer = MinimalGnssBufferConfig;
 };
 
-static_assert(navkit::core::config::NumericConfigPolicy<MinimalNumericConfig>);
-static_assert(navkit::core::estimation::BufferConfigPolicy<MinimalGnssBufferConfig>);
-static_assert(navkit::core::config::ConfigPolicy<MinimalConfig>);
-static_assert(navkit::core::estimation::BufferConfigPolicy<MinimalConfig::GnssBuffer>);
+static_assert(core::config::NumericConfigPolicy<MinimalNumericConfig>);
+static_assert(core::estimation::BufferConfigPolicy<MinimalGnssBufferConfig>);
+static_assert(core::config::ConfigPolicy<MinimalConfig>);
+static_assert(core::estimation::BufferConfigPolicy<MinimalConfig::GnssBuffer>);
 
-} // namespace navkit::config::examples
+} // namespace navkit::config::navkit

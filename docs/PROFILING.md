@@ -50,14 +50,38 @@ schema,point_id,point,start_tick,elapsed_ticks,sequence,parent_sequence,depth,fl
 `drain_profile_sink_to_csv<Tick, Sink>(path)` drains a fixed-capacity core sink
 into that CSV format.
 
-Complete run metadata should live beside the exported records, not inside the
-core hot path. Useful metadata includes schema version, profile-point mapping,
-clock source, tick frequency or tick-to-time conversion, build/config identity,
-run name, dropped-record count, and record flags.
+Compile-time profiling metadata belongs to the build, not the run. The selected
+compile-time config owns the C++ metadata constants. After the executable is
+built, `tools/build.py` asks the executable to describe the selected config
+through `navkit::app_support` helpers and writes that derived metadata into
+`build/<type>/navkit_build_manifest.json`, including clock source, tick-to-time
+conversion, sink capacity, overflow policy, and profile-point mapping. The
+runtime application uses app-support profile-export helpers to write only
+run-specific profile metadata in `profile_run_manifest.json`: run name, CSV
+file, record count, and dropped-record count.
 
 Binary dumps and a formal binary ICD are intentionally deferred until real
 algorithm records and metadata have been exercised through at least one
 integration path.
+
+## Configuration knobs
+
+Profiling behavior is selected at compile time by the concrete config. The main
+knobs are:
+
+- Clock source and resolution: desktop steady-clock microseconds today; future
+  embedded configs may use hardware timers, cycle counters, or RTOS clocks.
+- Tick type and range: `std::uint64_t` is comfortable for desktop; embedded
+  targets may prefer narrower counters and explicit wraparound handling.
+- Sink capacity: larger or denser instrumentation needs more fixed storage,
+  streaming, or overwrite behavior.
+- Overflow policy: reject overflow to preserve earliest records, or overwrite
+  oldest to preserve the most recent window.
+- Instrumentation density: profile-point placement usually matters more than
+  changing microseconds to nanoseconds.
+- Export metadata: tick scale, clock source, selected config, sink capacity,
+  and profile-point mapping belong in `navkit_build_manifest.json`; record
+  count and dropped count belong in `profile_run_manifest.json`.
 
 ## Analysis and visualization
 
@@ -65,7 +89,7 @@ The easiest end-to-end profiling demo is the profiled stationary GNSS config:
 
 ```bash
 python tools/build.py --build-type Debug --skip-conan \
-  --navkit-config navkit_sim/ProfiledStationaryGnss.hpp
+  --navkit-config apps/navkit_sim/ProfiledStationaryGnss.hpp
 
 python tools/run_first_sim.py --build-type Debug
 ```
@@ -73,6 +97,7 @@ python tools/run_first_sim.py --build-type Debug
 That writes:
 
 - `data/logs/stationary_gnss_demo/profile.csv`
+- `data/logs/stationary_gnss_demo/profile_run_manifest.json`
 - `data/logs/stationary_gnss_demo/profile.trace.json`
 
 `run_first_sim.py` reads the selected compile-time config from the build
@@ -91,14 +116,25 @@ Use `tools/profile_report.py` to inspect exported profile CSVs:
 python tools/profile_report.py data/logs/<run_name>/profile.csv
 ```
 
-To generate Chrome Trace / Perfetto-compatible JSON:
+To generate Chrome Trace / Perfetto-compatible JSON from an existing profile:
 
 ```bash
 python tools/profile_report.py data/logs/<run_name>/profile.csv \
+  --build-manifest build/Debug/navkit_build_manifest.json \
   --chrome-trace data/logs/<run_name>/profile.trace.json
 ```
 
-If one clock tick is not one microsecond, provide the conversion:
+Trace conversion requires both the runtime profile manifest and the build
+manifest so compile-time and runtime facts remain separate:
+
+```bash
+python tools/profile_report.py data/logs/<run_name>/profile.csv \
+  --profile-run-manifest data/logs/<run_name>/profile_run_manifest.json \
+  --build-manifest build/Debug/navkit_build_manifest.json \
+  --chrome-trace data/logs/<run_name>/profile.trace.json
+```
+
+Use `--tick-period-us` only as an explicit diagnostic override:
 
 ```bash
 python tools/profile_report.py data/logs/<run_name>/profile.csv \

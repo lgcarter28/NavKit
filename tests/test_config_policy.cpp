@@ -1,8 +1,9 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "examples/MinimalConfig.hpp"
+#include "navkit/MinimalConfig.hpp"
 #include "navkit/SelectedConfig.hpp"
+#include "navkit/app_support/ConfigTraits.hpp"
 #include "navkit/core/config/ConfigPolicy.hpp"
 #include "navkit/core/estimation/filter/FilterConfigPolicy.hpp"
 #include "navkit/core/estimation/sensor/Sensor.hpp"
@@ -40,27 +41,27 @@ struct MissingStatisticsFlagConfig
 
 struct MinimalConfig
 {
-    using Numeric = navkit::config::examples::MinimalNumericConfig;
+    using Numeric = navkit::config::navkit::MinimalNumericConfig;
 };
 
 struct MissingNumericConfig
 {
-    using GnssBuffer = navkit::config::examples::MinimalGnssBufferConfig;
+    using GnssBuffer = navkit::config::navkit::MinimalGnssBufferConfig;
 };
 
 struct NumericOnlyConfig
 {
-    using Numeric = navkit::config::examples::MinimalNumericConfig;
+    using Numeric = navkit::config::navkit::MinimalNumericConfig;
 };
 
 TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
 {
-    using ExampleConfig = navkit::config::examples::MinimalConfig;
-    using SimConfig = navkit::selected_config::Config;
+    using ExampleConfig = navkit::config::navkit::MinimalConfig;
+    using SimConfig = navkit::app_support::NavKitConfig_t<navkit::selected_config::Config>;
 
-    static_assert(NumericConfigPolicy<navkit::config::examples::MinimalNumericConfig>);
+    static_assert(NumericConfigPolicy<navkit::config::navkit::MinimalNumericConfig>);
     static_assert(navkit::core::estimation::BufferConfigPolicy<
-                  navkit::config::examples::MinimalGnssBufferConfig>);
+                  navkit::config::navkit::MinimalGnssBufferConfig>);
     static_assert(navkit::core::estimation::MeasurementStatisticsConfigPolicy<
                   SimConfig::MeasurementStatistics>);
     static_assert(navkit::core::estimation::BufferConfigPolicy<SimConfig::GnssBuffer>);
@@ -93,7 +94,7 @@ TEST_CASE("Concrete config composes at product-core sensor boundaries")
 {
     using StateDef = navkit::core::estimation::InsStateDef;
     using Model = navkit::core::models::GnssPosModel<StateDef>;
-    using SimConfig = navkit::selected_config::Config;
+    using SimConfig = navkit::app_support::NavKitConfig_t<navkit::selected_config::Config>;
     using Sensor = navkit::core::estimation::Sensor<Model, SimConfig::GnssBuffer::BufferSize>;
     using GnssOnlySensor =
         navkit::core::estimation::Sensor<Model, GnssOnlyBufferConfig::BufferSize>;

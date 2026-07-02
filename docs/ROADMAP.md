@@ -22,9 +22,10 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - Environment-policy Pass 1 is substantially implemented: planet/gravity concepts, CRTP bases, frame tags, WGS-84, Moon, Mars, spherical gravity, J2 gravity, and environment tests exist.
 - The estimator policy refactor is partially complete. `StateDefPolicy`, `InjectionPolicy`, `ResetPolicy`, `MeasurementPolicy`, `NoisePolicy`, `FilterPolicy`, `SensorCollectionPolicy`, and `UpdatePolicy` exist. `KalmanFilter` is constrained on state, injection, reset, and measurement-model boundaries; `Sensor` is constrained on noise-policy compatibility; and `Navigator` is constrained on current filter, sensor-collection, and update-policy boundaries. Propagation remains future work.
 - Public headers are organized by product boundary first, then engineering domain. `include/navkit/core` is the reusable product core, with estimation/navigation domains under `core/estimation`, environment models under `core/environment`, and reusable support domains such as `config`, `containers`, `frames`, `units`, and `models` also under `core`. Desktop simulation support remains under `include/navkit/sim`; desktop logging/file/JSON support remains under `include/navkit/io`.
-- CMake targets now separate product boundaries: `navkit_core`/`navkit::core` is the reusable product-core interface library, `navkit_sim`/`navkit::sim` is the compiled simulator support library, `navkit_io`/`navkit::io` is the desktop logging/file/JSON interface library, and runnable executables remain applications under `apps/`.
+- CMake targets now separate product boundaries: `navkit_core`/`navkit::core` is the reusable product-core interface library, `navkit_sim`/`navkit::sim` is the compiled simulator support library, `navkit_io`/`navkit::io` is the desktop logging/file/JSON interface library, `navkit_app_support`/`navkit::app_support` owns reusable selected-config/profile-export app plumbing, and runnable executables own their concrete application flow under `apps/`.
 - `core/config` contains shared product-core compile-time configuration vocabulary such as foundational scalar/time aliases and `NumericConfigPolicy`. Domain-specific configuration concepts live beside the domains that consume them, following the general pattern `include/navkit/<product-or-domain>/.../*ConfigPolicy.hpp`; estimator buffer and measurement-statistics configuration concepts are the first concrete examples.
-- Runtime scenario files for applications are treated as app inputs, not core configuration. Repository-provided configuration now lives under the root `config/` tree: `config/compiletime/...` for C++ compile-time configurations and `config/runtime/...` for JSON or other runtime inputs.
+- Runtime scenario files for applications are treated as app inputs, not core configuration. Repository-provided configuration now lives under the root `config/` tree: `config/compiletime/navkit/...` for reusable NavKit library configs, `config/compiletime/apps/...` for top-level executable composition configs, and `config/runtime/...` for JSON or other runtime inputs.
+- App composition configs intentionally live in a separate tree from reusable NavKit library configs, so the same descriptive file name can exist in both places without ambiguity. A selected app config owns the link between `using NavKit = ...` and `using App = ...`; runtime JSON is then validated by the app-support layer against that compiled composition before the executable runs.
 - Debug and Release build flags are now treated as explicit engineering products for NavKit-owned targets. CI enables warnings-as-errors, Release uses an embedded-oriented optimization profile, Linux Debug CI runs clang-tidy against the compilation database, and local agentic workflows intentionally do not run clang-tidy unless diagnosing that CI lane. Target-specific embedded toolchain flags remain future work until a target profile is selected.
 - `GnssPosModel`, `GnssVelModel`, and `BaroAltModel` exist, but only GNSS position is integrated into the current simulation. The barometer model currently selects the third position component; it is not yet a general ECEF-to-local-vertical altitude model.
 - The current trajectory generator supports only a simplistic stationary ECEF trajectory. It sets body rate to zero and therefore does not model Earth rotation correctly for stationary IMU truth.
@@ -173,17 +174,17 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 ### Pass 3.1d — Root configuration tree
 
 - [x] Create a root `config/` tree as the obvious place for repository-provided selectable configuration.
-- [x] Add `config/compiletime/...` for C++ compile-time configuration headers that define complete app/product build configurations.
+- [x] Add `config/compiletime/...` for C++ compile-time configuration headers, split into reusable NavKit library configs and app composition configs.
 - [x] Add `config/runtime/...` for JSON or other runtime inputs consumed by desktop applications, simulators, and demos.
 - [x] Move `navkit_sim` runtime JSON files to `config/runtime/navkit_sim/...` and update tools, apps, docs, and tests.
-- [x] Add at least one plug-and-play compile-time configuration for `navkit_sim`, such as `config/compiletime/navkit_sim/StationaryGnss.hpp`, so a fresh clone can build and run without user-authored configuration.
+- [x] Add at least one plug-and-play app compile-time configuration for `navkit_sim`, such as `config/compiletime/apps/navkit_sim/StationaryGnss.hpp`, so a fresh clone can build and run without user-authored configuration.
 - [x] Add README files or examples that show where new desktop, embedded-target, simulation, and test-fixture configurations should live.
 
 ### Pass 3.1e — CMake selected-config path
 
 - [x] Add a CMake cache variable named `NAVKIT_CONFIG` for selecting exactly one compile-time configuration header per build tree.
-- [x] Provide a good default `-DNAVKIT_CONFIG` value, for example `navkit_sim/StationaryGnss.hpp` relative to `config/compiletime`, so ordinary clone/build/test workflows work without extra flags.
-- [x] Keep `NAVKIT_CONFIG` orthogonal to `CMAKE_BUILD_TYPE`; Debug/Release chooses compiler mode, while `NAVKIT_CONFIG` chooses the product/app configuration.
+- [x] Provide a good default `-DNAVKIT_CONFIG` value, for example `apps/navkit_sim/StationaryGnss.hpp` relative to `config/compiletime`, so ordinary clone/build/test workflows work without extra flags.
+- [x] Keep `NAVKIT_CONFIG` orthogonal to `CMAKE_BUILD_TYPE`; Debug/Release chooses compiler mode, while `NAVKIT_CONFIG` chooses the top-level compile-time build configuration.
 - [x] Generate a build-local selected-config header, for example `build/generated/navkit/SelectedConfig.hpp`, from a CMake template so generic applications can include one stable header.
 - [x] Expose the selected compile-time configuration through a stable alias such as `navkit::selected_config::Config` or an equivalent clearly documented name.
 - [x] Ensure selected-config include paths are applied to app or product targets that need them, not forced into `navkit::core` as a dependency on repository app configuration.
@@ -194,9 +195,11 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Document the primary rule: one build tree selects one `NAVKIT_CONFIG`.
 - [x] Support multiple configurations by using multiple build directories or CMake presets, not by making one executable dynamically switch among compile-time configurations.
 - [x] Add CMake presets or documented wrapper examples that pair common build types and selected configs for convenience while keeping those axes independent.
-- [x] Add a `tools/build.py` option such as `--navkit-config navkit_sim/StationaryGnss.hpp` that forwards to `-DNAVKIT_CONFIG=...`.
+- [x] Add a `tools/build.py` option such as `--navkit-config apps/navkit_sim/StationaryGnss.hpp` that forwards to `-DNAVKIT_CONFIG=...`.
 - [x] Document how to add a new compile-time config header, how to select it with CMake or the build wrapper, and how to pair it with a runtime JSON input when an application needs one.
 - [x] Reconcile `README.md`, `docs/SETUP.md`, `docs/ARCHITECTURE.md`, and `AGENTS.md` so the default selected config, root config tree, and one-config-per-build-tree rule stay discoverable.
+- [x] Keep reusable NavKit library configs and app composition configs in dedicated directories so app and library configs can share descriptive names without coupling their ownership.
+- [x] Add runtime-input validation at the app-support boundary so missing scenario sections, unsupported sensor/emulator sections, and malformed JSON inputs fail early with clear diagnostics against the selected compile-time composition.
 
 ## Compiler flags and static-analysis hardening
 
@@ -405,6 +408,13 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [ ] Add log/schema version metadata and compatibility checks.
 - [ ] Extend the Phase 3 timing/resource artifacts into Monte Carlo aggregate reports.
 - [ ] Add memory/high-water statistics suitable for embedded evaluation once target/resource APIs are defined.
+- [x] Keep compile-time profiling metadata in `navkit_build_manifest.json`, including clock source, tick scale, selected config, sink capacity, overflow policy, schema version, and profile-point mapping.
+- [x] Add `profile_run_manifest.json` beside profile exports with runtime-only profile output facts such as CSV path, run name, record count, and dropped-record count.
+- [ ] Extend the build and run manifest contracts with richer build identity once the selected-config and logging metadata stabilize.
+- [ ] Improve Chrome Trace / Perfetto export readability with process/thread metadata, clearer display names, and stable category naming.
+- [ ] Use profile record `sequence`, `parent_sequence`, and `depth` to represent cleaner nested timing once propagation, mechanization, and multi-sensor update paths make nesting informative.
+- [ ] Add profile points around propagation, mechanization, sensor queue processing, update policies, and Monte Carlo/app-level loops after the first INS path exists.
+- [ ] Evaluate whether Perfetto/Chrome trace remains sufficient before building NavKit-native timeline or flame-style visualization.
 - [ ] Consider an optional binary backend only after CSV/JSON throughput becomes a demonstrated bottleneck.
 
 **Exit criteria:** a repeatable batch command produces deterministic aggregate results and records enough version/configuration metadata to reproduce them.
