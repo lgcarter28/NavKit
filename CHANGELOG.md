@@ -23,6 +23,7 @@ This project follows
 - First-pass `FilterPolicy`, `SensorCollectionPolicy`, and `UpdatePolicy` concepts for Navigator orchestration boundaries.
 - Measurement-statistics regression tests for accepted and rejected measurement updates.
 - Design-intent testing guide plus focused coverage for ring-buffer overflow policies, sensor FIFO/noise behavior, CSV writer output/failure behavior, and stationary trajectory semantics.
+- Linux-oriented coverage reporting through `tools/coverage.py` and a CI coverage artifact.
 
 ### Changed
 

@@ -92,7 +92,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Add ordered Linux and Windows CI for source checks, C++23 Debug builds, tests, simulation, and headless analysis.
 - [ ] Confirm the first hosted GitHub Actions run passes on both platforms.
 - [x] Add clang-tidy selectively after the baseline build is stable.
-- [ ] Add basic coverage reporting after the test target accurately represents the suite; Phase 3 will turn coverage into a design-intent standard.
+- [x] Add basic coverage reporting after the test target accurately represents the suite; Phase 3 will turn coverage into a design-intent standard.
 
 **Exit criteria:** all intended tests are configured, the baseline build/test/simulation workflow is reproducible, language-standard intent is explicit, and architecture documents no longer overstate implementation status.
 
@@ -210,7 +210,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 ## Coverage and design-intent tests
 
 - [x] Review current test coverage by domain and identify meaningful gaps, not just line-count gaps.
-- [ ] Add coverage reporting once the configured test target accurately represents the intended suite.
+- [x] Add coverage reporting once the configured test target accurately represents the intended suite.
 - [x] Add tests that demonstrate intended extension usage for configuration, policies, models, sensors, filters, and Navigator orchestration.
 - [ ] Continue positive and negative compile-time concept tests for each public policy boundary.
 - [x] Add runtime tests for important incorrect-input or rejected-operation behavior where failure is expected and should be stable.

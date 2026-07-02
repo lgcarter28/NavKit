@@ -16,10 +16,18 @@ def run(cmd: list[str], cwd: Path) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--build-type", choices=["Release", "Debug"], default="Release")
+    parser.add_argument(
+        "--build-dir",
+        type=Path,
+        default=None,
+        help="Build directory. Defaults to build/<build-type>.",
+    )
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
-    build_dir = root / "build" / args.build_type
+    build_dir = args.build_dir if args.build_dir is not None else root / "build" / args.build_type
+    if not build_dir.is_absolute():
+        build_dir = root / build_dir
 
     if not build_dir.exists():
         print(f"Build directory does not exist: {build_dir}")

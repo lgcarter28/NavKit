@@ -265,6 +265,7 @@ These scripts provide a consistent cross-platform workflow and abstract away pla
 | `run_first_sim.py` | Run the default stationary GNSS simulation |
 | `run_analysis.py` | Generate plots and analysis from simulation logs |
 | `format.py` | Run clang-format; also exposes clang-tidy for CI diagnostics |
+| `coverage.py` | Generate Linux/GCC-style coverage reports with gcovr |
 | `copyright.py` | Insert or verify copyright headers |
 
 For normal development, prefer these Python wrappers over invoking Conan, CMake, or CTest directly.
@@ -603,6 +604,10 @@ CI runs clang-tidy on Linux as the canonical static-analysis gate. Local
 development does not require clang-tidy; run it locally only when explicitly
 debugging the CI static-analysis lane.
 
+CI also generates a Linux coverage artifact with `tools/coverage.py`. Local
+development does not require coverage reporting; use it only when reviewing
+coverage gaps or debugging the coverage lane.
+
 ---
 
 ## VS Code Debugging
@@ -721,6 +726,7 @@ The GitHub Actions workflow in `.github/workflows/ci.yml` enforces this order:
 4. Unit tests on both platforms.
 5. Stationary simulation and headless analysis smoke tests on both platforms.
 6. Release compile checks with warnings-as-errors on both platforms.
+7. Linux coverage report generation as an uploaded artifact.
 
 The build/test jobs wait for source checks, ensuring CI never tests code that would subsequently be changed by formatting.
 

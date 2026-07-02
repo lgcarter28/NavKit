@@ -32,13 +32,25 @@ failure behavior, and numerical expectations hard to misunderstand.
 - When a test encodes a temporary limitation, say so in the test name or nearby
   documentation so future implementation can deliberately replace it.
 
-## Coverage posture
+## Coverage reporting
 
 Coverage is useful only after the configured test target represents the intended
 suite. The near-term priority is meaningful domain coverage and design-intent
 tests. Line/branch coverage reporting should be added after this baseline is
 stable, and coverage gaps should be reviewed by engineering domain rather than
 treated as a blind percentage chase.
+
+Linux CI generates a coverage artifact using GCC/Clang-style coverage
+instrumentation and `gcovr`. Local Windows development does not need to run
+coverage. To reproduce the CI coverage path on a machine with compatible
+tooling:
+
+```bash
+python tools/coverage.py --html
+```
+
+Coverage reports are written under `build/coverage/coverage/`. Treat the report
+as a review aid for finding meaningful gaps, not as a standalone quality score.
 
 ## Local and CI workflow
 
@@ -47,4 +59,5 @@ configured doctest executable. Simulation and analysis smoke tests are added
 when behavior affects logs, navigation results, or runtime app wiring.
 
 Clang-tidy is intentionally a CI static-analysis gate, not part of the normal
-local workflow. Run it locally only when explicitly debugging that CI lane.
+local workflow. Coverage reporting is also CI-oriented; run it locally only when
+reviewing coverage gaps or debugging the CI coverage lane.

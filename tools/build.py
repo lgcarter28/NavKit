@@ -86,6 +86,11 @@ def main() -> int:
         action="store_true",
         help="Treat warnings in NavKit-owned C++ targets as errors.",
     )
+    parser.add_argument(
+        "--coverage",
+        action="store_true",
+        help="Enable coverage instrumentation for supported Debug builds.",
+    )
     parser.add_argument("--jobs", "-j", type=int, default=None)
     parser.add_argument(
         "--navkit-config",
@@ -104,6 +109,9 @@ def main() -> int:
 
     if args.build_only and args.clean:
         raise ValueError("--clean cannot be used with --build-only")
+
+    if args.coverage and args.build_type != "Debug":
+        raise ValueError("--coverage is only supported with --build-type Debug")
 
     if not args.build_only and not args.skip_conan:
         conan = find_executable_near_python("conan")
@@ -135,6 +143,7 @@ def main() -> int:
                 "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
                 f"-DNAVKIT_BUILD_TESTS={'OFF' if args.without_tests else 'ON'}",
                 f"-DNAVKIT_WARNINGS_AS_ERRORS={'ON' if args.warnings_as_errors else 'OFF'}",
+                f"-DNAVKIT_ENABLE_COVERAGE={'ON' if args.coverage else 'OFF'}",
                 *([f"-DNAVKIT_CONFIG={args.navkit_config}"] if args.navkit_config else []),
             ],
             cwd=root,
