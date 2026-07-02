@@ -209,12 +209,12 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Coverage and design-intent tests
 
-- [ ] Review current test coverage by domain and identify meaningful gaps, not just line-count gaps.
+- [x] Review current test coverage by domain and identify meaningful gaps, not just line-count gaps.
 - [ ] Add coverage reporting once the configured test target accurately represents the intended suite.
-- [ ] Add tests that demonstrate intended extension usage for configuration, policies, models, sensors, filters, and Navigator orchestration.
+- [x] Add tests that demonstrate intended extension usage for configuration, policies, models, sensors, filters, and Navigator orchestration.
 - [ ] Continue positive and negative compile-time concept tests for each public policy boundary.
-- [ ] Add runtime tests for important incorrect-input or rejected-operation behavior where failure is expected and should be stable.
-- [ ] Document the testing standard: completeness, clarity, and design intent matter more than tests for tests' sake.
+- [x] Add runtime tests for important incorrect-input or rejected-operation behavior where failure is expected and should be stable.
+- [x] Document the testing standard: completeness, clarity, and design intent matter more than tests for tests' sake.
 
 ## Runtime profiling and resource evidence
 

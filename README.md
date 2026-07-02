@@ -147,6 +147,7 @@ python tools/run_analysis.py data/logs/stationary_gnss_demo --show
 - [Documentation index](docs/README.md)
 - [Current architecture](docs/ARCHITECTURE.md)
 - [Configuration model](docs/CONFIGURATION.md)
+- [Testing strategy](docs/TESTING.md)
 - [Development setup and workflow](docs/SETUP.md)
 - [Master roadmap and current-state handoff](docs/ROADMAP.md)
 - [Naming conventions](docs/NAMING_CONVENTIONS.md)
