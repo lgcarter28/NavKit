@@ -249,17 +249,18 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ### Pass 3.4d - Profile sinks, export, and visualization path
 
-- [ ] Keep the embedded hot-path record format native, compact, fixed-size, and allocation-free; do not emit strings, JSON, file paths, or visualization-specific structures from `navkit::core`.
-- [ ] Add the first concrete core sink policies only after the algorithm hooks prove the record flow. Start with simple single-producer, non-thread-safe sinks: `NullSink` and a fixed-capacity buffer or ring-buffer sink with explicit dropped-record or overwrite accounting.
-- [ ] Prefer reusing `navkit::core::containers::RingBuffer` for the first ring-buffer sink if its reject/overwrite semantics match profiling needs. If profiling needs diverge, add a narrow profiling-specific fixed buffer rather than complicating the generic container.
-- [ ] Keep RTOS, ISR-safe, multi-producer, lock-free, or atomic sinks out of the first implementation. Add them later as separate sink policies when a target profile and concurrency model require them.
-- [ ] Define an initial logical `navkit.profile.v1` export schema outside the hot path for desktop/offline use. Prefer JSON or CSV first so the schema can evolve before any binary ICD is frozen.
-- [ ] Put C++ outer-layer export adapters in `navkit::io`, not `navkit::core`. Likely future adapters include profile CSV/JSON writers and a Chrome Trace / Perfetto JSON exporter; `navkit::sim` or applications can wire those adapters into desktop scenarios.
-- [ ] Add Python tooling that consumes exported profile records plus metadata and can emit a standards-friendly trace format, with Chrome Trace / Perfetto-compatible JSON as the preferred first visualization target.
-- [ ] Add Python summary views for count, total time, min/max/mean, p95/p99 where sample counts are meaningful, and percent-of-profiled-time by `ProfilePoint`.
-- [ ] Keep future NavKit-native plots optional; prefer exporting to established trace viewers before hand-building complex timeline/flame-chart UI.
-- [ ] Document required metadata for export: schema version, profile-point mapping, clock source, tick frequency or tick-to-time conversion, build/config identity, run name, dropped-record count, and record flags.
-- [ ] Defer binary profile dump and formal ICD work until real algorithm records and export metadata are proven by at least one integration pass.
+- [x] Keep the embedded hot-path record format native, compact, fixed-size, and allocation-free; do not emit strings, JSON, file paths, or visualization-specific structures from `navkit::core`.
+- [x] Add the first concrete core sink policies only after the algorithm hooks prove the record flow. Start with simple single-producer, non-thread-safe sinks: `NullProfileSink` and `RingBufferProfileSink` with explicit dropped-record or overwrite accounting.
+- [x] Prefer reusing `navkit::core::containers::RingBuffer` for the first ring-buffer sink if its reject/overwrite semantics match profiling needs. If profiling needs diverge, add a narrow profiling-specific fixed buffer rather than complicating the generic container.
+- [x] Keep RTOS, ISR-safe, multi-producer, lock-free, or atomic sinks out of the first implementation. Add them later as separate sink policies when a target profile and concurrency model require them.
+- [x] Define an initial logical `navkit.profile.v1` export schema outside the hot path for desktop/offline use. Prefer JSON or CSV first so the schema can evolve before any binary ICD is frozen.
+- [x] Put C++ outer-layer export adapters in `navkit::io`, not `navkit::core`. The first adapter is `ProfileCsvWriter`; Python handles Chrome Trace / Perfetto JSON conversion for now.
+- [x] Add a fully configured profiled stationary GNSS sim selection that emits `profile.csv` through an embedded-style clock, scoped profiler, and fixed-capacity ring-buffer sink.
+- [x] Add Python tooling that consumes exported profile records plus metadata and can emit a standards-friendly trace format, with Chrome Trace / Perfetto-compatible JSON as the preferred first visualization target.
+- [x] Add Python summary views for count, total time, min/max/mean, p95/p99 where sample counts are meaningful, and percent-of-profiled-time by `ProfilePoint`.
+- [x] Keep future NavKit-native plots optional; prefer exporting to established trace viewers before hand-building complex timeline/flame-chart UI.
+- [x] Document required metadata for export: schema version, profile-point mapping, clock source, tick frequency or tick-to-time conversion, build/config identity, run name, dropped-record count, and record flags.
+- [x] Defer binary profile dump and formal ICD work until real algorithm records and export metadata are proven by at least one integration pass.
 
 ### Pass 3.4e - Resource evidence and philosophy
 

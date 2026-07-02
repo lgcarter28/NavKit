@@ -320,6 +320,20 @@ relative to `config/compiletime`, and defaults to
 python tools/build.py --build-type Debug --skip-conan --navkit-config navkit_sim/StationaryGnss.hpp
 ```
 
+To run the same stationary GNSS scenario with the embedded-style profiling
+configuration:
+
+```bash
+python tools/build.py --build-type Debug --skip-conan --navkit-config navkit_sim/ProfiledStationaryGnss.hpp
+python tools/run_first_sim.py --build-type Debug
+```
+
+That writes `profile.csv` and `profile.trace.json` under
+`data/logs/stationary_gnss_demo/`. The run wrapper reads the selected
+compile-time config from the build manifest written by `build.py`; it does not
+reselect compile-time configuration at run time. Use `--no-profile-trace` when
+you want only the compact CSV profile export.
+
 Use a separate build directory for each selected compile-time configuration:
 
 ```bash
@@ -330,10 +344,15 @@ This keeps each generated `navkit/SelectedConfig.hpp` isolated. Debug/Release
 and `NAVKIT_CONFIG` are independent: build type chooses compiler mode, while
 `NAVKIT_CONFIG` chooses the product/app configuration.
 
+Run wrappers use `--build-type` to choose the Debug or Release executable from
+the default build tree. When you intentionally keep multiple build trees for
+different selected configs, pass the matching `--build-dir` to the run wrapper.
+
 `CMakePresets.json` also contains example selected-config presets such as
-`debug-stationary-gnss` and `release-stationary-gnss`. As with any Conan-backed
-CMake preset, install dependencies into the preset binary directory before
-configuring if the toolchain file does not exist yet.
+`debug-stationary-gnss`, `debug-profiled-stationary-gnss`,
+`release-stationary-gnss`, and `release-profiled-stationary-gnss`. As with any
+Conan-backed CMake preset, install dependencies into the preset binary directory
+before configuring if the toolchain file does not exist yet.
 
 ---
 

@@ -10,6 +10,7 @@ add_executable(navkit_tests
     test_measurement_policy.cpp
     test_measurement_statistics.cpp
     test_noise_policy.cpp
+    test_profile_csv_writer.cpp
     test_profiling_policy.cpp
     test_ring_buffer.cpp
     test_ring_buffer_policies.cpp
@@ -25,7 +26,7 @@ add_executable(navkit_tests
     test_trajectory_generator.cpp
 )
 
-target_link_libraries(navkit_tests PRIVATE navkit::core navkit::sim doctest::doctest)
+target_link_libraries(navkit_tests PRIVATE navkit::core navkit::sim navkit::io doctest::doctest)
 target_include_directories(navkit_tests
     PRIVATE
         ${PROJECT_SOURCE_DIR}/config/compiletime

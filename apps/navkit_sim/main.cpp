@@ -9,6 +9,8 @@
 #include "navkit/core/estimation/sensor/noise/NoisePolicies.hpp"
 #include "navkit/core/estimation/state/StateDefs.hpp"
 #include "navkit/core/models/GnssPosModel.hpp"
+#include "navkit/core/profiling/NullProfiler.hpp"
+#include "navkit/io/ProfileCsvWriter.hpp"
 #include "navkit/io/RunLogger.hpp"
 #include "navkit/sim/GnssSimulator.hpp"
 #include "navkit/sim/TrajectoryGenerator.hpp"
@@ -20,6 +22,7 @@
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include <type_traits>
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -34,6 +37,53 @@ Vec3 vec3_from_json(const json& value)
     v << value.at(0).get<navkit::core::Scalar_t>(), value.at(1).get<navkit::core::Scalar_t>(),
         value.at(2).get<navkit::core::Scalar_t>();
     return v;
+}
+
+template<typename Config, typename = void>
+struct ConfigProfiler
+{
+    using type = navkit::core::profiling::NullProfiler;
+};
+
+template<typename Config>
+struct ConfigProfiler<Config, std::void_t<typename Config::Profiler>>
+{
+    using type = typename Config::Profiler;
+};
+
+template<typename Config, typename = void>
+inline constexpr bool has_profile_export_v = false;
+
+template<typename Config>
+inline constexpr bool
+    has_profile_export_v<Config,
+                         std::void_t<typename Config::ProfileTick, typename Config::ProfileSink>> =
+        true;
+
+template<typename Config>
+void reset_profile_sink_if_configured()
+{
+    if constexpr (has_profile_export_v<Config>) {
+        using Sink = typename Config::ProfileSink;
+        Sink::reset();
+    }
+}
+
+template<typename Config>
+void export_profile_if_configured(const fs::path& output_dir)
+{
+    if constexpr (has_profile_export_v<Config>) {
+        using Sink = typename Config::ProfileSink;
+        using Tick = typename Config::ProfileTick;
+
+        const auto profile_path = output_dir / "profile.csv";
+        const std::size_t record_count =
+            navkit::io::drain_profile_sink_to_csv<Tick, Sink>(profile_path);
+        std::printf("Wrote NavKit profile log to: %s (%zu records, %zu dropped)\n",
+                    profile_path.string().c_str(),
+                    record_count,
+                    Sink::dropped_count());
+    }
 }
 
 } // namespace
@@ -72,9 +122,10 @@ int main(int argc, char** argv)
         const auto truth = navkit::sim::TrajectoryGenerator::stationary(traj_cfg);
         navkit::sim::GnssSimulator gnss_sim(gnss_cfg);
 
+        using AppConfig = navkit::selected_config::Config;
+        using Profiler = typename ConfigProfiler<AppConfig>::type;
         using StateDef = navkit::core::estimation::InsStateDef;
         using GnssModel = navkit::core::models::GnssPosModel<StateDef>;
-        using AppConfig = navkit::selected_config::Config;
         using GnssSensor =
             navkit::core::estimation::Sensor<GnssModel,
                                              AppConfig::GnssBuffer::BufferSize,
@@ -85,9 +136,12 @@ int main(int argc, char** argv)
             StateDef,
             navkit::core::estimation::DefaultInjectionPolicy<StateDef>,
             navkit::core::estimation::DefaultResetPolicy<StateDef>,
-            MeasurementModels>;
+            MeasurementModels,
+            Profiler>;
         using Navigator = navkit::core::estimation::
-            Navigator<Filter, Sensors, navkit::core::estimation::UpdatePostFilter>;
+            Navigator<Filter, Sensors, navkit::core::estimation::UpdatePostFilter, Profiler>;
+
+        reset_profile_sink_if_configured<AppConfig>();
 
         Navigator navigator;
         auto& filter = navigator.filter();
@@ -139,6 +193,7 @@ int main(int argc, char** argv)
         }
 
         logger.close();
+        export_profile_if_configured<AppConfig>(output_dir);
 
         std::printf("Wrote NavKit simulation logs to: %s\n", output_dir.string().c_str());
         return 0;

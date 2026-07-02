@@ -93,6 +93,10 @@ default after successful builds.
 See `docs/SETUP.md` for the fuller timing/resource workflow and Release size
 snapshot commands.
 
+Profiling records use a separate embedded-facing path from coarse wrapper
+timing. See `docs/PROFILING.md` for `ProfileRecord`, fixed-capacity sink, CSV
+export, and Chrome Trace / Perfetto conversion details.
+
 ### `navkit.timing.v1` schema
 
 Timing artifacts use the lightweight `navkit.timing.v1` JSON schema. The schema

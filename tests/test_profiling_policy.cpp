@@ -8,6 +8,7 @@
 #include "navkit/core/models/GnssPosModel.hpp"
 #include "navkit/core/profiling/NullProfiler.hpp"
 #include "navkit/core/profiling/ProfilePolicy.hpp"
+#include "navkit/core/profiling/ProfileSinks.hpp"
 #include "navkit/core/profiling/ScopedProfiler.hpp"
 #include "test_main.hpp"
 
@@ -124,8 +125,12 @@ using ProfiledNavigator =
 
 TEST_CASE("Profiler concepts accept valid clock, sink, scope, and profiler policies")
 {
+    using RejectSink = RingBufferProfileSink<FakeClock::Tick, 2U>;
+
     static_assert(ClockPolicy<FakeClock>);
     static_assert(ProfileSinkPolicy<FixedSink, FakeClock>);
+    static_assert(ProfileSinkPolicy<NullProfileSink, FakeClock>);
+    static_assert(ProfileSinkPolicy<RejectSink, FakeClock>);
     static_assert(ProfileScopePolicy<NullProfileScope>);
     static_assert(ProfileScopePolicy<ProfileScope<FakeClock, FixedSink>>);
     static_assert(ProfilerPolicy<NullProfiler>);
@@ -207,6 +212,8 @@ TEST_CASE("ProfileRecord carries optional visualization metadata")
     CHECK(record.parent_sequence == 7U);
     CHECK(record.depth == 2U);
     CHECK(record.flags == ProfileRecordFlags::DroppedBefore);
+    CHECK(has_profile_record_flag(record.flags, ProfileRecordFlags::DroppedBefore));
+    CHECK(!has_profile_record_flag(record.flags, ProfileRecordFlags::Incomplete));
 }
 
 TEST_CASE("NullProfiler satisfies the profiler contract without recording")
@@ -216,6 +223,55 @@ TEST_CASE("NullProfiler satisfies the profiler contract without recording")
 
     static_assert(ProfilerPolicy<NullProfiler>);
     CHECK(true);
+}
+
+TEST_CASE("RingBufferProfileSink rejects overflow and records dropped count")
+{
+    using RejectSink = RingBufferProfileSink<FakeClock::Tick, 2U>;
+
+    RejectSink::reset();
+    RejectSink::record({.point = ProfilePoint::NavigatorProcessMeasurements, .start_tick = 1U});
+    RejectSink::record({.point = ProfilePoint::KalmanObservationUpdate, .start_tick = 2U});
+    RejectSink::record({.point = ProfilePoint::PropagationUpdate, .start_tick = 3U});
+
+    CHECK(RejectSink::size() == 2U);
+    CHECK(RejectSink::dropped_count() == 1U);
+
+    ProfileRecord<FakeClock::Tick> record{};
+    REQUIRE(RejectSink::pop(record));
+    CHECK(record.point == ProfilePoint::NavigatorProcessMeasurements);
+    CHECK(record.start_tick == 1U);
+
+    REQUIRE(RejectSink::pop(record));
+    CHECK(record.point == ProfilePoint::KalmanObservationUpdate);
+    CHECK(record.start_tick == 2U);
+
+    CHECK(RejectSink::empty());
+}
+
+TEST_CASE("RingBufferProfileSink overwrite policy keeps newest records and flags gaps")
+{
+    using OverwriteSink =
+        RingBufferProfileSink<FakeClock::Tick, 2U, containers::OverflowPolicy::OverwriteOldest>;
+
+    OverwriteSink::reset();
+    OverwriteSink::record({.point = ProfilePoint::NavigatorProcessMeasurements, .start_tick = 1U});
+    OverwriteSink::record({.point = ProfilePoint::KalmanObservationUpdate, .start_tick = 2U});
+    OverwriteSink::record({.point = ProfilePoint::PropagationUpdate, .start_tick = 3U});
+
+    CHECK(OverwriteSink::size() == 2U);
+    CHECK(OverwriteSink::dropped_count() == 1U);
+
+    ProfileRecord<FakeClock::Tick> record{};
+    REQUIRE(OverwriteSink::pop(record));
+    CHECK(record.point == ProfilePoint::KalmanObservationUpdate);
+    CHECK(record.start_tick == 2U);
+    CHECK(record.flags == ProfileRecordFlags::None);
+
+    REQUIRE(OverwriteSink::pop(record));
+    CHECK(record.point == ProfilePoint::PropagationUpdate);
+    CHECK(record.start_tick == 3U);
+    CHECK(has_profile_record_flag(record.flags, ProfileRecordFlags::DroppedBefore));
 }
 
 TEST_CASE("KalmanFilter observation update emits the configured profile point")

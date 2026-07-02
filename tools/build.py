@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import subprocess
 import sys
@@ -82,6 +83,61 @@ def resolve_build_dir(root: Path, build_type: str, build_dir_arg: Path | None) -
     if not resolved.is_relative_to(root):
         raise ValueError(f"--build-dir must stay inside the repository: {build_dir_arg}")
     return resolved
+
+
+def read_cmake_cache_value(build_dir: Path, key: str) -> str | None:
+    cache_path = build_dir / "CMakeCache.txt"
+    if not cache_path.exists():
+        return None
+
+    for line in cache_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        prefix = f"{key}:"
+        if line.startswith(prefix):
+            _, value = line.split("=", maxsplit=1)
+            return value
+
+    return None
+
+
+def selected_navkit_config(build_dir: Path, navkit_config_arg: str | None) -> str:
+    if navkit_config_arg:
+        return navkit_config_arg
+
+    cached = read_cmake_cache_value(build_dir, "NAVKIT_CONFIG")
+    if cached:
+        return cached
+
+    manifest_path = build_dir / "navkit_build_manifest.json"
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest_config = manifest.get("navkit_config")
+        if isinstance(manifest_config, str) and manifest_config:
+            return manifest_config
+
+    return DEFAULT_NAVKIT_CONFIG
+
+
+def write_build_manifest(
+    build_dir: Path,
+    *,
+    build_type: str,
+    navkit_config: str,
+    tests_enabled: bool,
+    warnings_as_errors: bool,
+    coverage_enabled: bool,
+) -> Path:
+    manifest_path = build_dir / "navkit_build_manifest.json"
+    manifest = {
+        "schema": "navkit.build_manifest.v1",
+        "build_type": build_type,
+        "navkit_config": navkit_config,
+        "tests_enabled": tests_enabled,
+        "warnings_as_errors": warnings_as_errors,
+        "coverage_enabled": coverage_enabled,
+        "updated_utc": utc_now(),
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    return manifest_path
 
 
 def main() -> int:
@@ -207,6 +263,16 @@ def main() -> int:
         build_cmd += ["--parallel", str(args.jobs)]
 
     run(build_cmd, cwd=root)
+    navkit_config = selected_navkit_config(build_dir, args.navkit_config)
+    write_build_manifest(
+        build_dir,
+        build_type=args.build_type,
+        navkit_config=navkit_config,
+        tests_enabled=not args.without_tests,
+        warnings_as_errors=args.warnings_as_errors,
+        coverage_enabled=args.coverage,
+    )
+
     command_name = f"build_{args.build_type.lower()}"
     if not args.no_timing:
         record = update_timing_artifact(
@@ -216,7 +282,7 @@ def main() -> int:
             command=[Path(sys.executable).name, *sys.argv],
             result=timing_result(start_utc, start, 0),
             build_type=args.build_type,
-            navkit_config=args.navkit_config or DEFAULT_NAVKIT_CONFIG,
+            navkit_config=navkit_config,
             tool_version="build.py",
         )
         if not args.no_timing_report:
@@ -229,7 +295,7 @@ def main() -> int:
             resource_output,
             build_dir=build_dir,
             build_type=args.build_type,
-            navkit_config=args.navkit_config or DEFAULT_NAVKIT_CONFIG,
+            navkit_config=navkit_config,
         )
         print()
         print_resource_report(load_resource_report(resource_output), max_artifacts=8)

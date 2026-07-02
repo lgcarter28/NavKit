@@ -9,7 +9,6 @@
 #include "navkit/core/estimation/sensor/SensorConfigPolicy.hpp"
 #include "navkit/core/estimation/state/StateDefs.hpp"
 #include "navkit/core/models/GnssPosModel.hpp"
-#include "navkit_sim/StationaryGnss.hpp"
 
 #include <cstddef>
 #include <doctest/doctest.h>
@@ -57,8 +56,7 @@ struct NumericOnlyConfig
 TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
 {
     using ExampleConfig = navkit::config::examples::MinimalConfig;
-    using SimConfig = navkit::config::navkit_sim::StationaryGnssConfig;
-    using SelectedConfig = navkit::selected_config::Config;
+    using SimConfig = navkit::selected_config::Config;
 
     static_assert(NumericConfigPolicy<navkit::config::examples::MinimalNumericConfig>);
     static_assert(navkit::core::estimation::BufferConfigPolicy<
@@ -68,7 +66,6 @@ TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
     static_assert(navkit::core::estimation::BufferConfigPolicy<SimConfig::GnssBuffer>);
     static_assert(ConfigPolicy<ExampleConfig>);
     static_assert(ConfigPolicy<SimConfig>);
-    static_assert(ConfigPolicy<SelectedConfig>);
     static_assert(ConfigPolicy<MinimalConfig>);
 
     static_assert(std::is_same_v<ExampleConfig::Numeric::Scalar_t, navkit::core::Scalar_t>);
@@ -76,7 +73,6 @@ TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
 
     CHECK(ExampleConfig::GnssBuffer::BufferSize > 0);
     CHECK(SimConfig::GnssBuffer::BufferSize > 0);
-    CHECK(SelectedConfig::GnssBuffer::BufferSize == SimConfig::GnssBuffer::BufferSize);
 }
 
 TEST_CASE("Narrow config concepts reject only their own missing capabilities")
@@ -97,7 +93,7 @@ TEST_CASE("Concrete config composes at product-core sensor boundaries")
 {
     using StateDef = navkit::core::estimation::InsStateDef;
     using Model = navkit::core::models::GnssPosModel<StateDef>;
-    using SimConfig = navkit::config::navkit_sim::StationaryGnssConfig;
+    using SimConfig = navkit::selected_config::Config;
     using Sensor = navkit::core::estimation::Sensor<Model, SimConfig::GnssBuffer::BufferSize>;
     using GnssOnlySensor =
         navkit::core::estimation::Sensor<Model, GnssOnlyBufferConfig::BufferSize>;

@@ -6,6 +6,14 @@ This directory contains repository-provided C++ configuration headers.
 - `navkit_sim/` contains configurations used by the `navkit_sim` application.
 - `targets/` may be added later for desktop and embedded product targets.
 
+Provided `navkit_sim` selections:
+
+- `navkit_sim/StationaryGnss.hpp`: default stationary GNSS demo with measurement
+  statistics and no embedded profile export.
+- `navkit_sim/ProfiledStationaryGnss.hpp`: same demo shape, but selects a host
+  microsecond clock, fixed-capacity profiling ring-buffer sink, and scoped
+  profiler so the app emits `profile.csv`.
+
 Each concrete config header should include local `static_assert` checks for the
 concept slices it claims to satisfy.
 

@@ -17,6 +17,26 @@ enum class ProfileRecordFlags : std::uint16_t
     Incomplete = 1U << 1U
 };
 
+[[nodiscard]] constexpr ProfileRecordFlags operator|(ProfileRecordFlags lhs,
+                                                     ProfileRecordFlags rhs) noexcept
+{
+    return static_cast<ProfileRecordFlags>(static_cast<std::uint16_t>(lhs) |
+                                           static_cast<std::uint16_t>(rhs));
+}
+
+[[nodiscard]] constexpr ProfileRecordFlags operator&(ProfileRecordFlags lhs,
+                                                     ProfileRecordFlags rhs) noexcept
+{
+    return static_cast<ProfileRecordFlags>(static_cast<std::uint16_t>(lhs) &
+                                           static_cast<std::uint16_t>(rhs));
+}
+
+[[nodiscard]] constexpr bool has_profile_record_flag(ProfileRecordFlags flags,
+                                                     ProfileRecordFlags flag) noexcept
+{
+    return (flags & flag) != ProfileRecordFlags::None;
+}
+
 template<typename Tick>
 struct ProfileRecord
 {

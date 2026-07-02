@@ -4,13 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 from perf_artifacts import (
-    DEFAULT_NAVKIT_CONFIG,
     DEFAULT_RUN_NAME,
     DEFAULT_TIMING_PATH,
     print_command_timing,
@@ -23,6 +23,13 @@ from perf_artifacts import (
 def run(cmd: list[str], cwd: Path) -> int:
     print("+", " ".join(cmd))
     return subprocess.call(cmd, cwd=cwd)
+
+
+def load_build_manifest(build_dir: Path) -> dict[str, object]:
+    manifest_path = build_dir / "navkit_build_manifest.json"
+    if not manifest_path.exists():
+        return {}
+    return json.loads(manifest_path.read_text(encoding="utf-8"))
 
 
 def main() -> int:
@@ -41,7 +48,6 @@ def main() -> int:
         help="timing.json path to update with this test duration.",
     )
     parser.add_argument("--timing-run-name", default=DEFAULT_RUN_NAME)
-    parser.add_argument("--navkit-config", default=DEFAULT_NAVKIT_CONFIG)
     parser.add_argument(
         "--no-timing",
         action="store_true",
@@ -66,6 +72,9 @@ def main() -> int:
         print("Run: python tools/build.py --build-type", args.build_type)
         return 1
 
+    build_manifest = load_build_manifest(build_dir)
+    navkit_config = str(build_manifest.get("navkit_config", "unknown"))
+
     # Avoid Conan-generated CMake preset names such as conan-release/conan-debug.
     # Those can collide with repository presets. Drive CTest directly from the
     # generated build tree instead.
@@ -88,7 +97,7 @@ def main() -> int:
             command=[Path(sys.executable).name, *sys.argv],
             result=timing_result(start_utc, start, return_code),
             build_type=args.build_type,
-            navkit_config=args.navkit_config,
+            navkit_config=navkit_config,
             tool_version="run_tests.py",
         )
         if not args.no_timing_report:
