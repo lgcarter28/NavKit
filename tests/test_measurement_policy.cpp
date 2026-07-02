@@ -35,13 +35,15 @@ struct ValidMeasurement
         Scalar_t sigma{1.0};
     };
 
-    static O_t obs(const State_t&)
+    static O_t obs(const State_t& unused_state)
     {
+        static_cast<void>(unused_state);
         return O_t::Zero();
     }
 
-    static H_t compute_h(const State_t&)
+    static H_t compute_h(const State_t& unused_state)
     {
+        static_cast<void>(unused_state);
         return H_t::Zero();
     }
 
@@ -62,10 +64,14 @@ struct LocalInjection
 
 struct LocalReset
 {
-    static void reset_covariance(State<MeasurementPolicyTestStateDef>&,
-                                 const State<MeasurementPolicyTestStateDef>&,
-                                 StateCov<MeasurementPolicyTestStateDef>&)
-    {}
+    static void reset_covariance(State<MeasurementPolicyTestStateDef>& unused_state,
+                                 const State<MeasurementPolicyTestStateDef>& unused_dx,
+                                 StateCov<MeasurementPolicyTestStateDef>& unused_covariance)
+    {
+        static_cast<void>(unused_state);
+        static_cast<void>(unused_dx);
+        static_cast<void>(unused_covariance);
+    }
 
     static void reset_dx(State<MeasurementPolicyTestStateDef>& dx)
     {

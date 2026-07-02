@@ -80,6 +80,12 @@ def main() -> int:
     parser.add_argument("--clean", action="store_true")
     parser.add_argument("--skip-conan", action="store_true")
     parser.add_argument("--build-only", action="store_true")
+    parser.add_argument("--without-tests", action="store_true", help="Configure without test targets.")
+    parser.add_argument(
+        "--warnings-as-errors",
+        action="store_true",
+        help="Treat warnings in NavKit-owned C++ targets as errors.",
+    )
     parser.add_argument("--jobs", "-j", type=int, default=None)
     parser.add_argument(
         "--navkit-config",
@@ -126,6 +132,9 @@ def main() -> int:
                 str(build_dir),
                 f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file}",
                 f"-DCMAKE_BUILD_TYPE={args.build_type}",
+                "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+                f"-DNAVKIT_BUILD_TESTS={'OFF' if args.without_tests else 'ON'}",
+                f"-DNAVKIT_WARNINGS_AS_ERRORS={'ON' if args.warnings_as_errors else 'OFF'}",
                 *([f"-DNAVKIT_CONFIG={args.navkit_config}"] if args.navkit_config else []),
             ],
             cwd=root,

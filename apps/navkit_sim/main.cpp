@@ -13,9 +13,9 @@
 #include "navkit/sim/GnssSimulator.hpp"
 #include "navkit/sim/TrajectoryGenerator.hpp"
 
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string>
@@ -28,11 +28,11 @@ namespace
 {
 
 template<typename Vec3>
-Vec3 vec3_from_json(const json& j)
+Vec3 vec3_from_json(const json& value)
 {
     Vec3 v;
-    v << j.at(0).get<navkit::core::Scalar_t>(), j.at(1).get<navkit::core::Scalar_t>(),
-        j.at(2).get<navkit::core::Scalar_t>();
+    v << value.at(0).get<navkit::core::Scalar_t>(), value.at(1).get<navkit::core::Scalar_t>(),
+        value.at(2).get<navkit::core::Scalar_t>();
     return v;
 }
 
@@ -46,7 +46,7 @@ int main(int argc, char** argv)
                        : fs::path("config/runtime/navkit_sim/stationary_gnss.json");
         std::ifstream cfg_stream(config_path);
         if (!cfg_stream) {
-            std::cerr << "Failed to open config: " << config_path << '\n';
+            std::fprintf(stderr, "Failed to open config: %s\n", config_path.string().c_str());
             return 1;
         }
 
@@ -55,17 +55,19 @@ int main(int argc, char** argv)
         const std::string run_name = cfg.value("run_name", "stationary_gnss_demo");
         const fs::path output_dir = cfg.value("output_dir", std::string("data/logs/") + run_name);
 
+        const auto& trajectory_config = cfg.at("trajectory");
         navkit::sim::StationaryTrajectoryConfig traj_cfg;
-        traj_cfg.duration_s = cfg["trajectory"].value("duration_s", 60.0);
-        traj_cfg.dt_s = cfg["trajectory"].value("dt_s", 1.0);
-        traj_cfg.p_e =
-            vec3_from_json<Eigen::Matrix<navkit::core::Scalar_t, 3, 1>>(cfg["trajectory"]["p_e_m"]);
+        traj_cfg.duration_s = trajectory_config.value("duration_s", 60.0);
+        traj_cfg.dt_s = trajectory_config.value("dt_s", 1.0);
+        traj_cfg.p_e = vec3_from_json<Eigen::Matrix<navkit::core::Scalar_t, 3, 1>>(
+            trajectory_config.at("p_e_m"));
 
+        const auto& gnss_config = cfg.at("gnss");
         navkit::sim::GnssSimulatorConfig gnss_cfg;
-        gnss_cfg.dt_s = cfg["gnss"].value("dt_s", 1.0);
-        gnss_cfg.sigma_h_m = cfg["gnss"].value("sigma_h_m", 3.0);
-        gnss_cfg.sigma_v_m = cfg["gnss"].value("sigma_v_m", 5.0);
-        gnss_cfg.seed = cfg["gnss"].value("seed", 42U);
+        gnss_cfg.dt_s = gnss_config.value("dt_s", 1.0);
+        gnss_cfg.sigma_h_m = gnss_config.value("sigma_h_m", 3.0);
+        gnss_cfg.sigma_v_m = gnss_config.value("sigma_v_m", 5.0);
+        gnss_cfg.seed = gnss_config.value("seed", 42U);
 
         const auto truth = navkit::sim::TrajectoryGenerator::stationary(traj_cfg);
         navkit::sim::GnssSimulator gnss_sim(gnss_cfg);
@@ -90,24 +92,25 @@ int main(int argc, char** argv)
         Navigator navigator;
         auto& filter = navigator.filter();
 
-        Filter::State_t x0 = Filter::State_t::Zero();
-        x0.template segment<3>(StateDef::Pos::i) = traj_cfg.p_e;
+        Filter::State_t initial_state = Filter::State_t::Zero();
+        initial_state.template segment<3>(StateDef::Pos::i) = traj_cfg.p_e;
 
-        if (cfg.contains("filter") && cfg["filter"].contains("initial_position_offset_m")) {
-            x0.template segment<3>(StateDef::Pos::i) +=
+        const auto filter_config = cfg.find("filter");
+        if (filter_config != cfg.end() && filter_config->contains("initial_position_offset_m")) {
+            initial_state.template segment<3>(StateDef::Pos::i) +=
                 vec3_from_json<Eigen::Matrix<navkit::core::Scalar_t, 3, 1>>(
-                    cfg["filter"]["initial_position_offset_m"]);
+                    filter_config->at("initial_position_offset_m"));
         }
 
-        filter.set_state(x0);
+        filter.set_state(initial_state);
 
-        Filter::P_t P0 = Filter::P_t::Identity();
+        Filter::P_t initial_covariance = Filter::P_t::Identity();
         const navkit::core::Scalar_t sigma_p0 =
             cfg.value("filter", json::object()).value("initial_position_sigma_m", 100.0);
-        P0 *= 1.0e-6;
-        P0.template block<3, 3>(StateDef::Pos::i, StateDef::Pos::i) =
+        initial_covariance *= 1.0e-6;
+        initial_covariance.template block<3, 3>(StateDef::Pos::i, StateDef::Pos::i) =
             (sigma_p0 * sigma_p0) * Eigen::Matrix<navkit::core::Scalar_t, 3, 3>::Identity();
-        filter.set_covariance(P0);
+        filter.set_covariance(initial_covariance);
 
         auto& gnss_sensor = navigator.template sensor<0>();
         gnss_sensor.noise_context().sigma_h = gnss_cfg.sigma_h_m;
@@ -137,11 +140,11 @@ int main(int argc, char** argv)
 
         logger.close();
 
-        std::cout << "Wrote NavKit simulation logs to: " << output_dir << '\n';
+        std::printf("Wrote NavKit simulation logs to: %s\n", output_dir.string().c_str());
         return 0;
     }
     catch (const std::exception& e) {
-        std::cerr << "navkit_sim error: " << e.what() << '\n';
+        std::fprintf(stderr, "navkit_sim error: %s\n", e.what());
         return 1;
     }
 }

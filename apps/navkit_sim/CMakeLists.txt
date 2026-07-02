@@ -9,3 +9,4 @@ target_include_directories(navkit_sim_app
         ${NAVKIT_GENERATED_INCLUDE_DIR}
 )
 target_link_libraries(navkit_sim_app PRIVATE navkit::core navkit::sim navkit::io)
+navkit_configure_target(navkit_sim_app)

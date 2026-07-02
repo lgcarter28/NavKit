@@ -19,8 +19,10 @@ using NoiseTestMeasurement = Measurement<NoiseTestModel::M>;
 
 struct ExactNoisePolicy
 {
-    static void update(NoiseTestModel::NoiseContext& ctx, const NoiseTestMeasurement&)
+    static void update(NoiseTestModel::NoiseContext& ctx,
+                       const NoiseTestMeasurement& unused_measurement)
     {
+        static_cast<void>(unused_measurement);
         ctx.sigma_h = 4.0;
         ctx.sigma_v = 6.0;
     }
@@ -31,18 +33,30 @@ struct MissingUpdate
 
 struct WrongNoiseContext
 {
-    static void update(int&, const NoiseTestMeasurement&) {}
+    static void update(int& unused_context, const NoiseTestMeasurement& unused_measurement)
+    {
+        static_cast<void>(unused_context);
+        static_cast<void>(unused_measurement);
+    }
 };
 
 struct WrongMeasurementSample
 {
-    static void update(NoiseTestModel::NoiseContext&, const Measurement<1>&) {}
+    static void update(NoiseTestModel::NoiseContext& unused_context,
+                       const Measurement<1>& unused_measurement)
+    {
+        static_cast<void>(unused_context);
+        static_cast<void>(unused_measurement);
+    }
 };
 
 struct ReturningUpdate
 {
-    static bool update(NoiseTestModel::NoiseContext&, const NoiseTestMeasurement&)
+    static bool update(NoiseTestModel::NoiseContext& unused_context,
+                       const NoiseTestMeasurement& unused_measurement)
     {
+        static_cast<void>(unused_context);
+        static_cast<void>(unused_measurement);
         return true;
     }
 };

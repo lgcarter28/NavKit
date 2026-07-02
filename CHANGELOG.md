@@ -51,7 +51,11 @@ This project follows
 - Moved concrete app/product compile-time configuration examples out of public NavKit headers and into `config/compiletime`.
 - Added `NAVKIT_CONFIG` CMake selection with a generated `navkit/SelectedConfig.hpp` alias and `tools/build.py --navkit-config` forwarding.
 - Added `tools/build.py --build-dir`, selected-config CMake presets, and stricter `NAVKIT_CONFIG` validation for multi-config development.
+- Added centralized NavKit-owned target warning profiles, CI warnings-as-errors, embedded-oriented Release optimization settings, Release CI build verification, and `tools/build.py` compile-check switches.
+- Added Linux Debug `clang-tidy` static analysis to CI and made the local tidy wrapper require a valid compilation database instead of silently running without build flags.
+- Clarified that clang-tidy is intentionally a CI gate and not part of the normal local agentic development loop.
 - Moved `navkit_sim` runtime JSON inputs from `apps/navkit_sim/configs` to `config/runtime/navkit_sim`.
+- Removed stale root example placeholder directories and documented that future architecture domains should not be represented by empty folders.
 
 ### Fixed
 

@@ -7,6 +7,7 @@ project(navkit VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(NAVKIT_BUILD_TESTS "Build NavKit tests" ON)
 set(NAVKIT_CONFIG "navkit_sim/StationaryGnss.hpp"
@@ -41,6 +42,7 @@ configure_file(
 find_package(Eigen3 REQUIRED CONFIG)
 find_package(nlohmann_json REQUIRED CONFIG)
 
+include(cmake/NavKitWarnings.cmake)
 include(cmake/targets/NavKitCore.cmake)
 include(cmake/targets/NavKitIo.cmake)
 add_subdirectory(src/sim)

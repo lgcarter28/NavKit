@@ -47,10 +47,6 @@ include/navkit/
     environment/
       planet/
       gravity/
-      atmosphere/
-      magnetic/
-      geoid/
-      terrain/
     frames/
     units/
     models/
@@ -72,6 +68,9 @@ src/
 `include/navkit/core` is the reusable product core, not a miscellaneous bucket.
 Simulation, desktop IO, concrete app/product compile-time configurations, and
 executable runtime input bundles are intentionally outside the core boundary.
+Future domains such as atmosphere, magnetic-field, geoid, and terrain policies
+should be added when concrete implementations land; the repository should avoid
+empty placeholder directories for planned architecture.
 
 ## Namespaces
 

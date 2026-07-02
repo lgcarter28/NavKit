@@ -31,15 +31,23 @@ struct MissingInjectionApply
 
 struct MutableErrorInjection
 {
-    static void apply(State<PolicyTestStateDef>&, State<PolicyTestStateDef>&) {}
+    static void apply(State<PolicyTestStateDef>& unused_state, State<PolicyTestStateDef>& unused_dx)
+    {
+        static_cast<void>(unused_state);
+        static_cast<void>(unused_dx);
+    }
 };
 
 struct ValidReset
 {
-    static void reset_covariance(State<PolicyTestStateDef>&,
-                                 const State<PolicyTestStateDef>&,
-                                 StateCov<PolicyTestStateDef>&)
-    {}
+    static void reset_covariance(State<PolicyTestStateDef>& unused_state,
+                                 const State<PolicyTestStateDef>& unused_dx,
+                                 StateCov<PolicyTestStateDef>& unused_covariance)
+    {
+        static_cast<void>(unused_state);
+        static_cast<void>(unused_dx);
+        static_cast<void>(unused_covariance);
+    }
 
     static void reset_dx(State<PolicyTestStateDef>& dx)
     {
@@ -57,10 +65,14 @@ struct MissingCovarianceReset
 
 struct MissingErrorStateReset
 {
-    static void reset_covariance(State<PolicyTestStateDef>&,
-                                 const State<PolicyTestStateDef>&,
-                                 StateCov<PolicyTestStateDef>&)
-    {}
+    static void reset_covariance(State<PolicyTestStateDef>& unused_state,
+                                 const State<PolicyTestStateDef>& unused_dx,
+                                 StateCov<PolicyTestStateDef>& unused_covariance)
+    {
+        static_cast<void>(unused_state);
+        static_cast<void>(unused_dx);
+        static_cast<void>(unused_covariance);
+    }
 };
 
 TEST_CASE("InjectionPolicy accepts compatible policies")

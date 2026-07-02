@@ -23,7 +23,7 @@ using Filter = KalmanFilter<StateDef,
 
 struct StatisticsFixture
 {
-    Filter filter{};
+    Filter filter;
     State<StateDef> initial_error_state{State<StateDef>::Zero()};
     StateCov<StateDef> initial_covariance{StateCov<StateDef>::Identity()};
     Model::O_t measurement{Model::O_t::Zero()};

@@ -30,14 +30,20 @@ struct MissingProcessSensor
 
 struct MissingSensorUpdate
 {
-    static void filter_update(NavigatorPolicyFilter&) {}
+    static void filter_update(NavigatorPolicyFilter& unused_filter)
+    {
+        static_cast<void>(unused_filter);
+    }
 };
 
 struct MissingFilterUpdate
 {
     template<typename Sensor>
-    static void sensor_update(NavigatorPolicyFilter&, const Sensor&)
-    {}
+    static void sensor_update(NavigatorPolicyFilter& unused_filter, const Sensor& unused_sensor)
+    {
+        static_cast<void>(unused_filter);
+        static_cast<void>(unused_sensor);
+    }
 };
 
 template<typename Filter, typename Sensors>

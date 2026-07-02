@@ -6,7 +6,10 @@ Checks: >
   modernize-*,
   readability-*,
   cppcoreguidelines-*,
+  -bugprone-easily-swappable-parameters,
+  -modernize-use-std-print,
   -modernize-use-trailing-return-type,
+  -readability-identifier-length,
   -readability-magic-numbers,
   -readability-function-cognitive-complexity,
   -cppcoreguidelines-avoid-magic-numbers,
@@ -34,8 +37,12 @@ CheckOptions:
     value: lower_case
   - key: readability-identifier-naming.VariableCase
     value: lower_case
+  - key: readability-identifier-naming.VariableIgnoredRegexp
+    value: '^([HKPRS]|C_[a-z]{2})$'
   - key: readability-identifier-naming.ParameterCase
     value: lower_case
+  - key: readability-identifier-naming.ParameterIgnoredRegexp
+    value: '^[HKPRS]$'
   - key: readability-identifier-naming.PrivateMemberCase
     value: lower_case
   - key: readability-identifier-naming.PrivateMemberPrefix
@@ -46,6 +53,14 @@ CheckOptions:
     value: m_
   - key: readability-identifier-naming.ConstantCase
     value: lower_case
+  - key: readability-identifier-naming.ClassConstantCase
+    value: CamelCase
+  - key: readability-identifier-naming.ClassConstantIgnoredRegexp
+    value: '^(i|sz)$'
+  - key: readability-identifier-naming.StructConstantCase
+    value: CamelCase
+  - key: readability-identifier-naming.StructConstantIgnoredRegexp
+    value: '^(i|sz)$'
   - key: readability-identifier-naming.StaticConstantCase
     value: CamelCase
   - key: readability-identifier-naming.TemplateParameterCase

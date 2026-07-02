@@ -33,6 +33,12 @@ SOURCE_EXTENSIONS = {
     ".tpp",
 }
 
+TIDY_SOURCE_EXTENSIONS = {
+    ".cpp",
+    ".cc",
+    ".cxx",
+}
+
 
 def repo_root() -> Path:
     script = Path(__file__).resolve()
@@ -79,8 +85,16 @@ def main() -> int:
         action="store_true",
         help="Apply clang-tidy fixes (requires --tidy).",
     )
+    parser.add_argument(
+        "--tidy-warnings-as-errors",
+        action="store_true",
+        help="Promote clang-tidy warnings to errors (requires --tidy).",
+    )
 
     args = parser.parse_args()
+
+    if args.tidy_warnings_as_errors and not args.tidy:
+        parser.error("--tidy-warnings-as-errors requires --tidy")
 
     root = repo_root()
     files = find_cpp_files(root)
@@ -123,8 +137,20 @@ def main() -> int:
             return 1
 
         build_dir = root / "build" / "Debug"
+        compile_commands = build_dir / "compile_commands.json"
 
-        for file in files:
+        if not compile_commands.exists():
+            print(
+                "ERROR: clang-tidy requires a compilation database at "
+                f"{compile_commands}.\n"
+                "Configure a Debug build with a generator that exports "
+                "compile_commands.json, then rerun this command.",
+            )
+            return 1
+
+        tidy_files = [file for file in files if file.suffix.lower() in TIDY_SOURCE_EXTENSIONS]
+
+        for file in tidy_files:
             cmd = [
                 clang_tidy,
                 str(file),
@@ -134,6 +160,9 @@ def main() -> int:
 
             if args.fix:
                 cmd.append("--fix")
+
+            if args.tidy_warnings_as_errors:
+                cmd.append("--warnings-as-errors=*")
 
             ret = run(cmd)
 

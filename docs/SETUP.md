@@ -16,7 +16,7 @@ NavKit currently expects:
 - Python 3.10 or newer
 - VS Code
 - MSVC on Windows, or GCC/Clang on Linux/macOS
-- LLVM tooling for formatting and static analysis
+- LLVM tooling for formatting
 
 Recommended editor:
 
@@ -194,17 +194,16 @@ On Windows, CMake may already be installed with Visual Studio if the CMake tools
 
 ---
 
-## Install LLVM for Formatting and Linting
+## Install LLVM for Formatting
 
-NavKit uses repository-wide formatting and static-analysis configuration stored in:
+NavKit uses repository-wide formatting configuration stored in:
 
 ```text
 .clang-format
-.clang-tidy
 .editorconfig
 ```
 
-These files live at the repository root and are automatically used by VS Code, `clang-format`, and `clang-tidy`.
+These files live at the repository root and are automatically used by VS Code and `clang-format`.
 
 ### Windows
 
@@ -218,7 +217,6 @@ Restart VS Code or your terminal, then verify:
 
 ```powershell
 clang-format --version
-clang-tidy --version
 ```
 
 If the commands are not found, add the LLVM `bin` directory to your `PATH`, typically:
@@ -233,14 +231,13 @@ Install Clang tooling:
 
 ```bash
 sudo apt update
-sudo apt install clang-format clang-tidy
+sudo apt install clang-format
 ```
 
 Verify:
 
 ```bash
 clang-format --version
-clang-tidy --version
 ```
 
 ---
@@ -267,7 +264,7 @@ These scripts provide a consistent cross-platform workflow and abstract away pla
 | `run_tests.py` | Execute the complete unit test suite |
 | `run_first_sim.py` | Run the default stationary GNSS simulation |
 | `run_analysis.py` | Generate plots and analysis from simulation logs |
-| `format.py` | Run clang-format and optional clang-tidy |
+| `format.py` | Run clang-format; also exposes clang-tidy for CI diagnostics |
 | `copyright.py` | Insert or verify copyright headers |
 
 For normal development, prefer these Python wrappers over invoking Conan, CMake, or CTest directly.
@@ -302,6 +299,12 @@ Release build:
 
 ```bash
 python tools/build.py --build-type Release --clean
+```
+
+Release compile verification without test targets:
+
+```bash
+python tools/build.py --build-type Release --clean --without-tests
 ```
 
 In day-to-day development, `--build-only` is typically sufficient unless CMake configuration, Conan dependencies, or build-system files have changed.
@@ -537,18 +540,6 @@ Check formatting without modifying files:
 python tools/format.py --check
 ```
 
-Run static analysis:
-
-```bash
-python tools/format.py --tidy
-```
-
-Apply available clang-tidy fixes:
-
-```bash
-python tools/format.py --tidy --fix
-```
-
 Formatting behavior is controlled by:
 
 ```text
@@ -566,6 +557,51 @@ Basic editor whitespace behavior is controlled by:
 ```text
 .editorconfig
 ```
+
+---
+
+## Compiler Diagnostics and Build Profiles
+
+NavKit applies warning and Release optimization settings through
+`cmake/NavKitWarnings.cmake` for NavKit-owned targets.
+
+Warnings are enabled by default:
+
+- MSVC: `/W4`, `/permissive-`, and `/Zc:__cplusplus`
+- GCC/Clang: `-Wall`, `-Wextra`, `-Wpedantic`, `-Wconversion`,
+  `-Wsign-conversion`, and `-Wshadow`
+
+Warnings-as-errors are intentionally opt-in while the architecture is still
+moving quickly for local development, but CI enables them for NavKit-owned
+targets:
+
+```bash
+python tools/build.py --build-type Debug --skip-conan --warnings-as-errors
+```
+
+Debug builds also enable extra supported diagnostics:
+
+- MSVC Debug: `/sdl`
+- GCC/Clang Debug: `-fno-omit-frame-pointer`
+
+Release builds use an embedded-oriented optimization profile that favors a
+portable, conservative speed baseline plus dead-code elimination support:
+
+- MSVC Release: `/O2`, `/Ob2`, `/Gy`, `/Gw`, `/OPT:REF`, and `/OPT:ICF`
+- GCC/Clang Release: `-O2`, `-ffunction-sections`, `-fdata-sections`, and
+  linker garbage collection (`--gc-sections`, or `dead_strip` on Apple)
+
+CI builds and tests Debug, then also verifies that Release compiles. Run a
+Release build locally when changing performance-sensitive code or compiler
+configuration. For a compile-only optimization-profile check, omit test targets:
+
+```bash
+python tools/build.py --build-type Release --clean --without-tests --warnings-as-errors
+```
+
+CI runs clang-tidy on Linux as the canonical static-analysis gate. Local
+development does not require clang-tidy; run it locally only when explicitly
+debugging the CI static-analysis lane.
 
 ---
 
@@ -680,9 +716,11 @@ Do not rely on dependencies persisting between independent cloud tasks. The boot
 The GitHub Actions workflow in `.github/workflows/ci.yml` enforces this order:
 
 1. Copyright and formatting checks on Linux.
-2. C++23 Debug builds on Linux and Windows.
-3. Unit tests on both platforms.
-4. Stationary simulation and headless analysis smoke tests on both platforms.
+2. C++23 Debug builds with warnings-as-errors on Linux and Windows.
+3. `clang-tidy` static analysis on the Linux Debug compilation database.
+4. Unit tests on both platforms.
+5. Stationary simulation and headless analysis smoke tests on both platforms.
+6. Release compile checks with warnings-as-errors on both platforms.
 
 The build/test jobs wait for source checks, ensuring CI never tests code that would subsequently be changed by formatting.
 

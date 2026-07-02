@@ -25,7 +25,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - CMake targets now separate product boundaries: `navkit_core`/`navkit::core` is the reusable product-core interface library, `navkit_sim`/`navkit::sim` is the compiled simulator support library, `navkit_io`/`navkit::io` is the desktop logging/file/JSON interface library, and runnable executables remain applications under `apps/`.
 - `core/config` contains shared product-core compile-time configuration vocabulary such as foundational scalar/time aliases and `NumericConfigPolicy`. Domain-specific configuration concepts live beside the domains that consume them, following the general pattern `include/navkit/<product-or-domain>/.../*ConfigPolicy.hpp`; estimator buffer and measurement-statistics configuration concepts are the first concrete examples.
 - Runtime scenario files for applications are treated as app inputs, not core configuration. Repository-provided configuration now lives under the root `config/` tree: `config/compiletime/...` for C++ compile-time configurations and `config/runtime/...` for JSON or other runtime inputs.
-- Debug and Release build flags are not yet treated as explicit engineering products. Release optimization settings, strict Debug diagnostics, and static-analysis expectations should be made deliberate before performance trends become meaningful.
+- Debug and Release build flags are now treated as explicit engineering products for NavKit-owned targets. CI enables warnings-as-errors, Release uses an embedded-oriented optimization profile, Linux Debug CI runs clang-tidy against the compilation database, and local agentic workflows intentionally do not run clang-tidy unless diagnosing that CI lane. Target-specific embedded toolchain flags remain future work until a target profile is selected.
 - `GnssPosModel`, `GnssVelModel`, and `BaroAltModel` exist, but only GNSS position is integrated into the current simulation. The barometer model currently selects the third position component; it is not yet a general ECEF-to-local-vertical altitude model.
 - The current trajectory generator supports only a simplistic stationary ECEF trajectory. It sets body rate to zero and therefore does not model Earth rotation correctly for stationary IMU truth.
 - `ImuSimulator` and `BaroSimulator` are empty shells, and the IMU process model is a placeholder.
@@ -91,7 +91,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 - [x] Add ordered Linux and Windows CI for source checks, C++23 Debug builds, tests, simulation, and headless analysis.
 - [ ] Confirm the first hosted GitHub Actions run passes on both platforms.
-- [ ] Add clang-tidy selectively after the baseline build is stable.
+- [x] Add clang-tidy selectively after the baseline build is stable.
 - [ ] Add basic coverage reporting after the test target accurately represents the suite; Phase 3 will turn coverage into a design-intent standard.
 
 **Exit criteria:** all intended tests are configured, the baseline build/test/simulation workflow is reproducible, language-standard intent is explicit, and architecture documents no longer overstate implementation status.
@@ -200,12 +200,12 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Compiler flags and static-analysis hardening
 
-- [ ] Audit current Debug, Release, and CI compiler flags for MSVC, Clang, and GCC where supported.
-- [ ] Define strict Debug diagnostics that catch likely correctness issues early without creating unreviewable warning noise.
-- [ ] Define Release optimization flags deliberately and document which optimization profile is used for performance evidence.
-- [ ] Add a Release build verification path to the normal workflow or CI once flags are stable.
-- [ ] Decide how clang-tidy, compiler warnings-as-errors, sanitizers, and platform-specific analysis tools fit into local and CI workflows.
-- [ ] Keep target-specific embedded flags separate from desktop development flags until an embedded toolchain/profile is selected.
+- [x] Audit current Debug, Release, and CI compiler flags for MSVC, Clang, and GCC where supported.
+- [x] Define strict Debug diagnostics that catch likely correctness issues early without creating unreviewable warning noise.
+- [x] Define Release optimization flags deliberately and document which optimization profile is used for performance evidence.
+- [x] Add a Release build verification path to the normal workflow or CI once flags are stable.
+- [x] Decide how clang-tidy, compiler warnings-as-errors, sanitizers, and platform-specific analysis tools fit into local and CI workflows. Clang-tidy is a CI gate, not a default local agentic workflow step.
+- [x] Keep target-specific embedded flags separate from desktop development flags until an embedded toolchain/profile is selected.
 
 ## Coverage and design-intent tests
 

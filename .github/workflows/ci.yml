@@ -27,10 +27,10 @@ jobs:
           cache: pip
           cache-dependency-path: python/pyproject.toml
 
-      - name: Install clang-format
+      - name: Install LLVM analysis tools
         run: |
           sudo apt-get update
-          sudo apt-get install --yes clang-format
+          sudo apt-get install --yes clang-format clang-tidy
 
       - name: Bootstrap development environment
         run: python tools/bootstrap.py
@@ -73,8 +73,18 @@ jobs:
       - name: Bootstrap development environment
         run: python tools/bootstrap.py
 
+      - name: Install clang-tidy
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang-tidy
+
       - name: Build Debug
-        run: ${{ matrix.python }} tools/build.py --build-type Debug --clean
+        run: ${{ matrix.python }} tools/build.py --build-type Debug --clean --warnings-as-errors
+
+      - name: Run clang-tidy
+        if: runner.os == 'Linux'
+        run: ${{ matrix.python }} tools/format.py --check --tidy --tidy-warnings-as-errors
 
       - name: Run unit tests
         run: ${{ matrix.python }} tools/run_tests.py --build-type Debug
@@ -86,3 +96,6 @@ jobs:
         env:
           MPLBACKEND: Agg
         run: ${{ matrix.python }} tools/run_analysis.py data/logs/stationary_gnss_demo
+
+      - name: Build Release
+        run: ${{ matrix.python }} tools/build.py --build-type Release --clean --without-tests --warnings-as-errors

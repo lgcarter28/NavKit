@@ -28,3 +28,4 @@ target_include_directories(navkit_tests
 )
 
 add_test(NAME navkit_tests COMMAND navkit_tests)
+navkit_configure_target(navkit_tests)

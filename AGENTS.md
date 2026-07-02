@@ -89,7 +89,7 @@ After changing CMake files or configuration, reconfigure without reinstalling de
 python tools/build.py --build-type Debug --skip-conan
 ```
 
-Use `python tools/build.py --build-type Release --clean` when a Release build is relevant. Run the narrowest relevant tests during iteration and the full test executable before handing off changes. Report when a test file is not part of the configured target.
+Use `python tools/build.py --build-type Release --clean --without-tests` when a Release compile check is relevant. Run the narrowest relevant tests during iteration and the full Debug test executable before handing off changes. Report when a test file is not part of the configured target.
 
 For changes affecting the simulation or navigation results, also run:
 
@@ -100,7 +100,9 @@ python tools/run_analysis.py data/logs/stationary_gnss_demo --show
 
 Simulation logs belong under `data/logs/<run_name>/`. The analysis package is deliberately separate from the embedded C++ library.
 
-Use `python tools/format.py` to apply formatting. Use `python tools/format.py --tidy` when static analysis is relevant and LLVM tooling is available. Do not apply automatic tidy fixes broadly without reviewing their scope.
+Use `python tools/format.py` to apply formatting. Do not include clang-tidy in the normal local agentic workflow; it is intentionally a CI-only gate because Eigen-heavy translation units make local runs slow. Run `python tools/format.py --tidy` locally only when the user explicitly asks for clang-tidy or when diagnosing a clang-tidy CI failure. CI runs `python tools/format.py --check --tidy --tidy-warnings-as-errors` on the Linux Debug compilation database. Do not apply automatic tidy fixes broadly without reviewing their scope.
+
+NavKit-owned C++ targets use warning/profile settings from `cmake/NavKitWarnings.cmake`. CI enables `NAVKIT_WARNINGS_AS_ERRORS`; local builds may opt in with `python tools/build.py --warnings-as-errors`. Release builds use the embedded-oriented optimization profile in `NavKitWarnings.cmake`; verify Release builds when touching compiler flags, optimization settings, or performance-sensitive code.
 
 VS Code launch configurations assume that a Debug build already exists; they do not build automatically. Build with the wrapper before starting a debugging session.
 

@@ -15,7 +15,4 @@ target_link_libraries(navkit_sim
         navkit::core
 )
 
-target_compile_options(navkit_sim PRIVATE
-    $<$<CXX_COMPILER_ID:MSVC>:/W4>
-    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>
-)
+navkit_configure_target(navkit_sim)
