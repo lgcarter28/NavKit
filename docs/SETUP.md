@@ -264,6 +264,8 @@ These scripts provide a consistent cross-platform workflow and abstract away pla
 | `run_tests.py` | Execute the complete unit test suite |
 | `run_first_sim.py` | Run the default stationary GNSS simulation |
 | `run_analysis.py` | Generate plots and analysis from simulation logs |
+| `timing_report.py` | Summarize a complete `navkit.timing.v1` timing artifact |
+| `resource_report.py` | Write and display coarse executable/library size reports for a build tree |
 | `format.py` | Run clang-format; also exposes clang-tidy for CI diagnostics |
 | `coverage.py` | Generate Linux/GCC-style coverage reports with gcovr |
 | `copyright.py` | Insert or verify copyright headers |
@@ -477,11 +479,13 @@ nav.csv
 nav.meta.json
 
 run_manifest.json
+timing.json
 ```
 
 CSV is used for time-history logs. JSON is used for runtime input bundles,
-per-log metadata, and the hierarchical run manifest. Runtime input bundles such
-as `config/runtime/navkit_sim/stationary_gnss.json` are executable inputs, not
+per-log metadata, the hierarchical run manifest, and lightweight workflow
+timing artifacts. Runtime input bundles such as
+`config/runtime/navkit_sim/stationary_gnss.json` are executable inputs, not
 product-core compile-time configuration.
 
 ---
@@ -510,6 +514,72 @@ Future plotting utilities will include:
 - Monte Carlo statistics
 
 The analysis package is intentionally separated from the embedded navigation library to allow richer offline validation, visualization, Monte Carlo analysis, and future report generation without impacting embedded flight software.
+
+---
+
+## Collect Timing and Resource Artifacts
+
+The simulation and analysis wrappers automatically update:
+
+```text
+data/logs/<run_name>/timing.json
+```
+
+For the default stationary GNSS workflow:
+
+```bash
+python tools/run_first_sim.py --build-type Debug
+python tools/run_analysis.py data/logs/stationary_gnss_demo
+```
+
+Both commands update `timing.json` and print a compact timing summary for the
+operation they just ran. Add `--no-timing-report` to either command when script
+output needs to stay quiet.
+
+To view the timing artifact as a compact terminal report:
+
+```bash
+python tools/timing_report.py data/logs/stationary_gnss_demo/timing.json
+```
+
+Build, test, simulation, and analysis wrappers update the default timing
+artifact during normal use:
+
+```bash
+python tools/build.py --build-type Debug --skip-conan
+python tools/run_tests.py --build-type Debug
+python tools/run_first_sim.py --build-type Debug
+python tools/run_analysis.py data/logs/stationary_gnss_demo
+```
+
+Use `--timing-output <path>` on `build.py` or `run_tests.py` to write to a
+different timing artifact. Use `--no-timing` on those wrappers to disable timing
+updates for a single command.
+
+`build.py` and `run_tests.py` also print concise timing summaries by default.
+Use `--no-timing-report` when the timing artifact should still update but the
+terminal output should stay quiet.
+
+To write a coarse executable/library size report for a build tree:
+
+```bash
+python tools/resource_report.py --build-type Debug --output data/logs/stationary_gnss_demo/resources-debug-local.json
+```
+
+`build.py` writes and displays the same coarse artifact-size report by default
+after a successful build. Use `--resource-output <path>` to change where that
+report is written, or `--no-resource-report` to skip it for a single build.
+
+For a Release size snapshot:
+
+```bash
+python tools/build.py --build-type Release --clean --without-tests
+python tools/resource_report.py --build-type Release --output data/logs/stationary_gnss_demo/resources-release-local.json
+```
+
+These files are intended for trend review and future Monte Carlo summaries.
+They are deliberately not pass/fail gates because wall-clock timing and binary
+layout vary across local machines, compilers, and CI runners.
 
 ---
 
@@ -607,6 +677,12 @@ debugging the CI static-analysis lane.
 CI also generates a Linux coverage artifact with `tools/coverage.py`. Local
 development does not require coverage reporting; use it only when reviewing
 coverage gaps or debugging the coverage lane.
+
+Build, test, simulation, and analysis wrappers write a lightweight
+`timing.json` artifact under `data/logs/<run_name>/` during normal use. CI
+uploads those logs along with Debug and Release resource-size reports produced by
+`tools/resource_report.py`. These artifacts are trend evidence only; wall-clock
+timing and hosted-runner binary sizes are intentionally not pass/fail gates.
 
 ---
 

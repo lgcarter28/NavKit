@@ -30,7 +30,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - The current trajectory generator supports only a simplistic stationary ECEF trajectory. It sets body rate to zero and therefore does not model Earth rotation correctly for stationary IMU truth.
 - `ImuSimulator` and `BaroSimulator` are empty shells, and the IMU process model is a placeholder.
 - Analysis already provides position error/covariance, innovation, NIS, p-value, mean p-value, and innovation histogram plots. More formal statistics and consistency tests remain future work.
-- Runtime timing, profiling, and memory/resource tracking are not yet first-class outputs of the build, test, simulation, or analysis workflow.
+- Desktop timing and coarse binary-size artifacts now exist for the stationary simulation/analysis workflow and CI artifact upload. Embedded zero-overhead profiling hooks and memory/resource budgets remain future work.
 - The documented and configured language standard is C++23.
 - `tests/test_state_def_policy.cpp` is included in the configured test target, so its positive and negative concept assertions compile in local and CI builds.
 
@@ -220,12 +220,12 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ### Pass 3.4a — Desktop workflow timing artifacts
 
-- [ ] Add simple script-level timing around build/test/demo/analysis commands without forcing desktop-only dependencies into `navkit::core`.
-- [ ] Record stationary simulation wall time and analysis wall time in a machine-readable artifact, such as `data/logs/<run_name>/timing.json`.
-- [ ] Include metadata needed for trend review: schema version, run name, selected `NAVKIT_CONFIG`, build type, command names, start/end timestamps or elapsed seconds, and tool version where practical.
-- [ ] Add executable/library size reporting for Debug and Release artifacts as an early coarse resource signal.
-- [ ] Add CI or tool-wrapper hooks that preserve timing/resource artifacts as uploaded artifacts without making stochastic or machine-dependent values brittle pass/fail gates.
-- [ ] Keep these desktop timing artifacts useful for future Monte Carlo runtime summaries and batch trade studies.
+- [x] Add simple script-level timing around build/test/demo/analysis commands without forcing desktop-only dependencies into `navkit::core`.
+- [x] Record stationary simulation wall time and analysis wall time in a machine-readable artifact, such as `data/logs/<run_name>/timing.json`.
+- [x] Include metadata needed for trend review: schema version, run name, selected `NAVKIT_CONFIG`, build type, command names, start/end timestamps or elapsed seconds, and tool version where practical.
+- [x] Add executable/library size reporting for Debug and Release artifacts as an early coarse resource signal.
+- [x] Add CI or tool-wrapper hooks that preserve timing/resource artifacts as uploaded artifacts without making stochastic or machine-dependent values brittle pass/fail gates.
+- [x] Keep these desktop timing artifacts useful for future Monte Carlo runtime summaries and batch trade studies.
 
 ### Pass 3.4b — Embedded-ready profiling policy architecture
 

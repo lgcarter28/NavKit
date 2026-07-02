@@ -6,7 +6,23 @@ from __future__ import annotations
 import argparse
 import shutil
 import subprocess
+import sys
+import time
 from pathlib import Path
+
+from perf_artifacts import (
+    DEFAULT_NAVKIT_CONFIG,
+    DEFAULT_RUN_NAME,
+    DEFAULT_TIMING_PATH,
+    default_resource_report_path,
+    load_resource_report,
+    print_command_timing,
+    print_resource_report,
+    timing_result,
+    update_timing_artifact,
+    utc_now,
+    write_resource_report,
+)
 
 
 def repo_root() -> Path:
@@ -97,7 +113,37 @@ def main() -> int:
         default=None,
         help="Compile-time config header relative to config/compiletime.",
     )
+    parser.add_argument(
+        "--timing-output",
+        type=Path,
+        default=DEFAULT_TIMING_PATH,
+        help="timing.json path to update with this build duration.",
+    )
+    parser.add_argument("--timing-run-name", default=DEFAULT_RUN_NAME)
+    parser.add_argument(
+        "--no-timing",
+        action="store_true",
+        help="Do not update the timing artifact for this build.",
+    )
+    parser.add_argument(
+        "--no-timing-report",
+        action="store_true",
+        help="Update timing.json without printing the build timing summary.",
+    )
+    parser.add_argument(
+        "--resource-output",
+        type=Path,
+        default=None,
+        help="Resource report output path. Defaults to data/logs/stationary_gnss_demo/resources-<build>-local.json.",
+    )
+    parser.add_argument(
+        "--no-resource-report",
+        action="store_true",
+        help="Do not write or print the build artifact size report.",
+    )
     args = parser.parse_args()
+    start_utc = utc_now()
+    start = time.perf_counter()
 
     root = repo_root()
     build_dir = resolve_build_dir(root, args.build_type, args.build_dir)
@@ -161,6 +207,32 @@ def main() -> int:
         build_cmd += ["--parallel", str(args.jobs)]
 
     run(build_cmd, cwd=root)
+    command_name = f"build_{args.build_type.lower()}"
+    if not args.no_timing:
+        record = update_timing_artifact(
+            args.timing_output,
+            run_name=args.timing_run_name,
+            command_name=command_name,
+            command=[Path(sys.executable).name, *sys.argv],
+            result=timing_result(start_utc, start, 0),
+            build_type=args.build_type,
+            navkit_config=args.navkit_config or DEFAULT_NAVKIT_CONFIG,
+            tool_version="build.py",
+        )
+        if not args.no_timing_report:
+            print()
+            print_command_timing(command_name, record)
+
+    if not args.no_resource_report:
+        resource_output = args.resource_output or default_resource_report_path(args.build_type)
+        write_resource_report(
+            resource_output,
+            build_dir=build_dir,
+            build_type=args.build_type,
+            navkit_config=args.navkit_config or DEFAULT_NAVKIT_CONFIG,
+        )
+        print()
+        print_resource_report(load_resource_report(resource_output), max_artifacts=8)
     return 0
 
 

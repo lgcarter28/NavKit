@@ -61,3 +61,65 @@ when behavior affects logs, navigation results, or runtime app wiring.
 Clang-tidy is intentionally a CI static-analysis gate, not part of the normal
 local workflow. Coverage reporting is also CI-oriented; run it locally only when
 reviewing coverage gaps or debugging the CI coverage lane.
+
+## Timing and resource artifacts
+
+Simulation and analysis smoke tests write lightweight timing data to
+`data/logs/<run_name>/timing.json`. CI also preserves coarse Debug and Release
+executable/library size reports from `tools/resource_report.py` with the
+stationary GNSS logs. These artifacts are intended for trend review and future
+Monte Carlo summaries; they are not pass/fail tests because local machines and
+hosted runners vary too much for wall-clock thresholds to be meaningful yet.
+
+For a local timing smoke pass:
+
+```bash
+python tools/build.py --build-type Debug --skip-conan
+python tools/run_tests.py --build-type Debug
+python tools/run_first_sim.py --build-type Debug
+python tools/run_analysis.py data/logs/stationary_gnss_demo
+python tools/timing_report.py data/logs/stationary_gnss_demo/timing.json
+python tools/resource_report.py --build-type Debug --output data/logs/stationary_gnss_demo/resources-debug-local.json
+```
+
+Build, test, simulation, and analysis wrappers update the default timing
+artifact during normal use. Each wrapper prints a concise timing summary for the
+operation it just ran; `timing_report.py` prints the accumulated artifact. Use
+`--no-timing-report` when a quieter wrapper run is needed. Use `--no-timing` on
+`build.py` or `run_tests.py` when a command should not update that artifact.
+`build.py` also writes and displays a coarse executable/library size report by
+default after successful builds.
+
+See `docs/SETUP.md` for the fuller timing/resource workflow and Release size
+snapshot commands.
+
+### `navkit.timing.v1` schema
+
+Timing artifacts use the lightweight `navkit.timing.v1` JSON schema. The schema
+identifier is defined in `tools/perf_artifacts.py` and recorded in each artifact
+so future tooling can reject incompatible files instead of silently producing
+misleading reports.
+
+Required top-level fields:
+
+- `schema`: currently `navkit.timing.v1`.
+- `run_name`: logical run name, such as `stationary_gnss_demo`.
+- `created_utc`: timestamp for first artifact creation.
+- `updated_utc`: timestamp for the most recent record update.
+- `environment`: object with at least `platform` and `python`.
+- `build`: latest build metadata object that may contain `build_type` and
+  `navkit_config`.
+- `commands`: object keyed by stable command names.
+
+Each command record contains:
+
+- `command`: argv-style command list.
+- `tool_version`: wrapper/tool identity, currently the script name.
+- `build_type` and `navkit_config`: command-local build metadata when known.
+- `start_utc` and `end_utc`: command timing timestamps.
+- `elapsed_s`: wall-clock elapsed seconds.
+- `return_code`: process or wrapper return code.
+
+The schema is intentionally small and trend-oriented. It is suitable for local
+inspection, CI artifact preservation, and future Monte Carlo aggregation, but it
+does not define pass/fail thresholds.

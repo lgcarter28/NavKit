@@ -24,6 +24,8 @@ This project follows
 - Measurement-statistics regression tests for accepted and rejected measurement updates.
 - Design-intent testing guide plus focused coverage for ring-buffer overflow policies, sensor FIFO/noise behavior, CSV writer output/failure behavior, and stationary trajectory semantics.
 - Linux-oriented coverage reporting through `tools/coverage.py` and a CI coverage artifact.
+- Lightweight timing artifacts for stationary simulation and analysis runs, plus coarse Debug/Release executable/library size reports through `tools/resource_report.py`.
+- Human-readable timing summaries through `tools/timing_report.py` and documented `navkit.timing.v1` artifact schema fields.
 
 ### Changed
 
@@ -56,6 +58,10 @@ This project follows
 - Added centralized NavKit-owned target warning profiles, CI warnings-as-errors, embedded-oriented Release optimization settings, Release CI build verification, and `tools/build.py` compile-check switches.
 - Added Linux Debug `clang-tidy` static analysis to CI and made the local tidy wrapper require a valid compilation database instead of silently running without build flags.
 - Clarified that clang-tidy is intentionally a CI gate and not part of the normal local agentic development loop.
+- Preserved stationary GNSS timing and resource reports as CI artifacts without making wall-clock timing a brittle pass/fail gate.
+- Default-enabled timing artifact updates for build and test wrappers, with opt-out flags for quiet or artifact-free commands.
+- Made build, test, simulation, and analysis wrappers print concise timing summaries by default after updating `timing.json`.
+- Made build and resource-report wrappers display coarse executable/library size summaries by default after writing resource artifacts.
 - Moved `navkit_sim` runtime JSON inputs from `apps/navkit_sim/configs` to `config/runtime/navkit_sim`.
 - Removed stale root example placeholder directories and documented that future architecture domains should not be represented by empty folders.
 
