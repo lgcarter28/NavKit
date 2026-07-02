@@ -10,6 +10,7 @@ add_executable(navkit_tests
     test_measurement_policy.cpp
     test_measurement_statistics.cpp
     test_noise_policy.cpp
+    test_profiling_policy.cpp
     test_ring_buffer.cpp
     test_ring_buffer_policies.cpp
     test_sensor_behavior.cpp

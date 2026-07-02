@@ -50,6 +50,7 @@ include/navkit/
     frames/
     units/
     models/
+    profiling/
 
   sim/
   io/
@@ -90,6 +91,7 @@ currently contributes `navkit::core::environment::J2`, not
 | `navkit::core` | `navkit::core::environment` | Planet and gravity policies |
 | `navkit::core` | `navkit::core::frames` | Frame tags and frame-typed helpers |
 | `navkit::core` | `navkit::core::models` | Reusable product-core measurement and process models |
+| `navkit::core` | `navkit::core::profiling` | Zero-overhead-by-default profiling vocabulary, policies, and fixed records |
 | `navkit::core` | `navkit::core::units` | Unit and frame helper types |
 | `navkit::sim` | `navkit::sim` | Simulation support |
 | `navkit::io` | `navkit::io` | Logging, CSV, JSON, and run manifests |
@@ -157,6 +159,13 @@ not current behavior.
   policy.
 - Planet and gravity policies are the most complete examples of the intended
   concept -> optional CRTP base -> concrete policy layering.
+- Product-core profiling now provides the embedded-facing vocabulary for future
+  instrumentation: enum profile points, fixed timing records, optional
+  visualization metadata fields, clock/sink/profiler concepts, a null default
+  profiler, and a scoped profiler for deterministic clock/sink policies. Current
+  algorithms do not consume profiler policies yet; sequencing/nesting semantics
+  are not owned by the generic record type and remain future profiler/sink
+  policy work.
 - Simulation currently contains desktop-oriented support and may use runtime
   polymorphism where practical.
 - Python analysis is deliberately outside the embedded-facing C++ product core.

@@ -30,7 +30,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - The current trajectory generator supports only a simplistic stationary ECEF trajectory. It sets body rate to zero and therefore does not model Earth rotation correctly for stationary IMU truth.
 - `ImuSimulator` and `BaroSimulator` are empty shells, and the IMU process model is a placeholder.
 - Analysis already provides position error/covariance, innovation, NIS, p-value, mean p-value, and innovation histogram plots. More formal statistics and consistency tests remain future work.
-- Desktop timing and coarse binary-size artifacts now exist for the stationary simulation/analysis workflow and CI artifact upload. Embedded zero-overhead profiling hooks and memory/resource budgets remain future work.
+- Desktop timing and coarse binary-size artifacts now exist for the stationary simulation/analysis workflow and CI artifact upload. Product-core embedded profiling vocabulary now exists under `include/navkit/core/profiling`; algorithm integration points and memory/resource budgets remain future work.
 - The documented and configured language standard is C++23.
 - `tests/test_state_def_policy.cpp` is included in the configured test target, so its positive and negative concept assertions compile in local and CI builds.
 
@@ -229,15 +229,16 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ### Pass 3.4b — Embedded-ready profiling policy architecture
 
-- [ ] Add a zero-overhead-by-default profiling vocabulary under the reusable product-core boundary, likely `include/navkit/core/profiling`.
-- [ ] Define stable enum-based profile points instead of string-owned scope names for embedded-facing instrumentation, for example `ProfilePoint::NavigatorProcessMeasurements`, `ProfilePoint::KalmanObservationUpdate`, and future propagation/mechanization points.
-- [ ] Provide a `NullProfiler`/`NullProfileScope` that is the default and is expected to optimize away completely in production builds.
-- [ ] Define a profiler capability concept around static scope creation or scope-recording behavior so algorithms can be constrained without runtime polymorphism.
-- [ ] Define clock-policy expectations: target clocks provide a fixed `Tick` type and `now()` function. Future concrete clocks may include desktop steady clock, deterministic fake clock for tests, Cortex-M DWT cycle counter, and hardware timer counters.
-- [ ] Define sink-policy expectations: sinks record fixed-size timing records without allocation, exceptions, virtual dispatch, or string ownership. Future concrete sinks may include `NullSink`, fixed ring-buffer sink, memory-dump sink, SWO/UART/telemetry adapters, and desktop JSON/CSV adapters outside core.
-- [ ] Use fixed-size records such as `{ProfilePoint point, Tick start_tick, Tick elapsed_ticks}` or an equivalent representation that can be exported later without formatting in the hot path.
-- [ ] Add unit tests with a deterministic fake clock and fake sink to prove scope entry/exit records elapsed ticks correctly.
-- [ ] Add compile-time tests that valid profiler/clock/sink policies satisfy their concepts and invalid policies fail them.
+- [x] Add a zero-overhead-by-default profiling vocabulary under the reusable product-core boundary, likely `include/navkit/core/profiling`.
+- [x] Define stable enum-based profile points instead of string-owned scope names for embedded-facing instrumentation, for example `ProfilePoint::NavigatorProcessMeasurements`, `ProfilePoint::KalmanObservationUpdate`, and future propagation/mechanization points.
+- [x] Provide a `NullProfiler`/`NullProfileScope` that is the default and is expected to optimize away completely in production builds.
+- [x] Define a profiler capability concept around static scope creation or scope-recording behavior so algorithms can be constrained without runtime polymorphism.
+- [x] Define clock-policy expectations: target clocks provide a fixed `Tick` type and `now()` function. Future concrete clocks may include desktop steady clock, deterministic fake clock for tests, Cortex-M DWT cycle counter, and hardware timer counters.
+- [x] Define sink-policy expectations: sinks record fixed-size timing records without allocation, exceptions, virtual dispatch, or string ownership. Future concrete sinks may include `NullSink`, fixed ring-buffer sink, memory-dump sink, SWO/UART/telemetry adapters, and desktop JSON/CSV adapters outside core.
+- [x] Use fixed-size records such as `{ProfilePoint point, Tick start_tick, Tick elapsed_ticks}` or an equivalent representation that can be exported later without formatting in the hot path.
+- [x] Expand profile records with visualization-friendly metadata such as sequence, parent sequence, depth, and flags while leaving ordering/nesting ownership to future profiler/sink policies.
+- [x] Add unit tests with a deterministic fake clock and fake sink to prove scope entry/exit records elapsed ticks correctly.
+- [x] Add compile-time tests that valid profiler/clock/sink policies satisfy their concepts and invalid policies fail them.
 
 ### Pass 3.4c — First algorithm integration points
 
@@ -246,7 +247,17 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [ ] Avoid pervasive tiny-scope instrumentation until the first INS/mechanization hot path exists and measurement overhead is understood.
 - [ ] Keep desktop report formatting and file output outside `navkit::core`; embedded-facing code should only emit fixed records through policy sinks.
 
-### Pass 3.4d — Resource evidence and philosophy
+### Pass 3.4d - Profile export and visualization path
+
+- [ ] Keep the embedded hot-path record format native, compact, fixed-size, and allocation-free; do not emit strings, JSON, file paths, or visualization-specific structures from `navkit::core`.
+- [ ] Define an initial logical `navkit.profile.v1` export schema outside the hot path for desktop/offline use. Prefer JSON or CSV first so the schema can evolve before any binary ICD is frozen.
+- [ ] Add Python tooling that converts native profile records plus metadata into a standards-friendly trace format, with Chrome Trace / Perfetto-compatible JSON as the preferred first visualization target.
+- [ ] Add Python summary views for count, total time, min/max/mean, p95/p99 where sample counts are meaningful, and percent-of-profiled-time by `ProfilePoint`.
+- [ ] Keep future NavKit-native plots optional; prefer exporting to established trace viewers before hand-building complex timeline/flame-chart UI.
+- [ ] Document required metadata for export: schema version, profile-point mapping, clock source, tick frequency or tick-to-time conversion, build/config identity, run name, dropped-record count, and record flags.
+- [ ] Defer binary profile dump and formal ICD work until real algorithm records and export metadata are proven by at least one integration pass.
+
+### Pass 3.4e - Resource evidence and philosophy
 
 - [ ] Decide how memory/resource evidence should be collected on desktop now and mapped to embedded targets later.
 - [ ] Add allocation/resource checks where practical for fixed-capacity core paths, especially sensor queues and estimator update operations.
