@@ -162,10 +162,11 @@ not current behavior.
 - Product-core profiling now provides the embedded-facing vocabulary for future
   instrumentation: enum profile points, fixed timing records, optional
   visualization metadata fields, clock/sink/profiler concepts, a null default
-  profiler, and a scoped profiler for deterministic clock/sink policies. Current
-  algorithms do not consume profiler policies yet; sequencing/nesting semantics
-  are not owned by the generic record type and remain future profiler/sink
-  policy work.
+  profiler, and a scoped profiler for deterministic clock/sink policies.
+  `KalmanFilter::observation_update` and `Navigator::process_measurements` are
+  the first coarse algorithm integration points and both default to
+  `NullProfiler`. Sequencing/nesting semantics are not owned by the generic
+  record type and remain future profiler/sink policy work.
 - Simulation currently contains desktop-oriented support and may use runtime
   polymorphism where practical.
 - Python analysis is deliberately outside the embedded-facing C++ product core.

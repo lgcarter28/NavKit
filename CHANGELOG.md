@@ -27,6 +27,7 @@ This project follows
 - Lightweight timing artifacts for stationary simulation and analysis runs, plus coarse Debug/Release executable/library size reports through `tools/resource_report.py`.
 - Human-readable timing summaries through `tools/timing_report.py` and documented `navkit.timing.v1` artifact schema fields.
 - Product-core embedded profiling vocabulary with enum profile points, fixed timing records, visualization metadata fields, clock/sink/profiler concepts, `NullProfiler`, `ScopedProfiler`, and deterministic concept/runtime tests.
+- Coarse embedded profiling integration points for `KalmanFilter::observation_update` and `Navigator::process_measurements`, both defaulting to `NullProfiler`.
 
 ### Changed
 

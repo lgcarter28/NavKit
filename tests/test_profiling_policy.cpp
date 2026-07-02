@@ -1,6 +1,11 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
+#include "navkit/core/estimation/filter/KalmanFilter.hpp"
+#include "navkit/core/estimation/navigator/Navigator.hpp"
+#include "navkit/core/estimation/sensor/Sensor.hpp"
+#include "navkit/core/estimation/state/StateDefs.hpp"
+#include "navkit/core/models/GnssPosModel.hpp"
 #include "navkit/core/profiling/NullProfiler.hpp"
 #include "navkit/core/profiling/ProfilePolicy.hpp"
 #include "navkit/core/profiling/ScopedProfiler.hpp"
@@ -9,6 +14,8 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <tuple>
+#include <type_traits>
 
 namespace navkit::core::profiling::test
 {
@@ -22,6 +29,29 @@ struct FakeClock
     static Tick now()
     {
         return tick;
+    }
+};
+
+struct SteppingClock
+{
+    using Tick = std::uint32_t;
+
+    static inline std::array<Tick, 8> ticks{};
+    static inline std::size_t index{0U};
+
+    static void reset(std::array<Tick, 8> values)
+    {
+        ticks = values;
+        index = 0U;
+    }
+
+    static Tick now()
+    {
+        const Tick value = ticks[index];
+        if (index + 1U < ticks.size()) {
+            ++index;
+        }
+        return value;
     }
 };
 
@@ -76,6 +106,21 @@ struct MissingProfileFunctionProfiler
 };
 
 using FakeProfiler = ScopedProfiler<FakeClock, FixedSink>;
+using SteppingProfiler = ScopedProfiler<SteppingClock, FixedSink>;
+using ProfiledStateDef = navkit::core::estimation::InsStateDef;
+using ProfiledModel = navkit::core::models::GnssPosModel<ProfiledStateDef>;
+using ProfiledFilter = navkit::core::estimation::KalmanFilter<
+    ProfiledStateDef,
+    navkit::core::estimation::DefaultInjectionPolicy<ProfiledStateDef>,
+    navkit::core::estimation::DefaultResetPolicy<ProfiledStateDef>,
+    std::tuple<>,
+    SteppingProfiler>;
+using ProfiledSensor = navkit::core::estimation::Sensor<ProfiledModel, 4>;
+using ProfiledNavigator =
+    navkit::core::estimation::Navigator<navkit::core::estimation::KalmanFilter<ProfiledStateDef>,
+                                        std::tuple<ProfiledSensor>,
+                                        navkit::core::estimation::UpdatePostFilter,
+                                        SteppingProfiler>;
 
 TEST_CASE("Profiler concepts accept valid clock, sink, scope, and profiler policies")
 {
@@ -170,6 +215,53 @@ TEST_CASE("NullProfiler satisfies the profiler contract without recording")
     static_cast<void>(scope);
 
     static_assert(ProfilerPolicy<NullProfiler>);
+    CHECK(true);
+}
+
+TEST_CASE("KalmanFilter observation update emits the configured profile point")
+{
+    SteppingClock::reset({211U, 225U});
+    FixedSink::reset();
+
+    ProfiledFilter filter;
+    ProfiledModel::O_t z;
+    z.setZero();
+
+    ProfiledModel::NoiseContext ctx;
+    ctx.sigma_h = 1.0;
+    ctx.sigma_v = 1.0;
+
+    filter.observation_update<ProfiledModel>(z, 1.0, ctx, true);
+
+    REQUIRE(FixedSink::count == 1U);
+    CHECK(FixedSink::records[0].point == ProfilePoint::KalmanObservationUpdate);
+    CHECK(FixedSink::records[0].start_tick == 211U);
+    CHECK(FixedSink::records[0].elapsed_ticks == 14U);
+}
+
+TEST_CASE("Navigator process_measurements emits the configured profile point")
+{
+    SteppingClock::reset({310U, 333U});
+    FixedSink::reset();
+
+    ProfiledNavigator navigator;
+
+    navigator.process_measurements();
+
+    REQUIRE(FixedSink::count == 1U);
+    CHECK(FixedSink::records[0].point == ProfilePoint::NavigatorProcessMeasurements);
+    CHECK(FixedSink::records[0].start_tick == 310U);
+    CHECK(FixedSink::records[0].elapsed_ticks == 23U);
+}
+
+TEST_CASE("Estimator algorithms default to NullProfiler")
+{
+    using DefaultFilter = navkit::core::estimation::KalmanFilter<ProfiledStateDef>;
+    using DefaultNavigator =
+        navkit::core::estimation::Navigator<DefaultFilter, std::tuple<ProfiledSensor>>;
+
+    static_assert(std::is_same_v<DefaultFilter::Profiler_t, NullProfiler>);
+    static_assert(std::is_same_v<DefaultNavigator::Profiler_t, NullProfiler>);
     CHECK(true);
 }
 

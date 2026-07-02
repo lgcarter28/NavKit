@@ -8,6 +8,9 @@
 #include "navkit/core/estimation/navigator/SensorCollectionPolicy.hpp"
 #include "navkit/core/estimation/navigator/update/UpdatePolicies.hpp"
 #include "navkit/core/estimation/navigator/update/UpdatePolicy.hpp"
+#include "navkit/core/profiling/NullProfiler.hpp"
+#include "navkit/core/profiling/ProfilePoint.hpp"
+#include "navkit/core/profiling/ProfilePolicy.hpp"
 
 #include <cstddef>
 #include <tuple>
@@ -44,7 +47,8 @@ inline constexpr bool navigator_policy_compatible_v = NavigatorPolicyCompatibili
 
 template<typename Filter,
          SensorCollectionPolicy SensorTuple,
-         template<typename> typename UpdatePolicyTemplate = UpdatePostFilter>
+         template<typename> typename UpdatePolicyTemplate = UpdatePostFilter,
+         navkit::core::profiling::ProfilerPolicy Profiler = navkit::core::profiling::NullProfiler>
     requires detail::
         navigator_policy_compatible_v<Filter, UpdatePolicyTemplate<Filter>, SensorTuple>
     class Navigator
@@ -53,6 +57,7 @@ public:
     using Filter_t = Filter;
     using Sensors_t = SensorTuple;
     using UpdatePolicy_t = UpdatePolicyTemplate<Filter_t>;
+    using Profiler_t = Profiler;
 
     Filter_t& filter()
     {
@@ -88,6 +93,10 @@ public:
 
     void process_measurements()
     {
+        auto profile_scope =
+            Profiler::profile(navkit::core::profiling::ProfilePoint::NavigatorProcessMeasurements);
+        static_cast<void>(profile_scope);
+
         std::apply([this](auto&... sensor_obj) { (process_one_sensor(sensor_obj), ...); },
                    m_sensors);
         UpdatePolicy_t::filter_update(m_filter);

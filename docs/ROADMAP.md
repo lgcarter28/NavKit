@@ -30,7 +30,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - The current trajectory generator supports only a simplistic stationary ECEF trajectory. It sets body rate to zero and therefore does not model Earth rotation correctly for stationary IMU truth.
 - `ImuSimulator` and `BaroSimulator` are empty shells, and the IMU process model is a placeholder.
 - Analysis already provides position error/covariance, innovation, NIS, p-value, mean p-value, and innovation histogram plots. More formal statistics and consistency tests remain future work.
-- Desktop timing and coarse binary-size artifacts now exist for the stationary simulation/analysis workflow and CI artifact upload. Product-core embedded profiling vocabulary now exists under `include/navkit/core/profiling`; algorithm integration points and memory/resource budgets remain future work.
+- Desktop timing and coarse binary-size artifacts now exist for the stationary simulation/analysis workflow and CI artifact upload. Product-core embedded profiling vocabulary now exists under `include/navkit/core/profiling`, and the first coarse `Navigator` and `KalmanFilter` integration points are instrumented. Profile export/visualization and memory/resource budgets remain future work.
 - The documented and configured language standard is C++23.
 - `tests/test_state_def_policy.cpp` is included in the configured test target, so its positive and negative concept assertions compile in local and CI builds.
 
@@ -242,10 +242,10 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ### Pass 3.4c — First algorithm integration points
 
-- [ ] Introduce profiler policy parameters only at coarse, stable hot-path seams first: `Navigator::process_measurements`, `KalmanFilter::observation_update`, and future propagation/mechanization update.
-- [ ] Keep the default selected configuration on `NullProfiler`; profiling must not affect default runtime behavior, allocation behavior, or public numerical results.
-- [ ] Avoid pervasive tiny-scope instrumentation until the first INS/mechanization hot path exists and measurement overhead is understood.
-- [ ] Keep desktop report formatting and file output outside `navkit::core`; embedded-facing code should only emit fixed records through policy sinks.
+- [x] Introduce profiler policy parameters only at coarse, stable hot-path seams first: `Navigator::process_measurements`, `KalmanFilter::observation_update`, and future propagation/mechanization update.
+- [x] Keep the default selected configuration on `NullProfiler`; profiling must not affect default runtime behavior, allocation behavior, or public numerical results.
+- [x] Avoid pervasive tiny-scope instrumentation until the first INS/mechanization hot path exists and measurement overhead is understood.
+- [x] Keep desktop report formatting and file output outside `navkit::core`; embedded-facing code should only emit fixed records through policy sinks.
 
 ### Pass 3.4d - Profile export and visualization path
 

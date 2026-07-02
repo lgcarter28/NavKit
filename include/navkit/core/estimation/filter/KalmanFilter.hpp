@@ -10,6 +10,9 @@
 #include "navkit/core/estimation/filter/reset/ResetPolicy.hpp"
 #include "navkit/core/estimation/measurement/MeasurementPolicy.hpp"
 #include "navkit/core/estimation/state/State.hpp"
+#include "navkit/core/profiling/NullProfiler.hpp"
+#include "navkit/core/profiling/ProfilePoint.hpp"
+#include "navkit/core/profiling/ProfilePolicy.hpp"
 
 #include <Eigen/Dense>
 #include <tuple>
@@ -20,7 +23,8 @@ namespace navkit::core::estimation
 template<StateDefPolicy StateDef,
          InjectionPolicy<StateDef> Injection = DefaultInjectionPolicy<StateDef>,
          ResetPolicy<StateDef> Reset = DefaultResetPolicy<StateDef>,
-         typename MeasurementModels = std::tuple<>>
+         typename MeasurementModels = std::tuple<>,
+         navkit::core::profiling::ProfilerPolicy Profiler = navkit::core::profiling::NullProfiler>
 class KalmanFilter
 {
 public:
@@ -29,6 +33,7 @@ public:
     using P_t = StateCov<StateDef>;
     using MeasurementModels_t = MeasurementModels;
     using MeasurementStatistics_t = MeasurementStatisticsTuple_t<MeasurementModels_t>;
+    using Profiler_t = Profiler;
 
     KalmanFilter()
     {
@@ -133,6 +138,10 @@ public:
                             const typename Model::NoiseContext& ctx,
                             bool accepted = true)
     {
+        auto profile_scope =
+            Profiler::profile(navkit::core::profiling::ProfilePoint::KalmanObservationUpdate);
+        static_cast<void>(profile_scope);
+
         const typename Model::O_t innov = z - Model::obs(m_x);
         const typename Model::H_t H = Model::compute_h(m_x);
         const typename Model::R_t R = Model::compute_r(ctx);
