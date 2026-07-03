@@ -19,6 +19,15 @@ For new policy architecture, follow the intended layering where it is useful:
 
 Concepts express capabilities; CRTP bases share implementation and are not mandatory when there is nothing useful to share.
 
+## Simplicity and abstraction discipline
+
+- Prefer the simplest design that makes ownership, data flow, and extension points obvious. A clever abstraction is not a win if future readers must reverse-engineer tuple plumbing, type aliases, or helper traits to understand the product behavior.
+- Do not add a new policy, concept, wrapper type, tuple transform, helper alias, or CRTP layer just to make an idea fit the current pattern. Add abstraction only when it removes duplicated implementation, protects a real boundary, improves diagnostics materially, or represents a stable domain concept.
+- Treat compile-time configurability as an embedded performance and clarity tool, not a license to build a metaprogramming framework. Prefer explicit, boring config aliases over derived `_t`/`_v` machinery when the explicit version is clearer for users and maintainers.
+- When a proposed design would introduce parallel tuples, ID lookup helpers, nested template aliases, or cross-domain config dependencies, pause and explain the complexity cost before implementing. Offer the smaller alternative first, even if the user suggested the more abstract path.
+- Keep public API concepts and config contracts painfully clear. Internal helper machinery should be minimal, local, and named for the concrete problem it solves; avoid broad "utility" layers that become dumping grounds.
+- If a refactor is primarily hiding complexity rather than deleting it, call that out. The preferred outcome is simpler internals and simpler API, not a polished facade over a tangled implementation.
+
 ## Current implementation reality
 
 - The project requires **C++23** (`CMAKE_CXX_STANDARD 23`). Keep public code and supported toolchains compatible with that configured standard.
