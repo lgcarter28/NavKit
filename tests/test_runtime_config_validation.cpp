@@ -2,6 +2,7 @@
 // All Rights Reserved.
 
 #include "apps/navkit_sim/StationaryGnss.hpp"
+#include "navkit/app_support/EmulatorBindingPolicy.hpp"
 #include "navkit/app_support/GnssEmulator.hpp"
 #include "navkit/app_support/RuntimeConfigValidation.hpp"
 #include "navkit/app_support/SensorId.hpp"

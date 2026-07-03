@@ -37,9 +37,6 @@ struct ZeroCapacityBufferConfig
     static constexpr std::size_t BufferSize = 0;
 };
 
-struct MissingStatisticsFlagConfig
-{};
-
 struct MinimalConfig
 {
     using Numeric = navkit::config::navkit::MinimalNumericConfig;
@@ -63,19 +60,18 @@ TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
     static_assert(NumericConfigPolicy<navkit::config::navkit::MinimalNumericConfig>);
     static_assert(navkit::core::estimation::BufferConfigPolicy<
                   navkit::config::navkit::MinimalGnssBufferConfig>);
-    static_assert(navkit::core::estimation::MeasurementStatisticsConfigPolicy<
-                  SimConfig::MeasurementStatistics>);
+    static_assert(navkit::core::estimation::MeasurementStatisticsCollectionPolicy<
+                  SimConfig::MeasurementStatisticsConfigs>);
     static_assert(navkit::core::estimation::BufferConfigPolicy<SimConfig::GnssBuffer>);
     static_assert(ConfigPolicy<ExampleConfig>);
     static_assert(ConfigPolicy<SimConfig>);
     static_assert(ConfigPolicy<MinimalConfig>);
-    static_assert(navkit::api::config::SensorGraphConfigPolicy<SimConfig>);
     static_assert(navkit::api::config::NavKitProductConfigPolicy<SimConfig>);
-    static_assert(navkit::api::config::sensor_ids_unique_v<SimConfig::Sensors>);
+    static_assert(navkit::core::estimation::sensor_ids_unique_v<SimConfig::Sensors>);
     static_assert(
-        std::is_same_v<
-            navkit::api::config::SensorFromId_t<SimConfig::PrimaryGnssSensorId, SimConfig::Sensors>,
-            SimConfig::PrimaryGnssSensor>);
+        std::is_same_v<navkit::core::estimation::SensorFromId_t<SimConfig::PrimaryGnssSensorId,
+                                                                SimConfig::Sensors>,
+                       SimConfig::PrimaryGnssSensor>);
 
     static_assert(std::is_same_v<ExampleConfig::Numeric::Scalar_t, navkit::core::Scalar_t>);
     static_assert(std::is_same_v<ExampleConfig::Numeric::Time_t, navkit::core::Time_t>);
@@ -90,8 +86,6 @@ TEST_CASE("Narrow config concepts reject only their own missing capabilities")
     static_assert(navkit::core::estimation::BufferConfigPolicy<GnssOnlyBufferConfig>);
     static_assert(!navkit::core::estimation::BufferConfigPolicy<MissingBufferSizeConfig>);
     static_assert(!navkit::core::estimation::BufferConfigPolicy<ZeroCapacityBufferConfig>);
-    static_assert(
-        !navkit::core::estimation::MeasurementStatisticsConfigPolicy<MissingStatisticsFlagConfig>);
     static_assert(!ConfigPolicy<MissingNumericConfig>);
     static_assert(ConfigPolicy<NumericOnlyConfig>);
 
@@ -110,8 +104,8 @@ TEST_CASE("Concrete config composes at product-core sensor boundaries")
     static_assert(std::is_default_constructible_v<Sensor>);
     static_assert(std::is_default_constructible_v<GnssOnlySensor>);
     CHECK(SimConfig::GnssBuffer::BufferSize == 16U);
-    CHECK(navkit::api::config::SensorIndexFromId_v<SimConfig::PrimaryGnssSensorId,
-                                                   SimConfig::Sensors> == 0U);
+    CHECK(navkit::core::estimation::SensorIndexFromId_v<SimConfig::PrimaryGnssSensorId,
+                                                        SimConfig::Sensors> == 0U);
 }
 
 } // namespace navkit::core::config::test

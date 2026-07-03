@@ -62,6 +62,7 @@ TEST_CASE("SensorCollectionPolicy accepts tuple-like sensor collections")
     static_assert(SensorCollectionPolicy<NavigatorPolicySensors>);
     static_assert(SensorCollectionPolicy<const NavigatorPolicySensors&>);
     static_assert(!SensorCollectionPolicy<NavigatorPolicySensor>);
+    static_assert(!SensorCollectionPolicy<std::tuple<int, double>>);
 
     CHECK(true);
 }

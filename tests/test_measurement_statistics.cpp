@@ -2,6 +2,7 @@
 // All Rights Reserved.
 
 #include "navkit/core/estimation/filter/KalmanFilter.hpp"
+#include "navkit/core/estimation/sensor/Sensor.hpp"
 #include "navkit/core/estimation/state/StateDefs.hpp"
 #include "navkit/core/models/GnssPosModel.hpp"
 #include "test_main.hpp"
@@ -16,10 +17,11 @@ namespace
 
 using StateDef = InsStateDef;
 using Model = navkit::core::models::GnssPosModel<StateDef>;
+using Sensor = navkit::core::estimation::Sensor<0U, Model, 4U>;
 using Filter = KalmanFilter<StateDef,
                             DefaultInjectionPolicy<StateDef>,
                             DefaultResetPolicy<StateDef>,
-                            std::tuple<Model>>;
+                            std::tuple<MeasurementStatistics<Sensor>>>;
 
 struct StatisticsFixture
 {
@@ -28,6 +30,7 @@ struct StatisticsFixture
     StateCov<StateDef> initial_covariance{StateCov<StateDef>::Identity()};
     Model::O_t measurement{Model::O_t::Zero()};
     Model::NoiseContext noise{};
+    Measurement<Model::M> sensor_measurement{};
 
     StatisticsFixture()
     {
@@ -40,6 +43,9 @@ struct StatisticsFixture
 
         noise.sigma_h = 1.0;
         noise.sigma_v = 1.0;
+
+        sensor_measurement.time = 0.0;
+        sensor_measurement.z = measurement;
     }
 };
 
@@ -80,7 +86,7 @@ Scalar_t expected_nis()
     return expected_innovation().squaredNorm() / 101.0;
 }
 
-void check_common_statistics(const MeasurementStatistics<Model>& stats,
+void check_common_statistics(const MeasurementStatistics<Sensor>& stats,
                              const bool accepted,
                              const Time_t expected_time)
 {
@@ -101,19 +107,23 @@ TEST_CASE("accepted measurement update records statistics and updates filter sta
 {
     StatisticsFixture fixture{};
     constexpr Time_t update_time = 12.5;
+    Sensor sensor{};
+    fixture.sensor_measurement.time = update_time;
+    sensor.noise_context() = fixture.noise;
+    CHECK(sensor.push(fixture.sensor_measurement));
 
-    CHECK_FALSE(fixture.filter.has_measurement_statistics<Model>());
+    CHECK_FALSE(fixture.filter.has_measurement_statistics<Sensor>());
 
-    fixture.filter.observation_update<Model>(fixture.measurement, update_time, fixture.noise, true);
+    fixture.filter.process_sensor(sensor);
 
-    CHECK(fixture.filter.has_measurement_statistics<Model>());
-    check_common_statistics(fixture.filter.measurement_statistics<Model>(), true, update_time);
+    CHECK(fixture.filter.has_measurement_statistics<Sensor>());
+    check_common_statistics(fixture.filter.measurement_statistics<Sensor>(), true, update_time);
 
     CHECK_FALSE(fixture.filter.error_state().isApprox(fixture.initial_error_state, 1.0e-12));
     CHECK_FALSE(fixture.filter.covariance().isApprox(fixture.initial_covariance, 1.0e-12));
 }
 
-TEST_CASE("rejected measurement update records statistics without updating filter state")
+TEST_CASE("direct model update does not record sensor-keyed statistics")
 {
     StatisticsFixture fixture{};
     constexpr Time_t update_time = 23.0;
@@ -121,8 +131,7 @@ TEST_CASE("rejected measurement update records statistics without updating filte
     fixture.filter.observation_update<Model>(
         fixture.measurement, update_time, fixture.noise, false);
 
-    CHECK(fixture.filter.has_measurement_statistics<Model>());
-    check_common_statistics(fixture.filter.measurement_statistics<Model>(), false, update_time);
+    CHECK_FALSE(fixture.filter.has_measurement_statistics<Sensor>());
 
     CHECK(fixture.filter.error_state().isApprox(fixture.initial_error_state, 1.0e-12));
     CHECK(fixture.filter.covariance().isApprox(fixture.initial_covariance, 1.0e-12));

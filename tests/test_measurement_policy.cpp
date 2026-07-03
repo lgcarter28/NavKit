@@ -163,17 +163,14 @@ TEST_CASE("MeasurementPolicy rejects incomplete or incompatible models")
 
 TEST_CASE("KalmanFilter accepts constrained measurement models at observation boundary")
 {
-    using Filter = KalmanFilter<MeasurementPolicyTestStateDef,
-                                LocalInjection,
-                                LocalReset,
-                                std::tuple<ValidMeasurement>>;
+    using Filter = KalmanFilter<MeasurementPolicyTestStateDef, LocalInjection, LocalReset>;
     static_assert(std::is_default_constructible_v<Filter>);
 
     Filter filter;
     ValidMeasurement::NoiseContext ctx{};
     filter.observation_update<ValidMeasurement>(ValidMeasurement::O_t::Zero(), ctx);
 
-    CHECK(filter.has_measurement_statistics<ValidMeasurement>());
+    CHECK(filter.error_state().isZero());
 }
 
 } // namespace navkit::core::estimation::test

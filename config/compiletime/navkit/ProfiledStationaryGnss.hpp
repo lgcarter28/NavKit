@@ -37,11 +37,6 @@ struct ProfiledStationaryGnssNumericConfig
     using Time_t = core::Time_t;
 };
 
-struct ProfiledStationaryGnssMeasurementStatisticsConfig
-{
-    static constexpr bool EnableMeasurementStatistics = true;
-};
-
 struct ProfiledStationaryGnssBufferConfig
 {
     static constexpr std::size_t BufferSize = 16;
@@ -65,7 +60,6 @@ struct ProfiledStationaryGnssConfig
     static constexpr double ProfileTickPeriodUs = 1.0;
 
     using Numeric = ProfiledStationaryGnssNumericConfig;
-    using MeasurementStatistics = ProfiledStationaryGnssMeasurementStatisticsConfig;
     using GnssBuffer = ProfiledStationaryGnssBufferConfig;
 
     // Public product graph.
@@ -78,7 +72,8 @@ struct ProfiledStationaryGnssConfig
                                                        core::estimation::GnssFixedNoisePolicy>;
 
     using Sensors = std::tuple<PrimaryGnssSensor>;
-    using MeasurementModels = api::config::MeasurementModelsFromSensors_t<Sensors>;
+    using MeasurementStatisticsConfigs =
+        std::tuple<core::estimation::MeasurementStatistics<PrimaryGnssSensor>>;
 
     using ProfileClock = HostSteadyMicrosecondClock;
     using ProfileTick = typename ProfileClock::Tick;
@@ -89,25 +84,22 @@ struct ProfiledStationaryGnssConfig
         core::estimation::KalmanFilter<StateDef,
                                        core::estimation::DefaultInjectionPolicy<StateDef>,
                                        core::estimation::DefaultResetPolicy<StateDef>,
-                                       MeasurementModels,
+                                       MeasurementStatisticsConfigs,
                                        Profiler>;
     using Navigator =
         core::estimation::Navigator<Filter, Sensors, core::estimation::UpdatePostFilter, Profiler>;
 };
 
 static_assert(core::config::NumericConfigPolicy<ProfiledStationaryGnssNumericConfig>);
-static_assert(core::estimation::MeasurementStatisticsConfigPolicy<
-              ProfiledStationaryGnssMeasurementStatisticsConfig>);
 static_assert(core::estimation::BufferConfigPolicy<ProfiledStationaryGnssBufferConfig>);
 static_assert(core::profiling::ClockPolicy<HostSteadyMicrosecondClock>);
 static_assert(core::profiling::ProfileSinkPolicy<ProfiledStationaryGnssConfig::ProfileSink,
                                                  HostSteadyMicrosecondClock>);
 static_assert(core::profiling::ProfilerPolicy<ProfiledStationaryGnssConfig::Profiler>);
 static_assert(core::config::ConfigPolicy<ProfiledStationaryGnssConfig>);
-static_assert(core::estimation::MeasurementStatisticsConfigPolicy<
-              ProfiledStationaryGnssConfig::MeasurementStatistics>);
+static_assert(core::estimation::MeasurementStatisticsCollectionPolicy<
+              ProfiledStationaryGnssConfig::MeasurementStatisticsConfigs>);
 static_assert(core::estimation::BufferConfigPolicy<ProfiledStationaryGnssConfig::GnssBuffer>);
-static_assert(api::config::SensorGraphConfigPolicy<ProfiledStationaryGnssConfig>);
 static_assert(api::config::NavKitProductConfigPolicy<ProfiledStationaryGnssConfig>);
 
 } // namespace navkit::config::navkit

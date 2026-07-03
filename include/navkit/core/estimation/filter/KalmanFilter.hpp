@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "navkit/core/containers/TupleTraits.hpp"
+#include "navkit/core/estimation/filter/FilterConfigPolicy.hpp"
 #include "navkit/core/estimation/filter/MeasurementStatistics.hpp"
 #include "navkit/core/estimation/filter/injection/InjectionPolicies.hpp"
 #include "navkit/core/estimation/filter/injection/InjectionPolicy.hpp"
@@ -16,6 +18,7 @@
 
 #include <Eigen/Dense>
 #include <tuple>
+#include <type_traits>
 
 namespace navkit::core::estimation
 {
@@ -23,7 +26,7 @@ namespace navkit::core::estimation
 template<StateDefPolicy StateDef,
          InjectionPolicy<StateDef> Injection = DefaultInjectionPolicy<StateDef>,
          ResetPolicy<StateDef> Reset = DefaultResetPolicy<StateDef>,
-         typename MeasurementModels = std::tuple<>,
+         MeasurementStatisticsCollectionPolicy MeasurementStatisticsConfigs = std::tuple<>,
          navkit::core::profiling::ProfilerPolicy Profiler = navkit::core::profiling::NullProfiler>
 class KalmanFilter
 {
@@ -31,8 +34,8 @@ public:
     using StateDef_t = StateDef;
     using State_t = State<StateDef>;
     using P_t = StateCov<StateDef>;
-    using MeasurementModels_t = MeasurementModels;
-    using MeasurementStatistics_t = MeasurementStatisticsTuple_t<MeasurementModels_t>;
+    using MeasurementStatisticsConfigs_t = MeasurementStatisticsConfigs;
+    using MeasurementStatistics_t = MeasurementStatisticsConfigs_t;
     using Profiler_t = Profiler;
 
     KalmanFilter()
@@ -88,31 +91,43 @@ public:
         m_P = P;
     }
 
-    template<MeasurementPolicy<StateDef> Model>
+    template<SensorPolicy Sensor>
+        requires MeasurementPolicy<typename Sensor::Model_t, StateDef>
     [[nodiscard]] bool has_measurement_statistics() const
     {
-        if constexpr (tuple_contains_v<Model, MeasurementModels_t>) {
-            return measurement_statistics<Model>().valid;
+        if constexpr (navkit::core::containers::tuple_contains_v<MeasurementStatistics<Sensor>,
+                                                                 MeasurementStatisticsConfigs_t>) {
+            return measurement_statistics<Sensor>().valid;
         }
         else {
             return false;
         }
     }
 
-    template<MeasurementPolicy<StateDef> Model>
-    MeasurementStatistics<Model>& measurement_statistics()
+    template<SensorPolicy Sensor>
+        requires MeasurementPolicy<typename Sensor::Model_t, StateDef>
+    MeasurementStatistics<Sensor>& measurement_statistics()
     {
-        static_assert(tuple_contains_v<Model, MeasurementModels_t>,
-                      "Requested Model is not listed in the KalmanFilter MeasurementModels tuple.");
-        return std::get<tuple_index_v<Model, MeasurementModels_t>>(m_measurement_stats);
+        static_assert(
+            navkit::core::containers::tuple_contains_v<MeasurementStatistics<Sensor>,
+                                                       MeasurementStatisticsConfigs_t>,
+            "Requested Sensor does not have a MeasurementStatistics entry in this KalmanFilter.");
+        return std::get<navkit::core::containers::tuple_index_v<MeasurementStatistics<Sensor>,
+                                                                MeasurementStatisticsConfigs_t>>(
+            m_measurement_stats);
     }
 
-    template<MeasurementPolicy<StateDef> Model>
-    [[nodiscard]] const MeasurementStatistics<Model>& measurement_statistics() const
+    template<SensorPolicy Sensor>
+        requires MeasurementPolicy<typename Sensor::Model_t, StateDef>
+    [[nodiscard]] const MeasurementStatistics<Sensor>& measurement_statistics() const
     {
-        static_assert(tuple_contains_v<Model, MeasurementModels_t>,
-                      "Requested Model is not listed in the KalmanFilter MeasurementModels tuple.");
-        return std::get<tuple_index_v<Model, MeasurementModels_t>>(m_measurement_stats);
+        static_assert(
+            navkit::core::containers::tuple_contains_v<MeasurementStatistics<Sensor>,
+                                                       MeasurementStatisticsConfigs_t>,
+            "Requested Sensor does not have a MeasurementStatistics entry in this KalmanFilter.");
+        return std::get<navkit::core::containers::tuple_index_v<MeasurementStatistics<Sensor>,
+                                                                MeasurementStatisticsConfigs_t>>(
+            m_measurement_stats);
     }
 
     template<MeasurementPolicy<StateDef> Model>
@@ -138,28 +153,7 @@ public:
                             const typename Model::NoiseContext& ctx,
                             bool accepted = true)
     {
-        auto profile_scope =
-            Profiler::profile(navkit::core::profiling::ProfilePoint::KalmanObservationUpdate);
-        static_cast<void>(profile_scope);
-
-        const typename Model::O_t innov = z - Model::obs(m_x);
-        const typename Model::H_t H = Model::compute_h(m_x);
-        const typename Model::R_t R = Model::compute_r(ctx);
-
-        typename Model::R_t S{};
-        typename Model::K_t K{};
-        State_t dx{};
-        P_t P_f{};
-
-        covariance_update<Model>(m_P, H, R, innov, S, K, dx, P_f);
-
-        const Scalar_t nis = innov.dot(S.ldlt().solve(innov));
-        record_measurement_statistics<Model>(time, accepted, innov, S, R, H, K, nis);
-
-        if (accepted) {
-            m_dx += dx;
-            m_P = P_f;
-        }
+        observation_update_impl<Model, void>(z, time, ctx, accepted);
     }
 
     template<MeasurementPolicy<StateDef> Model>
@@ -179,7 +173,7 @@ public:
                 break;
             }
             sensor.update_noise_context(meas);
-            observation_update<Model>(meas.z, meas.time, sensor.noise_context(), true);
+            observation_update_impl<Model, Sensor>(meas.z, meas.time, sensor.noise_context(), true);
         }
     }
 
@@ -195,18 +189,53 @@ public:
     }
 
 private:
-    template<MeasurementPolicy<StateDef> Model>
+    template<MeasurementPolicy<StateDef> Model, typename Sensor>
+    void observation_update_impl(const typename Model::O_t& z,
+                                 Time_t time,
+                                 const typename Model::NoiseContext& ctx,
+                                 bool accepted)
+    {
+        auto profile_scope =
+            Profiler::profile(navkit::core::profiling::ProfilePoint::KalmanObservationUpdate);
+        static_cast<void>(profile_scope);
+
+        const typename Model::O_t innov = z - Model::obs(m_x);
+        const typename Model::H_t H = Model::compute_h(m_x);
+        const typename Model::R_t R = Model::compute_r(ctx);
+
+        typename Model::R_t S{};
+        typename Model::K_t K{};
+        State_t dx{};
+        P_t P_f{};
+
+        covariance_update<Model>(m_P, H, R, innov, S, K, dx, P_f);
+
+        const Scalar_t nis = innov.dot(S.ldlt().solve(innov));
+
+        if constexpr (!std::is_void_v<Sensor>) {
+            record_measurement_statistics<Sensor>(time, accepted, innov, S, R, H, K, nis);
+        }
+
+        if (accepted) {
+            m_dx += dx;
+            m_P = P_f;
+        }
+    }
+
+    template<SensorPolicy Sensor>
+        requires MeasurementPolicy<typename Sensor::Model_t, StateDef>
     void record_measurement_statistics(const Time_t time,
                                        const bool accepted,
-                                       const typename Model::O_t& innovation,
-                                       const typename Model::R_t& S,
-                                       const typename Model::R_t& R,
-                                       const typename Model::H_t& H,
-                                       const typename Model::K_t& K,
+                                       const typename Sensor::Model_t::O_t& innovation,
+                                       const typename Sensor::Model_t::R_t& S,
+                                       const typename Sensor::Model_t::R_t& R,
+                                       const typename Sensor::Model_t::H_t& H,
+                                       const typename Sensor::Model_t::K_t& K,
                                        const Scalar_t nis)
     {
-        if constexpr (tuple_contains_v<Model, MeasurementModels_t>) {
-            auto& stats = measurement_statistics<Model>();
+        if constexpr (navkit::core::containers::tuple_contains_v<MeasurementStatistics<Sensor>,
+                                                                 MeasurementStatisticsConfigs_t>) {
+            auto& stats = measurement_statistics<Sensor>();
             stats.valid = true;
             stats.accepted = accepted;
             stats.time = time;

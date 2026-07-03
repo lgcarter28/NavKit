@@ -75,8 +75,12 @@ This project follows
 - Moved runnable NavKit product graph aliases into reusable NavKit configs and collapsed app configs to `NavKit` plus explicit `EmulatorBindings`.
 - Renamed the profiled reusable NavKit GNSS config to `ProfiledStationaryGnss.hpp` to match the app-level selected config name.
 - Replaced app-facing sensor-index wiring with configured `Sensor::Id` values, explicit `(Id, Emulator, Sensor)` bindings, and tuple helpers for ID-based lookup.
+- Replaced derived `MeasurementModels` config aliases with explicit `MeasurementStatisticsConfigs` keyed by configured sensor types.
+- Tightened `SensorCollectionPolicy` around real NavKit sensors and moved ID/tuple lookup helpers out of public config headers.
 
 ### Removed
+
+- Removed the public `SensorGraphConfigPolicy` helper and the `MeasurementModelsFromSensors_t` derivation path.
 
 - Placeholder `imu_gnss_straight_line.json` runtime config until the corresponding simulation path is real and validated.
 

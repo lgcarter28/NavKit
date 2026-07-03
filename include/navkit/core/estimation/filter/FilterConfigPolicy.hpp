@@ -3,14 +3,40 @@
 
 #pragma once
 
+#include "navkit/core/containers/TupleTraits.hpp"
+#include "navkit/core/estimation/filter/MeasurementStatistics.hpp"
+#include "navkit/core/estimation/sensor/SensorPolicy.hpp"
+
 #include <concepts>
+#include <tuple>
+#include <type_traits>
 
 namespace navkit::core::estimation
 {
 
 template<typename Candidate>
-concept MeasurementStatisticsConfigPolicy = requires {
-    { Candidate::EnableMeasurementStatistics } -> std::convertible_to<bool>;
-};
+concept MeasurementStatisticsConfigPolicy =
+    requires {
+        typename Candidate::Sensor_t;
+        typename Candidate::Model_t;
+        { Candidate::Id } -> std::convertible_to<SensorId>;
+    } && SensorPolicy<typename Candidate::Sensor_t> &&
+    std::same_as<typename Candidate::Model_t, typename Candidate::Sensor_t::Model_t>;
+
+namespace detail
+{
+
+template<typename Candidate>
+struct is_measurement_statistics_config
+    : std::bool_constant<MeasurementStatisticsConfigPolicy<Candidate>>
+{};
+
+} // namespace detail
+
+template<typename Candidate>
+concept MeasurementStatisticsCollectionPolicy =
+    requires { typename std::tuple_size<std::remove_cvref_t<Candidate>>::type; } &&
+    navkit::core::containers::tuple_all_v<detail::is_measurement_statistics_config,
+                                          std::remove_cvref_t<Candidate>>;
 
 } // namespace navkit::core::estimation

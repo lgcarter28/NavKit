@@ -5,6 +5,7 @@
 
 #include "navkit/api/config/ConfigApi.hpp"
 #include "navkit/app_support/ConfigTraits.hpp"
+#include "navkit/app_support/EmulatorBindingPolicy.hpp"
 #include "navkit/app_support/JsonInput.hpp"
 #include "navkit/app_support/ProfileExport.hpp"
 #include "navkit/app_support/RuntimeConfigValidation.hpp"
@@ -24,27 +25,6 @@
 namespace navkit::app_support
 {
 
-namespace detail
-{
-
-template<typename BindingTuple, typename SensorTuple>
-struct emulator_binding_sensors_valid;
-
-template<typename SensorTuple, typename... Bindings>
-struct emulator_binding_sensors_valid<std::tuple<Bindings...>, SensorTuple>
-    : std::bool_constant<(
-          (navkit::api::config::sensor_type_contains_v<typename Bindings::Sensor_t, SensorTuple> &&
-           navkit::api::config::sensor_id_exists_v<Bindings::Id, SensorTuple> &&
-           (Bindings::Id == Bindings::Sensor_t::Id)) &&
-          ...)>
-{};
-
-template<typename BindingTuple, typename SensorTuple>
-inline constexpr bool emulator_binding_sensors_valid_v =
-    emulator_binding_sensors_valid<BindingTuple, SensorTuple>::value;
-
-} // namespace detail
-
 template<typename Config>
 concept SimulationAppConfigPolicy =
     requires {
@@ -52,8 +32,8 @@ concept SimulationAppConfigPolicy =
         typename Config::EmulatorBindings;
     } && navkit::api::config::NavKitProductConfigPolicy<typename Config::NavKit> &&
     emulator_binding_ids_unique_v<typename Config::EmulatorBindings> &&
-    detail::emulator_binding_sensors_valid_v<typename Config::EmulatorBindings,
-                                             typename Config::NavKit::Sensors>;
+    emulator_binding_sensors_valid_v<typename Config::EmulatorBindings,
+                                     typename Config::NavKit::Sensors>;
 
 template<SimulationAppConfigPolicy Config>
 class SimulationApp
@@ -182,7 +162,7 @@ private:
     static auto& sensor_for_binding(Navigator& navigator)
     {
         constexpr auto SensorIndex =
-            navkit::api::config::SensorIndexFromId_v<Binding::Id, typename NavKit::Sensors>;
+            navkit::core::estimation::SensorIndexFromId_v<Binding::Id, typename NavKit::Sensors>;
         return navigator.template sensor<SensorIndex>();
     }
 
@@ -228,26 +208,29 @@ private:
 
     static void log_measurement_statistics(io::RunLogger& logger, const Filter& filter)
     {
-        log_measurement_statistics_impl(logger, filter, typename NavKit::MeasurementModels{});
+        log_measurement_statistics_impl(
+            logger, filter, typename NavKit::MeasurementStatisticsConfigs{});
     }
 
-    template<typename... Models>
+    template<typename... StatisticsConfigs>
     static void log_measurement_statistics_impl(io::RunLogger& logger,
                                                 const Filter& filter,
-                                                std::tuple<Models...>)
+                                                std::tuple<StatisticsConfigs...>)
     {
-        (log_measurement_statistics_for_model<Models>(logger, filter), ...);
+        (log_measurement_statistics_for_sensor<typename StatisticsConfigs::Sensor_t>(logger,
+                                                                                     filter),
+         ...);
     }
 
-    template<typename Model>
-    static void log_measurement_statistics_for_model(io::RunLogger& logger, const Filter& filter)
+    template<typename Sensor>
+    static void log_measurement_statistics_for_sensor(io::RunLogger& logger, const Filter& filter)
     {
         if constexpr (requires {
                           logger.log_gnss_pos_statistics(
-                              filter.template measurement_statistics<Model>());
+                              filter.template measurement_statistics<Sensor>());
                       }) {
-            if (filter.template has_measurement_statistics<Model>()) {
-                logger.log_gnss_pos_statistics(filter.template measurement_statistics<Model>());
+            if (filter.template has_measurement_statistics<Sensor>()) {
+                logger.log_gnss_pos_statistics(filter.template measurement_statistics<Sensor>());
             }
         }
     }

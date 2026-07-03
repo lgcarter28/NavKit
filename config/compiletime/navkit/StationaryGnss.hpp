@@ -32,11 +32,6 @@ struct StationaryGnssNumericConfig
     using Time_t = core::Time_t;
 };
 
-struct StationaryGnssMeasurementStatisticsConfig
-{
-    static constexpr bool EnableMeasurementStatistics = true;
-};
-
 struct StationaryGnssBufferConfig
 {
     static constexpr std::size_t BufferSize = 16;
@@ -45,7 +40,6 @@ struct StationaryGnssBufferConfig
 struct StationaryGnssConfig
 {
     using Numeric = StationaryGnssNumericConfig;
-    using MeasurementStatistics = StationaryGnssMeasurementStatisticsConfig;
     using GnssBuffer = StationaryGnssBufferConfig;
 
     // Public product graph.
@@ -58,28 +52,26 @@ struct StationaryGnssConfig
                                                        core::estimation::GnssFixedNoisePolicy>;
 
     using Sensors = std::tuple<PrimaryGnssSensor>;
-    using MeasurementModels = api::config::MeasurementModelsFromSensors_t<Sensors>;
+    using MeasurementStatisticsConfigs =
+        std::tuple<core::estimation::MeasurementStatistics<PrimaryGnssSensor>>;
 
     using Profiler = core::profiling::NullProfiler;
     using Filter =
         core::estimation::KalmanFilter<StateDef,
                                        core::estimation::DefaultInjectionPolicy<StateDef>,
                                        core::estimation::DefaultResetPolicy<StateDef>,
-                                       MeasurementModels,
+                                       MeasurementStatisticsConfigs,
                                        Profiler>;
     using Navigator =
         core::estimation::Navigator<Filter, Sensors, core::estimation::UpdatePostFilter, Profiler>;
 };
 
 static_assert(core::config::NumericConfigPolicy<StationaryGnssNumericConfig>);
-static_assert(
-    core::estimation::MeasurementStatisticsConfigPolicy<StationaryGnssMeasurementStatisticsConfig>);
 static_assert(core::estimation::BufferConfigPolicy<StationaryGnssBufferConfig>);
 static_assert(core::config::ConfigPolicy<StationaryGnssConfig>);
-static_assert(core::estimation::MeasurementStatisticsConfigPolicy<
-              StationaryGnssConfig::MeasurementStatistics>);
+static_assert(core::estimation::MeasurementStatisticsCollectionPolicy<
+              StationaryGnssConfig::MeasurementStatisticsConfigs>);
 static_assert(core::estimation::BufferConfigPolicy<StationaryGnssConfig::GnssBuffer>);
-static_assert(api::config::SensorGraphConfigPolicy<StationaryGnssConfig>);
 static_assert(api::config::NavKitProductConfigPolicy<StationaryGnssConfig>);
 
 } // namespace navkit::config::navkit

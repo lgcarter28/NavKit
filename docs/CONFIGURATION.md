@@ -112,8 +112,8 @@ struct StationaryGnssConfig
                                          GnssBuffer::BufferSize>;
 
     using Sensors = std::tuple<PrimaryGnssSensor>;
-    using MeasurementModels =
-        navkit::api::config::MeasurementModelsFromSensors_t<Sensors>;
+    using MeasurementStatisticsConfigs =
+        std::tuple<navkit::core::estimation::MeasurementStatistics<PrimaryGnssSensor>>;
     using Profiler = navkit::core::profiling::NullProfiler;
     using Filter = /* concrete filter type */;
     using Navigator = /* concrete navigator type */;
@@ -123,10 +123,12 @@ static_assert(navkit::api::config::NavKitProductConfigPolicy<StationaryGnssConfi
 ```
 
 `SensorId` gives each configured sensor a stable product-graph identity even
-when multiple sensors share the same model. `MeasurementModels` is intentionally
-derived from `Sensors` today because the filter still needs a model tuple for
-measurement-statistics storage. Keeping both aliases visible makes the current
-product graph explicit while avoiding duplicate hand-written model lists.
+when multiple sensors share the same model. `MeasurementStatisticsConfigs` is
+manually authored on purpose: the filter owns diagnostic storage, and the config
+should make each stored diagnostic stream obvious. A statistic entry is keyed by
+the configured sensor type, such as `MeasurementStatistics<PrimaryGnssSensor>`,
+not by the sensor model alone. This keeps primary and backup sensors
+unambiguous even when they use the same measurement model.
 
 ### 4. App configs compose a NavKit config with an executable
 
