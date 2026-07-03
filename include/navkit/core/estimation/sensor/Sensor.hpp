@@ -5,6 +5,7 @@
 
 #include "navkit/core/containers/RingBuffer.hpp"
 #include "navkit/core/estimation/measurement/Measurement.hpp"
+#include "navkit/core/estimation/sensor/SensorId.hpp"
 #include "navkit/core/estimation/sensor/noise/NoisePolicies.hpp"
 #include "navkit/core/estimation/sensor/noise/NoisePolicy.hpp"
 
@@ -13,12 +14,15 @@
 namespace navkit::core::estimation
 {
 
-template<typename Model,
+template<SensorId IdValue,
+         typename Model,
          std::size_t BufferSize,
          NoisePolicy<Model, Measurement<Model::M>> Noise = DefaultNoisePolicy>
 class Sensor
 {
 public:
+    static constexpr SensorId Id = IdValue;
+
     using Model_t = Model;
     using O_t = typename Model_t::O_t;
     using H_t = typename Model_t::H_t;

@@ -54,6 +54,7 @@ Target data flow adds multi-rate sensor simulation, mechanization/prediction, an
 
 ```text
 include/navkit/core/  Reusable product-core public headers
+include/navkit/api/   User-facing compile-time configuration API contracts
 include/navkit/sim/   Simulation support public headers
 include/navkit/io/    Desktop logging/file/JSON public headers
 include/navkit/app_support/
@@ -86,6 +87,7 @@ through `navkit::io`.
 | `navkit::core` | `navkit::core::frames` | Frame tags and frame-typed helpers |
 | `navkit::core` | `navkit::core::models` | Reusable product-core measurement and process models |
 | `navkit::core` | `navkit::core::units` | Unit and frame helper types |
+| `navkit::core` | `navkit::api::config` | Public compile-time config contracts for product graph authors |
 | `navkit::sim` | `navkit::sim` | Simulation support |
 | `navkit::io` | `navkit::io` | Desktop logging, file, CSV, and JSON support |
 | `navkit::app_support` | `navkit::app_support` | Selected-config app runner, JSON input, config description, and profile export helpers |
@@ -105,8 +107,11 @@ selected per build tree with `NAVKIT_CONFIG`. Reusable NavKit library configs
 live under `config/compiletime/navkit`; executable composition configs live
 under `config/compiletime/apps`. Runtime scenario inputs live under
 `config/runtime`. App-support code validates runtime inputs against the selected
-compile-time app composition before running, so missing scenario sections or
-unsupported sensor/emulator sections fail early with clear diagnostics.
+compile-time app composition before running. Reusable NavKit configs expose the
+product graph (`StateDef`, `Sensors`, `Profiler`, `Filter`, and `Navigator`);
+app configs connect emulators to selected NavKit sensors with stable unsigned
+sensor IDs plus explicit sensor aliases, so duplicate sensors of the same model
+type remain representable without raw tuple indices in app configs.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for target-boundary,
 namespace, and source-layout rationale.

@@ -38,7 +38,7 @@ SensorTestMeasurement make_measurement(const double time_s, const double x_m)
 
 TEST_CASE("Sensor preserves FIFO measurement order")
 {
-    Sensor<SensorTestModel, 2> sensor;
+    Sensor<0U, SensorTestModel, 2> sensor;
     CHECK_FALSE(sensor.has_measurement());
 
     CHECK(sensor.push(make_measurement(1.0, 10.0)));
@@ -61,7 +61,7 @@ TEST_CASE("Sensor preserves FIFO measurement order")
 
 TEST_CASE("Sensor noise policy can update context from the measurement sample")
 {
-    Sensor<SensorTestModel, 1, MeasurementDrivenNoisePolicy> sensor;
+    Sensor<0U, SensorTestModel, 1, MeasurementDrivenNoisePolicy> sensor;
     auto measurement = make_measurement(1.0, 10.0);
 
     sensor.update_noise_context(measurement);

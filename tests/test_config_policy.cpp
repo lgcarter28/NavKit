@@ -3,6 +3,7 @@
 
 #include "navkit/MinimalConfig.hpp"
 #include "navkit/SelectedConfig.hpp"
+#include "navkit/api/config/ConfigApi.hpp"
 #include "navkit/app_support/ConfigTraits.hpp"
 #include "navkit/core/config/ConfigPolicy.hpp"
 #include "navkit/core/estimation/filter/FilterConfigPolicy.hpp"
@@ -68,6 +69,13 @@ TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
     static_assert(ConfigPolicy<ExampleConfig>);
     static_assert(ConfigPolicy<SimConfig>);
     static_assert(ConfigPolicy<MinimalConfig>);
+    static_assert(navkit::api::config::SensorGraphConfigPolicy<SimConfig>);
+    static_assert(navkit::api::config::NavKitProductConfigPolicy<SimConfig>);
+    static_assert(navkit::api::config::sensor_ids_unique_v<SimConfig::Sensors>);
+    static_assert(
+        std::is_same_v<
+            navkit::api::config::SensorFromId_t<SimConfig::PrimaryGnssSensorId, SimConfig::Sensors>,
+            SimConfig::PrimaryGnssSensor>);
 
     static_assert(std::is_same_v<ExampleConfig::Numeric::Scalar_t, navkit::core::Scalar_t>);
     static_assert(std::is_same_v<ExampleConfig::Numeric::Time_t, navkit::core::Time_t>);
@@ -95,13 +103,15 @@ TEST_CASE("Concrete config composes at product-core sensor boundaries")
     using StateDef = navkit::core::estimation::InsStateDef;
     using Model = navkit::core::models::GnssPosModel<StateDef>;
     using SimConfig = navkit::app_support::NavKitConfig_t<navkit::selected_config::Config>;
-    using Sensor = navkit::core::estimation::Sensor<Model, SimConfig::GnssBuffer::BufferSize>;
+    using Sensor = navkit::core::estimation::Sensor<0U, Model, SimConfig::GnssBuffer::BufferSize>;
     using GnssOnlySensor =
-        navkit::core::estimation::Sensor<Model, GnssOnlyBufferConfig::BufferSize>;
+        navkit::core::estimation::Sensor<1U, Model, GnssOnlyBufferConfig::BufferSize>;
 
     static_assert(std::is_default_constructible_v<Sensor>);
     static_assert(std::is_default_constructible_v<GnssOnlySensor>);
     CHECK(SimConfig::GnssBuffer::BufferSize == 16U);
+    CHECK(navkit::api::config::SensorIndexFromId_v<SimConfig::PrimaryGnssSensorId,
+                                                   SimConfig::Sensors> == 0U);
 }
 
 } // namespace navkit::core::config::test

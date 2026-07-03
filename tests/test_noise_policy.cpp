@@ -83,7 +83,7 @@ TEST_CASE("NoisePolicy rejects incompatible noise policies")
 
 TEST_CASE("Sensor accepts constrained noise policy and preserves fixed capacity")
 {
-    using TestSensor = Sensor<NoiseTestModel, 2, ExactNoisePolicy>;
+    using TestSensor = Sensor<0U, NoiseTestModel, 2, ExactNoisePolicy>;
     static_assert(std::is_default_constructible_v<TestSensor>);
 
     TestSensor sensor;

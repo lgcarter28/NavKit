@@ -40,7 +40,16 @@ Application-level configs should compose a reusable NavKit library config:
 struct ExampleAppConfig
 {
     using NavKit = navkit::config::navkit::SomeNavKitConfig;
-    using App = navkit::app_support::SomeApp<ExampleAppConfig>;
+
+    static constexpr navkit::app_support::SensorId PrimarySensorId =
+        NavKit::PrimarySensorId;
+    using EmulatorBindings = std::tuple<
+        navkit::app_support::EmulatorBinding<
+            PrimarySensorId,
+            navkit::app_support::SomeEmulator,
+            NavKit::PrimarySensor>>;
+
+    using App = navkit::app_support::SimulationApp<ExampleAppConfig>;
 };
 ```
 
@@ -49,7 +58,10 @@ use `navkit::selected_config::Config` rather than including concrete config
 headers directly.
 
 When an app consumes runtime JSON, validate that input against the selected
-compile-time composition before running. The current stationary GNSS app does
-this in `navkit::app_support` so missing `trajectory`/`gnss` sections,
-unsupported sensor sections, and malformed numeric/vector fields produce clear
-early errors.
+compile-time composition before running. `SimulationApp<Config>` uses
+`EmulatorBindings` to decide which runtime sections are required. Stable
+unsigned `SensorId` values identify app/runtime streams, while explicit NavKit
+sensor aliases document which concrete configured sensor each emulator feeds.
+The binding ID must match the selected sensor's `Sensor::Id`, and app-support
+helpers can query sensors or emulator bindings by ID without ambiguous model-type
+lookup.

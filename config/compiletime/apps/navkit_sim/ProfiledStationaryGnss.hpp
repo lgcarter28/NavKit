@@ -3,16 +3,28 @@
 
 #pragma once
 
-#include "navkit/ProfiledGnss.hpp"
-#include "navkit/app_support/StationaryGnssApp.hpp"
+#include "navkit/ProfiledStationaryGnss.hpp"
+#include "navkit/app_support/GnssEmulator.hpp"
+#include "navkit/app_support/SensorId.hpp"
+#include "navkit/app_support/SimulationApp.hpp"
+
+#include <tuple>
 
 namespace navkit::config::apps::navkit_sim
 {
 
 struct ProfiledStationaryGnssConfig
 {
-    using NavKit = ::navkit::config::navkit::ProfiledGnssConfig;
-    using App = ::navkit::app_support::StationaryGnssApp<ProfiledStationaryGnssConfig>;
+    using NavKit = ::navkit::config::navkit::ProfiledStationaryGnssConfig;
+
+    static constexpr ::navkit::app_support::SensorId PrimaryGnssSensorId =
+        NavKit::PrimaryGnssSensorId;
+    using EmulatorBindings =
+        std::tuple<::navkit::app_support::EmulatorBinding<PrimaryGnssSensorId,
+                                                          ::navkit::app_support::GnssEmulator,
+                                                          NavKit::PrimaryGnssSensor>>;
+
+    using App = ::navkit::app_support::SimulationApp<ProfiledStationaryGnssConfig>;
 };
 
 } // namespace navkit::config::apps::navkit_sim

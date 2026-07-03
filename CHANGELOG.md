@@ -29,6 +29,8 @@ This project follows
 - Product-core embedded profiling vocabulary with enum profile points, fixed timing records, visualization metadata fields, clock/sink/profiler concepts, `NullProfiler`, `ScopedProfiler`, and deterministic concept/runtime tests.
 - Coarse embedded profiling integration points for `KalmanFilter::observation_update` and `Navigator::process_measurements`, both defaulting to `NullProfiler`.
 - Runtime-input validation for the selected stationary GNSS app composition, including required scenario sections, unsupported sensor/emulator sections, and numeric/vector shape checks.
+- Generic `SimulationApp<Config>` support with app-configured sensor bindings, unsigned sensor IDs, emulator tuples, and tuple-derived runtime validation.
+- Public `include/navkit/api/config` contracts for user-facing product config graphs, including `NavKitProductConfigPolicy` and sensor-derived measurement-model aliases.
 
 ### Changed
 
@@ -39,7 +41,7 @@ This project follows
 - Consolidated superseded TODO lists and early core design notes into the canonical roadmap before removing them.
 - Constrained `KalmanFilter` on `StateDefPolicy`, injection policy, and reset policy boundaries.
 - Constrained `KalmanFilter` observation-update and measurement-statistics methods on measurement-model policy compatibility.
-- Constrained `Sensor<Model, BufferSize, NoisePolicy>` on noise-policy compatibility while preserving fixed-capacity buffering.
+- Constrained `Sensor<Id, Model, BufferSize, NoisePolicy>` on noise-policy compatibility while preserving fixed-capacity buffering.
 - Completed the Phase 2 estimator-boundary refactor scope and explicitly deferred `SensorPolicy` until a Navigator-facing capability boundary exists.
 - Constrained `Navigator` on current filter, sensor-collection, and update-policy capabilities.
 - Clarified ADR-003 and agent guidance around valid C++ concept-definition syntax versus constrained template-parameter syntax.
@@ -69,6 +71,14 @@ This project follows
 - Removed stale root example placeholder directories and documented that future architecture domains should not be represented by empty folders.
 - Split compile-time configs into reusable NavKit library configs under `config/compiletime/navkit` and app composition configs under `config/compiletime/apps`, with a generic selected-app launcher for `navkit_sim`.
 - Clarified that same-named NavKit and app compile-time config files are expected when separated by ownership directories, and documented how runtime JSON links to the selected app/NavKit composition.
+- Replaced the bespoke stationary GNSS app runner with the generic simulation app loop while preserving stationary GNSS log/profile behavior.
+- Moved runnable NavKit product graph aliases into reusable NavKit configs and collapsed app configs to `NavKit` plus explicit `EmulatorBindings`.
+- Renamed the profiled reusable NavKit GNSS config to `ProfiledStationaryGnss.hpp` to match the app-level selected config name.
+- Replaced app-facing sensor-index wiring with configured `Sensor::Id` values, explicit `(Id, Emulator, Sensor)` bindings, and tuple helpers for ID-based lookup.
+
+### Removed
+
+- Placeholder `imu_gnss_straight_line.json` runtime config until the corresponding simulation path is real and validated.
 
 ### Fixed
 

@@ -26,6 +26,10 @@ The current implementation has the first pieces of the configuration model:
   consume them:
   - `include/navkit/core/estimation/sensor/SensorConfigPolicy.hpp`
   - `include/navkit/core/estimation/filter/FilterConfigPolicy.hpp`
+- User-facing product-configuration concepts live under
+  `include/navkit/api/config`. This is the public front door for config authors
+  who want to assert that a composed NavKit config exposes the required product
+  graph.
 - Concrete repository-provided compile-time configs live under
   `config/compiletime`. NavKit library/core configs live under
   `config/compiletime/navkit`, while top-level executable composition configs
@@ -92,6 +96,38 @@ static_assert(navkit::core::estimation::BufferConfigPolicy<MinimalConfig::GnssBu
 `MinimalConfig` is intended as a teaching/example shape, not a universal
 production target and not a base class.
 
+Runnable/product NavKit configs also expose the product graph that downstream
+apps consume:
+
+```cpp
+struct StationaryGnssConfig
+{
+    using StateDef = navkit::core::estimation::InsStateDef;
+    using PrimaryGnssModel = navkit::core::models::GnssPosModel<StateDef>;
+    static constexpr navkit::core::estimation::SensorId PrimaryGnssSensorId = 0U;
+
+    using PrimaryGnssSensor =
+        navkit::core::estimation::Sensor<PrimaryGnssSensorId,
+                                         PrimaryGnssModel,
+                                         GnssBuffer::BufferSize>;
+
+    using Sensors = std::tuple<PrimaryGnssSensor>;
+    using MeasurementModels =
+        navkit::api::config::MeasurementModelsFromSensors_t<Sensors>;
+    using Profiler = navkit::core::profiling::NullProfiler;
+    using Filter = /* concrete filter type */;
+    using Navigator = /* concrete navigator type */;
+};
+
+static_assert(navkit::api::config::NavKitProductConfigPolicy<StationaryGnssConfig>);
+```
+
+`SensorId` gives each configured sensor a stable product-graph identity even
+when multiple sensors share the same model. `MeasurementModels` is intentionally
+derived from `Sensors` today because the filter still needs a model tuple for
+measurement-statistics storage. Keeping both aliases visible makes the current
+product graph explicit while avoiding duplicate hand-written model lists.
+
 ### 4. App configs compose a NavKit config with an executable
 
 An application-level config is the usual `NAVKIT_CONFIG` selection for runnable
@@ -102,12 +138,27 @@ being built:
 struct StationaryGnssAppConfig
 {
     using NavKit = navkit::config::navkit::StationaryGnssConfig;
-    using App = navkit::app_support::StationaryGnssApp<StationaryGnssAppConfig>;
+
+    static constexpr navkit::app_support::SensorId PrimaryGnssSensorId =
+        NavKit::PrimaryGnssSensorId;
+    using EmulatorBindings = std::tuple<
+        navkit::app_support::EmulatorBinding<
+            PrimaryGnssSensorId,
+            navkit::app_support::GnssEmulator,
+            NavKit::PrimaryGnssSensor>>;
+
+    using App = navkit::app_support::SimulationApp<StationaryGnssAppConfig>;
 };
 ```
 
 This keeps the NavKit library config reusable across apps while still allowing
 one build tree to select one concrete executable composition.
+App sensor/emulator links use stable unsigned `SensorId` constants for runtime
+identity and explicit NavKit sensor aliases for compile-time wiring. The app
+does not reconstruct NavKit sensors or write raw tuple indices. The binding ID
+must match the selected sensor's configured `Sensor::Id`, which keeps duplicate
+sensors of the same model type, such as primary and backup GNSS receivers,
+unambiguous.
 
 The app and NavKit config trees are deliberately separate:
 

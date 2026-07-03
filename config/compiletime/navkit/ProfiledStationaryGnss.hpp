@@ -18,35 +18,55 @@
 #include "navkit/core/estimation/sensor/noise/NoisePolicies.hpp"
 #include "navkit/core/estimation/state/StateDefs.hpp"
 #include "navkit/core/models/GnssPosModel.hpp"
-#include "navkit/core/profiling/NullProfiler.hpp"
+#include "navkit/core/profiling/ProfilePolicy.hpp"
+#include "navkit/core/profiling/ProfileSinks.hpp"
+#include "navkit/core/profiling/ScopedProfiler.hpp"
 
+#include <chrono>
 #include <cstddef>
+#include <cstdint>
+#include <string_view>
 #include <tuple>
 
 namespace navkit::config::navkit
 {
 
-struct StationaryGnssNumericConfig
+struct ProfiledStationaryGnssNumericConfig
 {
     using Scalar_t = core::Scalar_t;
     using Time_t = core::Time_t;
 };
 
-struct StationaryGnssMeasurementStatisticsConfig
+struct ProfiledStationaryGnssMeasurementStatisticsConfig
 {
     static constexpr bool EnableMeasurementStatistics = true;
 };
 
-struct StationaryGnssBufferConfig
+struct ProfiledStationaryGnssBufferConfig
 {
     static constexpr std::size_t BufferSize = 16;
 };
 
-struct StationaryGnssConfig
+struct HostSteadyMicrosecondClock
 {
-    using Numeric = StationaryGnssNumericConfig;
-    using MeasurementStatistics = StationaryGnssMeasurementStatisticsConfig;
-    using GnssBuffer = StationaryGnssBufferConfig;
+    using Tick = std::uint64_t;
+
+    static Tick now()
+    {
+        const auto now = std::chrono::steady_clock::now().time_since_epoch();
+        return static_cast<Tick>(
+            std::chrono::duration_cast<std::chrono::microseconds>(now).count());
+    }
+};
+
+struct ProfiledStationaryGnssConfig
+{
+    static constexpr std::string_view ProfileClockSource = "std::chrono::steady_clock";
+    static constexpr double ProfileTickPeriodUs = 1.0;
+
+    using Numeric = ProfiledStationaryGnssNumericConfig;
+    using MeasurementStatistics = ProfiledStationaryGnssMeasurementStatisticsConfig;
+    using GnssBuffer = ProfiledStationaryGnssBufferConfig;
 
     // Public product graph.
     using StateDef = core::estimation::InsStateDef;
@@ -60,7 +80,11 @@ struct StationaryGnssConfig
     using Sensors = std::tuple<PrimaryGnssSensor>;
     using MeasurementModels = api::config::MeasurementModelsFromSensors_t<Sensors>;
 
-    using Profiler = core::profiling::NullProfiler;
+    using ProfileClock = HostSteadyMicrosecondClock;
+    using ProfileTick = typename ProfileClock::Tick;
+    using ProfileSink = core::profiling::RingBufferProfileSink<ProfileTick, 4096U>;
+    using Profiler = core::profiling::ScopedProfiler<ProfileClock, ProfileSink>;
+
     using Filter =
         core::estimation::KalmanFilter<StateDef,
                                        core::estimation::DefaultInjectionPolicy<StateDef>,
@@ -71,15 +95,19 @@ struct StationaryGnssConfig
         core::estimation::Navigator<Filter, Sensors, core::estimation::UpdatePostFilter, Profiler>;
 };
 
-static_assert(core::config::NumericConfigPolicy<StationaryGnssNumericConfig>);
-static_assert(
-    core::estimation::MeasurementStatisticsConfigPolicy<StationaryGnssMeasurementStatisticsConfig>);
-static_assert(core::estimation::BufferConfigPolicy<StationaryGnssBufferConfig>);
-static_assert(core::config::ConfigPolicy<StationaryGnssConfig>);
+static_assert(core::config::NumericConfigPolicy<ProfiledStationaryGnssNumericConfig>);
 static_assert(core::estimation::MeasurementStatisticsConfigPolicy<
-              StationaryGnssConfig::MeasurementStatistics>);
-static_assert(core::estimation::BufferConfigPolicy<StationaryGnssConfig::GnssBuffer>);
-static_assert(api::config::SensorGraphConfigPolicy<StationaryGnssConfig>);
-static_assert(api::config::NavKitProductConfigPolicy<StationaryGnssConfig>);
+              ProfiledStationaryGnssMeasurementStatisticsConfig>);
+static_assert(core::estimation::BufferConfigPolicy<ProfiledStationaryGnssBufferConfig>);
+static_assert(core::profiling::ClockPolicy<HostSteadyMicrosecondClock>);
+static_assert(core::profiling::ProfileSinkPolicy<ProfiledStationaryGnssConfig::ProfileSink,
+                                                 HostSteadyMicrosecondClock>);
+static_assert(core::profiling::ProfilerPolicy<ProfiledStationaryGnssConfig::Profiler>);
+static_assert(core::config::ConfigPolicy<ProfiledStationaryGnssConfig>);
+static_assert(core::estimation::MeasurementStatisticsConfigPolicy<
+              ProfiledStationaryGnssConfig::MeasurementStatistics>);
+static_assert(core::estimation::BufferConfigPolicy<ProfiledStationaryGnssConfig::GnssBuffer>);
+static_assert(api::config::SensorGraphConfigPolicy<ProfiledStationaryGnssConfig>);
+static_assert(api::config::NavKitProductConfigPolicy<ProfiledStationaryGnssConfig>);
 
 } // namespace navkit::config::navkit

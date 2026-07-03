@@ -18,7 +18,7 @@ namespace navkit::core::estimation::test
 
 using NavigatorPolicyStateDef = InsStateDef;
 using NavigatorPolicyModel = navkit::core::models::GnssPosModel<NavigatorPolicyStateDef>;
-using NavigatorPolicySensor = Sensor<NavigatorPolicyModel, 4>;
+using NavigatorPolicySensor = Sensor<0U, NavigatorPolicyModel, 4>;
 using NavigatorPolicyFilter = KalmanFilter<NavigatorPolicyStateDef>;
 using NavigatorPolicySensors = std::tuple<NavigatorPolicySensor>;
 

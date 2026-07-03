@@ -13,7 +13,7 @@ NavKit is split by product boundary first, then by engineering domain.
 | Product core | `navkit::core` | `include/navkit/core` | Reusable estimation/navigation framework and domain models |
 | Simulation support | `navkit::sim` | `include/navkit/sim` | Desktop simulation infrastructure and generated measurements |
 | IO support | `navkit::io` | `include/navkit/io` | Desktop logging, files, CSV, JSON, and run manifests |
-| Application support | `navkit::app_support` | `include/navkit/app_support` | Header-only executable support helpers for JSON inputs, selected-config description, runtime-input validation, estimator aliases, and profile export |
+| Application support | `navkit::app_support` | `include/navkit/app_support` | Header-only executable support helpers for JSON inputs, selected-config description, runtime-input validation, simulation app composition, estimator aliases, and profile export |
 | Applications | app targets under `apps/` | `apps/` | Executable entry points that compose the libraries they need |
 | Analysis | Python package under `python/` | `python/navkit_analysis` | Offline plots and validation analysis |
 
@@ -130,9 +130,9 @@ Use CMake target kinds honestly:
   live in `src/sim/*.cpp`.
 - `navkit::app_support` is currently an `INTERFACE` target because its reusable
   support is template-heavy and selected-config dependent. It provides C++
-  helpers for JSON runtime inputs, compiled configuration description, repeated
-  estimator aliases, and profile export. Concrete application business logic
-  remains in the relevant application entry point.
+  helpers for JSON runtime inputs, compiled configuration description, selected
+  simulation app composition, repeated estimator aliases, and profile export.
+  Concrete application entry points remain thin selected-config dispatchers.
 
 Do not add dummy `.cpp` files merely to force a static archive. Convert an
 `INTERFACE` target to a compiled/static library when the component owns
@@ -154,10 +154,11 @@ selected-config portion of that manifest comes from C++: after building,
 `tools/build.py` asks the executable to describe its compiled config. Runtime
 application manifests and log metadata are written by C++ application/IO code.
 Application entry points should stay selected-config generic where practical.
-The selected app config composes a reusable NavKit library config with an app
-composition, while `navkit::app_support` owns reusable JSON-input,
-runtime-validation, config-description, estimator-alias, selected-app runner,
-and profile-export plumbing.
+The selected app config composes a reusable NavKit library config with app-side
+sensor bindings and emulator policies. `navkit::app_support` owns reusable
+JSON-input, tuple-derived runtime validation, config-description,
+estimator-alias, selected-app runner, simulation-loop, and profile-export
+plumbing.
 
 This boundary avoids checked-in sidecar metadata that can drift from the actual
 compiled configuration. If build-manifest writing moves fully into C++ later,

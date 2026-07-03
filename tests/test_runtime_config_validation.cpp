@@ -1,12 +1,17 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/StationaryGnss.hpp"
+#include "apps/navkit_sim/StationaryGnss.hpp"
+#include "navkit/app_support/GnssEmulator.hpp"
 #include "navkit/app_support/RuntimeConfigValidation.hpp"
+#include "navkit/app_support/SensorId.hpp"
+#include "navkit/app_support/SimulationApp.hpp"
 #include "test_main.hpp"
 
 #include <nlohmann/json.hpp>
 #include <stdexcept>
+#include <tuple>
+#include <type_traits>
 
 namespace navkit::app_support::test
 {
@@ -14,9 +19,29 @@ namespace navkit::app_support::test
 namespace
 {
 
-struct StationaryGnssAppConfig
+using StationaryGnssAppConfig = navkit::config::apps::navkit_sim::StationaryGnssConfig;
+
+struct DuplicateSensorIdConfig
 {
-    using NavKit = navkit::config::navkit::StationaryGnssConfig;
+    using NavKit = StationaryGnssAppConfig::NavKit;
+    using EmulatorBindings = std::tuple<
+        navkit::app_support::
+            EmulatorBinding<0U, navkit::app_support::GnssEmulator, NavKit::PrimaryGnssSensor>,
+        navkit::app_support::
+            EmulatorBinding<0U, navkit::app_support::GnssEmulator, NavKit::PrimaryGnssSensor>>;
+};
+
+struct UnknownSensor
+{
+    static constexpr SensorId Id = 99U;
+};
+
+struct MissingTargetSensorConfig
+{
+    using NavKit = StationaryGnssAppConfig::NavKit;
+    using EmulatorBindings =
+        std::tuple<navkit::app_support::
+                       EmulatorBinding<99U, navkit::app_support::GnssEmulator, UnknownSensor>>;
 };
 
 [[nodiscard]] nlohmann::json valid_stationary_gnss_runtime_config()
@@ -40,7 +65,15 @@ TEST_CASE("Stationary GNSS runtime validator accepts the documented input shape"
 {
     const auto cfg = valid_stationary_gnss_runtime_config();
 
-    CHECK_NOTHROW(validate_stationary_gnss_runtime_config<StationaryGnssAppConfig>(cfg));
+    static_assert(SimulationAppConfigPolicy<StationaryGnssAppConfig>);
+    static_assert(!SimulationAppConfigPolicy<DuplicateSensorIdConfig>);
+    static_assert(!SimulationAppConfigPolicy<MissingTargetSensorConfig>);
+    static_assert(emulator_binding_ids_unique_v<StationaryGnssAppConfig::EmulatorBindings>);
+    static_assert(std::is_same_v<EmulatorFromId_t<StationaryGnssAppConfig::PrimaryGnssSensorId,
+                                                  StationaryGnssAppConfig::EmulatorBindings>,
+                                 GnssEmulator>);
+
+    CHECK_NOTHROW(validate_runtime_config<StationaryGnssAppConfig>(cfg));
 }
 
 TEST_CASE("Stationary GNSS runtime validator rejects missing required sections")
@@ -48,8 +81,7 @@ TEST_CASE("Stationary GNSS runtime validator rejects missing required sections")
     auto cfg = valid_stationary_gnss_runtime_config();
     cfg.erase("gnss");
 
-    CHECK_THROWS_AS(validate_stationary_gnss_runtime_config<StationaryGnssAppConfig>(cfg),
-                    std::runtime_error);
+    CHECK_THROWS_AS(validate_runtime_config<StationaryGnssAppConfig>(cfg), std::runtime_error);
 }
 
 TEST_CASE("Stationary GNSS runtime validator rejects unsupported sensor sections")
@@ -57,8 +89,7 @@ TEST_CASE("Stationary GNSS runtime validator rejects unsupported sensor sections
     auto cfg = valid_stationary_gnss_runtime_config();
     cfg["imu"] = nlohmann::json::object();
 
-    CHECK_THROWS_AS(validate_stationary_gnss_runtime_config<StationaryGnssAppConfig>(cfg),
-                    std::runtime_error);
+    CHECK_THROWS_AS(validate_runtime_config<StationaryGnssAppConfig>(cfg), std::runtime_error);
 }
 
 TEST_CASE("Stationary GNSS runtime validator rejects invalid trajectory shape")
@@ -66,8 +97,7 @@ TEST_CASE("Stationary GNSS runtime validator rejects invalid trajectory shape")
     auto cfg = valid_stationary_gnss_runtime_config();
     cfg["trajectory"]["p_e_m"] = {1.0, 2.0};
 
-    CHECK_THROWS_AS(validate_stationary_gnss_runtime_config<StationaryGnssAppConfig>(cfg),
-                    std::runtime_error);
+    CHECK_THROWS_AS(validate_runtime_config<StationaryGnssAppConfig>(cfg), std::runtime_error);
 }
 
 TEST_CASE("Stationary GNSS runtime validator keeps numeric tuning runtime-configurable")
@@ -78,7 +108,7 @@ TEST_CASE("Stationary GNSS runtime validator keeps numeric tuning runtime-config
     cfg["gnss"]["sigma_v_m"] = 0.0;
     cfg["filter"]["initial_position_sigma_m"] = 0.0;
 
-    CHECK_NOTHROW(validate_stationary_gnss_runtime_config<StationaryGnssAppConfig>(cfg));
+    CHECK_NOTHROW(validate_runtime_config<StationaryGnssAppConfig>(cfg));
 }
 
 } // namespace navkit::app_support::test

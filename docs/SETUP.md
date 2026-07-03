@@ -328,7 +328,9 @@ config/compiletime/apps/navkit_sim/StationaryGnss.hpp
 ```
 
 The app config is the executable composition selected by CMake. The NavKit
-config is the reusable library configuration consumed by that app.
+config is the reusable library configuration consumed by that app. App configs
+also declare the simulator/emulator tuple and bind each emulator to a NavKit
+sensor with a stable unsigned sensor ID.
 
 To run the same stationary GNSS scenario with the embedded-style profiling
 configuration:
@@ -380,7 +382,9 @@ src/app_support/CMakeLists.txt   navkit_app_support / navkit::app_support
 Applications should link only the product-boundary targets they need. For
 example, `apps/navkit_sim` links `navkit::app_support` for selected-config
 description, JSON-input, runtime-validation, estimator-alias, and profile-export
-helpers, while its `main.cpp` remains a thin selected-config entry point.
+helpers, while its `main.cpp` remains a thin selected-config entry point. The
+generic `SimulationApp<Config>` loop lives in app support and is selected by the
+app compile-time config.
 `apps/navkit_replay` currently links only `navkit::core`.
 
 For target boundaries, namespaces, and the header-only versus compiled-library

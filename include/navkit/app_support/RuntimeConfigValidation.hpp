@@ -3,15 +3,13 @@
 
 #pragma once
 
-#include "navkit/app_support/ConfigTraits.hpp"
-#include "navkit/core/estimation/sensor/SensorConfigPolicy.hpp"
-
 #include <cstdint>
-#include <initializer_list>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <tuple>
+#include <vector>
 
 namespace navkit::app_support
 {
@@ -132,16 +130,22 @@ inline void require_vec3(const nlohmann::json& cfg, std::string_view path)
     require_optional_vec3(cfg, path);
 }
 
+inline bool contains_key(const std::vector<std::string_view>& keys, const std::string& key)
+{
+    for (const auto allowed_key : keys) {
+        if (key == allowed_key) {
+            return true;
+        }
+    }
+    return false;
+}
+
 inline void reject_unknown_top_level_keys(const nlohmann::json& cfg,
-                                          std::initializer_list<std::string_view> allowed_keys)
+                                          const std::vector<std::string_view>& allowed_keys)
 {
     for (const auto& [key, unused] : cfg.items()) {
         (void)unused;
-        bool allowed = false;
-        for (const auto allowed_key : allowed_keys) {
-            allowed = allowed || key == allowed_key;
-        }
-        if (!allowed) {
+        if (!contains_key(allowed_keys, key)) {
             throw_runtime_config_error("unknown top-level key '" + key + "'");
         }
     }
@@ -149,41 +153,53 @@ inline void reject_unknown_top_level_keys(const nlohmann::json& cfg,
 
 } // namespace detail
 
-template<typename Config>
-void validate_stationary_gnss_runtime_config(const nlohmann::json& cfg)
-{
-    using NavKit = NavKitConfig_t<Config>;
+template<typename BindingTuple>
+struct EmulatorRuntimeKeys;
 
-    static_assert(core::estimation::BufferConfigPolicy<typename NavKit::GnssBuffer>,
-                  "StationaryGnssApp requires NavKit::GnssBuffer to be configured");
+template<typename... Bindings>
+struct EmulatorRuntimeKeys<std::tuple<Bindings...>>
+{
+    static std::vector<std::string_view> values()
+    {
+        return {Bindings::Emulator_t::RuntimeKey...};
+    }
+};
+
+template<typename Config>
+void validate_runtime_config(const nlohmann::json& cfg)
+{
+    using EmulatorBindings = typename Config::EmulatorBindings;
 
     if (!cfg.is_object()) {
         detail::throw_runtime_config_error("root input must be a JSON object");
     }
 
-    detail::reject_unknown_top_level_keys(
-        cfg, {"run_name", "output_dir", "trajectory", "gnss", "filter", "imu", "baro"});
+    auto allowed_keys = EmulatorRuntimeKeys<EmulatorBindings>::values();
+    allowed_keys.push_back("run_name");
+    allowed_keys.push_back("output_dir");
+    allowed_keys.push_back("trajectory");
+    allowed_keys.push_back("filter");
+    detail::reject_unknown_top_level_keys(cfg, allowed_keys);
+
     detail::require_optional_string(cfg, "run_name");
     detail::require_optional_string(cfg, "output_dir");
-    detail::reject_object_if_present(cfg, "imu", "StationaryGnssApp does not emulate IMU");
-    detail::reject_object_if_present(cfg, "baro", "StationaryGnssApp does not emulate barometer");
 
     const auto& trajectory = detail::require_object(cfg, "trajectory");
     detail::require_optional_string(trajectory, "type");
     if (const auto type_iter = trajectory.find("type");
         type_iter != trajectory.end() && type_iter->get<std::string>() != "stationary") {
         detail::throw_runtime_config_error(
-            "trajectory.type must be 'stationary' for StationaryGnssApp");
+            "trajectory.type must be 'stationary' for the current navkit_sim trajectory provider");
     }
     detail::require_optional_positive_number(trajectory, "duration_s");
     detail::require_optional_positive_number(trajectory, "dt_s");
     detail::require_vec3(trajectory, "p_e_m");
 
-    const auto& gnss = detail::require_object(cfg, "gnss");
-    detail::require_optional_positive_number(gnss, "dt_s");
-    detail::require_optional_nonnegative_number(gnss, "sigma_h_m");
-    detail::require_optional_nonnegative_number(gnss, "sigma_v_m");
-    detail::require_optional_unsigned_integer(gnss, "seed");
+    std::apply(
+        [&cfg](auto... binding) {
+            ((decltype(binding)::Emulator_t::validate_runtime_config(cfg)), ...);
+        },
+        EmulatorBindings{});
 
     if (const auto filter_iter = cfg.find("filter"); filter_iter != cfg.end()) {
         if (!filter_iter->is_object()) {

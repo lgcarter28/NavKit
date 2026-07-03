@@ -123,7 +123,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 ## Sensors and noise
 
 - [x] Define a noise-policy compatibility concept for a measurement model and measurement sample.
-- [x] Constrain `Sensor<Model, BufferSize, NoisePolicy>`.
+- [x] Constrain `Sensor<Id, Model, BufferSize, NoisePolicy>`.
 - [x] Defer `SensorPolicy` until Navigator or another generic consumer has a real capability boundary that needs it.
 - [x] Verify fixed-capacity, allocation-free behavior remains intact.
 
@@ -200,6 +200,31 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Reconcile `README.md`, `docs/SETUP.md`, `docs/ARCHITECTURE.md`, and `AGENTS.md` so the default selected config, root config tree, and one-config-per-build-tree rule stay discoverable.
 - [x] Keep reusable NavKit library configs and app composition configs in dedicated directories so app and library configs can share descriptive names without coupling their ownership.
 - [x] Add runtime-input validation at the app-support boundary so missing scenario sections, unsupported sensor/emulator sections, and malformed JSON inputs fail early with clear diagnostics against the selected compile-time composition.
+
+### Pass 3.1g — Generic simulation-app composition
+
+- [x] Replace the bespoke `StationaryGnssApp::run()` shape with a generic `SimulationApp<Config>::run()` that owns the common application loop: load runtime input, validate it against the selected compile-time app/NavKit composition, create the runtime trajectory, construct configured emulators, push generated measurements into the matching NavKit sensors, process the Navigator, log outputs, and export profiling artifacts.
+- [x] Move app sensor/emulator capability selection into app compile-time config tuples, now represented as `EmulatorBindings`, while keeping numeric values such as noise, covariance, seeds, rates, output paths, and run names in runtime JSON.
+- [x] Replace the current `RuntimeConfigValidation` shape with generic app-support validation that is derived from the selected app compile-time tuples. Validation must support arbitrary combinations of emulators/loggers and must not be hard-coded to stationary GNSS.
+- [x] Define a small `SensorEmulatorPolicy`/adapter contract that connects each app-side emulator to an explicit configured NavKit sensor alias plus a stable app/runtime sensor ID. Do not rely solely on model-type lookup because realistic configurations may include multiple sensors with the same model type, such as two GNSS receivers, dual barometers, or redundant IMUs.
+- [x] Represent each configured NavKit sensor and app emulator stream with an unsigned `SensorId`, optionally named by config-local constants such as `PrimaryGnssSensorId = 0U`. App bindings explicitly state `(Id, Emulator, Sensor)`, and compile-time checks prove IDs are unique, every emulator target sensor exists in the selected NavKit sensor graph, and binding IDs match the configured `Sensor::Id`.
+- [ ] Keep trajectory category and trajectory parameters runtime-configurable for now. Swapping stationary, straight-line, turn, and future scripted trajectory families from JSON is intentionally useful and is an acceptable non-hot-path runtime polymorphism exception outside product-core embedded algorithms.
+- [ ] Treat logging as a mixed compile-time/runtime concern: compile-time config selects available log families, schemas, profile export capability, and logger adapters; runtime JSON selects output directory, run name, enabled optional log products where safe, and verbosity/detail levels. Avoid baking run-specific logging choices into `NAVKIT_CONFIG`.
+- [x] Remove stale placeholder runtime configs, including placeholder future-scenario JSON files, during this refactor unless they are converted into real validated examples.
+- [ ] Preserve existing stationary GNSS runtime behavior, file names, manifest contents, profile export behavior, and analysis compatibility during the first generic-loop refactor.
+- [x] Add compile-time tests for valid/invalid app composition concepts and runtime tests for missing emulator sections, extra unsupported sections, and app/NavKit capability mismatches.
+
+### Pass 3.1h — Public config API surface and product graph aliases
+
+- [x] Add an explicit public config API directory, for example `include/navkit/api/config`, as the front door for compile-time configuration contracts intended for end users.
+- [x] Define `NavKitProductConfigPolicy` in the public config API. It should explicitly state the required aliases for a runnable/product NavKit configuration, including at least `StateDef`, `Sensors`, `Profiler`, `Filter`, and `Navigator`.
+- [x] Define or expose additional public config API concepts only when users are expected to satisfy or assert them in concrete compile-time configs. Domain implementation concepts stay beside their consuming domain unless they graduate into the user-facing config API.
+- [x] Keep the public API concepts as contracts and documentation for config authors; do not move every low-level policy concept into the API folder merely because it exists.
+- [x] Move product graph aliases into reusable NavKit configs: state definition, sensor model aliases, concrete sensor aliases, `Sensors`, `Profiler`, `Filter`, and `Navigator`.
+- [x] Decide whether `MeasurementModels` should be a public alias, a derived alias such as `MeasurementModelsFromSensors_t<Sensors>`, or an implementation detail. Prefer deriving it from `Sensors` if the filter still needs it for measurement-statistics storage.
+- [x] Collapse app configs so they no longer reconstruct NavKit sensors. App configs should select `NavKit`, define app-local unsigned sensor IDs, define `EmulatorBindings`, and select `SimulationApp<Config>`.
+- [x] Simplify emulator binding machinery so the ID is the app/runtime key and the sensor target is an explicit NavKit sensor alias. `SimulationApp` derives the tuple index from `NavKit::Sensors` by `Sensor::Id`, so app configs avoid raw indices and do not search sensor bindings by potentially duplicated model type.
+- [x] Update configuration docs and tests so users can find the public config concepts, see which aliases are required, and understand which aliases are local helper wiring rather than the public config contract.
 
 ## Compiler flags and static-analysis hardening
 
@@ -405,6 +430,11 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Logging
 
+- [ ] Refactor the current monolithic `RunLogger` into composable logging adapters after `SimulationApp<Config>` exists. `RunLogger` currently mixes truth logging, GNSS measurement logging, nav-state/error logging, GNSS update-statistics logging, metadata schemas, manifests, and app-specific dimensions in one large header.
+- [ ] Move log-family selection into compile-time app logging config while keeping run-specific choices runtime-configurable. Compile-time logging config should define available log products, schema writers, and required compile-time dimensions; runtime JSON should select output directory, run name, optional enabled/disabled products where safe, and detail/verbosity.
+- [ ] Replace hard-coded logging assumptions such as GNSS-only files, `StateDef::Pos` position extraction, and fixed `H`/`K` matrix dimensions with model/state-derived schema helpers or logger policies.
+- [ ] Keep IO/logging adapters outside `navkit::core`; they may depend on `navkit::sim`, `navkit::io`, and app-support types, but product-core embedded algorithms must continue to emit only typed states, measurements, statistics, and profile records.
+- [ ] Preserve existing stationary GNSS file names and schema compatibility until downstream analysis is intentionally migrated.
 - [ ] Add log/schema version metadata and compatibility checks.
 - [ ] Extend the Phase 3 timing/resource artifacts into Monte Carlo aggregate reports.
 - [ ] Add memory/high-water statistics suitable for embedded evaluation once target/resource APIs are defined.
