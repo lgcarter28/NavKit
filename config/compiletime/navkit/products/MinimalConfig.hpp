@@ -3,9 +3,7 @@
 
 #pragma once
 
-#include "navkit/core/config/ConfigPolicy.hpp"
-#include "navkit/core/config/Types.hpp"
-#include "navkit/core/estimation/sensor/SensorConfigPolicy.hpp"
+#include "navkit/api/config/ConfigApi.hpp"
 
 #include <cstddef>
 

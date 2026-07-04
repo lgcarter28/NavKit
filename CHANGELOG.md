@@ -71,6 +71,7 @@ This project follows
 - Removed stale root example placeholder directories and documented that future architecture domains should not be represented by empty folders.
 - Split compile-time configs into reusable NavKit library configs under `config/compiletime/navkit` and app composition configs under `config/compiletime/apps`, with a generic selected-app launcher for `navkit_sim`.
 - Moved reusable NavKit product configs under `config/compiletime/navkit/products` with product-local namespaces and role-based internal type names.
+- Expanded `ConfigApi.hpp` into the shared product-config include for common core graph machinery.
 - Clarified that same-named NavKit and app compile-time config files are expected when separated by ownership directories, and documented how runtime JSON links to the selected app/NavKit composition.
 - Replaced the bespoke stationary GNSS app runner with the generic simulation app loop while preserving stationary GNSS log/profile behavior.
 - Moved runnable NavKit product graph aliases into reusable NavKit configs and collapsed app configs to `NavKit` plus explicit `EmulatorBindings`.

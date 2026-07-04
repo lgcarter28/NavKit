@@ -27,6 +27,9 @@ with a single aggregate check, such as
 `static_assert(navkit::api::config::NavKitProductConfigPolicy<Config>);`.
 Detailed slice-level concept assertions belong in deliberately educational
 examples, such as `navkit/products/MinimalConfig.hpp`, and in focused tests.
+Product configs should include `navkit/api/config/ConfigApi.hpp` for shared
+core graph machinery, then include only the concrete model, profiler, target, or
+component headers they select.
 
 Headers intended for `NAVKIT_CONFIG` selection must also expose:
 

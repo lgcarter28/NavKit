@@ -30,6 +30,10 @@ The current implementation has the first pieces of the configuration model:
   `include/navkit/api/config`. This is the public front door for config authors
   who want to assert that a composed NavKit config exposes the required product
   graph.
+- `include/navkit/api/config/ConfigApi.hpp` is the product-config convenience
+  include. It collects the shared core graph machinery used by reusable product
+  configs. Product headers should still include their specific model, profiler,
+  target, or component choices explicitly.
 - Concrete repository-provided compile-time configs live under
   `config/compiletime`. Reusable NavKit product configs live under
   `config/compiletime/navkit/products`, while top-level executable composition
