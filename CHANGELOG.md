@@ -20,7 +20,7 @@ This project follows
 - Candidate-first `InjectionPolicy` and `ResetPolicy` concepts with positive and negative compile-time tests.
 - Candidate-first `MeasurementPolicy` concept with positive coverage for GNSS position, GNSS velocity, and barometer models plus negative compile-time tests.
 - Candidate-first `NoisePolicy` concept with positive and negative compile-time tests.
-- First-pass `FilterPolicy`, `SensorCollectionPolicy`, and `UpdatePolicy` concepts for Navigator orchestration boundaries.
+- First-pass `FilterPolicy`, `SensorCollectionPolicy`, `UpdatePolicy`, and `NavigatorUpdatePolicy` concepts for Navigator orchestration boundaries.
 - Measurement-statistics regression tests for accepted and rejected measurement updates.
 - Design-intent testing guide plus focused coverage for ring-buffer overflow policies, sensor FIFO/noise behavior, CSV writer output/failure behavior, and stationary trajectory semantics.
 - Linux-oriented coverage reporting through `tools/coverage.py` and a CI coverage artifact.
@@ -30,7 +30,7 @@ This project follows
 - Coarse embedded profiling integration points for `KalmanFilter::observation_update` and `Navigator::process_measurements`, both defaulting to `NullProfiler`.
 - Runtime-input validation for the selected stationary GNSS app composition, including required scenario sections, unsupported sensor/emulator sections, and numeric/vector shape checks.
 - Generic `SimulationApp<Config>` support with app-configured sensor bindings, unsigned sensor IDs, emulator tuples, and tuple-derived runtime validation.
-- Public `include/navkit/api/config` contracts for user-facing product config graphs, including `NavKitProductConfigPolicy` and sensor-derived measurement-model aliases.
+- Public `include/navkit/api/config` contracts for user-facing product config graphs, including `NavKitProductConfigPolicy`.
 
 ### Changed
 
@@ -78,6 +78,7 @@ This project follows
 - Replaced derived `MeasurementModels` config aliases with explicit `MeasurementStatisticsTuple` aliases keyed by configured sensor types.
 - Tightened `SensorCollectionPolicy` around real NavKit sensors and moved ID/tuple lookup helpers out of public config headers.
 - Moved Navigator policy compatibility checks to a dedicated header and simplified KalmanFilter measurement-statistics storage naming.
+- Replaced Navigator's update-policy template-template parameter with an explicit concrete `NavigatorUpdate` policy alias in reusable NavKit configs.
 - Moved app-side emulator binding vocabulary to `EmulatorBinding.hpp`, added focused trajectory-provider and measurement-statistics logging helpers, and slimmed `SimulationApp` orchestration.
 
 ### Removed

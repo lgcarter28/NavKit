@@ -12,7 +12,7 @@ domain config concept -> concrete config slice -> composed compile-time config
 
 This replaces the "obvious spine" that a virtual base-class hierarchy would
 normally provide. The spine is instead made explicit through domain concepts,
-example concrete configs, local `static_assert` checks, tests, and build-system
+readable concrete configs, aggregate config checks, tests, and build-system
 selection.
 
 ## Current status
@@ -72,8 +72,10 @@ struct GnssBufferConfig
 static_assert(navkit::core::estimation::BufferConfigPolicy<GnssBufferConfig>);
 ```
 
-The `static_assert` is intentional documentation. It tells users and the
-compiler which contract the slice claims to satisfy.
+Slice-level `static_assert` checks are useful in teaching examples and tests.
+Runnable product configs should usually avoid repeating every consumed slice
+check; the aliases that consume those slices plus the aggregate product-config
+check are the real validation path.
 
 ### 3. NavKit configs collect reusable library slices
 
@@ -116,6 +118,7 @@ struct StationaryGnssConfig
         std::tuple<navkit::core::estimation::MeasurementStatistics<PrimaryGnssSensor>>;
     using Profiler = navkit::core::profiling::NullProfiler;
     using Filter = /* concrete filter type */;
+    using NavigatorUpdate = /* concrete update policy type */;
     using Navigator = /* concrete navigator type */;
 };
 
@@ -129,6 +132,12 @@ should make each stored diagnostic stream obvious. A statistic entry is keyed by
 the configured sensor type, such as `MeasurementStatistics<PrimaryGnssSensor>`,
 not by the sensor model alone. This keeps primary and backup sensors
 unambiguous even when they use the same measurement model.
+
+`NavigatorUpdate` is the selected concrete update behavior for the configured
+`Filter` and `Sensors`, such as `UpdatePostFilter<Filter>`. The lower-level
+`UpdatePolicy` concept describes the per-sensor update interface, while the
+tuple-wide `NavigatorUpdatePolicy` concept proves that the selected
+`NavigatorUpdate` is valid for the whole Navigator boundary.
 
 ### 4. App configs compose a NavKit config with an executable
 
@@ -276,7 +285,10 @@ The expected workflow is:
 1. Copy the nearest example, such as `config/compiletime/navkit/MinimalConfig.hpp`.
 2. Rename the config type.
 3. Adjust or add the NavKit config slices your library/application needs.
-4. Add `static_assert` checks for each concept slice the config claims to satisfy.
+4. For runnable/product NavKit configs, add the aggregate
+   `NavKitProductConfigPolicy` check. Keep detailed slice-level `static_assert`
+   checks in teaching examples or focused tests unless they materially improve
+   diagnostics for a real consumed alias.
 5. For executables, add or update an app config under `config/compiletime/apps`
    that names `using NavKit = ...` and `using App = ...`.
 6. Expose the selected app or library type as `navkit::config::SelectedConfig`.

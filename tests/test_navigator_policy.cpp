@@ -3,6 +3,7 @@
 
 #include "navkit/core/estimation/filter/FilterPolicy.hpp"
 #include "navkit/core/estimation/navigator/Navigator.hpp"
+#include "navkit/core/estimation/navigator/NavigatorUpdatePolicy.hpp"
 #include "navkit/core/estimation/navigator/SensorCollectionPolicy.hpp"
 #include "navkit/core/estimation/navigator/update/UpdatePolicy.hpp"
 #include "navkit/core/estimation/sensor/Sensor.hpp"
@@ -21,6 +22,7 @@ using NavigatorPolicyModel = navkit::core::models::GnssPosModel<NavigatorPolicyS
 using NavigatorPolicySensor = Sensor<0U, NavigatorPolicyModel, 4>;
 using NavigatorPolicyFilter = KalmanFilter<NavigatorPolicyStateDef>;
 using NavigatorPolicySensors = std::tuple<NavigatorPolicySensor>;
+using NavigatorPolicyUpdate = UpdatePostFilter<NavigatorPolicyFilter>;
 
 struct MissingProcessSensor
 {
@@ -69,14 +71,26 @@ TEST_CASE("SensorCollectionPolicy accepts tuple-like sensor collections")
 
 TEST_CASE("UpdatePolicy captures Navigator update hooks")
 {
-    static_assert(UpdatePolicy<UpdatePostFilter<NavigatorPolicyFilter>,
-                               NavigatorPolicyFilter,
-                               NavigatorPolicySensor>);
+    static_assert(
+        UpdatePolicy<NavigatorPolicyUpdate, NavigatorPolicyFilter, NavigatorPolicySensor>);
     static_assert(UpdatePolicy<UpdateAfterEachSensor<NavigatorPolicyFilter>,
                                NavigatorPolicyFilter,
                                NavigatorPolicySensor>);
     static_assert(!UpdatePolicy<MissingSensorUpdate, NavigatorPolicyFilter, NavigatorPolicySensor>);
     static_assert(!UpdatePolicy<MissingFilterUpdate, NavigatorPolicyFilter, NavigatorPolicySensor>);
+
+    CHECK(true);
+}
+
+TEST_CASE("NavigatorUpdatePolicy captures tuple-wide Navigator update compatibility")
+{
+    static_assert(NavigatorUpdatePolicy<NavigatorPolicyUpdate,
+                                        NavigatorPolicyFilter,
+                                        NavigatorPolicySensors>);
+    static_assert(
+        !NavigatorUpdatePolicy<MissingSensorUpdate, NavigatorPolicyFilter, NavigatorPolicySensors>);
+    static_assert(
+        !NavigatorUpdatePolicy<MissingFilterUpdate, NavigatorPolicyFilter, NavigatorPolicySensors>);
 
     CHECK(true);
 }

@@ -86,20 +86,10 @@ struct ProfiledStationaryGnssConfig
                                        core::estimation::DefaultResetPolicy<StateDef>,
                                        MeasurementStatisticsTuple,
                                        Profiler>;
-    using Navigator =
-        core::estimation::Navigator<Filter, Sensors, core::estimation::UpdatePostFilter, Profiler>;
+    using NavigatorUpdate = core::estimation::UpdatePostFilter<Filter>;
+    using Navigator = core::estimation::Navigator<Filter, Sensors, NavigatorUpdate, Profiler>;
 };
 
-static_assert(core::config::NumericConfigPolicy<ProfiledStationaryGnssNumericConfig>);
-static_assert(core::estimation::BufferConfigPolicy<ProfiledStationaryGnssBufferConfig>);
-static_assert(core::profiling::ClockPolicy<HostSteadyMicrosecondClock>);
-static_assert(core::profiling::ProfileSinkPolicy<ProfiledStationaryGnssConfig::ProfileSink,
-                                                 HostSteadyMicrosecondClock>);
-static_assert(core::profiling::ProfilerPolicy<ProfiledStationaryGnssConfig::Profiler>);
-static_assert(core::config::ConfigPolicy<ProfiledStationaryGnssConfig>);
-static_assert(core::estimation::MeasurementStatisticsCollectionPolicy<
-              ProfiledStationaryGnssConfig::MeasurementStatisticsTuple>);
-static_assert(core::estimation::BufferConfigPolicy<ProfiledStationaryGnssConfig::GnssBuffer>);
 static_assert(api::config::NavKitProductConfigPolicy<ProfiledStationaryGnssConfig>);
 
 } // namespace navkit::config::navkit

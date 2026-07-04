@@ -122,11 +122,12 @@ using ProfiledFilter = navkit::core::estimation::KalmanFilter<
     std::tuple<>,
     SteppingProfiler>;
 using ProfiledSensor = navkit::core::estimation::Sensor<0U, ProfiledModel, 4>;
-using ProfiledNavigator =
-    navkit::core::estimation::Navigator<navkit::core::estimation::KalmanFilter<ProfiledStateDef>,
-                                        std::tuple<ProfiledSensor>,
-                                        navkit::core::estimation::UpdatePostFilter,
-                                        SteppingProfiler>;
+using ProfiledNavigatorFilter = navkit::core::estimation::KalmanFilter<ProfiledStateDef>;
+using ProfiledNavigatorUpdate = navkit::core::estimation::UpdatePostFilter<ProfiledNavigatorFilter>;
+using ProfiledNavigator = navkit::core::estimation::Navigator<ProfiledNavigatorFilter,
+                                                              std::tuple<ProfiledSensor>,
+                                                              ProfiledNavigatorUpdate,
+                                                              SteppingProfiler>;
 
 TEST_CASE("Profiler concepts accept valid clock, sink, scope, and profiler policies")
 {

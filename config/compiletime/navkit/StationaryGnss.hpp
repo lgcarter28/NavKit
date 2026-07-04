@@ -62,16 +62,10 @@ struct StationaryGnssConfig
                                        core::estimation::DefaultResetPolicy<StateDef>,
                                        MeasurementStatisticsTuple,
                                        Profiler>;
-    using Navigator =
-        core::estimation::Navigator<Filter, Sensors, core::estimation::UpdatePostFilter, Profiler>;
+    using NavigatorUpdate = core::estimation::UpdatePostFilter<Filter>;
+    using Navigator = core::estimation::Navigator<Filter, Sensors, NavigatorUpdate, Profiler>;
 };
 
-static_assert(core::config::NumericConfigPolicy<StationaryGnssNumericConfig>);
-static_assert(core::estimation::BufferConfigPolicy<StationaryGnssBufferConfig>);
-static_assert(core::config::ConfigPolicy<StationaryGnssConfig>);
-static_assert(core::estimation::MeasurementStatisticsCollectionPolicy<
-              StationaryGnssConfig::MeasurementStatisticsTuple>);
-static_assert(core::estimation::BufferConfigPolicy<StationaryGnssConfig::GnssBuffer>);
 static_assert(api::config::NavKitProductConfigPolicy<StationaryGnssConfig>);
 
 } // namespace navkit::config::navkit

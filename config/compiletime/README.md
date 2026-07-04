@@ -22,8 +22,11 @@ Provided `NAVKIT_CONFIG` selections:
   fixed-capacity profiling ring-buffer sink, and scoped profiler so the app
   emits `profile.csv`.
 
-Each concrete config header should include local `static_assert` checks for the
-concept slices it claims to satisfy.
+Runnable/product NavKit configs should read like product graphs and usually end
+with a single aggregate check, such as
+`static_assert(navkit::api::config::NavKitProductConfigPolicy<Config>);`.
+Detailed slice-level concept assertions belong in deliberately educational
+examples, such as `MinimalConfig.hpp`, and in focused tests.
 
 Headers intended for `NAVKIT_CONFIG` selection must also expose:
 

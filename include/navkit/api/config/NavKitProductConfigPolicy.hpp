@@ -5,6 +5,7 @@
 
 #include "navkit/core/config/ConfigPolicy.hpp"
 #include "navkit/core/estimation/filter/FilterConfigPolicy.hpp"
+#include "navkit/core/estimation/navigator/NavigatorUpdatePolicy.hpp"
 #include "navkit/core/estimation/navigator/SensorCollectionPolicy.hpp"
 #include "navkit/core/estimation/sensor/SensorTuple.hpp"
 #include "navkit/core/estimation/state/StateDefPolicy.hpp"
@@ -43,6 +44,7 @@ concept NavKitProductConfigPolicy = requires {
     typename Candidate::MeasurementStatisticsTuple;
     typename Candidate::Profiler;
     typename Candidate::Filter;
+    typename Candidate::NavigatorUpdate;
     typename Candidate::Navigator;
 
     requires navkit::core::config::ConfigPolicy<Candidate>;
@@ -55,6 +57,9 @@ concept NavKitProductConfigPolicy = requires {
         typename Candidate::MeasurementStatisticsTuple,
         typename Candidate::Sensors>;
     requires navkit::core::profiling::ProfilerPolicy<typename Candidate::Profiler>;
+    requires navkit::core::estimation::NavigatorUpdatePolicy<typename Candidate::NavigatorUpdate,
+                                                             typename Candidate::Filter,
+                                                             typename Candidate::Sensors>;
 };
 
 } // namespace navkit::api::config

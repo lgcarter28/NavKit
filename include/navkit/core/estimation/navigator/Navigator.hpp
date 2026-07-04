@@ -4,7 +4,7 @@
 #pragma once
 
 #include "navkit/core/estimation/filter/KalmanFilter.hpp"
-#include "navkit/core/estimation/navigator/NavigatorPolicyCompatibility.hpp"
+#include "navkit/core/estimation/navigator/NavigatorUpdatePolicy.hpp"
 #include "navkit/core/estimation/navigator/SensorCollectionPolicy.hpp"
 #include "navkit/core/estimation/navigator/update/UpdatePolicies.hpp"
 #include "navkit/core/profiling/NullProfiler.hpp"
@@ -20,16 +20,14 @@ namespace navkit::core::estimation
 
 template<typename Filter,
          SensorCollectionPolicy SensorTuple,
-         template<typename> typename UpdatePolicyTemplate = UpdatePostFilter,
+         NavigatorUpdatePolicy<Filter, SensorTuple> Update = UpdatePostFilter<Filter>,
          navkit::core::profiling::ProfilerPolicy Profiler = navkit::core::profiling::NullProfiler>
-    requires detail::
-        navigator_policy_compatible_v<Filter, UpdatePolicyTemplate<Filter>, SensorTuple>
-    class Navigator
+class Navigator
 {
 public:
     using Filter_t = Filter;
     using Sensors_t = SensorTuple;
-    using UpdatePolicy_t = UpdatePolicyTemplate<Filter_t>;
+    using Update_t = Update;
     using Profiler_t = Profiler;
 
     Filter_t& filter()
@@ -61,7 +59,7 @@ public:
     {
         using SensorNoRef = std::remove_reference_t<Sensor>;
         m_filter.process_sensor(sensor_obj);
-        UpdatePolicy_t::template sensor_update<SensorNoRef>(m_filter, sensor_obj);
+        Update_t::template sensor_update<SensorNoRef>(m_filter, sensor_obj);
     }
 
     void process_measurements()
@@ -72,7 +70,7 @@ public:
 
         std::apply([this](auto&... sensor_obj) { (process_one_sensor(sensor_obj), ...); },
                    m_sensors);
-        UpdatePolicy_t::filter_update(m_filter);
+        Update_t::filter_update(m_filter);
     }
 
 private:
