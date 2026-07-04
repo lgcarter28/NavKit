@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "navkit/app_support/SensorId.hpp"
+#include "navkit/app_support/EmulatorBinding.hpp"
 #include "navkit/core/estimation/sensor/SensorTuple.hpp"
 
 #include <cstddef>

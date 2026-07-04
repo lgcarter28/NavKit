@@ -5,13 +5,14 @@
 
 #include "navkit/api/config/ConfigApi.hpp"
 #include "navkit/app_support/ConfigTraits.hpp"
+#include "navkit/app_support/EmulatorBinding.hpp"
 #include "navkit/app_support/EmulatorBindingPolicy.hpp"
 #include "navkit/app_support/JsonInput.hpp"
+#include "navkit/app_support/MeasurementStatisticsLogger.hpp"
 #include "navkit/app_support/ProfileExport.hpp"
 #include "navkit/app_support/RuntimeConfigValidation.hpp"
-#include "navkit/app_support/SensorId.hpp"
+#include "navkit/app_support/TrajectoryProvider.hpp"
 #include "navkit/io/RunLogger.hpp"
-#include "navkit/sim/TrajectoryGenerator.hpp"
 
 #include <cstdio>
 #include <filesystem>
@@ -54,26 +55,26 @@ public:
         const std::filesystem::path output_dir =
             cfg.value("output_dir", std::string("data/logs/") + run_name);
 
-        const auto traj_cfg = stationary_trajectory_config_from_json(cfg);
-        const auto truth = sim::TrajectoryGenerator::stationary(traj_cfg);
+        const auto trajectory = trajectory_run_from_json(cfg);
         auto emulator_runtimes = make_emulator_runtimes(cfg);
 
         reset_profile_sink_if_configured<NavKit>();
 
         Navigator navigator;
         auto& filter = navigator.filter();
-        configure_initial_filter_state(filter, cfg, traj_cfg.p_e);
+        configure_initial_filter_state(filter, cfg, trajectory.initial_position_e_m);
 
         io::RunLogger logger(output_dir, run_name, cfg);
         configure_emulators(navigator, logger, cfg);
 
-        for (const auto& sample : truth) {
+        for (const auto& sample : trajectory.truth_samples) {
             logger.log_truth(sample);
             process_emulators(navigator, logger, emulator_runtimes, sample);
 
             navigator.process_measurements();
 
-            log_measurement_statistics(logger, filter);
+            log_measurement_statistics(
+                logger, filter, typename NavKit::MeasurementStatisticsTuple{});
             logger.log_nav<StateDef>(sample.time, filter, sample);
         }
 
@@ -85,18 +86,6 @@ public:
     }
 
 private:
-    static sim::StationaryTrajectoryConfig
-    stationary_trajectory_config_from_json(const nlohmann::json& cfg)
-    {
-        const auto& trajectory_config = cfg.at("trajectory");
-        sim::StationaryTrajectoryConfig traj_cfg;
-        traj_cfg.duration_s = trajectory_config.value("duration_s", 60.0);
-        traj_cfg.dt_s = trajectory_config.value("dt_s", 1.0);
-        traj_cfg.p_e =
-            vec3_from_json<Eigen::Matrix<core::Scalar_t, 3, 1>>(trajectory_config.at("p_e_m"));
-        return traj_cfg;
-    }
-
     static void configure_initial_filter_state(Filter& filter,
                                                const nlohmann::json& cfg,
                                                const Eigen::Matrix<core::Scalar_t, 3, 1>& p_e)
@@ -203,35 +192,6 @@ private:
 
         if (!sensor.push(measurement)) {
             throw std::runtime_error("Sensor buffer overflow for configured emulator");
-        }
-    }
-
-    static void log_measurement_statistics(io::RunLogger& logger, const Filter& filter)
-    {
-        log_measurement_statistics_impl(
-            logger, filter, typename NavKit::MeasurementStatisticsConfigs{});
-    }
-
-    template<typename... StatisticsConfigs>
-    static void log_measurement_statistics_impl(io::RunLogger& logger,
-                                                const Filter& filter,
-                                                std::tuple<StatisticsConfigs...>)
-    {
-        (log_measurement_statistics_for_sensor<typename StatisticsConfigs::Sensor_t>(logger,
-                                                                                     filter),
-         ...);
-    }
-
-    template<typename Sensor>
-    static void log_measurement_statistics_for_sensor(io::RunLogger& logger, const Filter& filter)
-    {
-        if constexpr (requires {
-                          logger.log_gnss_pos_statistics(
-                              filter.template measurement_statistics<Sensor>());
-                      }) {
-            if (filter.template has_measurement_statistics<Sensor>()) {
-                logger.log_gnss_pos_statistics(filter.template measurement_statistics<Sensor>());
-            }
         }
     }
 };

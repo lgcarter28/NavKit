@@ -40,7 +40,7 @@ concept NavKitProductConfigPolicy = requires {
     typename Candidate::Numeric;
     typename Candidate::StateDef;
     typename Candidate::Sensors;
-    typename Candidate::MeasurementStatisticsConfigs;
+    typename Candidate::MeasurementStatisticsTuple;
     typename Candidate::Profiler;
     typename Candidate::Filter;
     typename Candidate::Navigator;
@@ -50,9 +50,9 @@ concept NavKitProductConfigPolicy = requires {
     requires navkit::core::estimation::SensorCollectionPolicy<typename Candidate::Sensors>;
     requires navkit::core::estimation::sensor_ids_unique_v<typename Candidate::Sensors>;
     requires navkit::core::estimation::MeasurementStatisticsCollectionPolicy<
-        typename Candidate::MeasurementStatisticsConfigs>;
+        typename Candidate::MeasurementStatisticsTuple>;
     requires detail::measurement_statistics_sources_configured_v<
-        typename Candidate::MeasurementStatisticsConfigs,
+        typename Candidate::MeasurementStatisticsTuple,
         typename Candidate::Sensors>;
     requires navkit::core::profiling::ProfilerPolicy<typename Candidate::Profiler>;
 };

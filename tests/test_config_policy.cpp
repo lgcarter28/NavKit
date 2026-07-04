@@ -61,7 +61,7 @@ TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
     static_assert(navkit::core::estimation::BufferConfigPolicy<
                   navkit::config::navkit::MinimalGnssBufferConfig>);
     static_assert(navkit::core::estimation::MeasurementStatisticsCollectionPolicy<
-                  SimConfig::MeasurementStatisticsConfigs>);
+                  SimConfig::MeasurementStatisticsTuple>);
     static_assert(navkit::core::estimation::BufferConfigPolicy<SimConfig::GnssBuffer>);
     static_assert(ConfigPolicy<ExampleConfig>);
     static_assert(ConfigPolicy<SimConfig>);

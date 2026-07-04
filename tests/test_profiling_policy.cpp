@@ -48,7 +48,7 @@ struct SteppingClock
 
     static Tick now()
     {
-        const Tick value = ticks[index];
+        const Tick value = ticks.at(index);
         if (index + 1U < ticks.size()) {
             ++index;
         }
@@ -70,9 +70,14 @@ struct FixedSink
     static void record(ProfileRecord<FakeClock::Tick> record)
     {
         if (count < records.size()) {
-            records[count] = record;
+            records.at(count) = record;
             ++count;
         }
+    }
+
+    static const ProfileRecord<FakeClock::Tick>& first_record()
+    {
+        return records.at(0U);
     }
 };
 
@@ -162,13 +167,14 @@ TEST_CASE("ScopedProfiler records elapsed ticks through the configured sink")
     }
 
     REQUIRE(FixedSink::count == 1U);
-    CHECK(FixedSink::records[0].point == ProfilePoint::KalmanObservationUpdate);
-    CHECK(FixedSink::records[0].start_tick == 100U);
-    CHECK(FixedSink::records[0].elapsed_ticks == 37U);
-    CHECK(FixedSink::records[0].sequence == 0U);
-    CHECK(FixedSink::records[0].parent_sequence == 0U);
-    CHECK(FixedSink::records[0].depth == 0U);
-    CHECK(FixedSink::records[0].flags == ProfileRecordFlags::None);
+    const auto& record = FixedSink::first_record();
+    CHECK(record.point == ProfilePoint::KalmanObservationUpdate);
+    CHECK(record.start_tick == 100U);
+    CHECK(record.elapsed_ticks == 37U);
+    CHECK(record.sequence == 0U);
+    CHECK(record.parent_sequence == 0U);
+    CHECK(record.depth == 0U);
+    CHECK(record.flags == ProfileRecordFlags::None);
 }
 
 TEST_CASE("Moved profile scope records exactly once")
@@ -184,13 +190,14 @@ TEST_CASE("Moved profile scope records exactly once")
     }
 
     REQUIRE(FixedSink::count == 1U);
-    CHECK(FixedSink::records[0].point == ProfilePoint::NavigatorProcessMeasurements);
-    CHECK(FixedSink::records[0].start_tick == 10U);
-    CHECK(FixedSink::records[0].elapsed_ticks == 15U);
-    CHECK(FixedSink::records[0].sequence == 0U);
-    CHECK(FixedSink::records[0].parent_sequence == 0U);
-    CHECK(FixedSink::records[0].depth == 0U);
-    CHECK(FixedSink::records[0].flags == ProfileRecordFlags::None);
+    const auto& record = FixedSink::first_record();
+    CHECK(record.point == ProfilePoint::NavigatorProcessMeasurements);
+    CHECK(record.start_tick == 10U);
+    CHECK(record.elapsed_ticks == 15U);
+    CHECK(record.sequence == 0U);
+    CHECK(record.parent_sequence == 0U);
+    CHECK(record.depth == 0U);
+    CHECK(record.flags == ProfileRecordFlags::None);
 }
 
 TEST_CASE("ProfileRecord carries optional visualization metadata")
@@ -295,9 +302,10 @@ TEST_CASE("KalmanFilter observation update emits the configured profile point")
     filter.observation_update<ProfiledModel>(z, 1.0, ctx, true);
 
     REQUIRE(FixedSink::count == 1U);
-    CHECK(FixedSink::records[0].point == ProfilePoint::KalmanObservationUpdate);
-    CHECK(FixedSink::records[0].start_tick == 211U);
-    CHECK(FixedSink::records[0].elapsed_ticks == 14U);
+    const auto& record = FixedSink::first_record();
+    CHECK(record.point == ProfilePoint::KalmanObservationUpdate);
+    CHECK(record.start_tick == 211U);
+    CHECK(record.elapsed_ticks == 14U);
 }
 
 TEST_CASE("Navigator process_measurements emits the configured profile point")
@@ -310,9 +318,10 @@ TEST_CASE("Navigator process_measurements emits the configured profile point")
     navigator.process_measurements();
 
     REQUIRE(FixedSink::count == 1U);
-    CHECK(FixedSink::records[0].point == ProfilePoint::NavigatorProcessMeasurements);
-    CHECK(FixedSink::records[0].start_tick == 310U);
-    CHECK(FixedSink::records[0].elapsed_ticks == 23U);
+    const auto& record = FixedSink::first_record();
+    CHECK(record.point == ProfilePoint::NavigatorProcessMeasurements);
+    CHECK(record.start_tick == 310U);
+    CHECK(record.elapsed_ticks == 23U);
 }
 
 TEST_CASE("Estimator algorithms default to NullProfiler")

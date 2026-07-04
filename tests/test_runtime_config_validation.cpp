@@ -2,10 +2,10 @@
 // All Rights Reserved.
 
 #include "apps/navkit_sim/StationaryGnss.hpp"
+#include "navkit/app_support/EmulatorBinding.hpp"
 #include "navkit/app_support/EmulatorBindingPolicy.hpp"
 #include "navkit/app_support/GnssEmulator.hpp"
 #include "navkit/app_support/RuntimeConfigValidation.hpp"
-#include "navkit/app_support/SensorId.hpp"
 #include "navkit/app_support/SimulationApp.hpp"
 #include "test_main.hpp"
 
@@ -88,7 +88,7 @@ TEST_CASE("Stationary GNSS runtime validator rejects missing required sections")
 TEST_CASE("Stationary GNSS runtime validator rejects unsupported sensor sections")
 {
     auto cfg = valid_stationary_gnss_runtime_config();
-    cfg["imu"] = nlohmann::json::object();
+    cfg.emplace("imu", nlohmann::json::object());
 
     CHECK_THROWS_AS(validate_runtime_config<StationaryGnssAppConfig>(cfg), std::runtime_error);
 }
@@ -96,7 +96,7 @@ TEST_CASE("Stationary GNSS runtime validator rejects unsupported sensor sections
 TEST_CASE("Stationary GNSS runtime validator rejects invalid trajectory shape")
 {
     auto cfg = valid_stationary_gnss_runtime_config();
-    cfg["trajectory"]["p_e_m"] = {1.0, 2.0};
+    cfg.at("trajectory").at("p_e_m") = {1.0, 2.0};
 
     CHECK_THROWS_AS(validate_runtime_config<StationaryGnssAppConfig>(cfg), std::runtime_error);
 }
@@ -104,10 +104,10 @@ TEST_CASE("Stationary GNSS runtime validator rejects invalid trajectory shape")
 TEST_CASE("Stationary GNSS runtime validator keeps numeric tuning runtime-configurable")
 {
     auto cfg = valid_stationary_gnss_runtime_config();
-    cfg["trajectory"]["duration_s"] = 5.0;
-    cfg["gnss"]["sigma_h_m"] = 0.0;
-    cfg["gnss"]["sigma_v_m"] = 0.0;
-    cfg["filter"]["initial_position_sigma_m"] = 0.0;
+    cfg.at("trajectory").at("duration_s") = 5.0;
+    cfg.at("gnss").at("sigma_h_m") = 0.0;
+    cfg.at("gnss").at("sigma_v_m") = 0.0;
+    cfg.at("filter").at("initial_position_sigma_m") = 0.0;
 
     CHECK_NOTHROW(validate_runtime_config<StationaryGnssAppConfig>(cfg));
 }

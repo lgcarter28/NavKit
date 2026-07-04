@@ -21,7 +21,7 @@ TEST_CASE("Stationary trajectory includes both endpoints at fixed sample spacing
     CHECK(samples.back().time == doctest::Approx(2.0));
 
     for (std::size_t index = 0; index < samples.size(); ++index) {
-        const auto& sample = samples[index];
+        const auto& sample = samples.at(index);
         CHECK(sample.time == doctest::Approx(static_cast<double>(index) * config.dt_s));
         CHECK(sample.p_e.isApprox(config.p_e));
         CHECK(sample.v_e.isZero());

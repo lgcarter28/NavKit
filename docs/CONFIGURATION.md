@@ -112,7 +112,7 @@ struct StationaryGnssConfig
                                          GnssBuffer::BufferSize>;
 
     using Sensors = std::tuple<PrimaryGnssSensor>;
-    using MeasurementStatisticsConfigs =
+    using MeasurementStatisticsTuple =
         std::tuple<navkit::core::estimation::MeasurementStatistics<PrimaryGnssSensor>>;
     using Profiler = navkit::core::profiling::NullProfiler;
     using Filter = /* concrete filter type */;
@@ -123,7 +123,7 @@ static_assert(navkit::api::config::NavKitProductConfigPolicy<StationaryGnssConfi
 ```
 
 `SensorId` gives each configured sensor a stable product-graph identity even
-when multiple sensors share the same model. `MeasurementStatisticsConfigs` is
+when multiple sensors share the same model. `MeasurementStatisticsTuple` is
 manually authored on purpose: the filter owns diagnostic storage, and the config
 should make each stored diagnostic stream obvious. A statistic entry is keyed by
 the configured sensor type, such as `MeasurementStatistics<PrimaryGnssSensor>`,

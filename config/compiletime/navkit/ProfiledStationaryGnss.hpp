@@ -72,7 +72,7 @@ struct ProfiledStationaryGnssConfig
                                                        core::estimation::GnssFixedNoisePolicy>;
 
     using Sensors = std::tuple<PrimaryGnssSensor>;
-    using MeasurementStatisticsConfigs =
+    using MeasurementStatisticsTuple =
         std::tuple<core::estimation::MeasurementStatistics<PrimaryGnssSensor>>;
 
     using ProfileClock = HostSteadyMicrosecondClock;
@@ -84,7 +84,7 @@ struct ProfiledStationaryGnssConfig
         core::estimation::KalmanFilter<StateDef,
                                        core::estimation::DefaultInjectionPolicy<StateDef>,
                                        core::estimation::DefaultResetPolicy<StateDef>,
-                                       MeasurementStatisticsConfigs,
+                                       MeasurementStatisticsTuple,
                                        Profiler>;
     using Navigator =
         core::estimation::Navigator<Filter, Sensors, core::estimation::UpdatePostFilter, Profiler>;
@@ -98,7 +98,7 @@ static_assert(core::profiling::ProfileSinkPolicy<ProfiledStationaryGnssConfig::P
 static_assert(core::profiling::ProfilerPolicy<ProfiledStationaryGnssConfig::Profiler>);
 static_assert(core::config::ConfigPolicy<ProfiledStationaryGnssConfig>);
 static_assert(core::estimation::MeasurementStatisticsCollectionPolicy<
-              ProfiledStationaryGnssConfig::MeasurementStatisticsConfigs>);
+              ProfiledStationaryGnssConfig::MeasurementStatisticsTuple>);
 static_assert(core::estimation::BufferConfigPolicy<ProfiledStationaryGnssConfig::GnssBuffer>);
 static_assert(api::config::NavKitProductConfigPolicy<ProfiledStationaryGnssConfig>);
 

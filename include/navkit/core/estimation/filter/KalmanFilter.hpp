@@ -26,7 +26,7 @@ namespace navkit::core::estimation
 template<StateDefPolicy StateDef,
          InjectionPolicy<StateDef> Injection = DefaultInjectionPolicy<StateDef>,
          ResetPolicy<StateDef> Reset = DefaultResetPolicy<StateDef>,
-         MeasurementStatisticsCollectionPolicy MeasurementStatisticsConfigs = std::tuple<>,
+         MeasurementStatisticsCollectionPolicy MeasurementStatisticsTuple = std::tuple<>,
          navkit::core::profiling::ProfilerPolicy Profiler = navkit::core::profiling::NullProfiler>
 class KalmanFilter
 {
@@ -34,8 +34,6 @@ public:
     using StateDef_t = StateDef;
     using State_t = State<StateDef>;
     using P_t = StateCov<StateDef>;
-    using MeasurementStatisticsConfigs_t = MeasurementStatisticsConfigs;
-    using MeasurementStatistics_t = MeasurementStatisticsConfigs_t;
     using Profiler_t = Profiler;
 
     KalmanFilter()
@@ -96,7 +94,7 @@ public:
     [[nodiscard]] bool has_measurement_statistics() const
     {
         if constexpr (navkit::core::containers::tuple_contains_v<MeasurementStatistics<Sensor>,
-                                                                 MeasurementStatisticsConfigs_t>) {
+                                                                 MeasurementStatisticsTuple>) {
             return measurement_statistics<Sensor>().valid;
         }
         else {
@@ -110,10 +108,10 @@ public:
     {
         static_assert(
             navkit::core::containers::tuple_contains_v<MeasurementStatistics<Sensor>,
-                                                       MeasurementStatisticsConfigs_t>,
+                                                       MeasurementStatisticsTuple>,
             "Requested Sensor does not have a MeasurementStatistics entry in this KalmanFilter.");
         return std::get<navkit::core::containers::tuple_index_v<MeasurementStatistics<Sensor>,
-                                                                MeasurementStatisticsConfigs_t>>(
+                                                                MeasurementStatisticsTuple>>(
             m_measurement_stats);
     }
 
@@ -123,10 +121,10 @@ public:
     {
         static_assert(
             navkit::core::containers::tuple_contains_v<MeasurementStatistics<Sensor>,
-                                                       MeasurementStatisticsConfigs_t>,
+                                                       MeasurementStatisticsTuple>,
             "Requested Sensor does not have a MeasurementStatistics entry in this KalmanFilter.");
         return std::get<navkit::core::containers::tuple_index_v<MeasurementStatistics<Sensor>,
-                                                                MeasurementStatisticsConfigs_t>>(
+                                                                MeasurementStatisticsTuple>>(
             m_measurement_stats);
     }
 
@@ -234,7 +232,7 @@ private:
                                        const Scalar_t nis)
     {
         if constexpr (navkit::core::containers::tuple_contains_v<MeasurementStatistics<Sensor>,
-                                                                 MeasurementStatisticsConfigs_t>) {
+                                                                 MeasurementStatisticsTuple>) {
             auto& stats = measurement_statistics<Sensor>();
             stats.valid = true;
             stats.accepted = accepted;
@@ -251,7 +249,7 @@ private:
     State_t m_x{};
     State_t m_dx{};
     P_t m_P{};
-    MeasurementStatistics_t m_measurement_stats{};
+    MeasurementStatisticsTuple m_measurement_stats{};
 };
 
 } // namespace navkit::core::estimation
