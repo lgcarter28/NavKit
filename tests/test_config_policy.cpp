@@ -1,7 +1,6 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "navkit/MinimalConfig.hpp"
 #include "navkit/SelectedConfig.hpp"
 #include "navkit/api/config/ConfigApi.hpp"
 #include "navkit/app_support/ConfigTraits.hpp"
@@ -11,6 +10,7 @@
 #include "navkit/core/estimation/sensor/SensorConfigPolicy.hpp"
 #include "navkit/core/estimation/state/StateDefs.hpp"
 #include "navkit/core/models/GnssPosModel.hpp"
+#include "navkit/products/MinimalConfig.hpp"
 
 #include <cstddef>
 #include <doctest/doctest.h>
@@ -39,17 +39,17 @@ struct ZeroCapacityBufferConfig
 
 struct MinimalConfig
 {
-    using Numeric = navkit::config::navkit::MinimalNumericConfig;
+    using Numeric = navkit::config::navkit::MinimalConfig::Numeric;
 };
 
 struct MissingNumericConfig
 {
-    using GnssBuffer = navkit::config::navkit::MinimalGnssBufferConfig;
+    using GnssBuffer = navkit::config::navkit::MinimalConfig::GnssBuffer;
 };
 
 struct NumericOnlyConfig
 {
-    using Numeric = navkit::config::navkit::MinimalNumericConfig;
+    using Numeric = navkit::config::navkit::MinimalConfig::Numeric;
 };
 
 TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
@@ -57,9 +57,8 @@ TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
     using ExampleConfig = navkit::config::navkit::MinimalConfig;
     using SimConfig = navkit::app_support::NavKitConfig_t<navkit::selected_config::Config>;
 
-    static_assert(NumericConfigPolicy<navkit::config::navkit::MinimalNumericConfig>);
-    static_assert(navkit::core::estimation::BufferConfigPolicy<
-                  navkit::config::navkit::MinimalGnssBufferConfig>);
+    static_assert(NumericConfigPolicy<ExampleConfig::Numeric>);
+    static_assert(navkit::core::estimation::BufferConfigPolicy<ExampleConfig::GnssBuffer>);
     static_assert(navkit::core::estimation::MeasurementStatisticsCollectionPolicy<
                   SimConfig::MeasurementStatisticsTuple>);
     static_assert(navkit::core::estimation::BufferConfigPolicy<SimConfig::GnssBuffer>);

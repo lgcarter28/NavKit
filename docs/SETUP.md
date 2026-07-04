@@ -324,7 +324,7 @@ That app-level selection composes:
 
 ```text
 config/compiletime/apps/navkit_sim/StationaryGnss.hpp
-    -> config/compiletime/navkit/StationaryGnss.hpp
+    -> config/compiletime/navkit/products/StationaryGnss.hpp
 ```
 
 The app config is the executable composition selected by CMake. The NavKit

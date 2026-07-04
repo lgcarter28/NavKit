@@ -31,9 +31,9 @@ The current implementation has the first pieces of the configuration model:
   who want to assert that a composed NavKit config exposes the required product
   graph.
 - Concrete repository-provided compile-time configs live under
-  `config/compiletime`. NavKit library/core configs live under
-  `config/compiletime/navkit`, while top-level executable composition configs
-  live under `config/compiletime/apps`.
+  `config/compiletime`. Reusable NavKit product configs live under
+  `config/compiletime/navkit/products`, while top-level executable composition
+  configs live under `config/compiletime/apps`.
 - Runtime inputs live under `config/runtime`.
 - CMake selects one compile-time configuration per build tree with
   `NAVKIT_CONFIG`.
@@ -174,7 +174,7 @@ unambiguous.
 The app and NavKit config trees are deliberately separate:
 
 ```text
-config/compiletime/navkit/StationaryGnss.hpp
+config/compiletime/navkit/products/StationaryGnss.hpp
 config/compiletime/apps/navkit_sim/StationaryGnss.hpp
 ```
 
@@ -282,7 +282,8 @@ that pattern; they do not make Debug/Release part of the config itself.
 
 The expected workflow is:
 
-1. Copy the nearest example, such as `config/compiletime/navkit/MinimalConfig.hpp`.
+1. Copy the nearest example, such as
+   `config/compiletime/navkit/products/MinimalConfig.hpp`.
 2. Rename the config type.
 3. Adjust or add the NavKit config slices your library/application needs.
 4. For runnable/product NavKit configs, add the aggregate

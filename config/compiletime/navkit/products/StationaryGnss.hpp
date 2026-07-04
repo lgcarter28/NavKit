@@ -23,24 +23,24 @@
 #include <cstddef>
 #include <tuple>
 
-namespace navkit::config::navkit
+namespace navkit::config::navkit::products::stationary_gnss
 {
 
-struct StationaryGnssNumericConfig
+struct NumericConfig
 {
     using Scalar_t = core::Scalar_t;
     using Time_t = core::Time_t;
 };
 
-struct StationaryGnssBufferConfig
+struct GnssBufferConfig
 {
     static constexpr std::size_t BufferSize = 16;
 };
 
-struct StationaryGnssConfig
+struct ProductConfig
 {
-    using Numeric = StationaryGnssNumericConfig;
-    using GnssBuffer = StationaryGnssBufferConfig;
+    using Numeric = NumericConfig;
+    using GnssBuffer = GnssBufferConfig;
 
     // Public product graph.
     using StateDef = core::estimation::InsStateDef;
@@ -66,6 +66,13 @@ struct StationaryGnssConfig
     using Navigator = core::estimation::Navigator<Filter, Sensors, NavigatorUpdate, Profiler>;
 };
 
-static_assert(api::config::NavKitProductConfigPolicy<StationaryGnssConfig>);
+static_assert(api::config::NavKitProductConfigPolicy<ProductConfig>);
+
+} // namespace navkit::config::navkit::products::stationary_gnss
+
+namespace navkit::config::navkit
+{
+
+using StationaryGnssConfig = products::stationary_gnss::ProductConfig;
 
 } // namespace navkit::config::navkit

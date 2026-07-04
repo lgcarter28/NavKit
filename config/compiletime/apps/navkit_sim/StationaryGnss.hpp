@@ -3,10 +3,10 @@
 
 #pragma once
 
-#include "navkit/StationaryGnss.hpp"
 #include "navkit/app_support/EmulatorBinding.hpp"
 #include "navkit/app_support/GnssEmulator.hpp"
 #include "navkit/app_support/SimulationApp.hpp"
+#include "navkit/products/StationaryGnss.hpp"
 
 #include <tuple>
 

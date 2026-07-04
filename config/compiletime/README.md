@@ -2,16 +2,16 @@
 
 This directory contains repository-provided C++ configuration headers.
 
-- `navkit/` contains NavKit library/core policy configurations, including the
-  deliberately small `MinimalConfig.hpp` teaching config.
+- `navkit/products/` contains reusable NavKit product graph configurations,
+  including the deliberately small `MinimalConfig.hpp` teaching config.
 - `apps/` contains top-level executable composition configurations.
 - `targets/` may be added later for desktop and embedded product targets.
 
 The `navkit/` and `apps/` trees are intentionally separate. It is normal for
 both trees to contain the same descriptive file name, such as
-`StationaryGnss.hpp`: the NavKit file owns reusable library configuration,
-while the app file owns the executable composition that links a NavKit config to
-an app runner.
+`StationaryGnss.hpp`: the NavKit product file owns reusable library
+configuration, while the app file owns the executable composition that links a
+NavKit config to an app runner.
 
 Provided `NAVKIT_CONFIG` selections:
 
@@ -26,7 +26,7 @@ Runnable/product NavKit configs should read like product graphs and usually end
 with a single aggregate check, such as
 `static_assert(navkit::api::config::NavKitProductConfigPolicy<Config>);`.
 Detailed slice-level concept assertions belong in deliberately educational
-examples, such as `MinimalConfig.hpp`, and in focused tests.
+examples, such as `navkit/products/MinimalConfig.hpp`, and in focused tests.
 
 Headers intended for `NAVKIT_CONFIG` selection must also expose:
 

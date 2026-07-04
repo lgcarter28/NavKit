@@ -28,16 +28,16 @@
 #include <string_view>
 #include <tuple>
 
-namespace navkit::config::navkit
+namespace navkit::config::navkit::products::profiled_stationary_gnss
 {
 
-struct ProfiledStationaryGnssNumericConfig
+struct NumericConfig
 {
     using Scalar_t = core::Scalar_t;
     using Time_t = core::Time_t;
 };
 
-struct ProfiledStationaryGnssBufferConfig
+struct GnssBufferConfig
 {
     static constexpr std::size_t BufferSize = 16;
 };
@@ -54,13 +54,13 @@ struct HostSteadyMicrosecondClock
     }
 };
 
-struct ProfiledStationaryGnssConfig
+struct ProductConfig
 {
     static constexpr std::string_view ProfileClockSource = "std::chrono::steady_clock";
     static constexpr double ProfileTickPeriodUs = 1.0;
 
-    using Numeric = ProfiledStationaryGnssNumericConfig;
-    using GnssBuffer = ProfiledStationaryGnssBufferConfig;
+    using Numeric = NumericConfig;
+    using GnssBuffer = GnssBufferConfig;
 
     // Public product graph.
     using StateDef = core::estimation::InsStateDef;
@@ -90,6 +90,13 @@ struct ProfiledStationaryGnssConfig
     using Navigator = core::estimation::Navigator<Filter, Sensors, NavigatorUpdate, Profiler>;
 };
 
-static_assert(api::config::NavKitProductConfigPolicy<ProfiledStationaryGnssConfig>);
+static_assert(api::config::NavKitProductConfigPolicy<ProductConfig>);
+
+} // namespace navkit::config::navkit::products::profiled_stationary_gnss
+
+namespace navkit::config::navkit
+{
+
+using ProfiledStationaryGnssConfig = products::profiled_stationary_gnss::ProductConfig;
 
 } // namespace navkit::config::navkit
