@@ -61,7 +61,7 @@ concept lives with the sensor domain rather than in a central god-config header.
 This keeps each concept small and honest: it says what one domain needs, not
 what every possible NavKit application must provide.
 
-### 2. Concrete config slices provide values
+### 2. Concrete config slices provide values when they name a real boundary
 
 A concrete config slice is a small C++ type that satisfies one local concept.
 
@@ -79,7 +79,9 @@ static_assert(navkit::core::estimation::BufferConfigPolicy<GnssBufferConfig>);
 Slice-level `static_assert` checks are useful in teaching examples and tests.
 Runnable product configs should usually avoid repeating every consumed slice
 check; the aliases that consume those slices plus the aggregate product-config
-check are the real validation path.
+check are the real validation path. Do not introduce a one-field slice just to
+carry a value that is only consumed locally inside one product graph; use a
+descriptive role constant instead.
 
 ### 3. NavKit configs collect reusable library slices
 
@@ -110,12 +112,13 @@ struct StationaryGnssConfig
 {
     using StateDef = navkit::core::estimation::InsStateDef;
     using PrimaryGnssModel = navkit::core::models::GnssPosModel<StateDef>;
-    static constexpr navkit::core::estimation::SensorId PrimaryGnssSensorId = 0U;
+    static constexpr navkit::core::estimation::SensorId primary_gnss_sensor_id = 0U;
+    static constexpr std::size_t primary_gnss_buffer_size = 16U;
 
     using PrimaryGnssSensor =
-        navkit::core::estimation::Sensor<PrimaryGnssSensorId,
+        navkit::core::estimation::Sensor<primary_gnss_sensor_id,
                                          PrimaryGnssModel,
-                                         GnssBuffer::BufferSize>;
+                                         primary_gnss_buffer_size>;
 
     using Sensors = std::tuple<PrimaryGnssSensor>;
     using MeasurementStatisticsTuple =
@@ -154,11 +157,11 @@ struct StationaryGnssAppConfig
 {
     using NavKit = navkit::config::navkit::StationaryGnssConfig;
 
-    static constexpr navkit::app_support::SensorId PrimaryGnssSensorId =
-        NavKit::PrimaryGnssSensorId;
+    static constexpr navkit::app_support::SensorId primary_gnss_sensor_id =
+        NavKit::primary_gnss_sensor_id;
     using EmulatorBindings = std::tuple<
         navkit::app_support::EmulatorBinding<
-            PrimaryGnssSensorId,
+            primary_gnss_sensor_id,
             navkit::app_support::GnssEmulator,
             NavKit::PrimaryGnssSensor>>;
 

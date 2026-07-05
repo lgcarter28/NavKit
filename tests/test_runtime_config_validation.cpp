@@ -70,7 +70,7 @@ TEST_CASE("Stationary GNSS runtime validator accepts the documented input shape"
     static_assert(!SimulationAppConfigPolicy<DuplicateSensorIdConfig>);
     static_assert(!SimulationAppConfigPolicy<MissingTargetSensorConfig>);
     static_assert(emulator_binding_ids_unique_v<StationaryGnssAppConfig::EmulatorBindings>);
-    static_assert(std::is_same_v<EmulatorFromId_t<StationaryGnssAppConfig::PrimaryGnssSensorId,
+    static_assert(std::is_same_v<EmulatorFromId_t<StationaryGnssAppConfig::primary_gnss_sensor_id,
                                                   StationaryGnssAppConfig::EmulatorBindings>,
                                  GnssEmulator>);
 

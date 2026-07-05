@@ -22,12 +22,17 @@ void log_measurement_statistics_for_sensor(Logger& logger, const Filter& filter)
 }
 
 template<typename Logger, typename Filter, typename... Statistics>
-void log_measurement_statistics(Logger& logger,
-                                const Filter& filter,
-                                std::tuple<Statistics...> statistics_tuple)
+void log_measurement_statistics_impl(Logger& logger,
+                                     const Filter& filter,
+                                     std::tuple<Statistics...>*)
 {
-    static_cast<void>(statistics_tuple);
     (log_measurement_statistics_for_sensor<typename Statistics::Sensor_t>(logger, filter), ...);
+}
+
+template<typename StatisticsTuple, typename Logger, typename Filter>
+void log_measurement_statistics(Logger& logger, const Filter& filter)
+{
+    log_measurement_statistics_impl(logger, filter, static_cast<StatisticsTuple*>(nullptr));
 }
 
 } // namespace navkit::app_support

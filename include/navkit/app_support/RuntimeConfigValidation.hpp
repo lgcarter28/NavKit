@@ -9,9 +9,21 @@
 #include <nlohmann/json.hpp>
 #include <string>
 #include <tuple>
+#include <utility>
 
 namespace navkit::app_support
 {
+
+namespace detail
+{
+
+template<typename EmulatorBindings, std::size_t... Is>
+void validate_emulator_runtime_config(const nlohmann::json& cfg, std::index_sequence<Is...>)
+{
+    (std::tuple_element_t<Is, EmulatorBindings>::Emulator_t::validate_runtime_config(cfg), ...);
+}
+
+} // namespace detail
 
 template<typename Config>
 void validate_runtime_config(const nlohmann::json& cfg)
@@ -43,11 +55,8 @@ void validate_runtime_config(const nlohmann::json& cfg)
     detail::require_optional_positive_number(trajectory, "dt_s");
     detail::require_vec3(trajectory, "p_e_m");
 
-    std::apply(
-        [&cfg](auto... binding) {
-            ((decltype(binding)::Emulator_t::validate_runtime_config(cfg)), ...);
-        },
-        EmulatorBindings{});
+    detail::validate_emulator_runtime_config<EmulatorBindings>(
+        cfg, std::make_index_sequence<std::tuple_size_v<EmulatorBindings>>{});
 
     if (const auto filter_iter = cfg.find("filter"); filter_iter != cfg.end()) {
         if (!filter_iter->is_object()) {

@@ -86,6 +86,8 @@ This project follows
 - Moved Navigator policy compatibility checks to a dedicated header and simplified KalmanFilter measurement-statistics storage naming.
 - Replaced Navigator's update-policy template-template parameter with an explicit concrete `NavigatorUpdate` policy alias in reusable NavKit configs.
 - Moved app-side emulator binding vocabulary to `EmulatorBinding.hpp`, added focused trajectory-provider and measurement-statistics logging helpers, and slimmed `SimulationApp` orchestration.
+- Extracted run settings, filter initialization, and emulator runtime processing out of `SimulationApp`, replaced dummy-object statistics dispatch with type-level logging, and collapsed one-field GNSS buffer config wrappers in reusable product configs.
+- Renamed compile-time config constants such as GNSS sensor IDs and buffer sizes to snake_case while keeping type aliases in PascalCase.
 
 ### Removed
 

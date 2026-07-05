@@ -61,14 +61,13 @@ TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
     static_assert(navkit::core::estimation::BufferConfigPolicy<ExampleConfig::GnssBuffer>);
     static_assert(navkit::core::estimation::MeasurementStatisticsCollectionPolicy<
                   SimConfig::MeasurementStatisticsTuple>);
-    static_assert(navkit::core::estimation::BufferConfigPolicy<SimConfig::GnssBuffer>);
     static_assert(ConfigPolicy<ExampleConfig>);
     static_assert(ConfigPolicy<SimConfig>);
     static_assert(ConfigPolicy<MinimalConfig>);
     static_assert(navkit::api::config::NavKitProductConfigPolicy<SimConfig>);
     static_assert(navkit::core::estimation::sensor_ids_unique_v<SimConfig::Sensors>);
     static_assert(
-        std::is_same_v<navkit::core::estimation::SensorFromId_t<SimConfig::PrimaryGnssSensorId,
+        std::is_same_v<navkit::core::estimation::SensorFromId_t<SimConfig::primary_gnss_sensor_id,
                                                                 SimConfig::Sensors>,
                        SimConfig::PrimaryGnssSensor>);
 
@@ -76,7 +75,7 @@ TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
     static_assert(std::is_same_v<ExampleConfig::Numeric::Time_t, navkit::core::Time_t>);
 
     CHECK(ExampleConfig::GnssBuffer::BufferSize > 0);
-    CHECK(SimConfig::GnssBuffer::BufferSize > 0);
+    CHECK(SimConfig::primary_gnss_buffer_size > 0U);
 }
 
 TEST_CASE("Narrow config concepts reject only their own missing capabilities")
@@ -96,14 +95,14 @@ TEST_CASE("Concrete config composes at product-core sensor boundaries")
     using StateDef = navkit::core::estimation::InsStateDef;
     using Model = navkit::core::models::GnssPosModel<StateDef>;
     using SimConfig = navkit::app_support::NavKitConfig_t<navkit::selected_config::Config>;
-    using Sensor = navkit::core::estimation::Sensor<0U, Model, SimConfig::GnssBuffer::BufferSize>;
+    using Sensor = navkit::core::estimation::Sensor<0U, Model, SimConfig::primary_gnss_buffer_size>;
     using GnssOnlySensor =
         navkit::core::estimation::Sensor<1U, Model, GnssOnlyBufferConfig::BufferSize>;
 
     static_assert(std::is_default_constructible_v<Sensor>);
     static_assert(std::is_default_constructible_v<GnssOnlySensor>);
-    CHECK(SimConfig::GnssBuffer::BufferSize == 16U);
-    CHECK(navkit::core::estimation::SensorIndexFromId_v<SimConfig::PrimaryGnssSensorId,
+    CHECK(SimConfig::primary_gnss_buffer_size == 16U);
+    CHECK(navkit::core::estimation::SensorIndexFromId_v<SimConfig::primary_gnss_sensor_id,
                                                         SimConfig::Sensors> == 0U);
 }
 

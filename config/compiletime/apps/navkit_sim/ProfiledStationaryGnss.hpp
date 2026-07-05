@@ -17,10 +17,10 @@ struct ProfiledStationaryGnssConfig
 {
     using NavKit = ::navkit::config::navkit::ProfiledStationaryGnssConfig;
 
-    static constexpr ::navkit::app_support::SensorId PrimaryGnssSensorId =
-        NavKit::PrimaryGnssSensorId;
+    static constexpr ::navkit::app_support::SensorId primary_gnss_sensor_id =
+        NavKit::primary_gnss_sensor_id;
     using EmulatorBindings =
-        std::tuple<::navkit::app_support::EmulatorBinding<PrimaryGnssSensorId,
+        std::tuple<::navkit::app_support::EmulatorBinding<primary_gnss_sensor_id,
                                                           ::navkit::app_support::GnssEmulator,
                                                           NavKit::PrimaryGnssSensor>>;
 

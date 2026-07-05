@@ -23,11 +23,6 @@ struct NumericConfig
     using Time_t = core::Time_t;
 };
 
-struct GnssBufferConfig
-{
-    static constexpr std::size_t BufferSize = 16;
-};
-
 struct HostSteadyMicrosecondClock
 {
     using Tick = std::uint64_t;
@@ -46,15 +41,15 @@ struct ProductConfig
     static constexpr double ProfileTickPeriodUs = 1.0;
 
     using Numeric = NumericConfig;
-    using GnssBuffer = GnssBufferConfig;
 
     // Public product graph.
     using StateDef = core::estimation::InsStateDef;
     using PrimaryGnssModel = core::models::GnssPosModel<StateDef>;
-    static constexpr core::estimation::SensorId PrimaryGnssSensorId = 0U;
-    using PrimaryGnssSensor = core::estimation::Sensor<PrimaryGnssSensorId,
+    static constexpr core::estimation::SensorId primary_gnss_sensor_id = 0U;
+    static constexpr std::size_t primary_gnss_buffer_size = 16U;
+    using PrimaryGnssSensor = core::estimation::Sensor<primary_gnss_sensor_id,
                                                        PrimaryGnssModel,
-                                                       GnssBuffer::BufferSize,
+                                                       primary_gnss_buffer_size,
                                                        core::estimation::GnssFixedNoisePolicy>;
 
     using Sensors = std::tuple<PrimaryGnssSensor>;
