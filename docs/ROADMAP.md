@@ -270,6 +270,22 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Preserve existing stationary GNSS runtime behavior, file names, manifest contents, profile export behavior, and analysis compatibility while simplifying the app loop and logging boundary.
 - [x] At the end of the pass, run the normal format/copyright/build/test workflow, then run local clang-tidy explicitly with `python tools/format.py --check --tidy --tidy-warnings-as-errors` and let it run long enough to collect full findings before deciding whether to fix or defer issues.
 
+### Pass 3.2 — Navigation initialization and transfer-alignment boundary
+
+- [ ] Replace direct truth/error-style filter initialization in app support with an explicit initialization boundary. Product-core navigation code must not know about truth, injected errors, or simulator-only perturbations.
+- [ ] Introduce a core-facing `NavInitialization`-style message that represents only the initial navigation solution, not the full Kalman/filter state. It should carry PVA content such as position, velocity, attitude, timestamp, and `CovariancePva`; the filter/product maps that message into its internal state layout.
+- [ ] Add an app-side `NavInitializationProvider` concept/config seam. It should produce the required one-time startup initialization message from runtime input, simulated truth, a saved state, external data, or future embedded inputs without changing Navigator construction.
+- [ ] Rename current runtime initialization inputs away from filter-error language such as `initial_position_offset_m`. Prefer explicit initializer types such as `explicit_pva` for JSON-provided PVA/covariance and `truth_perturbed_pva` for simulator-only noisy initialization generated from truth.
+- [ ] Keep Navigator construction separate from initialization. Construction wires the compile-time product graph; every runnable config calls an `initialize_navigator(...)`-style path with a `NavInitialization` message before normal updates.
+- [ ] Add a separate optional transfer-alignment boundary. Transfer alignment is not construction and not the required initial PVA message; it is a timestamped aiding stream that active configurations may call through a `transfer_align(...)`-style path.
+- [ ] Introduce a `TransferAlignmentProvider` concept/config seam for optional alignment aiding samples. Do not make the interface GNSS-specific: GNSS may be one aiding source, but transfer alignment should be framed around source-independent PVA aiding plus optional angular-rate and translational-acceleration aiding.
+- [ ] Define a `TransferAlignmentSample` shape with PVA, timestamp, optional angular-rate/specific-force aiding fields where useful, and a matching `CovarianceTxa` representation. Keep optional TXA covariance handling simple and explicit first; only introduce compile-time capability flags if runtime optional fields become unclear or too dynamic for embedded-facing paths.
+- [ ] Extend runtime JSON validation so initialization and transfer-alignment sections are checked against the selected compile-time app configuration. Missing required initialization inputs, unsupported initializer types, and disabled/unsupported transfer-alignment sections should produce clear errors.
+- [ ] Keep truth/noise/error-distribution logic entirely in app/sim providers. Product-core code consumes typed initialization and transfer-alignment messages only.
+- [ ] Preserve the current stationary GNSS demo behavior through a simple default initialization provider while migrating the naming and boundaries.
+- [ ] Add focused tests for runtime JSON validation, required initialization presence, unsupported initializer/transfer-alignment types, and the happy-path stationary GNSS initialization provider.
+- [ ] Document the lifecycle rule: construction is compile-time product wiring, initialization is required runtime nav-data input, transfer alignment is optional timestamped aiding input, and simulator truth/error/noise models stay outside product-core embedded algorithms.
+
 ## Compiler flags and static-analysis hardening
 
 - [x] Audit current Debug, Release, and CI compiler flags for MSVC, Clang, and GCC where supported.
