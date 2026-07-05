@@ -6,6 +6,7 @@
 #include "navkit/app_support/EmulatorBinding.hpp"
 #include "navkit/app_support/GnssEmulator.hpp"
 #include "navkit/app_support/SimulationApp.hpp"
+#include "navkit/io/RunLogger.hpp"
 #include "navkit/products/StationaryGnss.hpp"
 
 #include <tuple>
@@ -24,6 +25,7 @@ struct StationaryGnssConfig
                                                           ::navkit::app_support::GnssEmulator,
                                                           NavKit::PrimaryGnssSensor>>;
 
+    using Logger = ::navkit::io::RunLogger;
     using App = ::navkit::app_support::SimulationApp<StationaryGnssConfig>;
 };
 

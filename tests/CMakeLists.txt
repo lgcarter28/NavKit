@@ -7,6 +7,7 @@ add_executable(navkit_tests
     test_main.cpp
     test_config_policy.cpp
     test_injection_reset_policy.cpp
+    test_log_product_policy.cpp
     test_measurement_policy.cpp
     test_measurement_statistics.cpp
     test_noise_policy.cpp

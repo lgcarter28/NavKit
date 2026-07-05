@@ -165,6 +165,7 @@ struct StationaryGnssAppConfig
             navkit::app_support::GnssEmulator,
             NavKit::PrimaryGnssSensor>>;
 
+    using Logger = navkit::io::RunLogger;
     using App = navkit::app_support::SimulationApp<StationaryGnssAppConfig>;
 };
 ```
@@ -176,7 +177,9 @@ identity and explicit NavKit sensor aliases for compile-time wiring. The app
 does not reconstruct NavKit sensors or write raw tuple indices. The binding ID
 must match the selected sensor's configured `Sensor::Id`, which keeps duplicate
 sensors of the same model type, such as primary and backup GNSS receivers,
-unambiguous.
+unambiguous. App configs also select the logger adapter type at compile time;
+runtime JSON still owns run-specific choices such as run name and output
+directory.
 
 The app and NavKit config trees are deliberately separate:
 

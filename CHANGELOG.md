@@ -88,6 +88,8 @@ This project follows
 - Moved app-side emulator binding vocabulary to `EmulatorBinding.hpp`, added focused trajectory-provider and measurement-statistics logging helpers, and slimmed `SimulationApp` orchestration.
 - Extracted run settings, filter initialization, and emulator runtime processing out of `SimulationApp`, replaced dummy-object statistics dispatch with type-level logging, and collapsed one-field GNSS buffer config wrappers in reusable product configs.
 - Renamed compile-time config constants such as GNSS sensor IDs and buffer sizes to snake_case while keeping type aliases in PascalCase.
+- Refactored stationary simulation logging so `RunLogger` coordinates composable log-product adapters while app compile-time configs explicitly select the logger type.
+- Added payload-specific log-product concepts and CSV schema helpers so logging adapters expose explicit serialization boundaries.
 
 ### Removed
 

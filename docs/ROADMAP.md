@@ -265,12 +265,41 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Replace dummy-object type dispatch such as `typename NavKit::MeasurementStatisticsTuple{}` with explicit type-level helper APIs, for example `log_measurement_statistics<typename NavKit::MeasurementStatisticsTuple>(logger, filter)`, so `SimulationApp` does not appear to pass empty runtime statistics state.
 - [x] Keep trajectory category and trajectory parameters runtime-configurable. Swapping stationary, straight-line, turn, and future scripted trajectory families from JSON is intentionally useful and is an acceptable non-hot-path runtime polymorphism exception outside product-core embedded algorithms.
 - [x] Collapse one-field public concrete config slices into aggregate config settings where they do not improve readability. Keep internal domain policy concepts available where useful, but do not force end users through standalone one-field types unless those types are independently reusable.
-- [ ] Refactor `RunLogger` toward composable log products/adapters while preserving existing stationary GNSS filenames, schemas, manifests, and downstream analysis compatibility during a future focused IO cleanup pass.
-- [ ] Treat logging as a mixed compile-time/runtime concern during the app/logging cleanup: compile-time config selects available log families, schemas, profile export capability, and logger adapters; runtime JSON selects output directory, run name, enabled optional log products where safe, and verbosity/detail levels. Avoid baking run-specific logging choices into `NAVKIT_CONFIG`.
+- [x] Refactor `RunLogger` toward composable log products/adapters while preserving existing stationary GNSS filenames, schemas, manifests, and downstream analysis compatibility during a focused IO cleanup pass.
+- [x] Treat logging as a mixed compile-time/runtime concern at the first seam: app compile-time config selects the logger adapter type, while runtime JSON continues to select run name and output directory. Richer optional log-product enable/disable and verbosity selection remains a Phase 8 logging task.
 - [x] Preserve existing stationary GNSS runtime behavior, file names, manifest contents, profile export behavior, and analysis compatibility while simplifying the app loop and logging boundary.
 - [x] At the end of the pass, run the normal format/copyright/build/test workflow, then run local clang-tidy explicitly with `python tools/format.py --check --tidy --tidy-warnings-as-errors` and let it run long enough to collect full findings before deciding whether to fix or defer issues.
 
-### Pass 3.2 — Navigation initialization and transfer-alignment boundary
+### Pass 3.2 — Log product concepts and payload boundaries
+
+- [x] Add a narrow `LogProductPolicy<Candidate, Payload>` concept under `include/navkit/io` that validates the shared log-product lifecycle and the concrete payload-specific `log(payload)` operation. Do not force every log product into one fake common `log(...)` signature.
+- [x] Introduce explicit log payload wrapper types for products whose natural inputs are more than one argument, such as nav-estimate logging and measurement-statistics logging. Payload wrappers should name the serialized boundary clearly instead of leaking helper argument lists through `RunLogger`.
+- [x] Update existing concrete log products to satisfy `LogProductPolicy` with their actual payloads: truth samples, GNSS position measurements, nav-estimate payloads, and GNSS position update-statistics payloads.
+- [x] Move generic CSV schema helpers such as matrix-header and matrix-value flattening out of `RunLogProducts.hpp` into a focused helper header such as `include/navkit/io/CsvSchemaUtils.hpp`.
+- [x] Add compile-time tests proving each current concrete log product satisfies its intended `LogProductPolicy<Candidate, Payload>` instance, plus negative concept tests for missing lifecycle/schema/log operations.
+- [x] Keep `RunLogger` as the coordinating façade and manifest owner for now. It should compose log products through typed payloads, preserve current stationary GNSS filenames/schemas/manifests, and avoid becoming a second logging framework.
+- [x] Keep richer runtime optional log-product enable/disable, verbosity, schema migration, and model/state-derived generic logging in the later Phase 8 logging scope unless this pass uncovers a tiny prerequisite.
+
+#### Pass 3.2a — Log product header organization
+
+- [ ] Split concrete log products out of `RunLogProducts.hpp` into focused headers under `include/navkit/io/log_products/`: `TruthLogProduct.hpp`, `GnssPositionLogProduct.hpp`, `NavEstimateLogProduct.hpp`, and `GnssPositionUpdateLogProduct.hpp`.
+- [ ] Split reusable payload wrappers into `include/navkit/io/log_payloads/`: `NavEstimateLogPayload.hpp` and `MeasurementStatisticsLogPayload.hpp`. Keep payloads beside concrete products only if they are truly private to one product; otherwise keep the dedicated payload folder so callers can name payload boundaries clearly.
+- [ ] Keep `RunLogProducts.hpp` only as an optional narrow convenience umbrella if it has real value; otherwise replace includes with the specific product/payload headers and delete the umbrella.
+- [ ] Preserve the existing namespaces and public include compatibility where practical, but prefer narrow includes in production code and tests so dependencies stay obvious.
+- [ ] Add or update compile-time tests if needed so the split headers still expose all current concrete log-product policy checks.
+
+#### Pass 3.2b — Generic compile-time RunLogger composition
+
+- [ ] Replace the current hard-coded `RunLogger` member list with a generic `RunLogger<LogProducts...>` or equivalent tuple-based composition selected by app compile-time config. The default stationary GNSS logger should remain available through a clear alias so existing app configs stay readable.
+- [ ] Keep the implementation simple and explicit: avoid broad tuple metaprogramming machinery, type-erasure, virtual dispatch, or a runtime registry. Use small local helpers only where they directly dispatch a typed payload to the matching product.
+- [ ] Route logging by explicit payload type and `LogProductPolicy<Product, Payload>` conformance. If multiple products can consume the same payload, require an explicit decision instead of silently logging to all or guessing.
+- [ ] Keep `RunLogger` responsible for output directory setup, product open/flush/close orchestration, run manifest ownership, and metadata file emission. Concrete log products own their CSV/schema details.
+- [ ] Preserve stationary GNSS filenames, metadata schemas, run-manifest shape, profile export behavior, and downstream Python analysis compatibility.
+- [ ] Keep runtime JSON responsible for run name and output directory in this pass. Optional runtime log-product enable/disable and verbosity remain Phase 8 work unless a tiny prerequisite falls out naturally.
+- [ ] Add compile-time tests for generic logger composition and at least one negative case where a selected product cannot consume the requested payload.
+- [ ] Add runtime or integration evidence by running the stationary GNSS sim and analysis pipeline after the generic logger refactor.
+
+### Pass 3.3 — Navigation initialization and transfer-alignment boundary
 
 - [ ] Replace direct truth/error-style filter initialization in app support with an explicit initialization boundary. Product-core navigation code must not know about truth, injected errors, or simulator-only perturbations.
 - [ ] Introduce a core-facing `NavInitialization`-style message that represents only the initial navigation solution, not the full Kalman/filter state. It should carry PVA content such as position, velocity, attitude, timestamp, and `CovariancePva`; the filter/product maps that message into its internal state layout.

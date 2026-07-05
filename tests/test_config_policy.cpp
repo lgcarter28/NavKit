@@ -4,6 +4,7 @@
 #include "navkit/SelectedConfig.hpp"
 #include "navkit/api/config/ConfigApi.hpp"
 #include "navkit/app_support/ConfigTraits.hpp"
+#include "navkit/app_support/LoggingConfigTraits.hpp"
 #include "navkit/core/config/ConfigPolicy.hpp"
 #include "navkit/core/estimation/filter/FilterConfigPolicy.hpp"
 #include "navkit/core/estimation/sensor/Sensor.hpp"
@@ -55,6 +56,7 @@ struct NumericOnlyConfig
 TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
 {
     using ExampleConfig = navkit::config::navkit::MinimalConfig;
+    using SelectedAppConfig = navkit::selected_config::Config;
     using SimConfig = navkit::app_support::NavKitConfig_t<navkit::selected_config::Config>;
 
     static_assert(NumericConfigPolicy<ExampleConfig::Numeric>);
@@ -70,6 +72,8 @@ TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
         std::is_same_v<navkit::core::estimation::SensorFromId_t<SimConfig::primary_gnss_sensor_id,
                                                                 SimConfig::Sensors>,
                        SimConfig::PrimaryGnssSensor>);
+    static_assert(std::is_same_v<navkit::app_support::LoggerConfig_t<SelectedAppConfig>,
+                                 navkit::io::RunLogger>);
 
     static_assert(std::is_same_v<ExampleConfig::Numeric::Scalar_t, navkit::core::Scalar_t>);
     static_assert(std::is_same_v<ExampleConfig::Numeric::Time_t, navkit::core::Time_t>);

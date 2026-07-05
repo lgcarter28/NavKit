@@ -60,6 +60,16 @@ public:
         m_file << '\n';
     }
 
+    template<typename Value>
+    void write_row_values(const std::vector<Value>& values)
+    {
+        bool first = true;
+        for (const auto& value : values) {
+            write_value(value, first);
+        }
+        m_file << '\n';
+    }
+
     bool is_open() const
     {
         return m_file.is_open();

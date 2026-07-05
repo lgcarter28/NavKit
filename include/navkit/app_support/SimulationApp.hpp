@@ -10,12 +10,12 @@
 #include "navkit/app_support/EmulatorRuntime.hpp"
 #include "navkit/app_support/FilterInitialization.hpp"
 #include "navkit/app_support/JsonInput.hpp"
+#include "navkit/app_support/LoggingConfigTraits.hpp"
 #include "navkit/app_support/MeasurementStatisticsLogger.hpp"
 #include "navkit/app_support/ProfileExport.hpp"
 #include "navkit/app_support/RunSettings.hpp"
 #include "navkit/app_support/RuntimeConfigValidation.hpp"
 #include "navkit/app_support/TrajectoryProvider.hpp"
-#include "navkit/io/RunLogger.hpp"
 
 #include <cstdio>
 #include <filesystem>
@@ -45,6 +45,7 @@ public:
     using Navigator = typename NavKit::Navigator;
     using EmulatorBindings = typename Config::EmulatorBindings;
     using Emulators = EmulatorRuntime<NavKit, EmulatorBindings>;
+    using Logger = LoggerConfig_t<Config>;
 
     static int run(const std::filesystem::path& config_path)
     {
@@ -61,7 +62,7 @@ public:
         auto& filter = navigator.filter();
         configure_initial_filter_state<StateDef>(filter, cfg, trajectory.initial_position_e_m);
 
-        io::RunLogger logger(run_settings.output_dir, run_settings.run_name, cfg);
+        Logger logger(run_settings.output_dir, run_settings.run_name, cfg);
         Emulators::configure(navigator, logger, cfg);
 
         for (const auto& sample : trajectory.truth_samples) {

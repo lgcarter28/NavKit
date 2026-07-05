@@ -47,14 +47,15 @@ struct ExampleAppConfig
 {
     using NavKit = navkit::config::navkit::SomeNavKitConfig;
 
-    static constexpr navkit::app_support::SensorId PrimarySensorId =
-        NavKit::PrimarySensorId;
+    static constexpr navkit::app_support::SensorId primary_sensor_id =
+        NavKit::primary_sensor_id;
     using EmulatorBindings = std::tuple<
         navkit::app_support::EmulatorBinding<
-            PrimarySensorId,
+            primary_sensor_id,
             navkit::app_support::SomeEmulator,
             NavKit::PrimarySensor>>;
 
+    using Logger = navkit::io::RunLogger;
     using App = navkit::app_support::SimulationApp<ExampleAppConfig>;
 };
 ```
