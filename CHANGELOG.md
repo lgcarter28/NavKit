@@ -78,6 +78,9 @@ This project follows
 - Renamed the profiled reusable NavKit GNSS config to `ProfiledStationaryGnss.hpp` to match the app-level selected config name.
 - Replaced app-facing sensor-index wiring with configured `Sensor::Id` values, explicit `(Id, Emulator, Sensor)` bindings, and tuple helpers for ID-based lookup.
 - Replaced derived `MeasurementModels` config aliases with explicit `MeasurementStatisticsTuple` aliases keyed by configured sensor types.
+- Split profiling, sensor-tuple, emulator-binding, product-config, and runtime-config-validation headers so public contracts stay separate from helper/trait machinery.
+- Removed unused profiling and sensor-tuple umbrella headers after replacing internal users with narrower includes.
+- Documented the config API include boundary in agent and architecture guidance, keeping `ConfigApi.hpp` focused on shared product graph vocabulary and exposed defaults.
 - Tightened `SensorCollectionPolicy` around real NavKit sensors and moved ID/tuple lookup helpers out of public config headers.
 - Moved Navigator policy compatibility checks to a dedicated header and simplified KalmanFilter measurement-statistics storage naming.
 - Replaced Navigator's update-policy template-template parameter with an explicit concrete `NavigatorUpdate` policy alias in reusable NavKit configs.

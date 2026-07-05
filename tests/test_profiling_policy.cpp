@@ -6,9 +6,12 @@
 #include "navkit/core/estimation/sensor/Sensor.hpp"
 #include "navkit/core/estimation/state/StateDefs.hpp"
 #include "navkit/core/models/GnssPosModel.hpp"
+#include "navkit/core/profiling/ClockPolicy.hpp"
 #include "navkit/core/profiling/NullProfiler.hpp"
-#include "navkit/core/profiling/ProfilePolicy.hpp"
+#include "navkit/core/profiling/ProfileScopePolicy.hpp"
+#include "navkit/core/profiling/ProfileSinkPolicy.hpp"
 #include "navkit/core/profiling/ProfileSinks.hpp"
+#include "navkit/core/profiling/ProfilerPolicy.hpp"
 #include "navkit/core/profiling/ScopedProfiler.hpp"
 #include "test_main.hpp"
 

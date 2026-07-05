@@ -14,7 +14,7 @@
 #include "navkit/core/estimation/state/State.hpp"
 #include "navkit/core/profiling/NullProfiler.hpp"
 #include "navkit/core/profiling/ProfilePoint.hpp"
-#include "navkit/core/profiling/ProfilePolicy.hpp"
+#include "navkit/core/profiling/ProfilerPolicy.hpp"
 
 #include <Eigen/Dense>
 #include <tuple>

@@ -251,13 +251,13 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ### Pass 3.1k — Header boundary and helper split cleanup
 
-- [ ] Add durable config API inclusion guidelines to `AGENTS.md` and, if the rule is architecture-level enough, `docs/ARCHITECTURE.md`. `ConfigApi.hpp` should include shared public configuration vocabulary and defaults exposed by primary core template boundaries; concrete product configs should include `ConfigApi.hpp` plus the specific selected model, profiler, target, or component headers they use. Do not turn `ConfigApi.hpp` into a grab bag of every possible concrete component choice.
-- [ ] Split profiling policy vocabulary so the primary concepts and public types are easy to find. Separate clock, sink, scope, profiler, and sink-record trait/helper concerns from the umbrella `ProfilePolicy.hpp`; decide during implementation whether `ProfilePolicy.hpp` remains as a convenience include or is retired.
-- [ ] Split `ScopedProfiler.hpp` so the scoped RAII profile record type and the profiler facade have obvious ownership and neither is buried under unrelated helpers.
-- [ ] Clarify `SensorTuple.hpp`. If it is a collection of traits/helpers rather than a concrete `SensorTuple` type, split the public sensor-tuple concept/policy from tuple lookup/count traits, for example `SensorTuplePolicy.hpp` and `SensorTupleTraits.hpp`.
-- [ ] Clarify app emulator-binding headers. If `EmulatorBindingPolicy.hpp` mostly owns binding structs, tuple uniqueness, lookup, and validation helpers rather than an obvious `EmulatorBindingPolicy` concept/type, split policy/contract vocabulary from traits/helpers.
-- [ ] Split `NavKitProductConfigPolicy.hpp` so the public product-config concept stays readable as the API contract, while supporting detail checks live in a small detail/traits header.
-- [ ] Decompose `RuntimeConfigValidation.hpp` into smaller app-support headers for runtime key/schema definitions, JSON value parsing helpers, emulator runtime-key derivation, and validation orchestration. Keep the top-level validation entry point obvious.
+- [x] Add durable config API inclusion guidelines to `AGENTS.md` and, if the rule is architecture-level enough, `docs/ARCHITECTURE.md`. `ConfigApi.hpp` should include shared public configuration vocabulary and defaults exposed by primary core template boundaries; concrete product configs should include `ConfigApi.hpp` plus the specific selected model, profiler, target, or component headers they use. Do not turn `ConfigApi.hpp` into a grab bag of every possible concrete component choice.
+- [x] Split profiling policy vocabulary so the primary concepts and public types are easy to find. Separate clock, sink, scope, profiler, and sink-record trait/helper concerns, then retire the unused `ProfilePolicy.hpp` umbrella include.
+- [x] Split `ScopedProfiler.hpp` so the scoped RAII profile record type and the profiler facade have obvious ownership and neither is buried under unrelated helpers.
+- [x] Clarify the old `SensorTuple.hpp` umbrella. Split the public sensor-tuple concept/policy from tuple lookup/count traits into `SensorTuplePolicy.hpp` and `SensorTupleTraits.hpp`, then retire the unused umbrella include.
+- [x] Clarify app emulator-binding headers. If `EmulatorBindingPolicy.hpp` mostly owns binding structs, tuple uniqueness, lookup, and validation helpers rather than an obvious `EmulatorBindingPolicy` concept/type, split policy/contract vocabulary from traits/helpers.
+- [x] Split `NavKitProductConfigPolicy.hpp` so the public product-config concept stays readable as the API contract, while supporting detail checks live in a small detail/traits header.
+- [x] Decompose `RuntimeConfigValidation.hpp` into smaller app-support headers for runtime key/schema definitions, JSON value parsing helpers, emulator runtime-key derivation, and validation orchestration. Keep the top-level validation entry point obvious.
 
 ### Pass 3.1l — Follow-on app/config simplification
 

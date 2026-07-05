@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "navkit/app_support/RuntimeConfigValidation.hpp"
+#include "navkit/app_support/RuntimeConfigJson.hpp"
 #include "navkit/sim/GnssSimulator.hpp"
 
 #include <nlohmann/json.hpp>

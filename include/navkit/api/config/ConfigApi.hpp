@@ -18,3 +18,5 @@
 #include "navkit/core/estimation/sensor/SensorId.hpp"
 #include "navkit/core/estimation/sensor/noise/NoisePolicies.hpp"
 #include "navkit/core/estimation/state/StateDefs.hpp"
+#include "navkit/core/profiling/NullProfiler.hpp"
+#include "navkit/core/profiling/ProfilerPolicy.hpp"

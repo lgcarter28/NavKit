@@ -108,6 +108,13 @@ domain that consumes them; for example, estimator sensor-buffer and
 measurement-statistics configuration concepts currently live under the
 `navkit::core::estimation` namespace.
 
+The public config API include boundary is intentionally narrow.
+`include/navkit/api/config/ConfigApi.hpp` collects shared product-graph
+vocabulary, required contracts, and defaults exposed directly by primary core
+template boundaries. Concrete product configs include `ConfigApi.hpp` plus the
+specific model, profiler, target, or component headers they select. It should
+not become a universal include for every concrete component choice.
+
 See [`CONFIGURATION.md`](CONFIGURATION.md) for the user-facing configuration
 mental model, example config contracts, and the selected-config build workflow.
 

@@ -5,7 +5,6 @@
 
 #include "navkit/api/config/ConfigApi.hpp"
 #include "navkit/core/models/GnssPosModel.hpp"
-#include "navkit/core/profiling/ProfilePolicy.hpp"
 #include "navkit/core/profiling/ProfileSinks.hpp"
 #include "navkit/core/profiling/ScopedProfiler.hpp"
 

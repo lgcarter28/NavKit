@@ -3,38 +3,17 @@
 
 #pragma once
 
+#include "navkit/api/config/NavKitProductConfigTraits.hpp"
 #include "navkit/core/config/ConfigPolicy.hpp"
 #include "navkit/core/estimation/filter/FilterConfigPolicy.hpp"
 #include "navkit/core/estimation/navigator/NavigatorUpdatePolicy.hpp"
 #include "navkit/core/estimation/navigator/SensorCollectionPolicy.hpp"
-#include "navkit/core/estimation/sensor/SensorTuple.hpp"
+#include "navkit/core/estimation/sensor/SensorTupleTraits.hpp"
 #include "navkit/core/estimation/state/StateDefPolicy.hpp"
-#include "navkit/core/profiling/ProfilePolicy.hpp"
-
-#include <tuple>
-#include <type_traits>
+#include "navkit/core/profiling/ProfilerPolicy.hpp"
 
 namespace navkit::api::config
 {
-
-namespace detail
-{
-
-template<typename StatisticsTuple, typename SensorTuple>
-struct measurement_statistics_sources_configured;
-
-template<typename SensorTuple, typename... Statistics>
-struct measurement_statistics_sources_configured<std::tuple<Statistics...>, SensorTuple>
-    : std::bool_constant<(navkit::core::estimation::
-                              sensor_type_contains_v<typename Statistics::Sensor_t, SensorTuple> &&
-                          ...)>
-{};
-
-template<typename StatisticsTuple, typename SensorTuple>
-inline constexpr bool measurement_statistics_sources_configured_v =
-    measurement_statistics_sources_configured<StatisticsTuple, SensorTuple>::value;
-
-} // namespace detail
 
 template<typename Candidate>
 concept NavKitProductConfigPolicy = requires {
