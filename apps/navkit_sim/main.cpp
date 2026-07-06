@@ -3,7 +3,7 @@
 
 #include "navkit/SelectedConfig.hpp"
 #include "navkit/app_support/AppRunner.hpp"
-#include "navkit/app_support/ConfigDescription.hpp"
+#include "navkit/app_support/config/ConfigDescription.hpp"
 
 #include <cstdio>
 #include <filesystem>

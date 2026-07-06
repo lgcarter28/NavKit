@@ -4,8 +4,8 @@
 #pragma once
 
 #include "navkit/api/config/NavKitProductConfigPolicy.hpp"
-#include "navkit/app_support/EmulatorBindingPolicy.hpp"
-#include "navkit/app_support/EmulatorBindingTuplePolicy.hpp"
+#include "navkit/app_support/emulation/EmulatorBindingPolicy.hpp"
+#include "navkit/app_support/emulation/EmulatorBindingTuplePolicy.hpp"
 #include "navkit/core/estimation/sensor/SensorTupleTraits.hpp"
 #include "navkit/io/RunLogger.hpp"
 #include "navkit/sim/TruthSample.hpp"

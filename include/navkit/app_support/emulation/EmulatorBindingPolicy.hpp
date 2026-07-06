@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "navkit/app_support/EmulatorBinding.hpp"
-#include "navkit/app_support/EmulatorPolicy.hpp"
+#include "navkit/app_support/emulation/EmulatorBinding.hpp"
+#include "navkit/app_support/emulation/EmulatorPolicy.hpp"
 #include "navkit/core/estimation/sensor/SensorPolicy.hpp"
 #include "navkit/io/RunLogger.hpp"
 

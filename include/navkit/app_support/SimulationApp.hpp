@@ -3,17 +3,17 @@
 
 #pragma once
 
-#include "navkit/app_support/ConfigTraits.hpp"
-#include "navkit/app_support/EmulatorRuntime.hpp"
-#include "navkit/app_support/FilterInitialization.hpp"
-#include "navkit/app_support/JsonInput.hpp"
-#include "navkit/app_support/LoggingConfigTraits.hpp"
-#include "navkit/app_support/MeasurementStatisticsLogger.hpp"
-#include "navkit/app_support/ProfileExport.hpp"
-#include "navkit/app_support/RunSettings.hpp"
-#include "navkit/app_support/RuntimeConfigValidation.hpp"
-#include "navkit/app_support/SimulationAppConfigPolicy.hpp"
-#include "navkit/app_support/TrajectoryProvider.hpp"
+#include "navkit/app_support/config/ConfigTraits.hpp"
+#include "navkit/app_support/config/LoggingConfigTraits.hpp"
+#include "navkit/app_support/config/SimulationAppConfigPolicy.hpp"
+#include "navkit/app_support/emulation/EmulatorRuntime.hpp"
+#include "navkit/app_support/initialization/FilterInitialization.hpp"
+#include "navkit/app_support/logging/MeasurementStatisticsLogger.hpp"
+#include "navkit/app_support/profiling/ProfileExport.hpp"
+#include "navkit/app_support/runtime/JsonInput.hpp"
+#include "navkit/app_support/runtime/RunSettings.hpp"
+#include "navkit/app_support/runtime/RuntimeConfigValidation.hpp"
+#include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
 
 #include <cstdio>
 #include <filesystem>

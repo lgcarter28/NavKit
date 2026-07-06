@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include "navkit/app_support/EmulatorBinding.hpp"
-#include "navkit/app_support/GnssEmulator.hpp"
 #include "navkit/app_support/SimulationApp.hpp"
+#include "navkit/app_support/emulation/EmulatorBinding.hpp"
+#include "navkit/app_support/emulation/concrete/GnssEmulator.hpp"
 #include "navkit/io/RunLogger.hpp"
 #include "navkit/products/ProfiledStationaryGnss.hpp"
 

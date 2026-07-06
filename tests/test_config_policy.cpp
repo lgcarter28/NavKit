@@ -3,8 +3,8 @@
 
 #include "navkit/SelectedConfig.hpp"
 #include "navkit/api/config/ConfigApi.hpp"
-#include "navkit/app_support/ConfigTraits.hpp"
-#include "navkit/app_support/LoggingConfigTraits.hpp"
+#include "navkit/app_support/config/ConfigTraits.hpp"
+#include "navkit/app_support/config/LoggingConfigTraits.hpp"
 #include "navkit/core/config/ConfigPolicy.hpp"
 #include "navkit/core/estimation/filter/FilterConfigPolicy.hpp"
 #include "navkit/core/estimation/sensor/Sensor.hpp"

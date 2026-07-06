@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "navkit/app_support/EmulatorBindingPolicy.hpp"
-#include "navkit/app_support/EmulatorBindingTraits.hpp"
+#include "navkit/app_support/emulation/EmulatorBindingPolicy.hpp"
+#include "navkit/app_support/emulation/EmulatorBindingTraits.hpp"
 #include "navkit/core/containers/TupleTraits.hpp"
 
 #include <tuple>

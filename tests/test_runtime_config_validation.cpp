@@ -2,13 +2,13 @@
 // All Rights Reserved.
 
 #include "apps/navkit_sim/StationaryGnss.hpp"
-#include "navkit/app_support/EmulatorBinding.hpp"
-#include "navkit/app_support/EmulatorBindingPolicy.hpp"
-#include "navkit/app_support/EmulatorBindingTuplePolicy.hpp"
-#include "navkit/app_support/EmulatorPolicy.hpp"
-#include "navkit/app_support/GnssEmulator.hpp"
-#include "navkit/app_support/RuntimeConfigValidation.hpp"
 #include "navkit/app_support/SimulationApp.hpp"
+#include "navkit/app_support/emulation/EmulatorBinding.hpp"
+#include "navkit/app_support/emulation/EmulatorBindingPolicy.hpp"
+#include "navkit/app_support/emulation/EmulatorBindingTuplePolicy.hpp"
+#include "navkit/app_support/emulation/EmulatorPolicy.hpp"
+#include "navkit/app_support/emulation/concrete/GnssEmulator.hpp"
+#include "navkit/app_support/runtime/RuntimeConfigValidation.hpp"
 #include "navkit/io/RunLogger.hpp"
 #include "test_main.hpp"
 

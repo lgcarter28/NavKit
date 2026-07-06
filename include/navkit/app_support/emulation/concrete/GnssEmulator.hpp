@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "navkit/app_support/RuntimeConfigJson.hpp"
+#include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
 #include "navkit/core/estimation/sensor/SensorId.hpp"
 #include "navkit/sim/GnssSimulator.hpp"
 

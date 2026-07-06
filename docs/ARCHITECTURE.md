@@ -13,7 +13,7 @@ NavKit is split by product boundary first, then by engineering domain.
 | Product core | `navkit::core` | `include/navkit/core` | Reusable estimation/navigation framework and domain models |
 | Simulation support | `navkit::sim` | `include/navkit/sim` | Desktop simulation infrastructure and generated measurements |
 | IO support | `navkit::io` | `include/navkit/io` | Desktop logging, files, CSV, JSON, and run manifests |
-| Application support | `navkit::app_support` | `include/navkit/app_support` | Header-only executable support helpers for JSON inputs, selected-config description, runtime-input validation, simulation app composition, estimator aliases, and profile export |
+| Application support | `navkit::app_support` | `include/navkit/app_support` | Header-only executable support helpers for selected-config app composition, runtime JSON input/validation, emulator binding, trajectory, logging, initialization, and profile export |
 | Applications | app targets under `apps/` | `apps/` | Executable entry points that compose the libraries they need |
 | Analysis | Python package under `python/` | `python/navkit_analysis` | Offline plots and validation analysis |
 
@@ -57,6 +57,14 @@ include/navkit/
   sim/
   io/
   app_support/
+    config/
+    emulation/
+      concrete/
+    runtime/
+    initialization/
+    logging/
+    profiling/
+    trajectory/
 
 config/
   compiletime/
@@ -163,9 +171,11 @@ application manifests and log metadata are written by C++ application/IO code.
 Application entry points should stay selected-config generic where practical.
 The selected app config composes a reusable NavKit library config with app-side
 sensor bindings and emulator policies. `navkit::app_support` owns reusable
-JSON-input, tuple-derived runtime validation, config-description,
-estimator-alias, selected-app runner, simulation-loop, and profile-export
-plumbing.
+selected-app runner and simulation-loop plumbing at the top level, with focused
+subdirectories for app compile-time config vocabulary, generic emulator binding
+and runtime dispatch, concrete emulators, JSON/runtime validation, current
+startup initialization helpers, app-side logging adapters, profile export, and
+trajectory providers.
 
 This boundary avoids checked-in sidecar metadata that can drift from the actual
 compiled configuration. If build-manifest writing moves fully into C++ later,

@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "navkit/app_support/JsonInput.hpp"
+#include "navkit/app_support/runtime/JsonInput.hpp"
 #include "navkit/core/config/Types.hpp"
 #include "navkit/sim/TrajectoryGenerator.hpp"
 #include "navkit/sim/TruthSample.hpp"

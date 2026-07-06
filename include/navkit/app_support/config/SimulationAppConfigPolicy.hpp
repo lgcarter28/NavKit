@@ -4,7 +4,7 @@
 #pragma once
 
 #include "navkit/api/config/ConfigApi.hpp"
-#include "navkit/app_support/EmulatorBindingTuplePolicy.hpp"
+#include "navkit/app_support/emulation/EmulatorBindingTuplePolicy.hpp"
 
 namespace navkit::app_support
 {

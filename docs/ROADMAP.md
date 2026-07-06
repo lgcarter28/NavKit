@@ -294,12 +294,12 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ### Pass 3.1o — App-support directory organization
 
-- [ ] Reorganize `include/navkit/app_support` into ownership-oriented subdirectories while preserving behavior: top-level app entry/orchestration headers, `config/` for app compile-time config concepts and traits, `emulation/` for generic emulator/binding/runtime machinery, `runtime/` for JSON/runtime-input parsing and validation, `initialization/` for current startup initialization helpers, `logging/` for app-side logging adapters, `profiling/` for profile export adapters, and `trajectory/` for trajectory-provider helpers.
-- [ ] Keep generic emulation infrastructure directly under `app_support/emulation`, but move concrete emulators into a clearly named concrete location such as `app_support/emulation/concrete` unless a domain-specific subfolder like `gnss/` becomes immediately useful.
-- [ ] Update includes to prefer the new narrow paths. Add temporary umbrella headers only when they materially reduce churn or preserve useful public include compatibility; do not recreate a flat junk drawer through umbrellas.
-- [ ] Keep `SimulationApp.hpp` easy to read after the move: it should remain an orchestration loop that delegates runtime input, emulation, logging, profiling, trajectory, and initialization responsibilities to focused headers.
-- [ ] Add or update documentation in `docs/ARCHITECTURE.md` or `docs/CONFIGURATION.md` if the new layout changes how end users discover app compile-time config, runtime JSON validation, or simulator emulators.
-- [ ] Run format/copyright checks, Debug build/tests, and the stationary GNSS sim/analysis pipeline after the move to catch include-path and selected-config regressions.
+- [x] Reorganize `include/navkit/app_support` into ownership-oriented subdirectories while preserving behavior: top-level app entry/orchestration headers, `config/` for app compile-time config concepts and traits, `emulation/` for generic emulator/binding/runtime machinery, `runtime/` for JSON/runtime-input parsing and validation, `initialization/` for current startup initialization helpers, `logging/` for app-side logging adapters, `profiling/` for profile export adapters, and `trajectory/` for trajectory-provider helpers.
+- [x] Keep generic emulation infrastructure directly under `app_support/emulation`, but move concrete emulators into a clearly named concrete location such as `app_support/emulation/concrete` unless a domain-specific subfolder like `gnss/` becomes immediately useful.
+- [x] Update includes to prefer the new narrow paths. Add temporary umbrella headers only when they materially reduce churn or preserve useful public include compatibility; do not recreate a flat junk drawer through umbrellas.
+- [x] Keep `SimulationApp.hpp` easy to read after the move: it should remain an orchestration loop that delegates runtime input, emulation, logging, profiling, trajectory, and initialization responsibilities to focused headers.
+- [x] Add or update documentation in `docs/ARCHITECTURE.md` or `docs/CONFIGURATION.md` if the new layout changes how end users discover app compile-time config, runtime JSON validation, or simulator emulators.
+- [x] Run format/copyright checks, Debug build/tests, and the stationary GNSS sim/analysis pipeline after the move to catch include-path and selected-config regressions.
 
 ### Pass 3.2 — Log product concepts and payload boundaries
 

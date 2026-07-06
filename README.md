@@ -58,7 +58,9 @@ include/navkit/api/   User-facing compile-time configuration API contracts
 include/navkit/sim/   Simulation support public headers
 include/navkit/io/    Desktop logging/file/JSON public headers
 include/navkit/app_support/
-                       Header-only executable support helpers
+                       Header-only executable support helpers organized by app
+                       config, emulation, runtime input, logging, profiling,
+                       trajectory, and initialization boundaries
 config/               Compile-time configurations and runtime input bundles
 cmake/targets/        Header-only/interface CMake target definitions
 src/sim/              Compiled simulator implementation

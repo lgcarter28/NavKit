@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include "navkit/app_support/EmulatorRuntimeKeys.hpp"
-#include "navkit/app_support/RuntimeConfigJson.hpp"
-#include "navkit/app_support/SimulationAppConfigPolicy.hpp"
+#include "navkit/app_support/config/SimulationAppConfigPolicy.hpp"
+#include "navkit/app_support/emulation/EmulatorRuntimeKeys.hpp"
+#include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
 
 #include <nlohmann/json.hpp>
 #include <string>

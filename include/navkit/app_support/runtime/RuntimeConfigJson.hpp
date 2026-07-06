@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "navkit/app_support/RuntimeConfigError.hpp"
+#include "navkit/app_support/runtime/RuntimeConfigError.hpp"
 
 #include <cstdint>
 #include <nlohmann/json.hpp>

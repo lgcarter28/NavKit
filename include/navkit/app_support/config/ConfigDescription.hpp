@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "navkit/app_support/ConfigTraits.hpp"
-#include "navkit/app_support/ProfileExport.hpp"
+#include "navkit/app_support/config/ConfigTraits.hpp"
+#include "navkit/app_support/profiling/ProfileExport.hpp"
 
 #include <nlohmann/json.hpp>
 #include <ostream>
