@@ -270,6 +270,28 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Preserve existing stationary GNSS runtime behavior, file names, manifest contents, profile export behavior, and analysis compatibility while simplifying the app loop and logging boundary.
 - [x] At the end of the pass, run the normal format/copyright/build/test workflow, then run local clang-tidy explicitly with `python tools/format.py --check --tidy --tidy-warnings-as-errors` and let it run long enough to collect full findings before deciding whether to fix or defer issues.
 
+### Pass 3.1m — App config type-aggregation cleanup
+
+- [ ] Refactor app compile-time configs to use the same readable type-aggregation style as NavKit product configs: local role aliases, configured emulator aliases, explicit binding aliases, aggregate `EmulatorBindings`, selected `Logger`, and final `App`. App configs may reference exported NavKit product aliases but must not reconstruct product-core internals.
+- [ ] Treat `EmulatorBindings` as the owned app graph. Do not add a separate `Emulators` tuple unless a real app consumer needs emulator-only iteration; each binding already carries the emulator, target sensor, and runtime stream relationship.
+- [ ] Embed the runtime stream `Id` into configured emulator types, mirroring `Sensor::Id`. `EmulatorBinding<Emulator, Sensor>` should derive `Binding::Id` from `Emulator::Id` and `static_assert(Emulator::Id == Sensor::Id)`, instead of duplicating the same ID as a third binding template parameter.
+- [ ] Preserve current selected-config behavior, stationary GNSS runtime behavior, file names, profiling export, and analysis compatibility.
+
+### Pass 3.1n — App-support concept-policy boundary cleanup
+
+- [ ] Move `SimulationAppConfigPolicy` out of `SimulationApp.hpp` into a focused standalone policy header. Keep `SimulationApp.hpp` focused on the application orchestration loop.
+- [ ] Establish the hard default rule that policy concepts live in clear standalone `*Policy.hpp` headers. Exceptions should be rare and deliberate: tiny private implementation concepts may stay local only when moving them would make ownership less clear.
+- [ ] Replace raw emulator-binding trait checks inside `SimulationAppConfigPolicy` with a named binding-tuple concept. The simulation-app config concept should read in terms of product config plus emulator-binding compatibility, not raw `_v` helper plumbing.
+- [ ] Split emulator binding vocabulary into an individual `EmulatorBindingPolicy` for one binding and an `EmulatorBindingTuplePolicy` for the tuple relationship against the selected NavKit sensor tuple. Keep lookup/count helpers in traits headers, not in the policy headers.
+- [ ] Constrain `EmulatorRuntime<NavKit, EmulatorBindings>` on `NavKitProductConfigPolicy<NavKit>` and the emulator-binding tuple policy so runtime plumbing cannot be instantiated with unrelated tuple-like types.
+- [ ] Constrain `validate_runtime_config<Config>` on the simulation-app config concept after the concept lives in a standalone header, so runtime validation shares the same compile-time app/product contract as `SimulationApp`.
+- [ ] Add an `EmulatorPolicy` concept for app-side emulators. It should capture the real static interface used by `EmulatorRuntime`: runtime construction, runtime-key/JSON validation, sensor configuration, measurement generation, and measurement logging. Keep it narrow and based on the current emulator boundary; do not introduce a generic simulation framework.
+- [ ] Constrain `MeasurementModelBase` and concrete measurement models such as GNSS position, GNSS velocity, and barometer on `StateDefPolicy` where the state definition is a real public template boundary.
+- [ ] Try constraining `Navigator::process_one_sensor` with `SensorPolicy` so the internal Navigator loop stays aligned with the public sensor-collection contract. Keep the change only if it improves diagnostics without fighting `std::apply` reference behavior.
+- [ ] Investigate, but do not force in this pass, whether `KalmanFilter::process_sensor` and the private direct-observation implementation should be split or further constrained. Avoid contorting the design merely to replace `typename` where the current mixed sensor/direct-model path is intentional.
+- [ ] Hold off on additional `RunLogger`/`RunLogProducts` concept work until the dedicated generic logger-composition pass. Note that logger constraints should be revisited there, after the product/payload split is stable.
+- [ ] Add focused compile-time tests for the new policy concepts and negative cases. Keep helper machinery minimal and local; the concepts should clarify ownership boundaries, not add another abstraction layer.
+
 ### Pass 3.2 — Log product concepts and payload boundaries
 
 - [x] Add a narrow `LogProductPolicy<Candidate, Payload>` concept under `include/navkit/io` that validates the shared log-product lifecycle and the concrete payload-specific `log(payload)` operation. Do not force every log product into one fake common `log(...)` signature.
@@ -293,9 +315,13 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [ ] Replace the current hard-coded `RunLogger` member list with a generic `RunLogger<LogProducts...>` or equivalent tuple-based composition selected by app compile-time config. The default stationary GNSS logger should remain available through a clear alias so existing app configs stay readable.
 - [ ] Keep the implementation simple and explicit: avoid broad tuple metaprogramming machinery, type-erasure, virtual dispatch, or a runtime registry. Use small local helpers only where they directly dispatch a typed payload to the matching product.
 - [ ] Route logging by explicit payload type and `LogProductPolicy<Product, Payload>` conformance. If multiple products can consume the same payload, require an explicit decision instead of silently logging to all or guessing.
+- [ ] Replace `MeasurementStatisticsLogger`'s GNSS-specific method probing, such as `log_gnss_pos_statistics(...)`, with typed payload dispatch through the selected logger/log products. App-support generic code must not hard-code GNSS-specific logger method names.
+- [ ] Move log-family selection into compile-time app logging config while keeping run-specific choices runtime-configurable. Compile-time logging config should define available log products, schema writers, and required compile-time dimensions; runtime JSON should continue to select output directory and run name in this pass.
+- [ ] Begin removing hard-coded logging assumptions such as GNSS-only update-statistics plumbing, `StateDef::Pos` position extraction, and fixed `H`/`K` matrix dimensions where the selected product/log payload can own the schema more clearly.
 - [ ] Keep `RunLogger` responsible for output directory setup, product open/flush/close orchestration, run manifest ownership, and metadata file emission. Concrete log products own their CSV/schema details.
 - [ ] Preserve stationary GNSS filenames, metadata schemas, run-manifest shape, profile export behavior, and downstream Python analysis compatibility.
-- [ ] Keep runtime JSON responsible for run name and output directory in this pass. Optional runtime log-product enable/disable and verbosity remain Phase 8 work unless a tiny prerequisite falls out naturally.
+- [ ] Keep IO/logging adapters outside `navkit::core`; they may depend on `navkit::sim`, `navkit::io`, and app-support types, but product-core embedded algorithms must continue to emit only typed states, measurements, statistics, and profile records.
+- [ ] Keep optional runtime log-product enable/disable, verbosity, schema migration, and richer compatibility checks in Phase 8 unless a tiny prerequisite falls out naturally.
 - [ ] Add compile-time tests for generic logger composition and at least one negative case where a selected product cannot consume the requested payload.
 - [ ] Add runtime or integration evidence by running the stationary GNSS sim and analysis pipeline after the generic logger refactor.
 
@@ -519,12 +545,10 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Logging
 
-- [ ] Refactor the current monolithic `RunLogger` into composable logging adapters after `SimulationApp<Config>` exists. `RunLogger` currently mixes truth logging, GNSS measurement logging, nav-state/error logging, GNSS update-statistics logging, metadata schemas, manifests, and app-specific dimensions in one large header.
-- [ ] Move log-family selection into compile-time app logging config while keeping run-specific choices runtime-configurable. Compile-time logging config should define available log products, schema writers, and required compile-time dimensions; runtime JSON should select output directory, run name, optional enabled/disabled products where safe, and detail/verbosity.
-- [ ] Replace hard-coded logging assumptions such as GNSS-only files, `StateDef::Pos` position extraction, and fixed `H`/`K` matrix dimensions with model/state-derived schema helpers or logger policies.
-- [ ] Keep IO/logging adapters outside `navkit::core`; they may depend on `navkit::sim`, `navkit::io`, and app-support types, but product-core embedded algorithms must continue to emit only typed states, measurements, statistics, and profile records.
-- [ ] Preserve existing stationary GNSS file names and schema compatibility until downstream analysis is intentionally migrated.
-- [ ] Add log/schema version metadata and compatibility checks.
+- [ ] Add optional runtime log-product enable/disable and verbosity/detail selection once compile-time log-product composition is stable.
+- [ ] Migrate or version downstream analysis intentionally when stationary GNSS file names or schemas are changed; until then, preserve compatibility in Phase 3 logging refactors.
+- [ ] Add richer log/schema version metadata, compatibility checks, and migration guidance after the generic logger and product payload contracts stabilize.
+- [ ] Extend model/state-derived schema helpers or logger policies beyond the first stationary GNSS products as new sensors and state definitions appear.
 - [ ] Extend the Phase 3 timing/resource artifacts into Monte Carlo aggregate reports.
 - [ ] Add memory/high-water statistics suitable for embedded evaluation once target/resource APIs are defined.
 - [x] Keep compile-time profiling metadata in `navkit_build_manifest.json`, including clock source, tick scale, selected config, sink capacity, overflow policy, schema version, and profile-point mapping.
