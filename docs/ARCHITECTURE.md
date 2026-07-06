@@ -56,6 +56,8 @@ include/navkit/
 
   sim/
   io/
+    log_payloads/
+    log_products/
   app_support/
     config/
     emulation/
@@ -175,7 +177,10 @@ selected-app runner and simulation-loop plumbing at the top level, with focused
 subdirectories for app compile-time config vocabulary, generic emulator binding
 and runtime dispatch, concrete emulators, JSON/runtime validation, current
 startup initialization helpers, app-side logging adapters, profile export, and
-trajectory providers.
+trajectory providers. IO log products and typed payload wrappers live under
+`include/navkit/io/log_products` and `include/navkit/io/log_payloads` so the
+serialization boundary is explicit without forcing a generic logger framework
+into product-core code.
 
 This boundary avoids checked-in sidecar metadata that can drift from the actual
 compiled configuration. If build-manifest writing moves fully into C++ later,

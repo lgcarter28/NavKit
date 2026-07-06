@@ -7,7 +7,12 @@
 #include "navkit/core/estimation/state/StateDefs.hpp"
 #include "navkit/core/models/GnssPosModel.hpp"
 #include "navkit/io/LogProductPolicy.hpp"
-#include "navkit/io/RunLogProducts.hpp"
+#include "navkit/io/log_payloads/MeasurementStatisticsLogPayload.hpp"
+#include "navkit/io/log_payloads/NavEstimateLogPayload.hpp"
+#include "navkit/io/log_products/GnssPositionLogProduct.hpp"
+#include "navkit/io/log_products/GnssPositionUpdateLogProduct.hpp"
+#include "navkit/io/log_products/NavEstimateLogProduct.hpp"
+#include "navkit/io/log_products/TruthLogProduct.hpp"
 #include "navkit/sim/TruthSample.hpp"
 #include "test_main.hpp"
 

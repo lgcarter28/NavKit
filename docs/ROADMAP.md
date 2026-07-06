@@ -313,11 +313,11 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 #### Pass 3.2a — Log product header organization
 
-- [ ] Split concrete log products out of `RunLogProducts.hpp` into focused headers under `include/navkit/io/log_products/`: `TruthLogProduct.hpp`, `GnssPositionLogProduct.hpp`, `NavEstimateLogProduct.hpp`, and `GnssPositionUpdateLogProduct.hpp`.
-- [ ] Split reusable payload wrappers into `include/navkit/io/log_payloads/`: `NavEstimateLogPayload.hpp` and `MeasurementStatisticsLogPayload.hpp`. Keep payloads beside concrete products only if they are truly private to one product; otherwise keep the dedicated payload folder so callers can name payload boundaries clearly.
-- [ ] Keep `RunLogProducts.hpp` only as an optional narrow convenience umbrella if it has real value; otherwise replace includes with the specific product/payload headers and delete the umbrella.
-- [ ] Preserve the existing namespaces and public include compatibility where practical, but prefer narrow includes in production code and tests so dependencies stay obvious.
-- [ ] Add or update compile-time tests if needed so the split headers still expose all current concrete log-product policy checks.
+- [x] Split concrete log products out of `RunLogProducts.hpp` into focused headers under `include/navkit/io/log_products/`: `TruthLogProduct.hpp`, `GnssPositionLogProduct.hpp`, `NavEstimateLogProduct.hpp`, and `GnssPositionUpdateLogProduct.hpp`.
+- [x] Split reusable payload wrappers into `include/navkit/io/log_payloads/`: `NavEstimateLogPayload.hpp` and `MeasurementStatisticsLogPayload.hpp`. Keep payloads beside concrete products only if they are truly private to one product; otherwise keep the dedicated payload folder so callers can name payload boundaries clearly.
+- [x] Keep `RunLogProducts.hpp` only as an optional narrow convenience umbrella if it has real value; otherwise replace includes with the specific product/payload headers and delete the umbrella.
+- [x] Preserve the existing namespaces and public include compatibility where practical, but prefer narrow includes in production code and tests so dependencies stay obvious.
+- [x] Add or update compile-time tests if needed so the split headers still expose all current concrete log-product policy checks.
 
 #### Pass 3.2b — Generic compile-time RunLogger composition
 

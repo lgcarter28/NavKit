@@ -56,7 +56,8 @@ Target data flow adds multi-rate sensor simulation, mechanization/prediction, an
 include/navkit/core/  Reusable product-core public headers
 include/navkit/api/   User-facing compile-time configuration API contracts
 include/navkit/sim/   Simulation support public headers
-include/navkit/io/    Desktop logging/file/JSON public headers
+include/navkit/io/    Desktop logging/file/JSON public headers, including log
+                       products and payload boundaries
 include/navkit/app_support/
                        Header-only executable support helpers organized by app
                        config, emulation, runtime input, logging, profiling,
