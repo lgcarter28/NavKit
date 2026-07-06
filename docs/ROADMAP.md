@@ -279,18 +279,27 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ### Pass 3.1n — App-support concept-policy boundary cleanup
 
-- [ ] Move `SimulationAppConfigPolicy` out of `SimulationApp.hpp` into a focused standalone policy header. Keep `SimulationApp.hpp` focused on the application orchestration loop.
-- [ ] Establish the hard default rule that policy concepts live in clear standalone `*Policy.hpp` headers. Exceptions should be rare and deliberate: tiny private implementation concepts may stay local only when moving them would make ownership less clear.
-- [ ] Replace raw emulator-binding trait checks inside `SimulationAppConfigPolicy` with a named binding-tuple concept. The simulation-app config concept should read in terms of product config plus emulator-binding compatibility, not raw `_v` helper plumbing.
-- [ ] Split emulator binding vocabulary into an individual `EmulatorBindingPolicy` for one binding and an `EmulatorBindingTuplePolicy` for the tuple relationship against the selected NavKit sensor tuple. Keep lookup/count helpers in traits headers, not in the policy headers.
-- [ ] Constrain `EmulatorRuntime<NavKit, EmulatorBindings>` on `NavKitProductConfigPolicy<NavKit>` and the emulator-binding tuple policy so runtime plumbing cannot be instantiated with unrelated tuple-like types.
-- [ ] Constrain `validate_runtime_config<Config>` on the simulation-app config concept after the concept lives in a standalone header, so runtime validation shares the same compile-time app/product contract as `SimulationApp`.
-- [ ] Add an `EmulatorPolicy` concept for app-side emulators. It should capture the real static interface used by `EmulatorRuntime`: runtime construction, runtime-key/JSON validation, sensor configuration, measurement generation, and measurement logging. Keep it narrow and based on the current emulator boundary; do not introduce a generic simulation framework.
-- [ ] Constrain `MeasurementModelBase` and concrete measurement models such as GNSS position, GNSS velocity, and barometer on `StateDefPolicy` where the state definition is a real public template boundary.
-- [ ] Try constraining `Navigator::process_one_sensor` with `SensorPolicy` so the internal Navigator loop stays aligned with the public sensor-collection contract. Keep the change only if it improves diagnostics without fighting `std::apply` reference behavior.
-- [ ] Investigate, but do not force in this pass, whether `KalmanFilter::process_sensor` and the private direct-observation implementation should be split or further constrained. Avoid contorting the design merely to replace `typename` where the current mixed sensor/direct-model path is intentional.
-- [ ] Hold off on additional `RunLogger`/`RunLogProducts` concept work until the dedicated generic logger-composition pass. Note that logger constraints should be revisited there, after the product/payload split is stable.
-- [ ] Add focused compile-time tests for the new policy concepts and negative cases. Keep helper machinery minimal and local; the concepts should clarify ownership boundaries, not add another abstraction layer.
+- [x] Move `SimulationAppConfigPolicy` out of `SimulationApp.hpp` into a focused standalone policy header. Keep `SimulationApp.hpp` focused on the application orchestration loop.
+- [x] Establish the hard default rule that policy concepts live in clear standalone `*Policy.hpp` headers. Exceptions should be rare and deliberate: tiny private implementation concepts may stay local only when moving them would make ownership less clear.
+- [x] Replace raw emulator-binding trait checks inside `SimulationAppConfigPolicy` with a named binding-tuple concept. The simulation-app config concept should read in terms of product config plus emulator-binding compatibility, not raw `_v` helper plumbing.
+- [x] Split emulator binding vocabulary into an individual `EmulatorBindingPolicy` for one binding and an `EmulatorBindingTuplePolicy` for the tuple relationship against the selected NavKit sensor tuple. Keep lookup/count helpers in traits headers, not in the policy headers.
+- [x] Constrain `EmulatorRuntime<NavKit, EmulatorBindings>` on `NavKitProductConfigPolicy<NavKit>` and the emulator-binding tuple policy so runtime plumbing cannot be instantiated with unrelated tuple-like types.
+- [x] Constrain `validate_runtime_config<Config>` on the simulation-app config concept after the concept lives in a standalone header, so runtime validation shares the same compile-time app/product contract as `SimulationApp`.
+- [x] Add an `EmulatorPolicy` concept for app-side emulators. It should capture the real static interface used by `EmulatorRuntime`: runtime construction, runtime-key/JSON validation, sensor configuration, measurement generation, and measurement logging. Keep it narrow and based on the current emulator boundary; do not introduce a generic simulation framework.
+- [x] Constrain `MeasurementModelBase` and concrete measurement models such as GNSS position, GNSS velocity, and barometer on `StateDefPolicy` where the state definition is a real public template boundary.
+- [x] Try constraining `Navigator::process_one_sensor` with `SensorPolicy` so the internal Navigator loop stays aligned with the public sensor-collection contract. Keep the change only if it improves diagnostics without fighting `std::apply` reference behavior.
+- [x] Investigate, but do not force in this pass, whether `KalmanFilter::process_sensor` and the private direct-observation implementation should be split or further constrained. Avoid contorting the design merely to replace `typename` where the current mixed sensor/direct-model path is intentional.
+- [x] Hold off on additional `RunLogger`/`RunLogProducts` concept work until the dedicated generic logger-composition pass. Note that logger constraints should be revisited there, after the product/payload split is stable.
+- [x] Add focused compile-time tests for the new policy concepts and negative cases. Keep helper machinery minimal and local; the concepts should clarify ownership boundaries, not add another abstraction layer.
+
+### Pass 3.1o — App-support directory organization
+
+- [ ] Reorganize `include/navkit/app_support` into ownership-oriented subdirectories while preserving behavior: top-level app entry/orchestration headers, `config/` for app compile-time config concepts and traits, `emulation/` for generic emulator/binding/runtime machinery, `runtime/` for JSON/runtime-input parsing and validation, `initialization/` for current startup initialization helpers, `logging/` for app-side logging adapters, `profiling/` for profile export adapters, and `trajectory/` for trajectory-provider helpers.
+- [ ] Keep generic emulation infrastructure directly under `app_support/emulation`, but move concrete emulators into a clearly named concrete location such as `app_support/emulation/concrete` unless a domain-specific subfolder like `gnss/` becomes immediately useful.
+- [ ] Update includes to prefer the new narrow paths. Add temporary umbrella headers only when they materially reduce churn or preserve useful public include compatibility; do not recreate a flat junk drawer through umbrellas.
+- [ ] Keep `SimulationApp.hpp` easy to read after the move: it should remain an orchestration loop that delegates runtime input, emulation, logging, profiling, trajectory, and initialization responsibilities to focused headers.
+- [ ] Add or update documentation in `docs/ARCHITECTURE.md` or `docs/CONFIGURATION.md` if the new layout changes how end users discover app compile-time config, runtime JSON validation, or simulator emulators.
+- [ ] Run format/copyright checks, Debug build/tests, and the stationary GNSS sim/analysis pipeline after the move to catch include-path and selected-config regressions.
 
 ### Pass 3.2 — Log product concepts and payload boundaries
 

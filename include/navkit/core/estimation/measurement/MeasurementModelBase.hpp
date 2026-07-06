@@ -4,13 +4,14 @@
 #pragma once
 
 #include "navkit/core/estimation/state/State.hpp"
+#include "navkit/core/estimation/state/StateDefPolicy.hpp"
 
 #include <Eigen/Dense>
 
 namespace navkit::core::estimation
 {
 
-template<typename Derived, typename StateDef, int M_>
+template<typename Derived, StateDefPolicy StateDef, int M_>
 class MeasurementModelBase
 {
 public:

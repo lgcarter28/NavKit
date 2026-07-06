@@ -4,6 +4,7 @@
 #pragma once
 
 #include "navkit/core/estimation/measurement/MeasurementModelBase.hpp"
+#include "navkit/core/estimation/state/StateDefPolicy.hpp"
 
 #include <string_view>
 
@@ -12,7 +13,7 @@ namespace navkit::core::models
 
 using navkit::core::estimation::MeasurementModelBase;
 
-template<typename StateDef>
+template<navkit::core::estimation::StateDefPolicy StateDef>
 class BaroAltModel : public MeasurementModelBase<BaroAltModel<StateDef>, StateDef, 1>
 {
 public:

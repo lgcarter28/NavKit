@@ -3,10 +3,7 @@
 
 #pragma once
 
-#include "navkit/api/config/ConfigApi.hpp"
 #include "navkit/app_support/ConfigTraits.hpp"
-#include "navkit/app_support/EmulatorBinding.hpp"
-#include "navkit/app_support/EmulatorBindingPolicy.hpp"
 #include "navkit/app_support/EmulatorRuntime.hpp"
 #include "navkit/app_support/FilterInitialization.hpp"
 #include "navkit/app_support/JsonInput.hpp"
@@ -15,25 +12,15 @@
 #include "navkit/app_support/ProfileExport.hpp"
 #include "navkit/app_support/RunSettings.hpp"
 #include "navkit/app_support/RuntimeConfigValidation.hpp"
+#include "navkit/app_support/SimulationAppConfigPolicy.hpp"
 #include "navkit/app_support/TrajectoryProvider.hpp"
 
 #include <cstdio>
 #include <filesystem>
 #include <nlohmann/json.hpp>
-#include <tuple>
 
 namespace navkit::app_support
 {
-
-template<typename Config>
-concept SimulationAppConfigPolicy =
-    requires {
-        typename Config::NavKit;
-        typename Config::EmulatorBindings;
-    } && navkit::api::config::NavKitProductConfigPolicy<typename Config::NavKit> &&
-    emulator_binding_ids_unique_v<typename Config::EmulatorBindings> &&
-    emulator_binding_sensors_valid_v<typename Config::EmulatorBindings,
-                                     typename Config::NavKit::Sensors>;
 
 template<SimulationAppConfigPolicy Config>
 class SimulationApp

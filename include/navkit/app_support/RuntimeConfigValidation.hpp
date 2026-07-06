@@ -5,6 +5,7 @@
 
 #include "navkit/app_support/EmulatorRuntimeKeys.hpp"
 #include "navkit/app_support/RuntimeConfigJson.hpp"
+#include "navkit/app_support/SimulationAppConfigPolicy.hpp"
 
 #include <nlohmann/json.hpp>
 #include <string>
@@ -25,7 +26,7 @@ void validate_emulator_runtime_config(const nlohmann::json& cfg, std::index_sequ
 
 } // namespace detail
 
-template<typename Config>
+template<SimulationAppConfigPolicy Config>
 void validate_runtime_config(const nlohmann::json& cfg)
 {
     using EmulatorBindings = typename Config::EmulatorBindings;

@@ -3,6 +3,9 @@
 
 #pragma once
 
+#include "navkit/api/config/NavKitProductConfigPolicy.hpp"
+#include "navkit/app_support/EmulatorBindingPolicy.hpp"
+#include "navkit/app_support/EmulatorBindingTuplePolicy.hpp"
 #include "navkit/core/estimation/sensor/SensorTupleTraits.hpp"
 #include "navkit/io/RunLogger.hpp"
 #include "navkit/sim/TruthSample.hpp"
@@ -15,7 +18,8 @@
 namespace navkit::app_support
 {
 
-template<typename NavKit, typename EmulatorBindings>
+template<navkit::api::config::NavKitProductConfigPolicy NavKit,
+         EmulatorBindingTuplePolicy<typename NavKit::Sensors> EmulatorBindings>
 class EmulatorRuntime
 {
 public:
@@ -67,7 +71,7 @@ private:
         (configure_one<std::tuple_element_t<Is, BindingTuple>>(navigator, logger, cfg), ...);
     }
 
-    template<typename Binding>
+    template<EmulatorBindingPolicy Binding>
     static void
     configure_one(Navigator& navigator, io::RunLogger& logger, const nlohmann::json& cfg)
     {
@@ -76,7 +80,7 @@ private:
         Binding::Emulator_t::configure_logger(logger, cfg);
     }
 
-    template<typename Binding>
+    template<EmulatorBindingPolicy Binding>
     static auto& sensor_for_binding(Navigator& navigator)
     {
         constexpr auto SensorIndex =
@@ -96,7 +100,7 @@ private:
          ...);
     }
 
-    template<typename Binding, typename Runtime>
+    template<EmulatorBindingPolicy Binding, typename Runtime>
     static void process_one(Navigator& navigator,
                             io::RunLogger& logger,
                             Runtime& runtime,

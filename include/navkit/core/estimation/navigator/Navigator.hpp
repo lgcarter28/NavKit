@@ -7,6 +7,7 @@
 #include "navkit/core/estimation/navigator/NavigatorUpdatePolicy.hpp"
 #include "navkit/core/estimation/navigator/SensorCollectionPolicy.hpp"
 #include "navkit/core/estimation/navigator/update/UpdatePolicies.hpp"
+#include "navkit/core/estimation/sensor/SensorPolicy.hpp"
 #include "navkit/core/profiling/NullProfiler.hpp"
 #include "navkit/core/profiling/ProfilePoint.hpp"
 #include "navkit/core/profiling/ProfilerPolicy.hpp"
@@ -54,12 +55,11 @@ public:
         return std::get<I>(m_sensors);
     }
 
-    template<typename Sensor>
+    template<SensorPolicy Sensor>
     void process_one_sensor(Sensor& sensor_obj)
     {
-        using SensorNoRef = std::remove_reference_t<Sensor>;
         m_filter.process_sensor(sensor_obj);
-        Update_t::template sensor_update<SensorNoRef>(m_filter, sensor_obj);
+        Update_t::template sensor_update<Sensor>(m_filter, sensor_obj);
     }
 
     void process_measurements()
