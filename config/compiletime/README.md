@@ -47,13 +47,12 @@ struct ExampleAppConfig
 {
     using NavKit = navkit::config::navkit::SomeNavKitConfig;
 
-    static constexpr navkit::app_support::SensorId primary_sensor_id =
-        NavKit::primary_sensor_id;
-    using EmulatorBindings = std::tuple<
-        navkit::app_support::EmulatorBinding<
-            primary_sensor_id,
-            navkit::app_support::SomeEmulator,
-            NavKit::PrimarySensor>>;
+    using PrimarySensor = typename NavKit::PrimarySensor;
+    using PrimaryEmulator = navkit::app_support::SomeEmulator<PrimarySensor::Id>;
+    using PrimaryBinding =
+        navkit::app_support::EmulatorBinding<PrimaryEmulator, PrimarySensor>;
+
+    using EmulatorBindings = std::tuple<PrimaryBinding>;
 
     using Logger = navkit::io::RunLogger;
     using App = navkit::app_support::SimulationApp<ExampleAppConfig>;
@@ -67,8 +66,9 @@ headers directly.
 When an app consumes runtime JSON, validate that input against the selected
 compile-time composition before running. `SimulationApp<Config>` uses
 `EmulatorBindings` to decide which runtime sections are required. Stable
-unsigned `SensorId` values identify app/runtime streams, while explicit NavKit
-sensor aliases document which concrete configured sensor each emulator feeds.
-The binding ID must match the selected sensor's `Sensor::Id`, and app-support
-helpers can query sensors or emulator bindings by ID without ambiguous model-type
-lookup.
+unsigned `SensorId` values identify app/runtime streams. Configured emulator
+types carry the stream ID, explicit NavKit sensor aliases document which
+concrete configured sensor each emulator feeds, and `EmulatorBinding<Emulator,
+Sensor>` verifies that `Emulator::Id` matches the selected sensor's
+`Sensor::Id`. App-support helpers can query sensors or emulator bindings by ID
+without ambiguous model-type lookup.

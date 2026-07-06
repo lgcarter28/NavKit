@@ -157,13 +157,12 @@ struct StationaryGnssAppConfig
 {
     using NavKit = navkit::config::navkit::StationaryGnssConfig;
 
-    static constexpr navkit::app_support::SensorId primary_gnss_sensor_id =
-        NavKit::primary_gnss_sensor_id;
-    using EmulatorBindings = std::tuple<
-        navkit::app_support::EmulatorBinding<
-            primary_gnss_sensor_id,
-            navkit::app_support::GnssEmulator,
-            NavKit::PrimaryGnssSensor>>;
+    using PrimaryGnssSensor = typename NavKit::PrimaryGnssSensor;
+    using PrimaryGnssEmulator = navkit::app_support::GnssEmulator<PrimaryGnssSensor::Id>;
+    using PrimaryGnssBinding =
+        navkit::app_support::EmulatorBinding<PrimaryGnssEmulator, PrimaryGnssSensor>;
+
+    using EmulatorBindings = std::tuple<PrimaryGnssBinding>;
 
     using Logger = navkit::io::RunLogger;
     using App = navkit::app_support::SimulationApp<StationaryGnssAppConfig>;
@@ -172,13 +171,16 @@ struct StationaryGnssAppConfig
 
 This keeps the NavKit library config reusable across apps while still allowing
 one build tree to select one concrete executable composition.
-App sensor/emulator links use stable unsigned `SensorId` constants for runtime
-identity and explicit NavKit sensor aliases for compile-time wiring. The app
-does not reconstruct NavKit sensors or write raw tuple indices. The binding ID
-must match the selected sensor's configured `Sensor::Id`, which keeps duplicate
-sensors of the same model type, such as primary and backup GNSS receivers,
-unambiguous. App configs also select the logger adapter type at compile time;
-runtime JSON still owns run-specific choices such as run name and output
+App sensor/emulator links use configured emulator types with stable unsigned
+`SensorId` values for runtime identity and explicit NavKit sensor aliases for
+compile-time wiring. The app does not reconstruct NavKit sensors, maintain a
+parallel `Emulators` tuple, or write raw tuple indices. `EmulatorBindings` is
+the owned app graph: each binding carries the configured emulator type, the
+target sensor type, and an ID derived from `Emulator::Id`; the binding verifies
+that this ID matches the selected sensor's configured `Sensor::Id`. This keeps
+duplicate sensors of the same model type, such as primary and backup GNSS
+receivers, unambiguous. App configs also select the logger adapter type at
+compile time; runtime JSON still owns run-specific choices such as run name and output
 directory.
 
 The app and NavKit config trees are deliberately separate:

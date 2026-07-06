@@ -25,11 +25,11 @@ using StationaryGnssAppConfig = navkit::config::apps::navkit_sim::StationaryGnss
 struct DuplicateSensorIdConfig
 {
     using NavKit = StationaryGnssAppConfig::NavKit;
-    using EmulatorBindings = std::tuple<
-        navkit::app_support::
-            EmulatorBinding<0U, navkit::app_support::GnssEmulator, NavKit::PrimaryGnssSensor>,
-        navkit::app_support::
-            EmulatorBinding<0U, navkit::app_support::GnssEmulator, NavKit::PrimaryGnssSensor>>;
+    using EmulatorBindings =
+        std::tuple<navkit::app_support::EmulatorBinding<navkit::app_support::GnssEmulator<0U>,
+                                                        NavKit::PrimaryGnssSensor>,
+                   navkit::app_support::EmulatorBinding<navkit::app_support::GnssEmulator<0U>,
+                                                        NavKit::PrimaryGnssSensor>>;
 };
 
 struct UnknownSensor
@@ -41,8 +41,8 @@ struct MissingTargetSensorConfig
 {
     using NavKit = StationaryGnssAppConfig::NavKit;
     using EmulatorBindings =
-        std::tuple<navkit::app_support::
-                       EmulatorBinding<99U, navkit::app_support::GnssEmulator, UnknownSensor>>;
+        std::tuple<navkit::app_support::EmulatorBinding<navkit::app_support::GnssEmulator<99U>,
+                                                        UnknownSensor>>;
 };
 
 [[nodiscard]] nlohmann::json valid_stationary_gnss_runtime_config()
@@ -70,9 +70,9 @@ TEST_CASE("Stationary GNSS runtime validator accepts the documented input shape"
     static_assert(!SimulationAppConfigPolicy<DuplicateSensorIdConfig>);
     static_assert(!SimulationAppConfigPolicy<MissingTargetSensorConfig>);
     static_assert(emulator_binding_ids_unique_v<StationaryGnssAppConfig::EmulatorBindings>);
-    static_assert(std::is_same_v<EmulatorFromId_t<StationaryGnssAppConfig::primary_gnss_sensor_id,
+    static_assert(std::is_same_v<EmulatorFromId_t<StationaryGnssAppConfig::PrimaryGnssEmulator::Id,
                                                   StationaryGnssAppConfig::EmulatorBindings>,
-                                 GnssEmulator>);
+                                 GnssEmulator<StationaryGnssAppConfig::PrimaryGnssEmulator::Id>>);
 
     CHECK_NOTHROW(validate_runtime_config<StationaryGnssAppConfig>(cfg));
 }

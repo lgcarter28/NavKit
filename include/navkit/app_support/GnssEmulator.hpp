@@ -4,6 +4,7 @@
 #pragma once
 
 #include "navkit/app_support/RuntimeConfigJson.hpp"
+#include "navkit/core/estimation/sensor/SensorId.hpp"
 #include "navkit/sim/GnssSimulator.hpp"
 
 #include <nlohmann/json.hpp>
@@ -12,8 +13,12 @@
 namespace navkit::app_support
 {
 
+using SensorId = navkit::core::estimation::SensorId;
+
+template<SensorId IdValue>
 struct GnssEmulator
 {
+    static constexpr SensorId Id = IdValue;
     static constexpr std::string_view RuntimeKey = "gnss";
 
     using Runtime = sim::GnssSimulator;

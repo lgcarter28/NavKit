@@ -207,7 +207,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Move app sensor/emulator capability selection into app compile-time config tuples, now represented as `EmulatorBindings`, while keeping numeric values such as noise, covariance, seeds, rates, output paths, and run names in runtime JSON.
 - [x] Replace the current `RuntimeConfigValidation` shape with generic app-support validation that is derived from the selected app compile-time tuples. Validation must support arbitrary combinations of emulators/loggers and must not be hard-coded to stationary GNSS.
 - [x] Define a small `SensorEmulatorPolicy`/adapter contract that connects each app-side emulator to an explicit configured NavKit sensor alias plus a stable app/runtime sensor ID. Do not rely solely on model-type lookup because realistic configurations may include multiple sensors with the same model type, such as two GNSS receivers, dual barometers, or redundant IMUs.
-- [x] Represent each configured NavKit sensor and app emulator stream with an unsigned `SensorId`, optionally named by config-local constants such as `primary_gnss_sensor_id = 0U`. App bindings explicitly state `(Id, Emulator, Sensor)`, and compile-time checks prove IDs are unique, every emulator target sensor exists in the selected NavKit sensor graph, and binding IDs match the configured `Sensor::Id`.
+- [x] Represent each configured NavKit sensor and app emulator stream with an unsigned `SensorId`, optionally named by config-local constants such as `primary_gnss_sensor_id = 0U`. Configured emulator types now carry the app/runtime stream ID, app bindings explicitly state `(Emulator, Sensor)`, and compile-time checks prove IDs are unique, every emulator target sensor exists in the selected NavKit sensor graph, and binding IDs match the configured `Sensor::Id`.
 - [x] Remove stale placeholder runtime configs, including placeholder future-scenario JSON files, during this refactor unless they are converted into real validated examples.
 - [x] Add compile-time tests for valid/invalid app composition concepts and runtime tests for missing emulator sections, extra unsupported sections, and app/NavKit capability mismatches.
 
@@ -219,7 +219,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Keep the public API concepts as contracts and documentation for config authors; do not move every low-level policy concept into the API folder merely because it exists.
 - [x] Move product graph aliases into reusable NavKit configs: state definition, sensor model aliases, concrete sensor aliases, `Sensors`, `Profiler`, `Filter`, and `Navigator`.
 - [x] Decide whether `MeasurementModels` should be public, derived, or removed. The current direction is to remove it and require explicit `MeasurementStatisticsTuple` aliases keyed by configured sensors.
-- [x] Collapse app configs so they no longer reconstruct NavKit sensors. App configs should select `NavKit`, define app-local unsigned sensor IDs, define `EmulatorBindings`, and select `SimulationApp<Config>`.
+- [x] Collapse app configs so they no longer reconstruct NavKit sensors. App configs should select `NavKit`, define configured emulator aliases that carry stream IDs, define `EmulatorBindings`, and select `SimulationApp<Config>`.
 - [x] Simplify emulator binding machinery so the ID is the app/runtime key and the sensor target is an explicit NavKit sensor alias. `SimulationApp` derives the tuple index from `NavKit::Sensors` by `Sensor::Id`, so app configs avoid raw indices and do not search sensor bindings by potentially duplicated model type.
 - [x] Update configuration docs and tests so users can find the public config concepts, see which aliases are required, and understand which aliases are local helper wiring rather than the public config contract.
 
@@ -272,10 +272,10 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ### Pass 3.1m — App config type-aggregation cleanup
 
-- [ ] Refactor app compile-time configs to use the same readable type-aggregation style as NavKit product configs: local role aliases, configured emulator aliases, explicit binding aliases, aggregate `EmulatorBindings`, selected `Logger`, and final `App`. App configs may reference exported NavKit product aliases but must not reconstruct product-core internals.
-- [ ] Treat `EmulatorBindings` as the owned app graph. Do not add a separate `Emulators` tuple unless a real app consumer needs emulator-only iteration; each binding already carries the emulator, target sensor, and runtime stream relationship.
-- [ ] Embed the runtime stream `Id` into configured emulator types, mirroring `Sensor::Id`. `EmulatorBinding<Emulator, Sensor>` should derive `Binding::Id` from `Emulator::Id` and `static_assert(Emulator::Id == Sensor::Id)`, instead of duplicating the same ID as a third binding template parameter.
-- [ ] Preserve current selected-config behavior, stationary GNSS runtime behavior, file names, profiling export, and analysis compatibility.
+- [x] Refactor app compile-time configs to use the same readable type-aggregation style as NavKit product configs: local role aliases, configured emulator aliases, explicit binding aliases, aggregate `EmulatorBindings`, selected `Logger`, and final `App`. App configs may reference exported NavKit product aliases but must not reconstruct product-core internals.
+- [x] Treat `EmulatorBindings` as the owned app graph. Do not add a separate `Emulators` tuple unless a real app consumer needs emulator-only iteration; each binding already carries the emulator, target sensor, and runtime stream relationship.
+- [x] Embed the runtime stream `Id` into configured emulator types, mirroring `Sensor::Id`. `EmulatorBinding<Emulator, Sensor>` should derive `Binding::Id` from `Emulator::Id` and `static_assert(Emulator::Id == Sensor::Id)`, instead of duplicating the same ID as a third binding template parameter.
+- [x] Preserve current selected-config behavior, stationary GNSS runtime behavior, file names, profiling export, and analysis compatibility.
 
 ### Pass 3.1n — App-support concept-policy boundary cleanup
 

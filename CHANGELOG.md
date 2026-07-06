@@ -76,7 +76,7 @@ This project follows
 - Replaced the bespoke stationary GNSS app runner with the generic simulation app loop while preserving stationary GNSS log/profile behavior.
 - Moved runnable NavKit product graph aliases into reusable NavKit configs and collapsed app configs to `NavKit` plus explicit `EmulatorBindings`.
 - Renamed the profiled reusable NavKit GNSS config to `ProfiledStationaryGnss.hpp` to match the app-level selected config name.
-- Replaced app-facing sensor-index wiring with configured `Sensor::Id` values, explicit `(Id, Emulator, Sensor)` bindings, and tuple helpers for ID-based lookup.
+- Replaced app-facing sensor-index wiring with configured `Sensor::Id` values, emulator-owned stream IDs, explicit `(Emulator, Sensor)` bindings, and tuple helpers for ID-based lookup.
 - Replaced derived `MeasurementModels` config aliases with explicit `MeasurementStatisticsTuple` aliases keyed by configured sensor types.
 - Added a `KalmanFilter::MeasurementStatisticsTuple_t` class-level alias for consistency with the other filter type aliases.
 - Split profiling, sensor-tuple, emulator-binding, product-config, and runtime-config-validation headers so public contracts stay separate from helper/trait machinery.
