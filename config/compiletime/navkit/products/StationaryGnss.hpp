@@ -25,11 +25,11 @@ struct ProductConfig
 
     // Public product graph.
     using StateDef = core::estimation::InsStateDef;
-    using PrimaryGnssModel = core::models::GnssPosModel<StateDef>;
+    using PrimaryGnssMeasurementModel = core::models::GnssPosModel<StateDef>;
     static constexpr core::estimation::SensorId primary_gnss_sensor_id = 0U;
     static constexpr std::size_t primary_gnss_buffer_size = 16U;
     using PrimaryGnssSensor = core::estimation::Sensor<primary_gnss_sensor_id,
-                                                       PrimaryGnssModel,
+                                                       PrimaryGnssMeasurementModel,
                                                        primary_gnss_buffer_size,
                                                        core::estimation::GnssFixedNoisePolicy>;
 

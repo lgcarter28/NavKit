@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "navkit/core/estimation/filter/FilterPolicy.hpp"
+
 #include <concepts>
 #include <type_traits>
 
@@ -10,11 +12,12 @@ namespace navkit::core::estimation
 {
 
 template<typename Candidate, typename Filter, typename Sensor>
-concept UpdatePolicy = requires(Filter& filter, Sensor& sensor) {
-    {
-        Candidate::template sensor_update<std::remove_reference_t<Sensor>>(filter, sensor)
-    } -> std::same_as<void>;
-    { Candidate::filter_update(filter) } -> std::same_as<void>;
-};
+concept UpdatePolicy =
+    FilterPolicy<Filter> && SensorPolicy<Sensor> && requires(Filter& filter, Sensor& sensor) {
+        {
+            Candidate::template sensor_update<std::remove_reference_t<Sensor>>(filter, sensor)
+        } -> std::same_as<void>;
+        { Candidate::filter_update(filter) } -> std::same_as<void>;
+    };
 
 } // namespace navkit::core::estimation

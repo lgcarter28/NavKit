@@ -18,10 +18,11 @@ template<typename Candidate>
 concept MeasurementStatisticsConfigPolicy =
     requires {
         typename Candidate::Sensor_t;
-        typename Candidate::Model_t;
+        typename Candidate::MeasurementModel_t;
         { Candidate::Id } -> std::convertible_to<SensorId>;
     } && SensorPolicy<typename Candidate::Sensor_t> &&
-    std::same_as<typename Candidate::Model_t, typename Candidate::Sensor_t::Model_t>;
+    std::same_as<typename Candidate::MeasurementModel_t,
+                 typename Candidate::Sensor_t::MeasurementModel_t>;
 
 namespace detail
 {

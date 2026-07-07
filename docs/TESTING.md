@@ -8,7 +8,7 @@ failure behavior, and numerical expectations hard to misunderstand.
 
 | Layer | Purpose | Current examples |
 |---|---|---|
-| Compile-time concept tests | Prove public policy boundaries accept valid types and reject invalid ones without intentionally uncompilable targets. | `test_config_policy.cpp`, `test_injection_reset_policy.cpp`, `test_measurement_policy.cpp`, `test_noise_policy.cpp`, `test_navigator_policy.cpp`, `test_profiling_policy.cpp`, `test_state_def_policy.cpp` |
+| Compile-time concept tests | Prove public policy boundaries accept valid types and reject invalid ones without intentionally uncompilable targets. | `test_config_policy.cpp`, `test_injection_reset_policy.cpp`, `test_measurement_model_policy.cpp`, `test_noise_policy.cpp`, `test_navigator_policy.cpp`, `test_profiling_policy.cpp`, `test_state_def_policy.cpp` |
 | Core behavior tests | Verify small deterministic product-core contracts. | ring buffers, segments, frame/unit helpers, sensor FIFO behavior |
 | Numerical estimator tests | Verify update math, statistics, accepted/rejected behavior, and future propagation behavior. | GNSS position update, measurement statistics |
 | Environment/model tests | Verify policy capabilities and physics/model semantics at a stable tolerance. | planet/gravity policy tests |

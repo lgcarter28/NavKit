@@ -18,7 +18,7 @@ This project follows
 - Repository-wide agent guidance and documentation indexes.
 - Cross-platform environment bootstrap tooling and Linux/Windows GitHub Actions CI.
 - Candidate-first `InjectionPolicy` and `ResetPolicy` concepts with positive and negative compile-time tests.
-- Candidate-first `MeasurementPolicy` concept with positive coverage for GNSS position, GNSS velocity, and barometer models plus negative compile-time tests.
+- Candidate-first `MeasurementModelPolicy` concept with positive coverage for GNSS position, GNSS velocity, and barometer models plus negative compile-time tests.
 - Candidate-first `NoisePolicy` concept with positive and negative compile-time tests.
 - First-pass `FilterPolicy`, `SensorCollectionPolicy`, `UpdatePolicy`, and `NavigatorUpdatePolicy` concepts for Navigator orchestration boundaries.
 - Measurement-statistics regression tests for accepted and rejected measurement updates.
@@ -38,6 +38,7 @@ This project follows
 - Updated the configured C++ language standard from C++20 to C++23.
 - Registered the StateDef policy tests in the configured test executable.
 - Ordered source mutation/checks before build and test verification.
+- Refined estimator policy concepts by splitting standalone filter, filter-correction, and sensor-filter compatibility contracts; renamed measurement-model vocabulary to `MeasurementModelPolicy` and `Sensor::MeasurementModel_t`.
 - Consolidated superseded TODO lists and early core design notes into the canonical roadmap before removing them.
 - Constrained `KalmanFilter` on `StateDefPolicy`, injection policy, and reset policy boundaries.
 - Constrained `KalmanFilter` observation-update and measurement-statistics methods on measurement-model policy compatibility.

@@ -5,6 +5,8 @@
 
 #include "navkit/app_support/runtime/JsonInput.hpp"
 #include "navkit/core/config/Types.hpp"
+#include "navkit/core/estimation/filter/FilterPolicy.hpp"
+#include "navkit/core/estimation/state/StateDefPolicy.hpp"
 
 #include <Eigen/Dense>
 #include <nlohmann/json.hpp>
@@ -12,7 +14,8 @@
 namespace navkit::app_support
 {
 
-template<typename StateDef, typename Filter>
+template<navkit::core::estimation::StateDefPolicy StateDef,
+         navkit::core::estimation::FilterPolicy Filter>
 void configure_initial_filter_state(Filter& filter,
                                     const nlohmann::json& cfg,
                                     const Eigen::Matrix<core::Scalar_t, 3, 1>& p_e)

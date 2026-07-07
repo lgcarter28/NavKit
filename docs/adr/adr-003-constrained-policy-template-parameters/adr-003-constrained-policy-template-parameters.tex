@@ -322,15 +322,15 @@ using Filter = KalmanFilter<
     DefaultReset>;
 \end{lstlisting}
 
-\section{Measurement Policy}
+\section{Measurement Model Policy}
 
-Measurement policies should follow the same ordering rule.
+Measurement-model policies should follow the same ordering rule.
 
 Example:
 
 \begin{lstlisting}[language=C++]
 template<typename T, typename StateDef>
-concept MeasurementPolicy =
+concept MeasurementModelPolicy =
     StateDefPolicy<StateDef> &&
     requires(const State<StateDef>& x, const typename T::NoiseContext& ctx)
 {
@@ -368,7 +368,7 @@ This enables declarations such as:
 \begin{lstlisting}[language=C++]
 template<
     StateDefPolicy StateDef,
-    MeasurementPolicy<StateDef> Measurement>
+    MeasurementModelPolicy<StateDef> Measurement>
 void observation_update(...);
 \end{lstlisting}
 

@@ -13,7 +13,7 @@ namespace navkit::core::estimation
 template<typename Candidate>
 concept SensorPolicy = requires {
     { Candidate::Id } -> std::convertible_to<SensorId>;
-    typename Candidate::Model_t;
+    typename Candidate::MeasurementModel_t;
     typename Candidate::Measurement_t;
     typename Candidate::NoiseContext_t;
 } && requires(Candidate sensor, typename Candidate::Measurement_t measurement) {

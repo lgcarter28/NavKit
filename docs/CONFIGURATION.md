@@ -111,13 +111,13 @@ apps consume:
 struct StationaryGnssConfig
 {
     using StateDef = navkit::core::estimation::InsStateDef;
-    using PrimaryGnssModel = navkit::core::models::GnssPosModel<StateDef>;
+    using PrimaryGnssMeasurementModel = navkit::core::models::GnssPosModel<StateDef>;
     static constexpr navkit::core::estimation::SensorId primary_gnss_sensor_id = 0U;
     static constexpr std::size_t primary_gnss_buffer_size = 16U;
 
     using PrimaryGnssSensor =
         navkit::core::estimation::Sensor<primary_gnss_sensor_id,
-                                         PrimaryGnssModel,
+                                         PrimaryGnssMeasurementModel,
                                          primary_gnss_buffer_size>;
 
     using Sensors = std::tuple<PrimaryGnssSensor>;

@@ -11,7 +11,7 @@ namespace navkit::core::estimation
 {
 
 template<typename Candidate, typename StateDef>
-concept MeasurementPolicy =
+concept MeasurementModelPolicy =
     StateDefPolicy<StateDef> &&
     requires(const State<StateDef>& x, const typename Candidate::NoiseContext& ctx) {
         { Candidate::M } -> std::convertible_to<int>;

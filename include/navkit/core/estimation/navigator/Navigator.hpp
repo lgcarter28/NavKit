@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "navkit/core/estimation/filter/FilterPolicy.hpp"
 #include "navkit/core/estimation/filter/KalmanFilter.hpp"
 #include "navkit/core/estimation/navigator/NavigatorUpdatePolicy.hpp"
 #include "navkit/core/estimation/navigator/SensorCollectionPolicy.hpp"
@@ -19,7 +20,7 @@
 namespace navkit::core::estimation
 {
 
-template<typename Filter,
+template<FilterPolicy Filter,
          SensorCollectionPolicy SensorTuple,
          NavigatorUpdatePolicy<Filter, SensorTuple> Update = UpdatePostFilter<Filter>,
          navkit::core::profiling::ProfilerPolicy Profiler = navkit::core::profiling::NullProfiler>

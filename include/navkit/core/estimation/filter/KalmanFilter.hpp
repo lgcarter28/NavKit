@@ -10,7 +10,7 @@
 #include "navkit/core/estimation/filter/injection/InjectionPolicy.hpp"
 #include "navkit/core/estimation/filter/reset/ResetPolicies.hpp"
 #include "navkit/core/estimation/filter/reset/ResetPolicy.hpp"
-#include "navkit/core/estimation/measurement/MeasurementPolicy.hpp"
+#include "navkit/core/estimation/measurement/MeasurementModelPolicy.hpp"
 #include "navkit/core/estimation/state/State.hpp"
 #include "navkit/core/profiling/NullProfiler.hpp"
 #include "navkit/core/profiling/ProfilePoint.hpp"
@@ -91,7 +91,7 @@ public:
     }
 
     template<SensorPolicy Sensor>
-        requires MeasurementPolicy<typename Sensor::Model_t, StateDef>
+        requires MeasurementModelPolicy<typename Sensor::MeasurementModel_t, StateDef>
     [[nodiscard]] bool has_measurement_statistics() const
     {
         if constexpr (navkit::core::containers::tuple_contains_v<MeasurementStatistics<Sensor>,
@@ -104,7 +104,7 @@ public:
     }
 
     template<SensorPolicy Sensor>
-        requires MeasurementPolicy<typename Sensor::Model_t, StateDef>
+        requires MeasurementModelPolicy<typename Sensor::MeasurementModel_t, StateDef>
     MeasurementStatistics<Sensor>& measurement_statistics()
     {
         static_assert(
@@ -117,7 +117,7 @@ public:
     }
 
     template<SensorPolicy Sensor>
-        requires MeasurementPolicy<typename Sensor::Model_t, StateDef>
+        requires MeasurementModelPolicy<typename Sensor::MeasurementModel_t, StateDef>
     [[nodiscard]] const MeasurementStatistics<Sensor>& measurement_statistics() const
     {
         static_assert(
@@ -129,50 +129,52 @@ public:
             m_measurement_stats);
     }
 
-    template<MeasurementPolicy<StateDef> Model>
+    template<MeasurementModelPolicy<StateDef> MeasurementModel>
     void covariance_update(const P_t& P_i,
-                           const typename Model::H_t& H,
-                           const typename Model::R_t& R,
-                           const typename Model::O_t& innovation,
-                           typename Model::R_t& S,
-                           typename Model::K_t& K,
+                           const typename MeasurementModel::H_t& H,
+                           const typename MeasurementModel::R_t& R,
+                           const typename MeasurementModel::O_t& innovation,
+                           typename MeasurementModel::R_t& S,
+                           typename MeasurementModel::K_t& K,
                            State_t& dx,
                            P_t& P_f)
     {
         S = H * P_i * H.transpose() + R;
-        K = P_i * H.transpose() * S.ldlt().solve(Model::R_t::Identity());
+        K = P_i * H.transpose() * S.ldlt().solve(MeasurementModel::R_t::Identity());
         dx = K * innovation;
         const P_t IKH = I() - K * H;
         P_f = IKH * P_i * IKH.transpose() + K * R * K.transpose();
     }
 
-    template<MeasurementPolicy<StateDef> Model>
-    void observation_update(const typename Model::O_t& z,
+    template<MeasurementModelPolicy<StateDef> MeasurementModel>
+    void observation_update(const typename MeasurementModel::O_t& z,
                             Time_t time,
-                            const typename Model::NoiseContext& ctx,
+                            const typename MeasurementModel::NoiseContext& ctx,
                             bool accepted = true)
     {
-        observation_update_impl<Model, void>(z, time, ctx, accepted);
+        observation_update_impl<MeasurementModel, void>(z, time, ctx, accepted);
     }
 
-    template<MeasurementPolicy<StateDef> Model>
-    void observation_update(const typename Model::O_t& z, const typename Model::NoiseContext& ctx)
+    template<MeasurementModelPolicy<StateDef> MeasurementModel>
+    void observation_update(const typename MeasurementModel::O_t& z,
+                            const typename MeasurementModel::NoiseContext& ctx)
     {
-        observation_update<Model>(z, 0.0, ctx, true);
+        observation_update<MeasurementModel>(z, 0.0, ctx, true);
     }
 
-    template<typename Sensor>
-        requires MeasurementPolicy<typename Sensor::Model_t, StateDef>
+    template<SensorPolicy Sensor>
+        requires MeasurementModelPolicy<typename Sensor::MeasurementModel_t, StateDef>
     void process_sensor(Sensor& sensor)
     {
-        using Model = typename Sensor::Model_t;
+        using MeasurementModel = typename Sensor::MeasurementModel_t;
         typename Sensor::Measurement_t meas{};
         while (sensor.has_measurement()) {
             if (!sensor.pop(meas)) {
                 break;
             }
             sensor.update_noise_context(meas);
-            observation_update_impl<Model, Sensor>(meas.z, meas.time, sensor.noise_context(), true);
+            observation_update_impl<MeasurementModel, Sensor>(
+                meas.z, meas.time, sensor.noise_context(), true);
         }
     }
 
@@ -188,26 +190,26 @@ public:
     }
 
 private:
-    template<MeasurementPolicy<StateDef> Model, typename Sensor>
-    void observation_update_impl(const typename Model::O_t& z,
+    template<MeasurementModelPolicy<StateDef> MeasurementModel, typename Sensor>
+    void observation_update_impl(const typename MeasurementModel::O_t& z,
                                  Time_t time,
-                                 const typename Model::NoiseContext& ctx,
+                                 const typename MeasurementModel::NoiseContext& ctx,
                                  bool accepted)
     {
         auto profile_scope =
             Profiler::profile(navkit::core::profiling::ProfilePoint::KalmanObservationUpdate);
         static_cast<void>(profile_scope);
 
-        const typename Model::O_t innov = z - Model::obs(m_x);
-        const typename Model::H_t H = Model::compute_h(m_x);
-        const typename Model::R_t R = Model::compute_r(ctx);
+        const typename MeasurementModel::O_t innov = z - MeasurementModel::obs(m_x);
+        const typename MeasurementModel::H_t H = MeasurementModel::compute_h(m_x);
+        const typename MeasurementModel::R_t R = MeasurementModel::compute_r(ctx);
 
-        typename Model::R_t S{};
-        typename Model::K_t K{};
+        typename MeasurementModel::R_t S{};
+        typename MeasurementModel::K_t K{};
         State_t dx{};
         P_t P_f{};
 
-        covariance_update<Model>(m_P, H, R, innov, S, K, dx, P_f);
+        covariance_update<MeasurementModel>(m_P, H, R, innov, S, K, dx, P_f);
 
         const Scalar_t nis = innov.dot(S.ldlt().solve(innov));
 
@@ -222,14 +224,14 @@ private:
     }
 
     template<SensorPolicy Sensor>
-        requires MeasurementPolicy<typename Sensor::Model_t, StateDef>
+        requires MeasurementModelPolicy<typename Sensor::MeasurementModel_t, StateDef>
     void record_measurement_statistics(const Time_t time,
                                        const bool accepted,
-                                       const typename Sensor::Model_t::O_t& innovation,
-                                       const typename Sensor::Model_t::R_t& S,
-                                       const typename Sensor::Model_t::R_t& R,
-                                       const typename Sensor::Model_t::H_t& H,
-                                       const typename Sensor::Model_t::K_t& K,
+                                       const typename Sensor::MeasurementModel_t::O_t& innovation,
+                                       const typename Sensor::MeasurementModel_t::R_t& S,
+                                       const typename Sensor::MeasurementModel_t::R_t& R,
+                                       const typename Sensor::MeasurementModel_t::H_t& H,
+                                       const typename Sensor::MeasurementModel_t::K_t& K,
                                        const Scalar_t nis)
     {
         if constexpr (navkit::core::containers::tuple_contains_v<MeasurementStatistics<Sensor>,

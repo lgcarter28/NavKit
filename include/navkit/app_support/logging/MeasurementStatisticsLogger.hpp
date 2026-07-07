@@ -3,12 +3,17 @@
 
 #pragma once
 
+#include "navkit/core/estimation/filter/FilterPolicy.hpp"
+#include "navkit/core/estimation/sensor/SensorPolicy.hpp"
+
 #include <tuple>
 
 namespace navkit::app_support
 {
 
-template<typename Sensor, typename Logger, typename Filter>
+template<navkit::core::estimation::SensorPolicy Sensor,
+         typename Logger,
+         navkit::core::estimation::FilterPolicy Filter>
 void log_measurement_statistics_for_sensor(Logger& logger, const Filter& filter)
 {
     if constexpr (requires {

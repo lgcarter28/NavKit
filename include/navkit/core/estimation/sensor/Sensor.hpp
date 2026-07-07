@@ -15,20 +15,20 @@ namespace navkit::core::estimation
 {
 
 template<SensorId IdValue,
-         typename Model,
+         typename MeasurementModel,
          std::size_t BufferSize,
-         NoisePolicy<Model, Measurement<Model::M>> Noise = DefaultNoisePolicy>
+         NoisePolicy<MeasurementModel, Measurement<MeasurementModel::M>> Noise = DefaultNoisePolicy>
 class Sensor
 {
 public:
     static constexpr SensorId Id = IdValue;
 
-    using Model_t = Model;
-    using O_t = typename Model_t::O_t;
-    using H_t = typename Model_t::H_t;
-    using R_t = typename Model_t::R_t;
-    using Measurement_t = Measurement<Model_t::M>;
-    using NoiseContext_t = typename Model_t::NoiseContext;
+    using MeasurementModel_t = MeasurementModel;
+    using O_t = typename MeasurementModel_t::O_t;
+    using H_t = typename MeasurementModel_t::H_t;
+    using R_t = typename MeasurementModel_t::R_t;
+    using Measurement_t = Measurement<MeasurementModel_t::M>;
+    using NoiseContext_t = typename MeasurementModel_t::NoiseContext;
 
     bool push(const Measurement_t& meas)
     {

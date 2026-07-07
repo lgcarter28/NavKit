@@ -3,13 +3,16 @@
 
 #pragma once
 
+#include "navkit/core/estimation/filter/FilterPolicy.hpp"
+#include "navkit/core/estimation/sensor/SensorPolicy.hpp"
+
 namespace navkit::core::estimation
 {
 
-template<typename Filter>
+template<FilterCorrectionPolicy Filter>
 struct UpdatePostFilter
 {
-    template<typename Sensor>
+    template<SensorPolicy Sensor>
     static void sensor_update(Filter&, const Sensor&)
     {
         // default: do nothing after each sensor
@@ -22,10 +25,10 @@ struct UpdatePostFilter
     }
 };
 
-template<typename Filter>
+template<FilterCorrectionPolicy Filter>
 struct UpdateAfterEachSensor
 {
-    template<typename Sensor>
+    template<SensorPolicy Sensor>
     static void sensor_update(Filter& filter, const Sensor&)
     {
         filter.inject();

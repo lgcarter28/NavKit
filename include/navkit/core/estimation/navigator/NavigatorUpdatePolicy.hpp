@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "navkit/core/estimation/filter/FilterPolicy.hpp"
 #include "navkit/core/estimation/navigator/NavigatorPolicyCompatibility.hpp"
 #include "navkit/core/estimation/navigator/SensorCollectionPolicy.hpp"
 
@@ -11,7 +12,7 @@ namespace navkit::core::estimation
 
 template<typename Candidate, typename Filter, typename SensorTuple>
 concept NavigatorUpdatePolicy =
-    SensorCollectionPolicy<SensorTuple> &&
+    FilterPolicy<Filter> && SensorCollectionPolicy<SensorTuple> &&
     detail::navigator_policy_compatible_v<Filter, Candidate, SensorTuple>;
 
 } // namespace navkit::core::estimation

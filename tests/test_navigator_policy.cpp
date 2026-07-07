@@ -24,10 +24,22 @@ using NavigatorPolicyFilter = KalmanFilter<NavigatorPolicyStateDef>;
 using NavigatorPolicySensors = std::tuple<NavigatorPolicySensor>;
 using NavigatorPolicyUpdate = UpdatePostFilter<NavigatorPolicyFilter>;
 
-struct MissingProcessSensor
+struct MissingFilterLifecycle
+{};
+
+struct MissingSensorProcessing
 {
-    void inject() {}
-    void reset() {}
+    using State_t = NavigatorPolicyFilter::State_t;
+    using P_t = NavigatorPolicyFilter::P_t;
+
+    State_t& state();
+    const State_t& state() const;
+    P_t& covariance();
+    const P_t& covariance() const;
+    void set_state(const State_t&);
+    void set_covariance(const P_t&);
+    void inject();
+    void reset();
 };
 
 struct MissingSensorUpdate
@@ -51,10 +63,23 @@ struct MissingFilterUpdate
 template<typename Filter, typename Sensors>
 concept CanInstantiateNavigator = requires { typename Navigator<Filter, Sensors>; };
 
-TEST_CASE("FilterPolicy captures the minimum Navigator filter operation")
+TEST_CASE("FilterPolicy captures the standalone filter lifecycle")
 {
-    static_assert(FilterPolicy<NavigatorPolicyFilter, NavigatorPolicySensor>);
-    static_assert(!FilterPolicy<MissingProcessSensor, NavigatorPolicySensor>);
+    static_assert(FilterCorrectionPolicy<NavigatorPolicyFilter>);
+    static_assert(FilterCorrectionPolicy<MissingSensorProcessing>);
+    static_assert(!FilterCorrectionPolicy<MissingFilterLifecycle>);
+
+    static_assert(FilterPolicy<NavigatorPolicyFilter>);
+    static_assert(FilterPolicy<MissingSensorProcessing>);
+    static_assert(!FilterPolicy<MissingFilterLifecycle>);
+
+    CHECK(true);
+}
+
+TEST_CASE("SensorFilterPolicy captures sensor-dependent filter processing")
+{
+    static_assert(SensorFilterPolicy<NavigatorPolicyFilter, NavigatorPolicySensor>);
+    static_assert(!SensorFilterPolicy<MissingSensorProcessing, NavigatorPolicySensor>);
 
     CHECK(true);
 }
@@ -101,7 +126,8 @@ TEST_CASE("Navigator is constrained by filter, sensor collection, and update bou
 
     static_assert(std::is_default_constructible_v<Nav>);
     static_assert(CanInstantiateNavigator<NavigatorPolicyFilter, NavigatorPolicySensors>);
-    static_assert(!CanInstantiateNavigator<MissingProcessSensor, NavigatorPolicySensors>);
+    static_assert(!CanInstantiateNavigator<MissingFilterLifecycle, NavigatorPolicySensors>);
+    static_assert(!CanInstantiateNavigator<MissingSensorProcessing, NavigatorPolicySensors>);
     static_assert(!CanInstantiateNavigator<NavigatorPolicyFilter, NavigatorPolicySensor>);
 
     CHECK(true);

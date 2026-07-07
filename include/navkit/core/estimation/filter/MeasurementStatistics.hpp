@@ -17,12 +17,12 @@ struct MeasurementStatistics
     static constexpr SensorId Id = Sensor::Id;
 
     using Sensor_t = Sensor;
-    using Model_t = typename Sensor_t::Model_t;
+    using MeasurementModel_t = typename Sensor_t::MeasurementModel_t;
 
-    using O_t = typename Model_t::O_t;
-    using R_t = typename Model_t::R_t;
-    using H_t = typename Model_t::H_t;
-    using K_t = typename Model_t::K_t;
+    using O_t = typename MeasurementModel_t::O_t;
+    using R_t = typename MeasurementModel_t::R_t;
+    using H_t = typename MeasurementModel_t::H_t;
+    using K_t = typename MeasurementModel_t::K_t;
 
     bool valid{false};
     bool accepted{false};
