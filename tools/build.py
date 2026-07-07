@@ -12,6 +12,8 @@ import sys
 import time
 from pathlib import Path
 
+from navkit_build_dirs import repo_root_from_tools_file
+from navkit_build_dirs import resolve_build_dir as resolve_config_build_dir
 from perf_artifacts import (
     DEFAULT_NAVKIT_CONFIG,
     DEFAULT_RUN_NAME,
@@ -29,10 +31,7 @@ from perf_artifacts import (
 
 def repo_root() -> Path:
     """Return the repository root when this script is run from tools/build.py."""
-    script_path = Path(__file__).resolve()
-    if script_path.parent.name == "tools":
-        return script_path.parent.parent
-    return Path.cwd().resolve()
+    return repo_root_from_tools_file(__file__)
 
 
 def run(cmd: list[str], cwd: Path) -> None:
@@ -73,17 +72,6 @@ def find_conan_toolchain(build_dir: Path) -> Path:
         "Could not find Conan-generated conan_toolchain.cmake. Searched:\n"
         f"{searched}"
     )
-
-
-def resolve_build_dir(root: Path, build_type: str, build_dir_arg: Path | None) -> Path:
-    if build_dir_arg is None:
-        return root / "build" / build_type
-
-    build_dir = build_dir_arg if build_dir_arg.is_absolute() else root / build_dir_arg
-    resolved = build_dir.resolve()
-    if not resolved.is_relative_to(root):
-        raise ValueError(f"--build-dir must stay inside the repository: {build_dir_arg}")
-    return resolved
 
 
 def read_cmake_cache_value(build_dir: Path, key: str) -> str | None:
@@ -180,7 +168,9 @@ def main() -> int:
         "--build-dir",
         type=Path,
         default=None,
-        help="Build directory. Defaults to build/<build-type>.",
+        help=(
+            "Build directory. Defaults to build/<build-type>/<navkit-config-without-.hpp>."
+        ),
     )
     parser.add_argument("--clean", action="store_true")
     parser.add_argument("--skip-conan", action="store_true")
@@ -235,7 +225,10 @@ def main() -> int:
     start = time.perf_counter()
 
     root = repo_root()
-    build_dir = resolve_build_dir(root, args.build_type, args.build_dir)
+    requested_navkit_config = args.navkit_config or DEFAULT_NAVKIT_CONFIG
+    build_dir = resolve_config_build_dir(
+        root, args.build_type, requested_navkit_config, args.build_dir
+    )
 
     if args.clean and build_dir.exists():
         shutil.rmtree(build_dir)
@@ -279,7 +272,7 @@ def main() -> int:
                 f"-DNAVKIT_BUILD_TESTS={'OFF' if args.without_tests else 'ON'}",
                 f"-DNAVKIT_WARNINGS_AS_ERRORS={'ON' if args.warnings_as_errors else 'OFF'}",
                 f"-DNAVKIT_ENABLE_COVERAGE={'ON' if args.coverage else 'OFF'}",
-                *([f"-DNAVKIT_CONFIG={args.navkit_config}"] if args.navkit_config else []),
+                f"-DNAVKIT_CONFIG={requested_navkit_config}",
             ],
             cwd=root,
         )
@@ -296,7 +289,7 @@ def main() -> int:
         build_cmd += ["--parallel", str(args.jobs)]
 
     run(build_cmd, cwd=root)
-    navkit_config = selected_navkit_config(build_dir, args.navkit_config)
+    navkit_config = selected_navkit_config(build_dir, requested_navkit_config)
     compiletime_config_metadata = query_compiletime_config_metadata(build_dir, args.build_type)
     write_build_manifest(
         build_dir,

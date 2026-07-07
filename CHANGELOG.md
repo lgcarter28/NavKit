@@ -81,6 +81,7 @@ This project follows
 - Split app-support policy concepts into standalone headers and constrained simulation app configs, emulator bindings, emulator runtime plumbing, runtime validation, measurement models, and Navigator sensor processing on their real concept boundaries.
 - Reorganized `include/navkit/app_support` into ownership-oriented subdirectories for app config, emulation, runtime input, initialization, logging, profiling, and trajectory support.
 - Split concrete IO log products and reusable log payload wrappers into focused `log_products` and `log_payloads` headers, and removed the unused `RunLogProducts.hpp` umbrella.
+- Changed the default build directory convention so Python wrappers and presets derive build trees from the selected compile-time config header, preventing different `NAVKIT_CONFIG` builds from sharing one generated selected-config tree.
 - Added a `KalmanFilter::MeasurementStatisticsTuple_t` class-level alias for consistency with the other filter type aliases.
 - Split profiling, sensor-tuple, emulator-binding, product-config, and runtime-config-validation headers so public contracts stay separate from helper/trait machinery.
 - Removed unused profiling and sensor-tuple umbrella headers after replacing internal users with narrower includes.

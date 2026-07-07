@@ -4,64 +4,66 @@
     {
       "name": "conan-release",
       "displayName": "Conan Release",
-      "binaryDir": "${sourceDir}/build/Release",
+      "binaryDir": "${sourceDir}/build/Release/apps/navkit_sim/StationaryGnss",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/Release/build/generators/conan_toolchain.cmake"
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/Release/apps/navkit_sim/StationaryGnss/build/generators/conan_toolchain.cmake",
+        "NAVKIT_CONFIG": "apps/navkit_sim/StationaryGnss.hpp"
       }
     },
     {
       "name": "conan-debug",
       "displayName": "Conan Debug",
-      "binaryDir": "${sourceDir}/build/Debug",
+      "binaryDir": "${sourceDir}/build/Debug/apps/navkit_sim/StationaryGnss",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/Debug/build/generators/conan_toolchain.cmake"
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/Debug/apps/navkit_sim/StationaryGnss/build/generators/conan_toolchain.cmake",
+        "NAVKIT_CONFIG": "apps/navkit_sim/StationaryGnss.hpp"
       }
     },
     {
       "name": "debug-stationary-gnss",
       "displayName": "Debug - navkit_sim StationaryGnss",
-      "binaryDir": "${sourceDir}/build/presets/debug-stationary-gnss",
+      "binaryDir": "${sourceDir}/build/Debug/apps/navkit_sim/StationaryGnss",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/presets/debug-stationary-gnss/build/generators/conan_toolchain.cmake",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/Debug/apps/navkit_sim/StationaryGnss/build/generators/conan_toolchain.cmake",
         "NAVKIT_CONFIG": "apps/navkit_sim/StationaryGnss.hpp"
       }
     },
     {
       "name": "debug-profiled-stationary-gnss",
       "displayName": "Debug - navkit_sim ProfiledStationaryGnss",
-      "binaryDir": "${sourceDir}/build/presets/debug-profiled-stationary-gnss",
+      "binaryDir": "${sourceDir}/build/Debug/apps/navkit_sim/ProfiledStationaryGnss",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/presets/debug-profiled-stationary-gnss/build/generators/conan_toolchain.cmake",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/Debug/apps/navkit_sim/ProfiledStationaryGnss/build/generators/conan_toolchain.cmake",
         "NAVKIT_CONFIG": "apps/navkit_sim/ProfiledStationaryGnss.hpp"
       }
     },
     {
       "name": "release-stationary-gnss",
       "displayName": "Release - navkit_sim StationaryGnss",
-      "binaryDir": "${sourceDir}/build/presets/release-stationary-gnss",
+      "binaryDir": "${sourceDir}/build/Release/apps/navkit_sim/StationaryGnss",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/presets/release-stationary-gnss/build/generators/conan_toolchain.cmake",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/Release/apps/navkit_sim/StationaryGnss/build/generators/conan_toolchain.cmake",
         "NAVKIT_CONFIG": "apps/navkit_sim/StationaryGnss.hpp"
       }
     },
     {
       "name": "release-profiled-stationary-gnss",
       "displayName": "Release - navkit_sim ProfiledStationaryGnss",
-      "binaryDir": "${sourceDir}/build/presets/release-profiled-stationary-gnss",
+      "binaryDir": "${sourceDir}/build/Release/apps/navkit_sim/ProfiledStationaryGnss",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/presets/release-profiled-stationary-gnss/build/generators/conan_toolchain.cmake",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/Release/apps/navkit_sim/ProfiledStationaryGnss/build/generators/conan_toolchain.cmake",
         "NAVKIT_CONFIG": "apps/navkit_sim/ProfiledStationaryGnss.hpp"
       }
     }

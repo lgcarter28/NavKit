@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from navkit_build_dirs import resolve_build_dir
 from perf_artifacts import (
     DEFAULT_NAVKIT_CONFIG,
     default_resource_report_path,
@@ -24,7 +25,8 @@ def main() -> int:
     parser.add_argument("--no-display", action="store_true")
     args = parser.parse_args()
 
-    build_dir = args.build_dir or (Path("build") / args.build_type)
+    root = Path(__file__).resolve().parents[1]
+    build_dir = resolve_build_dir(root, args.build_type, args.navkit_config, args.build_dir)
     output = args.output or default_resource_report_path(args.build_type)
 
     write_resource_report(

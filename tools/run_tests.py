@@ -10,7 +10,9 @@ import sys
 import time
 from pathlib import Path
 
+from navkit_build_dirs import resolve_build_dir
 from perf_artifacts import (
+    DEFAULT_NAVKIT_CONFIG,
     DEFAULT_RUN_NAME,
     DEFAULT_TIMING_PATH,
     print_command_timing,
@@ -39,7 +41,14 @@ def main() -> int:
         "--build-dir",
         type=Path,
         default=None,
-        help="Build directory. Defaults to build/<build-type>.",
+        help=(
+            "Build directory. Defaults to build/<build-type>/<navkit-config-without-.hpp>."
+        ),
+    )
+    parser.add_argument(
+        "--navkit-config",
+        default=DEFAULT_NAVKIT_CONFIG,
+        help="Compile-time config header relative to config/compiletime.",
     )
     parser.add_argument(
         "--timing-output",
@@ -63,13 +72,16 @@ def main() -> int:
     start = time.perf_counter()
 
     root = Path(__file__).resolve().parents[1]
-    build_dir = args.build_dir if args.build_dir is not None else root / "build" / args.build_type
-    if not build_dir.is_absolute():
-        build_dir = root / build_dir
+    build_dir = resolve_build_dir(root, args.build_type, args.navkit_config, args.build_dir)
 
     if not build_dir.exists():
         print(f"Build directory does not exist: {build_dir}")
-        print("Run: python tools/build.py --build-type", args.build_type)
+        print(
+            "Run: python tools/build.py --build-type",
+            args.build_type,
+            "--navkit-config",
+            args.navkit_config,
+        )
         return 1
 
     build_manifest = load_build_manifest(build_dir)

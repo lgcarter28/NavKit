@@ -349,7 +349,7 @@ you want only the compact CSV profile export.
 Use a separate build directory for each selected compile-time configuration:
 
 ```bash
-python tools/build.py --build-type Debug --build-dir build/debug-stationary-gnss --navkit-config apps/navkit_sim/StationaryGnss.hpp
+python tools/build.py --build-type Debug --build-dir build/custom/stationary-gnss --navkit-config apps/navkit_sim/StationaryGnss.hpp
 ```
 
 This keeps each generated `navkit/SelectedConfig.hpp` isolated. Debug/Release
@@ -403,39 +403,41 @@ The Python wrapper is preferred, but the raw commands are useful for debugging.
 From the repository root, install dependencies with Conan:
 
 ```bash
-conan install . --output-folder build/Debug --build=missing -s build_type=Debug
+conan install . --output-folder build/Debug/apps/navkit_sim/StationaryGnss --build=missing -s build_type=Debug
 ```
 
 Conan 2 usually writes the generated CMake toolchain file to:
 
 ```text
-build/Debug/build/generators/conan_toolchain.cmake
+build/Debug/apps/navkit_sim/StationaryGnss/build/generators/conan_toolchain.cmake
 ```
 
 Configure CMake manually:
 
 ```bash
-cmake -S . -B build/Debug -DCMAKE_TOOLCHAIN_FILE=build/Debug/build/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug
+cmake -S . -B build/Debug/apps/navkit_sim/StationaryGnss -DCMAKE_TOOLCHAIN_FILE=build/Debug/apps/navkit_sim/StationaryGnss/build/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
 ```
 
-To select a compile-time config manually, add `-DNAVKIT_CONFIG=...`:
+To select a different compile-time config manually, use a matching build
+directory and `-DNAVKIT_CONFIG=...`:
 
 ```bash
-cmake -S . -B build/Debug -DCMAKE_TOOLCHAIN_FILE=build/Debug/build/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
+conan install . --output-folder build/Debug/apps/navkit_sim/ProfiledStationaryGnss --build=missing -s build_type=Debug
+cmake -S . -B build/Debug/apps/navkit_sim/ProfiledStationaryGnss -DCMAKE_TOOLCHAIN_FILE=build/Debug/apps/navkit_sim/ProfiledStationaryGnss/build/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/ProfiledStationaryGnss.hpp
 ```
 
 Build manually:
 
 ```bash
-cmake --build build/Debug --config Debug
+cmake --build build/Debug/apps/navkit_sim/StationaryGnss --config Debug
 ```
 
 For Release, replace `Debug` with `Release`:
 
 ```bash
-conan install . --output-folder build/Release --build=missing -s build_type=Release
-cmake -S . -B build/Release -DCMAKE_TOOLCHAIN_FILE=build/Release/build/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release
-cmake --build build/Release --config Release
+conan install . --output-folder build/Release/apps/navkit_sim/StationaryGnss --build=missing -s build_type=Release
+cmake -S . -B build/Release/apps/navkit_sim/StationaryGnss -DCMAKE_TOOLCHAIN_FILE=build/Release/apps/navkit_sim/StationaryGnss/build/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
+cmake --build build/Release/apps/navkit_sim/StationaryGnss --config Release
 ```
 
 Notes:
@@ -459,13 +461,13 @@ If the project has already been built, this runs CTest against the selected buil
 Equivalent raw CTest command:
 
 ```bash
-ctest --test-dir build/Debug --output-on-failure -C Debug
+ctest --test-dir build/Debug/apps/navkit_sim/StationaryGnss --output-on-failure -C Debug
 ```
 
 For Release:
 
 ```bash
-ctest --test-dir build/Release --output-on-failure -C Release
+ctest --test-dir build/Release/apps/navkit_sim/StationaryGnss --output-on-failure -C Release
 ```
 
 ---
@@ -483,19 +485,19 @@ Or manually, after building:
 Windows Debug:
 
 ```powershell
-build\Debug\apps\navkit_sim\Debug\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
+build\Debug\apps\navkit_sim\StationaryGnss\apps\navkit_sim\Debug\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
 ```
 
 Windows Release:
 
 ```powershell
-build\Release\apps\navkit_sim\Release\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
+build\Release\apps\navkit_sim\StationaryGnss\apps\navkit_sim\Release\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
 ```
 
 Linux Debug:
 
 ```bash
-build/Debug/apps/navkit_sim/navkit_sim config/runtime/navkit_sim/stationary_gnss.json
+build/Debug/apps/navkit_sim/StationaryGnss/apps/navkit_sim/navkit_sim config/runtime/navkit_sim/stationary_gnss.json
 ```
 
 The simulation generates logs under:

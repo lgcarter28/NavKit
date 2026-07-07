@@ -4,7 +4,7 @@
         "conan": {}
     },
     "include": [
-        "build/Release/build/generators/CMakePresets.json",
-        "build/Debug/build/generators/CMakePresets.json"
+        "build/Debug/apps/navkit_sim/StationaryGnss/build/generators/CMakePresets.json",
+        "build/Debug/apps/navkit_sim/ProfiledStationaryGnss/build/generators/CMakePresets.json"
     ]
 }

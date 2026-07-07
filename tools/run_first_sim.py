@@ -9,7 +9,9 @@ import platform
 import subprocess
 from pathlib import Path
 
+from navkit_build_dirs import resolve_build_dir
 from perf_artifacts import (
+    DEFAULT_NAVKIT_CONFIG,
     measure_call,
     print_command_timing,
     update_timing_artifact,
@@ -24,10 +26,6 @@ from profile_report import (
     summarize,
     write_chrome_trace,
 )
-
-
-def default_build_dir(build_type: str) -> Path:
-    return Path("build") / build_type
 
 
 def default_exe(build_dir: Path, build_type: str) -> Path:
@@ -78,7 +76,14 @@ def main() -> int:
         "--build-dir",
         type=Path,
         default=None,
-        help="Build directory. Defaults to build/<build-type>.",
+        help=(
+            "Build directory. Defaults to build/<build-type>/<navkit-config-without-.hpp>."
+        ),
+    )
+    parser.add_argument(
+        "--navkit-config",
+        default=DEFAULT_NAVKIT_CONFIG,
+        help="Compile-time config header relative to config/compiletime.",
     )
     parser.add_argument(
         "--config", type=Path, default=Path("config/runtime/navkit_sim/stationary_gnss.json")
@@ -100,7 +105,8 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    build_dir = args.build_dir or default_build_dir(args.build_type)
+    root = Path(__file__).resolve().parents[1]
+    build_dir = resolve_build_dir(root, args.build_type, args.navkit_config, args.build_dir)
     build_manifest = load_build_manifest(build_dir)
     navkit_config = str(build_manifest.get("navkit_config", "unknown"))
 

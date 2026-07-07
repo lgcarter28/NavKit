@@ -120,7 +120,7 @@ To generate Chrome Trace / Perfetto-compatible JSON from an existing profile:
 
 ```bash
 python tools/profile_report.py data/logs/<run_name>/profile.csv \
-  --build-manifest build/Debug/navkit_build_manifest.json \
+  --build-manifest build/Debug/apps/navkit_sim/ProfiledStationaryGnss/navkit_build_manifest.json \
   --chrome-trace data/logs/<run_name>/profile.trace.json
 ```
 
@@ -130,7 +130,7 @@ manifest so compile-time and runtime facts remain separate:
 ```bash
 python tools/profile_report.py data/logs/<run_name>/profile.csv \
   --profile-run-manifest data/logs/<run_name>/profile_run_manifest.json \
-  --build-manifest build/Debug/navkit_build_manifest.json \
+  --build-manifest build/Debug/apps/navkit_sim/ProfiledStationaryGnss/navkit_build_manifest.json \
   --chrome-trace data/logs/<run_name>/profile.trace.json
 ```
 

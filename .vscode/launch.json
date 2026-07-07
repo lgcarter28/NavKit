@@ -5,7 +5,7 @@
             "name": "Windows Debug navkit_sim",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/Debug/apps/navkit_sim/Debug/navkit_sim.exe",
+            "program": "${workspaceFolder}/build/Debug/apps/navkit_sim/StationaryGnss/apps/navkit_sim/Debug/navkit_sim.exe",
             "args": [
                 "${workspaceFolder}/config/runtime/navkit_sim/stationary_gnss.json"
             ],
@@ -16,7 +16,7 @@
             "name": "Windows Debug navkit_tests",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/Debug/tests/Debug/navkit_tests.exe",
+            "program": "${workspaceFolder}/build/Debug/apps/navkit_sim/StationaryGnss/tests/Debug/navkit_tests.exe",
             "args": [],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
@@ -25,7 +25,7 @@
             "name": "Linux Debug navkit_sim",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/Debug/apps/navkit_sim/navkit_sim",
+            "program": "${workspaceFolder}/build/Debug/apps/navkit_sim/StationaryGnss/apps/navkit_sim/navkit_sim",
             "args": [
                 "${workspaceFolder}/config/runtime/navkit_sim/stationary_gnss.json"
             ],
@@ -38,7 +38,7 @@
             "name": "Linux Debug navkit_tests",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/Debug/tests/navkit_tests",
+            "program": "${workspaceFolder}/build/Debug/apps/navkit_sim/StationaryGnss/tests/navkit_tests",
             "args": [],
             "cwd": "${workspaceFolder}",
             "MIMode": "gdb",

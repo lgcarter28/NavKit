@@ -233,8 +233,8 @@ config/
 ```
 
 The selected concrete config header provides `navkit::config::SelectedConfig`.
-CMake generates `build/<type>/generated/navkit/SelectedConfig.hpp`, which exposes
-the stable application-facing alias:
+CMake generates `generated/navkit/SelectedConfig.hpp` inside the selected build
+tree, which exposes the stable application-facing alias:
 
 ```cpp
 using AppConfig = navkit::selected_config::Config;
@@ -245,7 +245,7 @@ using AppConfig = navkit::selected_config::Config;
 The CMake model is one compile-time configuration per build tree:
 
 ```text
-cmake -S . -B build/Debug -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
+cmake -S . -B build/Debug/apps/navkit_sim/StationaryGnss -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
 ```
 
 `NAVKIT_CONFIG` is a CMake cache variable relative to `config/compiletime`. It
@@ -261,8 +261,18 @@ Debug/Release and `NAVKIT_CONFIG` are separate axes:
 - `NAVKIT_CONFIG` selects the top-level compile-time build configuration,
   usually an app config for executables.
 
-Multiple configurations should use multiple build directories or CMake presets,
-not a single executable that dynamically switches among compile-time configs.
+Multiple configurations use multiple build directories or CMake presets, not a
+single executable that dynamically switches among compile-time configs. By
+default, repository Python tools derive the build directory from the selected
+config header:
+
+```text
+apps/navkit_sim/StationaryGnss.hpp
+    -> build/Debug/apps/navkit_sim/StationaryGnss
+
+apps/navkit_sim/ProfiledStationaryGnss.hpp
+    -> build/Debug/apps/navkit_sim/ProfiledStationaryGnss
+```
 
 Runtime JSON is still checked against the compiled app composition. For example,
 the stationary GNSS sim config currently requires `trajectory` and `gnss`
@@ -277,10 +287,11 @@ The Python build wrapper forwards the same selection:
 python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/StationaryGnss.hpp
 ```
 
-Use `--build-dir` when keeping more than one selected config locally:
+The default build directory is already config-rooted. Use `--build-dir` only
+when an explicit custom location is needed:
 
 ```text
-python tools/build.py --build-type Debug --build-dir build/debug-stationary-gnss --navkit-config apps/navkit_sim/StationaryGnss.hpp
+python tools/build.py --build-type Debug --build-dir build/custom/stationary --navkit-config apps/navkit_sim/StationaryGnss.hpp
 ```
 
 Each build directory has its own generated `navkit/SelectedConfig.hpp`, so two

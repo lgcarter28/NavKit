@@ -9,6 +9,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from navkit_build_dirs import default_build_dir
+
 
 def repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
@@ -24,8 +26,8 @@ def main() -> int:
     parser.add_argument(
         "--build-dir",
         type=Path,
-        default=Path("build/coverage"),
-        help="Coverage build directory. Defaults to build/coverage.",
+        default=None,
+        help="Coverage build directory. Defaults to build/coverage/<navkit-config-without-.hpp>.",
     )
     parser.add_argument(
         "--navkit-config",
@@ -40,7 +42,10 @@ def main() -> int:
     args = parser.parse_args()
 
     root = repo_root()
-    build_dir = args.build_dir if args.build_dir.is_absolute() else root / args.build_dir
+    if args.build_dir is None:
+        build_dir = default_build_dir(root, "coverage", args.navkit_config)
+    else:
+        build_dir = args.build_dir if args.build_dir.is_absolute() else root / args.build_dir
 
     gcovr = shutil.which("gcovr")
     if gcovr is None:
@@ -71,6 +76,8 @@ def main() -> int:
             "Debug",
             "--build-dir",
             str(build_dir),
+            "--navkit-config",
+            args.navkit_config,
         ],
         cwd=root,
     )

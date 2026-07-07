@@ -196,6 +196,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Support multiple configurations by using multiple build directories or CMake presets, not by making one executable dynamically switch among compile-time configurations.
 - [x] Add CMake presets or documented wrapper examples that pair common build types and selected configs for convenience while keeping those axes independent.
 - [x] Add a `tools/build.py` option such as `--navkit-config apps/navkit_sim/StationaryGnss.hpp` that forwards to `-DNAVKIT_CONFIG=...`.
+- [x] Make the default build directory derive from the selected compile-time config header, for example `apps/navkit_sim/StationaryGnss.hpp` maps to `build/Debug/apps/navkit_sim/StationaryGnss`, so switching configs does not overwrite another build tree's generated selected-config header.
 - [x] Document how to add a new compile-time config header, how to select it with CMake or the build wrapper, and how to pair it with a runtime JSON input when an application needs one.
 - [x] Reconcile `README.md`, `docs/SETUP.md`, `docs/ARCHITECTURE.md`, and `AGENTS.md` so the default selected config, root config tree, and one-config-per-build-tree rule stay discoverable.
 - [x] Keep reusable NavKit library configs and app composition configs in dedicated directories so app and library configs can share descriptive names without coupling their ownership.
