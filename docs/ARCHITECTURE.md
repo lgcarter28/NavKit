@@ -226,6 +226,32 @@ not current behavior.
   polymorphism where practical.
 - Python analysis is deliberately outside the embedded-facing C++ product core.
 
+## Policy concepts and template boundaries
+
+Policy concepts are intended to name stable capability boundaries, not to copy
+every member function of the first implementation that happens to satisfy them.
+Use a concept when multiple consumers rely on the same interface, when a
+configuration-selected type is intentionally swappable, or when diagnostics at a
+public template boundary would otherwise be poor.
+
+Context-dependent concepts stay candidate-first and carry only the context they
+actually require. For example, a measurement model is validated relative to a
+state definition at the filter or product-configuration boundary; the generic
+sensor container does not need to know that state definition merely to store and
+queue measurements.
+
+When two consumers need different parts of a type's capability, prefer separate
+narrow concepts over one over-coupled concept. A future filter cleanup may
+distinguish the standalone filter lifecycle contract from the sensor-specific
+"this filter can process this sensor" contract so Navigator construction,
+initialization, and tuple compatibility checks can each name the dependency they
+actually own.
+
+Raw `typename` remains appropriate for private tuple expansion helpers, local
+implementation details, and deliberately unconstrained utilities. It is a design
+smell on primary policy or product-configuration surfaces when a clear concept
+already exists and improves readability or diagnostics.
+
 ## Explicitly not implemented yet
 
 - INS propagation/mechanization.

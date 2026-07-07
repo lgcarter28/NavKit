@@ -37,6 +37,11 @@ Concepts express capabilities; CRTP bases share implementation and are not manda
 - Keep public API concepts and config contracts painfully clear. Internal helper machinery should be minimal, local, and named for the concrete problem it solves; avoid broad "utility" layers that become dumping grounds.
 - Consolidate genuinely reusable utilities rather than scattering narrowly named helpers across domains. A reusable helper should make ownership clearer and reduce repeated implementation, not obscure the product graph or create a second API users must mentally execute.
 - If a refactor is primarily hiding complexity rather than deleting it, call that out. The preferred outcome is simpler internals and simpler API, not a polished facade over a tangled implementation.
+- Concepts should describe stable consumer boundaries, not mirror every function on one implementation. Add function signatures to a concept only when a real consumer is allowed to depend on them, when the type is intentionally swappable, or when diagnostics at that boundary materially improve.
+- Split concepts when the dependency context is genuinely different. For example, a standalone filter object contract and a "filter can process this sensor" contract may be separate if some consumers need the filter lifecycle without knowing a sensor type. Do not force unrelated consumers to invent template context solely to satisfy an over-coupled concept.
+- Use policy concepts at public or reused template boundaries when the role is known. Raw `typename` is fine for private tuple expansion helpers, local implementation details, or intentionally unconstrained generic utilities; it is a smell on primary policy surfaces when a clear concept already exists.
+- Keep context-dependent concepts candidate-first and parameterized by the context they actually need. A measurement model can be well-formed only relative to a state definition, so constrain it as a measurement-model policy at the consuming boundary rather than pushing unrelated state knowledge into the sensor container.
+- Prefer domain-specific names when generic names become vague. If `Model` no longer communicates the boundary, use clearer vocabulary such as `MeasurementModel` or `ProcessModel` and update the matching policy names when the rename improves API clarity.
 
 ## Current implementation reality
 

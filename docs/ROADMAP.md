@@ -302,6 +302,21 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Add or update documentation in `docs/ARCHITECTURE.md` or `docs/CONFIGURATION.md` if the new layout changes how end users discover app compile-time config, runtime JSON validation, or simulator emulators.
 - [x] Run format/copyright checks, Debug build/tests, and the stationary GNSS sim/analysis pipeline after the move to catch include-path and selected-config regressions.
 
+### Pass 3.1p — Core policy-concept contract cleanup
+
+- [ ] Flesh out `FilterPolicy` so it names the stable standalone filter lifecycle contract consumed by Navigator, initialization, and app-support code. Do not include implementation-specific diagnostics or every `KalmanFilter` helper merely because they exist.
+- [ ] Add a separate sensor-dependent filter compatibility concept, such as `SensorFilterPolicy<Filter, Sensor>`, if the boundary remains useful after implementation review. Its job is to say "this filter can consume this configured sensor" without forcing every filter consumer to know about sensors.
+- [ ] Use `FilterPolicy` directly in the `Navigator` template declaration once the standalone filter concept is real, and keep tuple-wide sensor/filter/update compatibility checks in `NavigatorPolicyCompatibility`.
+- [ ] Update `NavigatorPolicyCompatibility` to read in terms of the real concepts it owns, such as `SensorFilterPolicy<Filter, Sensor>` and `UpdatePolicy<Update, Filter, Sensor>`, rather than overloading a broad filter concept with sensor-dependent meaning.
+- [ ] Constrain concrete Navigator update policies, such as `UpdatePostFilter<Filter>` and `UpdateAfterEachSensor<Filter>`, with the narrow filter operations they actually require. Avoid over-constraining update policies on sensor-processing behavior if the policy only injects/resets after updates.
+- [ ] Constrain `KalmanFilter::process_sensor` with `SensorPolicy Sensor` while keeping the separate measurement-model policy check that proves the sensor's measurement model can update the configured state definition.
+- [ ] Lightly constrain current app-support initialization helpers with `StateDefPolicy` and the appropriate filter concept, while avoiding a deep polish of the existing truth/error-style initialization path. Phase 3.3 owns the real PVA initialization and transfer-alignment redesign.
+- [ ] Lightly constrain `MeasurementStatisticsLogger` with existing sensor/filter concepts where it improves clarity, but defer logger-specific constraints until the generic logger composition pass replaces GNSS-specific method probing with typed payload dispatch.
+- [ ] Rename the measurement-model concept vocabulary from `MeasurementPolicy` to `MeasurementModelPolicy`, aligning it with `MeasurementModelBase` and making clear that the policy constrains the model attached to a sensor, not a raw measurement sample.
+- [ ] Migrate public/config-facing sensor aliases from generic model names to measurement-model names where clarity improves. In particular, add or rename `Sensor::Model_t` to `Sensor::MeasurementModel_t` and update downstream public aliases such as `MeasurementStatistics<Sensor>` to use `MeasurementModel_t`. Keep a short-lived compatibility alias only if it materially reduces churn during the migration.
+- [ ] Rename concrete config aliases such as `PrimaryGnssModel` to `PrimaryGnssMeasurementModel` where they are user-facing product graph nodes. Keep tiny local implementation aliases named `Model` only where the surrounding function scope makes the meaning obvious.
+- [ ] Add positive and negative compile-time tests for any new or renamed concepts. Keep raw `typename` in private tuple expansion helpers where a concept would only add ceremony.
+
 ### Pass 3.2 — Log product concepts and payload boundaries
 
 - [x] Add a narrow `LogProductPolicy<Candidate, Payload>` concept under `include/navkit/io` that validates the shared log-product lifecycle and the concrete payload-specific `log(payload)` operation. Do not force every log product into one fake common `log(...)` signature.
@@ -435,6 +450,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [ ] Define candidate-first `PropagationPolicy` using concrete prediction inputs rather than speculative APIs.
 - [ ] Implement `NoOpPropagation` to preserve current GNSS-only behavior.
 - [ ] Refactor Navigator to orchestrate prediction, sensor processing, and update policy application.
+- [ ] Revisit whether a standalone `NavigatorPolicy` is useful once Navigator owns construction, initialization handoff, propagation, sensor processing, and update orchestration. Expected requirements would include aliases such as `Filter_t`, `Sensors_t`, `Update_t`, and `Profiler_t`, accessors for filter and sensors, and `process_measurements()` or its propagation-aware successor; do not implement this concept until a real consumer needs it.
 - [ ] Keep Navigator unaware of planet, gravity, and frame types; those belong inside propagation/mechanization configuration.
 - [ ] Add valid and invalid compile-time tests for filter, sensor collection, propagation, and update boundaries.
 - [ ] Verify the stationary GNSS numerical baseline remains unchanged with `NoOpPropagation`.
