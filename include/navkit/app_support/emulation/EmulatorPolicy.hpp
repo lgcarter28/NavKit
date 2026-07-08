@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "navkit/io/LoggerPolicy.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
 #include <concepts>
@@ -30,6 +31,6 @@ concept EmulatorPolicy = requires(typename Candidate::Runtime& runtime,
     { Candidate::configure_logger(logger, cfg) } -> std::same_as<void>;
     { Candidate::generate(runtime, truth) } -> std::same_as<typename Sensor::Measurement_t>;
     { Candidate::log_measurement(logger, measurement) } -> std::same_as<void>;
-};
+} && navkit::io::LoggerPolicy<Logger>;
 
 } // namespace navkit::app_support

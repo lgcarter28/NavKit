@@ -96,6 +96,11 @@ This project follows
 - Refactored stationary simulation logging so `RunLogger` coordinates composable log-product adapters while app compile-time configs explicitly select the logger type.
 - Added payload-specific log-product concepts and CSV schema helpers so logging adapters expose explicit serialization boundaries.
 - Reworked `RunLogger` into a compile-time log-product tuple façade with typed payload dispatch, selected-product metadata emission, and generic app-support measurement-statistics logging.
+- Moved logger composition into app compile-time configs, added logger lifecycle/payload/product-access concepts, and made `RunLogger<...>` the generic log-product tuple façade.
+- Removed public `MeasurementStatisticsTuple` aliases from reusable product configs; `KalmanFilter` now derives filter-owned diagnostics storage from the configured `Sensors` tuple and exposes `measurement_statistics_available<Sensor>()`.
+- Added sensor diagnostics configuration and disabled-statistics coverage while keeping measurement statistics keyed by configured sensor type.
+- Installed Ninja through bootstrap as a local compile-database convenience for optional Windows clang-tidy diagnostics.
+- Exposed sensor diagnostics aliases in reusable product configs and moved profiling clock metadata onto the selected clock type to avoid config metadata drift.
 
 ### Removed
 

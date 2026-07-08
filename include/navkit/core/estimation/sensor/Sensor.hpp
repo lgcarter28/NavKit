@@ -5,6 +5,7 @@
 
 #include "navkit/core/containers/RingBuffer.hpp"
 #include "navkit/core/estimation/measurement/Measurement.hpp"
+#include "navkit/core/estimation/sensor/SensorDiagnosticsPolicy.hpp"
 #include "navkit/core/estimation/sensor/SensorId.hpp"
 #include "navkit/core/estimation/sensor/noise/NoisePolicies.hpp"
 #include "navkit/core/estimation/sensor/noise/NoisePolicy.hpp"
@@ -17,7 +18,8 @@ namespace navkit::core::estimation
 template<SensorId IdValue,
          typename MeasurementModel,
          std::size_t BufferSize,
-         NoisePolicy<MeasurementModel, Measurement<MeasurementModel::M>> Noise = DefaultNoisePolicy>
+         NoisePolicy<MeasurementModel, Measurement<MeasurementModel::M>> Noise = DefaultNoisePolicy,
+         SensorDiagnosticsPolicy Diagnostics = DefaultSensorDiagnostics>
 class Sensor
 {
 public:
@@ -29,6 +31,7 @@ public:
     using R_t = typename MeasurementModel_t::R_t;
     using Measurement_t = Measurement<MeasurementModel_t::M>;
     using NoiseContext_t = typename MeasurementModel_t::NoiseContext;
+    using Diagnostics_t = Diagnostics;
 
     bool push(const Measurement_t& meas)
     {

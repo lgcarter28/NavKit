@@ -180,8 +180,8 @@ startup initialization helpers, app-side logging adapters, profile export, and
 trajectory providers. IO log products and typed payload wrappers live under
 `include/navkit/io/log_products` and `include/navkit/io/log_payloads` so the
 serialization boundary is explicit without forcing logging into product-core
-code. `navkit::io::BasicRunLogger<...>` is a small compile-time façade over the
-selected log-product tuple: it owns output-directory setup, product
+code. `navkit::io::RunLogger<...>` is a small compile-time façade over the
+selected app-configured log-product tuple: it owns output-directory setup, product
 open/flush/close orchestration, per-product metadata files, and the run
 manifest, while concrete products own CSV schemas and payload serialization.
 

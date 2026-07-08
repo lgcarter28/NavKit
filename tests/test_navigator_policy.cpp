@@ -76,10 +76,10 @@ TEST_CASE("FilterPolicy captures the standalone filter lifecycle")
     CHECK(true);
 }
 
-TEST_CASE("SensorFilterPolicy captures sensor-dependent filter processing")
+TEST_CASE("FilterSensorPolicy captures sensor-dependent filter processing")
 {
-    static_assert(SensorFilterPolicy<NavigatorPolicyFilter, NavigatorPolicySensor>);
-    static_assert(!SensorFilterPolicy<MissingSensorProcessing, NavigatorPolicySensor>);
+    static_assert(FilterSensorPolicy<NavigatorPolicyFilter, NavigatorPolicySensor>);
+    static_assert(!FilterSensorPolicy<MissingSensorProcessing, NavigatorPolicySensor>);
 
     CHECK(true);
 }

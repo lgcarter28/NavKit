@@ -3,21 +3,11 @@
 
 #pragma once
 
-#include "navkit/io/RunLogger.hpp"
-
-#include <type_traits>
-
 namespace navkit::app_support
 {
 
-template<typename Config, typename = void>
-struct LoggerConfig
-{
-    using type = io::RunLogger;
-};
-
 template<typename Config>
-struct LoggerConfig<Config, std::void_t<typename Config::Logger>>
+struct LoggerConfig
 {
     using type = typename Config::Logger;
 };

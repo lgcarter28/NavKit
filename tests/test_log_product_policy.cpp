@@ -7,6 +7,7 @@
 #include "navkit/core/estimation/state/StateDefs.hpp"
 #include "navkit/core/models/GnssPosModel.hpp"
 #include "navkit/io/LogProductPolicy.hpp"
+#include "navkit/io/LoggerPolicy.hpp"
 #include "navkit/io/RunLogger.hpp"
 #include "navkit/io/log_payloads/MeasurementStatisticsLogPayload.hpp"
 #include "navkit/io/log_payloads/NavEstimateLogPayload.hpp"
@@ -18,6 +19,7 @@
 #include "test_main.hpp"
 
 #include <filesystem>
+#include <fstream>
 #include <nlohmann/json.hpp>
 #include <tuple>
 
@@ -30,13 +32,18 @@ namespace
 using StateDef = navkit::core::estimation::InsStateDef;
 using Model = navkit::core::models::GnssPosModel<StateDef>;
 using Sensor = navkit::core::estimation::Sensor<0U, Model, 4U>;
+using Sensors = std::tuple<Sensor>;
 using Filter = navkit::core::estimation::KalmanFilter<
     StateDef,
     navkit::core::estimation::DefaultInjectionPolicy<StateDef>,
     navkit::core::estimation::DefaultResetPolicy<StateDef>,
-    std::tuple<navkit::core::estimation::MeasurementStatistics<Sensor>>>;
+    Sensors>;
 using GnssMeasurement = navkit::core::estimation::Measurement<3>;
 using Statistics = navkit::core::estimation::MeasurementStatistics<Sensor>;
+using StationaryGnssTestRunLogger = RunLogger<TruthLogProduct,
+                                              GnssPositionLogProduct,
+                                              NavEstimateLogProduct,
+                                              GnssPositionUpdateLogProduct>;
 
 struct MissingOpen
 {
@@ -78,6 +85,97 @@ struct MissingManifest
     }
 };
 
+struct FakePayload
+{
+    int value{};
+};
+
+struct OtherFakePayload
+{
+    int value{};
+};
+
+class FakeLogProduct
+{
+public:
+    static constexpr std::string_view LogKey = "fake";
+
+    void open(const std::filesystem::path& output_dir)
+    {
+        m_path = output_dir / "fake.csv";
+        std::ofstream file(m_path);
+        file << "value\n";
+    }
+
+    void log(const FakePayload& payload)
+    {
+        ++m_log_count;
+        std::ofstream file(m_path, std::ios::app);
+        file << payload.value << '\n';
+    }
+
+    void flush()
+    {
+        ++m_flush_count;
+    }
+
+    nlohmann::json metadata() const
+    {
+        return {{"schema", "fake_v1"}, {"log_count", m_log_count}};
+    }
+
+    static nlohmann::json manifest_entry()
+    {
+        return {{"csv", "fake.csv"}, {"manifest", "fake.meta.json"}};
+    }
+
+    [[nodiscard]] int flush_count() const
+    {
+        return m_flush_count;
+    }
+
+private:
+    std::filesystem::path m_path;
+    int m_log_count = 0;
+    int m_flush_count = 0;
+};
+
+class OtherFakeLogProduct
+{
+public:
+    static constexpr std::string_view LogKey = "other";
+
+    void open(const std::filesystem::path&) {}
+    void log(const OtherFakePayload&) {}
+    void flush() {}
+    nlohmann::json metadata() const
+    {
+        return {{"schema", "other_v1"}};
+    }
+    static nlohmann::json manifest_entry()
+    {
+        return {{"csv", "other.csv"}, {"manifest", "other.meta.json"}};
+    }
+};
+
+class AmbiguousFakeLogProduct
+{
+public:
+    static constexpr std::string_view LogKey = "ambiguous";
+
+    void open(const std::filesystem::path&) {}
+    void log(const FakePayload&) {}
+    void flush() {}
+    nlohmann::json metadata() const
+    {
+        return {{"schema", "ambiguous_v1"}};
+    }
+    static nlohmann::json manifest_entry()
+    {
+        return {{"csv", "ambiguous.csv"}, {"manifest", "ambiguous.meta.json"}};
+    }
+};
+
 } // namespace
 
 TEST_CASE("log product policies describe concrete payload boundaries")
@@ -92,12 +190,73 @@ TEST_CASE("log product policies describe concrete payload boundaries")
     static_assert(!LogProductPolicy<MissingPayloadLog, GnssMeasurement>);
     static_assert(!LogProductPolicy<MissingManifest, GnssMeasurement>);
 
-    static_assert(RunLogger::MatchingProductCount<navkit::sim::TruthSample> == 1U);
-    static_assert(RunLogger::MatchingProductCount<GnssMeasurement> == 1U);
-    static_assert(RunLogger::MatchingProductCount<NavEstimateLogPayload<StateDef, Filter>> == 1U);
-    static_assert(RunLogger::MatchingProductCount<MeasurementStatisticsLogPayload<Statistics>> ==
+    static_assert(StationaryGnssTestRunLogger::matching_product_count_v<navkit::sim::TruthSample> ==
                   1U);
-    static_assert(RunLogger::MatchingProductCount<nlohmann::json> == 0U);
+    static_assert(StationaryGnssTestRunLogger::matching_product_count_v<GnssMeasurement> == 1U);
+    static_assert(StationaryGnssTestRunLogger::matching_product_count_v<
+                      NavEstimateLogPayload<StateDef, Filter>> == 1U);
+    static_assert(StationaryGnssTestRunLogger::matching_product_count_v<
+                      MeasurementStatisticsLogPayload<Statistics>> == 1U);
+    static_assert(StationaryGnssTestRunLogger::matching_product_count_v<nlohmann::json> == 0U);
+
+    static_assert(LoggerPolicy<StationaryGnssTestRunLogger>);
+    static_assert(LoggerPayloadPolicy<StationaryGnssTestRunLogger, GnssMeasurement>);
+    static_assert(LoggerProductAccessPolicy<StationaryGnssTestRunLogger, GnssPositionLogProduct>);
+
+    CHECK(true);
+}
+
+TEST_CASE("RunLogger routes payloads to one selected product and writes manifests")
+{
+    const auto output_dir =
+        std::filesystem::temp_directory_path() / "navkit_run_logger_test_output";
+    std::filesystem::remove_all(output_dir);
+
+    using Logger = RunLogger<FakeLogProduct, OtherFakeLogProduct>;
+    static_assert(Logger::matching_product_count_v<FakePayload> == 1U);
+    static_assert(Logger::matching_product_count_v<OtherFakePayload> == 1U);
+    static_assert(Logger::matching_product_count_v<nlohmann::json> == 0U);
+    static_assert(LoggerPolicy<Logger>);
+    static_assert(LoggerPayloadPolicy<Logger, FakePayload>);
+    static_assert(LoggerProductAccessPolicy<Logger, FakeLogProduct>);
+
+    Logger logger(output_dir, "run_logger_test", nlohmann::json{{"config", "fake"}});
+    logger.log(FakePayload{.value = 42});
+    logger.close();
+
+    CHECK(std::filesystem::exists(output_dir / "fake.csv"));
+    CHECK(std::filesystem::exists(output_dir / "fake.meta.json"));
+    CHECK(std::filesystem::exists(output_dir / "run_manifest.json"));
+
+    {
+        std::ifstream metadata_file(output_dir / "fake.meta.json");
+        const auto metadata = nlohmann::json::parse(metadata_file);
+        CHECK(metadata.at("schema") == "fake_v1");
+        CHECK(metadata.at("log_count") == 1);
+    }
+    CHECK(logger.product<FakeLogProduct>().flush_count() == 1);
+
+    {
+        std::ifstream manifest_file(output_dir / "run_manifest.json");
+        const auto manifest = nlohmann::json::parse(manifest_file);
+        CHECK(manifest.at("run_name") == "run_logger_test");
+        CHECK(manifest.at("logs").contains("fake"));
+        CHECK(manifest.at("logs").contains("other"));
+    }
+
+    std::filesystem::remove_all(output_dir);
+}
+
+TEST_CASE("RunLogger exposes zero and ambiguous payload matches at compile time")
+{
+    using MissingPayloadLogger = RunLogger<FakeLogProduct>;
+    using AmbiguousPayloadLogger = RunLogger<FakeLogProduct, AmbiguousFakeLogProduct>;
+
+    static_assert(MissingPayloadLogger::matching_product_count_v<OtherFakePayload> == 0U);
+    static_assert(!LoggerPayloadPolicy<MissingPayloadLogger, OtherFakePayload>);
+
+    static_assert(AmbiguousPayloadLogger::matching_product_count_v<FakePayload> == 2U);
+    static_assert(!LoggerPayloadPolicy<AmbiguousPayloadLogger, FakePayload>);
 
     CHECK(true);
 }

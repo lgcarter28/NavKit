@@ -28,21 +28,21 @@ struct ProductConfig
     using PrimaryGnssMeasurementModel = core::models::GnssPosModel<StateDef>;
     static constexpr core::estimation::SensorId primary_gnss_sensor_id = 0U;
     static constexpr std::size_t primary_gnss_buffer_size = 16U;
+    using PrimaryGnssDiagnostics = core::estimation::DefaultSensorDiagnostics;
     using PrimaryGnssSensor = core::estimation::Sensor<primary_gnss_sensor_id,
                                                        PrimaryGnssMeasurementModel,
                                                        primary_gnss_buffer_size,
-                                                       core::estimation::GnssFixedNoisePolicy>;
+                                                       core::estimation::GnssFixedNoisePolicy,
+                                                       PrimaryGnssDiagnostics>;
 
     using Sensors = std::tuple<PrimaryGnssSensor>;
-    using MeasurementStatisticsTuple =
-        std::tuple<core::estimation::MeasurementStatistics<PrimaryGnssSensor>>;
 
     using Profiler = core::profiling::NullProfiler;
     using Filter =
         core::estimation::KalmanFilter<StateDef,
                                        core::estimation::DefaultInjectionPolicy<StateDef>,
                                        core::estimation::DefaultResetPolicy<StateDef>,
-                                       MeasurementStatisticsTuple,
+                                       Sensors,
                                        Profiler>;
     using NavigatorUpdate = core::estimation::UpdatePostFilter<Filter>;
     using Navigator = core::estimation::Navigator<Filter, Sensors, NavigatorUpdate, Profiler>;

@@ -6,7 +6,7 @@
 #include "navkit/app_support/config/ConfigTraits.hpp"
 #include "navkit/app_support/config/LoggingConfigTraits.hpp"
 #include "navkit/core/config/ConfigPolicy.hpp"
-#include "navkit/core/estimation/filter/FilterConfigPolicy.hpp"
+#include "navkit/core/estimation/filter/MeasurementStatisticsStorage.hpp"
 #include "navkit/core/estimation/sensor/Sensor.hpp"
 #include "navkit/core/estimation/sensor/SensorConfigPolicy.hpp"
 #include "navkit/core/estimation/state/StateDefs.hpp"
@@ -61,8 +61,6 @@ TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
 
     static_assert(NumericConfigPolicy<ExampleConfig::Numeric>);
     static_assert(navkit::core::estimation::BufferConfigPolicy<ExampleConfig::GnssBuffer>);
-    static_assert(navkit::core::estimation::MeasurementStatisticsCollectionPolicy<
-                  SimConfig::MeasurementStatisticsTuple>);
     static_assert(ConfigPolicy<ExampleConfig>);
     static_assert(ConfigPolicy<SimConfig>);
     static_assert(ConfigPolicy<MinimalConfig>);
@@ -73,7 +71,12 @@ TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
                                                                 SimConfig::Sensors>,
                        SimConfig::PrimaryGnssSensor>);
     static_assert(std::is_same_v<navkit::app_support::LoggerConfig_t<SelectedAppConfig>,
-                                 navkit::io::RunLogger>);
+                                 SelectedAppConfig::Logger>);
+    static_assert(std::is_same_v<
+                  typename SimConfig::Filter::MeasurementStatisticsTuple_t,
+                  navkit::core::estimation::MeasurementStatisticsStorage_t<SimConfig::Sensors>>);
+    static_assert(std::is_same_v<typename SimConfig::PrimaryGnssSensor::Diagnostics_t,
+                                 SimConfig::PrimaryGnssDiagnostics>);
 
     static_assert(std::is_same_v<ExampleConfig::Numeric::Scalar_t, navkit::core::Scalar_t>);
     static_assert(std::is_same_v<ExampleConfig::Numeric::Time_t, navkit::core::Time_t>);

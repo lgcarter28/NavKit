@@ -3,11 +3,7 @@
 
 #pragma once
 
-#include "navkit/io/LogProductPolicy.hpp"
-#include "navkit/io/log_products/GnssPositionLogProduct.hpp"
-#include "navkit/io/log_products/GnssPositionUpdateLogProduct.hpp"
-#include "navkit/io/log_products/NavEstimateLogProduct.hpp"
-#include "navkit/io/log_products/TruthLogProduct.hpp"
+#include "navkit/io/RunLoggerTraits.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -21,41 +17,17 @@
 namespace navkit::io
 {
 
-namespace detail
-{
-
-template<typename Payload, typename Product>
-inline constexpr bool product_logs_payload_v = LogProductPolicy<Product, Payload>;
-
-template<typename Payload, typename... Products>
-inline constexpr std::size_t matching_log_product_count_v =
-    (std::size_t{0} + ... +
-     (product_logs_payload_v<Payload, Products> ? std::size_t{1} : std::size_t{0}));
-
-template<typename Product>
-std::filesystem::path metadata_path(const std::filesystem::path& output_dir)
-{
-    const auto manifest = Product::manifest_entry();
-    if (!manifest.contains("manifest") || !manifest.at("manifest").is_string()) {
-        throw std::runtime_error("Log product manifest entry must include a manifest file name");
-    }
-
-    return output_dir / manifest.at("manifest").template get<std::string>();
-}
-
-} // namespace detail
-
 template<typename... LogProducts>
-class BasicRunLogger
+class RunLogger
 {
 public:
     static_assert(sizeof...(LogProducts) > 0, "RunLogger requires at least one log product.");
 
     template<typename Payload>
-    static constexpr std::size_t MatchingProductCount =
-        detail::matching_log_product_count_v<Payload, LogProducts...>;
+    static constexpr std::size_t matching_product_count_v =
+        detail::matching_product_count_v<Payload, LogProducts...>;
 
-    BasicRunLogger(std::filesystem::path output_dir, std::string run_name, nlohmann::json config)
+    RunLogger(std::filesystem::path output_dir, std::string run_name, nlohmann::json config)
         : m_output_dir(std::move(output_dir))
         , m_run_name(std::move(run_name))
         , m_config(std::move(config))
@@ -71,10 +43,9 @@ public:
     }
 
     template<typename Payload>
+        requires(matching_product_count_v<Payload> == 1U)
     void log(const Payload& payload)
     {
-        static_assert(MatchingProductCount<Payload> == 1,
-                      "RunLogger payload dispatch requires exactly one matching log product.");
         log_payload(payload, std::make_index_sequence<sizeof...(LogProducts)>{});
     }
 
@@ -176,11 +147,5 @@ private:
 
     bool m_closed = false;
 };
-
-using StationaryGnssRunLogger = BasicRunLogger<TruthLogProduct,
-                                               GnssPositionLogProduct,
-                                               NavEstimateLogProduct,
-                                               GnssPositionUpdateLogProduct>;
-using RunLogger = StationaryGnssRunLogger;
 
 } // namespace navkit::io

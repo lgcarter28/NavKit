@@ -34,7 +34,7 @@ concept FilterPolicy =
     };
 
 template<typename Candidate, typename Sensor>
-concept SensorFilterPolicy =
+concept FilterSensorPolicy =
     FilterPolicy<Candidate> && SensorPolicy<Sensor> && requires(Candidate& filter, Sensor& sensor) {
         { filter.process_sensor(sensor) } -> std::same_as<void>;
     };

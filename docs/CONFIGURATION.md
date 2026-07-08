@@ -25,7 +25,6 @@ The current implementation has the first pieces of the configuration model:
 - Estimation-specific config concepts live beside the estimation domains that
   consume them:
   - `include/navkit/core/estimation/sensor/SensorConfigPolicy.hpp`
-  - `include/navkit/core/estimation/filter/FilterConfigPolicy.hpp`
 - User-facing product-configuration concepts live under
   `include/navkit/api/config`. This is the public front door for config authors
   who want to assert that a composed NavKit config exposes the required product
@@ -114,15 +113,16 @@ struct StationaryGnssConfig
     using PrimaryGnssMeasurementModel = navkit::core::models::GnssPosModel<StateDef>;
     static constexpr navkit::core::estimation::SensorId primary_gnss_sensor_id = 0U;
     static constexpr std::size_t primary_gnss_buffer_size = 16U;
+    using PrimaryGnssDiagnostics = navkit::core::estimation::DefaultSensorDiagnostics;
 
     using PrimaryGnssSensor =
         navkit::core::estimation::Sensor<primary_gnss_sensor_id,
                                          PrimaryGnssMeasurementModel,
-                                         primary_gnss_buffer_size>;
+                                         primary_gnss_buffer_size,
+                                         navkit::core::estimation::GnssFixedNoisePolicy,
+                                         PrimaryGnssDiagnostics>;
 
     using Sensors = std::tuple<PrimaryGnssSensor>;
-    using MeasurementStatisticsTuple =
-        std::tuple<navkit::core::estimation::MeasurementStatistics<PrimaryGnssSensor>>;
     using Profiler = navkit::core::profiling::NullProfiler;
     using Filter = /* concrete filter type */;
     using NavigatorUpdate = /* concrete update policy type */;
@@ -133,12 +133,12 @@ static_assert(navkit::api::config::NavKitProductConfigPolicy<StationaryGnssConfi
 ```
 
 `SensorId` gives each configured sensor a stable product-graph identity even
-when multiple sensors share the same model. `MeasurementStatisticsTuple` is
-manually authored on purpose: the filter owns diagnostic storage, and the config
-should make each stored diagnostic stream obvious. A statistic entry is keyed by
-the configured sensor type, such as `MeasurementStatistics<PrimaryGnssSensor>`,
-not by the sensor model alone. This keeps primary and backup sensors
-unambiguous even when they use the same measurement model.
+when multiple sensors share the same model. Product configs expose the explicit
+`Sensors` tuple and can name sensor-local diagnostics choices where that helps
+teach or customize the graph. The filter derives its own diagnostic storage
+from the sensor graph. This keeps the user-facing config focused on the product
+graph while still allowing filter-owned measurement statistics to remain keyed
+by the configured sensor type.
 
 `NavigatorUpdate` is the selected concrete update behavior for the configured
 `Filter` and `Sensors`, such as `UpdatePostFilter<Filter>`. The lower-level
@@ -164,7 +164,10 @@ struct StationaryGnssAppConfig
 
     using EmulatorBindings = std::tuple<PrimaryGnssBinding>;
 
-    using Logger = navkit::io::RunLogger;
+    using Logger = navkit::io::RunLogger<navkit::io::TruthLogProduct,
+                                         navkit::io::GnssPositionLogProduct,
+                                         navkit::io::NavEstimateLogProduct,
+                                         navkit::io::GnssPositionUpdateLogProduct>;
     using App = navkit::app_support::SimulationApp<StationaryGnssAppConfig>;
 };
 ```
@@ -180,10 +183,9 @@ target sensor type, and an ID derived from `Emulator::Id`; the binding verifies
 that this ID matches the selected sensor's configured `Sensor::Id`. This keeps
 duplicate sensors of the same model type, such as primary and backup GNSS
 receivers, unambiguous. App configs also select the logger adapter type at
-compile time; runtime JSON still owns run-specific choices such as run name and output
-directory. Logger adapters may be composed from concrete log products with
-`navkit::io::BasicRunLogger<...>`. The default `navkit::io::RunLogger` alias is
-the stationary GNSS product set used by the shipped demo.
+compile time; runtime JSON still owns run-specific choices such as run name and
+output directory. Logger adapters are composed from concrete log products with
+`navkit::io::RunLogger<...>`; the selected app config owns the product set.
 
 The app and NavKit config trees are deliberately separate:
 

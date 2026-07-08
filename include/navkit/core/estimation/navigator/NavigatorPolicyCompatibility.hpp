@@ -23,7 +23,7 @@ struct NavigatorPolicyCompatibility<Filter, Update, SensorTuple, std::index_sequ
     using Tuple = std::remove_cvref_t<SensorTuple>;
 
     static constexpr bool value =
-        ((SensorFilterPolicy<Filter, std::tuple_element_t<Is, Tuple>> &&
+        ((FilterSensorPolicy<Filter, std::tuple_element_t<Is, Tuple>> &&
           UpdatePolicy<Update, Filter, std::tuple_element_t<Is, Tuple>>) &&
          ...);
 };

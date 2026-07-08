@@ -59,7 +59,7 @@ public:
 
             navigator.process_measurements();
 
-            log_measurement_statistics<typename NavKit::MeasurementStatisticsTuple>(logger, filter);
+            log_measurement_statistics<typename NavKit::Sensors>(logger, filter);
             logger.log(io::NavEstimateLogPayload<StateDef, Filter>{
                 .time_s = sample.time,
                 .filter = filter,

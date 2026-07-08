@@ -31,7 +31,7 @@ def main() -> int:
     conan = venv_executable(root, "conan")
 
     run([str(python), "-m", "pip", "install", "--upgrade", "pip"], root)
-    run([str(python), "-m", "pip", "install", "conan", "-e", str(root / "python")], root)
+    run([str(python), "-m", "pip", "install", "conan", "ninja", "-e", str(root / "python")], root)
 
     profile = subprocess.run(
         [str(conan), "profile", "path", "default"],

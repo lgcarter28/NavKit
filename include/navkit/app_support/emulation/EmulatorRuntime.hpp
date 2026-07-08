@@ -7,6 +7,7 @@
 #include "navkit/app_support/emulation/EmulatorBindingPolicy.hpp"
 #include "navkit/app_support/emulation/EmulatorBindingTuplePolicy.hpp"
 #include "navkit/core/estimation/sensor/SensorTupleTraits.hpp"
+#include "navkit/io/LoggerPolicy.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
 #include <nlohmann/json.hpp>
@@ -18,7 +19,7 @@ namespace navkit::app_support
 {
 
 template<navkit::api::config::NavKitProductConfigPolicy NavKit,
-         typename Logger,
+         navkit::io::LoggerPolicy Logger,
          EmulatorBindingTuplePolicy<typename NavKit::Sensors, Logger> EmulatorBindings>
 class EmulatorRuntime
 {

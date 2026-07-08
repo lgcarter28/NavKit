@@ -6,7 +6,6 @@
 #include "navkit/api/config/NavKitProductConfigPolicy.hpp"
 #include "navkit/core/config/ConfigPolicy.hpp"
 #include "navkit/core/config/Types.hpp"
-#include "navkit/core/estimation/filter/FilterConfigPolicy.hpp"
 #include "navkit/core/estimation/filter/KalmanFilter.hpp"
 #include "navkit/core/estimation/filter/MeasurementStatistics.hpp"
 #include "navkit/core/estimation/filter/injection/InjectionPolicies.hpp"

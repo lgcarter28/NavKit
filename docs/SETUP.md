@@ -17,6 +17,7 @@ NavKit currently expects:
 - VS Code
 - MSVC on Windows, or GCC/Clang on Linux/macOS
 - LLVM tooling for formatting
+- Ninja for local compile-database workflows such as optional clang-tidy
 
 Recommended editor:
 
@@ -719,7 +720,9 @@ development does not require clang-tidy; run it locally only when explicitly
 debugging the CI static-analysis lane. Local clang-tidy requires a
 `compile_commands.json` in the selected config build directory, which generally
 means configuring with a compile-database-capable generator such as Ninja rather
-than the Visual Studio generator.
+than the Visual Studio generator. `tools/bootstrap.py` installs the Python
+`ninja` package as a convenient fallback, but using the Visual Studio Build
+Tools Ninja component is also fine.
 
 CI also generates a Linux coverage artifact with `tools/coverage.py`. Local
 development does not require coverage reporting; use it only when reviewing

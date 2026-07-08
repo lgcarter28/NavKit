@@ -7,6 +7,10 @@
 #include "navkit/app_support/emulation/EmulatorBinding.hpp"
 #include "navkit/app_support/emulation/concrete/GnssEmulator.hpp"
 #include "navkit/io/RunLogger.hpp"
+#include "navkit/io/log_products/GnssPositionLogProduct.hpp"
+#include "navkit/io/log_products/GnssPositionUpdateLogProduct.hpp"
+#include "navkit/io/log_products/NavEstimateLogProduct.hpp"
+#include "navkit/io/log_products/TruthLogProduct.hpp"
 #include "navkit/products/ProfiledStationaryGnss.hpp"
 
 #include <tuple>
@@ -25,7 +29,10 @@ struct ProfiledStationaryGnssConfig
 
     using EmulatorBindings = std::tuple<PrimaryGnssBinding>;
 
-    using Logger = ::navkit::io::RunLogger;
+    using Logger = ::navkit::io::RunLogger<::navkit::io::TruthLogProduct,
+                                           ::navkit::io::GnssPositionLogProduct,
+                                           ::navkit::io::NavEstimateLogProduct,
+                                           ::navkit::io::GnssPositionUpdateLogProduct>;
     using App = ::navkit::app_support::SimulationApp<ProfiledStationaryGnssConfig>;
 };
 

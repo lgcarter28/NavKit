@@ -27,6 +27,9 @@ struct HostSteadyMicrosecondClock
 {
     using Tick = std::uint64_t;
 
+    static constexpr std::string_view source = "std::chrono::steady_clock";
+    static constexpr double tick_period_us = 1.0;
+
     static Tick now()
     {
         const auto now = std::chrono::steady_clock::now().time_since_epoch();
@@ -37,9 +40,6 @@ struct HostSteadyMicrosecondClock
 
 struct ProductConfig
 {
-    static constexpr std::string_view ProfileClockSource = "std::chrono::steady_clock";
-    static constexpr double ProfileTickPeriodUs = 1.0;
-
     using Numeric = NumericConfig;
 
     // Public product graph.
@@ -47,14 +47,14 @@ struct ProductConfig
     using PrimaryGnssMeasurementModel = core::models::GnssPosModel<StateDef>;
     static constexpr core::estimation::SensorId primary_gnss_sensor_id = 0U;
     static constexpr std::size_t primary_gnss_buffer_size = 16U;
+    using PrimaryGnssDiagnostics = core::estimation::DefaultSensorDiagnostics;
     using PrimaryGnssSensor = core::estimation::Sensor<primary_gnss_sensor_id,
                                                        PrimaryGnssMeasurementModel,
                                                        primary_gnss_buffer_size,
-                                                       core::estimation::GnssFixedNoisePolicy>;
+                                                       core::estimation::GnssFixedNoisePolicy,
+                                                       PrimaryGnssDiagnostics>;
 
     using Sensors = std::tuple<PrimaryGnssSensor>;
-    using MeasurementStatisticsTuple =
-        std::tuple<core::estimation::MeasurementStatistics<PrimaryGnssSensor>>;
 
     using ProfileClock = HostSteadyMicrosecondClock;
     using ProfileTick = typename ProfileClock::Tick;
@@ -65,7 +65,7 @@ struct ProductConfig
         core::estimation::KalmanFilter<StateDef,
                                        core::estimation::DefaultInjectionPolicy<StateDef>,
                                        core::estimation::DefaultResetPolicy<StateDef>,
-                                       MeasurementStatisticsTuple,
+                                       Sensors,
                                        Profiler>;
     using NavigatorUpdate = core::estimation::UpdatePostFilter<Filter>;
     using Navigator = core::estimation::Navigator<Filter, Sensors, NavigatorUpdate, Profiler>;

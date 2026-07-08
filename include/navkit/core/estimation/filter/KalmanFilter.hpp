@@ -3,14 +3,15 @@
 
 #pragma once
 
-#include "navkit/core/containers/TupleTraits.hpp"
-#include "navkit/core/estimation/filter/FilterConfigPolicy.hpp"
 #include "navkit/core/estimation/filter/MeasurementStatistics.hpp"
+#include "navkit/core/estimation/filter/MeasurementStatisticsStorage.hpp"
 #include "navkit/core/estimation/filter/injection/InjectionPolicies.hpp"
 #include "navkit/core/estimation/filter/injection/InjectionPolicy.hpp"
 #include "navkit/core/estimation/filter/reset/ResetPolicies.hpp"
 #include "navkit/core/estimation/filter/reset/ResetPolicy.hpp"
 #include "navkit/core/estimation/measurement/MeasurementModelPolicy.hpp"
+#include "navkit/core/estimation/sensor/SensorTuplePolicy.hpp"
+#include "navkit/core/estimation/sensor/SensorTupleTraits.hpp"
 #include "navkit/core/estimation/state/State.hpp"
 #include "navkit/core/profiling/NullProfiler.hpp"
 #include "navkit/core/profiling/ProfilePoint.hpp"
@@ -26,15 +27,16 @@ namespace navkit::core::estimation
 template<StateDefPolicy StateDef,
          InjectionPolicy<StateDef> Injection = DefaultInjectionPolicy<StateDef>,
          ResetPolicy<StateDef> Reset = DefaultResetPolicy<StateDef>,
-         MeasurementStatisticsCollectionPolicy MeasurementStatisticsTuple = std::tuple<>,
+         SensorTuplePolicy Sensors = std::tuple<>,
          navkit::core::profiling::ProfilerPolicy Profiler = navkit::core::profiling::NullProfiler>
 class KalmanFilter
 {
 public:
     using StateDef_t = StateDef;
+    using Sensors_t = Sensors;
     using State_t = State<StateDef>;
     using P_t = StateCov<StateDef>;
-    using MeasurementStatisticsTuple_t = MeasurementStatisticsTuple;
+    using MeasurementStatisticsTuple_t = MeasurementStatisticsStorage_t<Sensors>;
     using Profiler_t = Profiler;
 
     KalmanFilter()
@@ -92,10 +94,10 @@ public:
 
     template<SensorPolicy Sensor>
         requires MeasurementModelPolicy<typename Sensor::MeasurementModel_t, StateDef>
-    [[nodiscard]] bool has_measurement_statistics() const
+    [[nodiscard]] bool measurement_statistics_available() const
     {
-        if constexpr (navkit::core::containers::tuple_contains_v<MeasurementStatistics<Sensor>,
-                                                                 MeasurementStatisticsTuple_t>) {
+        if constexpr (sensor_id_exists_v<Sensor::Id, Sensors_t> &&
+                      Sensor::Diagnostics_t::enable_measurement_statistics) {
             return measurement_statistics<Sensor>().valid;
         }
         else {
@@ -108,12 +110,9 @@ public:
     MeasurementStatistics<Sensor>& measurement_statistics()
     {
         static_assert(
-            navkit::core::containers::tuple_contains_v<MeasurementStatistics<Sensor>,
-                                                       MeasurementStatisticsTuple_t>,
+            sensor_id_exists_v<Sensor::Id, Sensors_t>,
             "Requested Sensor does not have a MeasurementStatistics entry in this KalmanFilter.");
-        return std::get<navkit::core::containers::tuple_index_v<MeasurementStatistics<Sensor>,
-                                                                MeasurementStatisticsTuple_t>>(
-            m_measurement_stats);
+        return std::get<SensorIndexFromId_v<Sensor::Id, Sensors_t>>(m_measurement_stats);
     }
 
     template<SensorPolicy Sensor>
@@ -121,12 +120,9 @@ public:
     [[nodiscard]] const MeasurementStatistics<Sensor>& measurement_statistics() const
     {
         static_assert(
-            navkit::core::containers::tuple_contains_v<MeasurementStatistics<Sensor>,
-                                                       MeasurementStatisticsTuple_t>,
+            sensor_id_exists_v<Sensor::Id, Sensors_t>,
             "Requested Sensor does not have a MeasurementStatistics entry in this KalmanFilter.");
-        return std::get<navkit::core::containers::tuple_index_v<MeasurementStatistics<Sensor>,
-                                                                MeasurementStatisticsTuple_t>>(
-            m_measurement_stats);
+        return std::get<SensorIndexFromId_v<Sensor::Id, Sensors_t>>(m_measurement_stats);
     }
 
     template<MeasurementModelPolicy<StateDef> MeasurementModel>
@@ -234,8 +230,8 @@ private:
                                        const typename Sensor::MeasurementModel_t::K_t& K,
                                        const Scalar_t nis)
     {
-        if constexpr (navkit::core::containers::tuple_contains_v<MeasurementStatistics<Sensor>,
-                                                                 MeasurementStatisticsTuple_t>) {
+        if constexpr (sensor_id_exists_v<Sensor::Id, Sensors_t> &&
+                      Sensor::Diagnostics_t::enable_measurement_statistics) {
             auto& stats = measurement_statistics<Sensor>();
             stats.valid = true;
             stats.accepted = accepted;

@@ -54,14 +54,16 @@ struct ExampleAppConfig
 
     using EmulatorBindings = std::tuple<PrimaryBinding>;
 
-    using Logger = navkit::io::RunLogger;
+    using Logger = navkit::io::RunLogger<navkit::io::TruthLogProduct,
+                                         navkit::io::GnssPositionLogProduct,
+                                         navkit::io::NavEstimateLogProduct,
+                                         navkit::io::GnssPositionUpdateLogProduct>;
     using App = navkit::app_support::SimulationApp<ExampleAppConfig>;
 };
 ```
 
-`navkit::io::RunLogger` is the default stationary GNSS logger alias. Custom app
-configs may select a `navkit::io::BasicRunLogger<...>` composition when they need
-a different compile-time set of log products.
+`navkit::io::RunLogger<...>` is a generic compile-time logger façade. App
+configs select their concrete log-product set explicitly.
 
 Applications should include the generated `navkit/SelectedConfig.hpp` header and
 use `navkit::selected_config::Config` rather than including concrete config

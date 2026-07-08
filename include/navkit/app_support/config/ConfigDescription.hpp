@@ -17,11 +17,12 @@ template<typename Config>
 [[nodiscard]] nlohmann::json profile_compiletime_metadata()
 {
     if constexpr (has_profile_export_v<Config>) {
+        using Clock = typename Config::ProfileClock;
         using Sink = typename Config::ProfileSink;
 
         return {{"enabled", true},
-                {"clock_source", std::string(Config::ProfileClockSource)},
-                {"tick_period_us", Config::ProfileTickPeriodUs},
+                {"clock_source", std::string(Clock::source)},
+                {"tick_period_us", Clock::tick_period_us},
                 {"sink_capacity", Sink::capacity()},
                 {"sink_overflow_policy", std::string(profile_overflow_policy_name<Sink>())},
                 {"profile_points", io::profile_point_mapping()}};

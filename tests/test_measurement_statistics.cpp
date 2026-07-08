@@ -18,10 +18,23 @@ namespace
 using StateDef = InsStateDef;
 using Model = navkit::core::models::GnssPosModel<StateDef>;
 using Sensor = navkit::core::estimation::Sensor<0U, Model, 4U>;
-using Filter = KalmanFilter<StateDef,
-                            DefaultInjectionPolicy<StateDef>,
-                            DefaultResetPolicy<StateDef>,
-                            std::tuple<MeasurementStatistics<Sensor>>>;
+struct DisabledStatisticsDiagnostics
+{
+    static constexpr bool enable_measurement_statistics = false;
+};
+using DisabledStatisticsSensor =
+    navkit::core::estimation::Sensor<1U,
+                                     Model,
+                                     4U,
+                                     navkit::core::estimation::DefaultNoisePolicy,
+                                     DisabledStatisticsDiagnostics>;
+using Sensors = std::tuple<Sensor>;
+using Filter =
+    KalmanFilter<StateDef, DefaultInjectionPolicy<StateDef>, DefaultResetPolicy<StateDef>, Sensors>;
+using DisabledStatisticsFilter = KalmanFilter<StateDef,
+                                              DefaultInjectionPolicy<StateDef>,
+                                              DefaultResetPolicy<StateDef>,
+                                              std::tuple<DisabledStatisticsSensor>>;
 
 struct StatisticsFixture
 {
@@ -112,11 +125,11 @@ TEST_CASE("accepted measurement update records statistics and updates filter sta
     sensor.noise_context() = fixture.noise;
     CHECK(sensor.push(fixture.sensor_measurement));
 
-    CHECK_FALSE(fixture.filter.has_measurement_statistics<Sensor>());
+    CHECK_FALSE(fixture.filter.measurement_statistics_available<Sensor>());
 
     fixture.filter.process_sensor(sensor);
 
-    CHECK(fixture.filter.has_measurement_statistics<Sensor>());
+    CHECK(fixture.filter.measurement_statistics_available<Sensor>());
     check_common_statistics(fixture.filter.measurement_statistics<Sensor>(), true, update_time);
 
     CHECK_FALSE(fixture.filter.error_state().isApprox(fixture.initial_error_state, 1.0e-12));
@@ -131,10 +144,34 @@ TEST_CASE("direct model update does not record sensor-keyed statistics")
     fixture.filter.observation_update<Model>(
         fixture.measurement, update_time, fixture.noise, false);
 
-    CHECK_FALSE(fixture.filter.has_measurement_statistics<Sensor>());
+    CHECK_FALSE(fixture.filter.measurement_statistics_available<Sensor>());
 
     CHECK(fixture.filter.error_state().isApprox(fixture.initial_error_state, 1.0e-12));
     CHECK(fixture.filter.covariance().isApprox(fixture.initial_covariance, 1.0e-12));
+}
+
+TEST_CASE("sensor diagnostics can disable measurement statistics storage")
+{
+    static_assert(SensorDiagnosticsPolicy<DisabledStatisticsDiagnostics>);
+
+    DisabledStatisticsFilter filter{};
+    DisabledStatisticsSensor sensor{};
+    Measurement<Model::M> measurement{};
+    Model::NoiseContext noise{};
+
+    State<StateDef> x = State<StateDef>::Zero();
+    x.template segment<3>(StateDef::Pos::i) << 10.0, -2.0, 5.0;
+    filter.set_state(x);
+    filter.set_covariance(StateCov<StateDef>::Identity() * 100.0);
+
+    noise.sigma_h = 1.0;
+    noise.sigma_v = 1.0;
+    sensor.noise_context() = noise;
+    CHECK(sensor.push(measurement));
+
+    filter.process_sensor(sensor);
+
+    CHECK_FALSE(filter.measurement_statistics_available<DisabledStatisticsSensor>());
 }
 
 } // namespace navkit::core::estimation::test

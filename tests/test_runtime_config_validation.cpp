@@ -28,6 +28,7 @@ using StationaryGnssAppConfig = navkit::config::apps::navkit_sim::StationaryGnss
 struct DuplicateSensorIdConfig
 {
     using NavKit = StationaryGnssAppConfig::NavKit;
+    using Logger = StationaryGnssAppConfig::Logger;
     using EmulatorBindings =
         std::tuple<navkit::app_support::EmulatorBinding<navkit::app_support::GnssEmulator<0U>,
                                                         NavKit::PrimaryGnssSensor>,
@@ -43,6 +44,7 @@ struct UnknownSensor
 struct MissingTargetSensorConfig
 {
     using NavKit = StationaryGnssAppConfig::NavKit;
+    using Logger = StationaryGnssAppConfig::Logger;
     using EmulatorBindings =
         std::tuple<navkit::app_support::EmulatorBinding<navkit::app_support::GnssEmulator<99U>,
                                                         UnknownSensor>>;
@@ -80,22 +82,22 @@ TEST_CASE("Stationary GNSS runtime validator accepts the documented input shape"
     static_assert(!SimulationAppConfigPolicy<MissingTargetSensorConfig>);
     static_assert(EmulatorPolicy<StationaryGnssAppConfig::PrimaryGnssEmulator,
                                  StationaryGnssAppConfig::PrimaryGnssSensor,
-                                 navkit::io::RunLogger>);
+                                 StationaryGnssAppConfig::Logger>);
     static_assert(!EmulatorPolicy<NotAnEmulator,
                                   StationaryGnssAppConfig::PrimaryGnssSensor,
-                                  navkit::io::RunLogger>);
-    static_assert(
-        EmulatorBindingPolicy<StationaryGnssAppConfig::PrimaryGnssBinding, navkit::io::RunLogger>);
-    static_assert(!EmulatorBindingPolicy<NotABinding, navkit::io::RunLogger>);
+                                  StationaryGnssAppConfig::Logger>);
+    static_assert(EmulatorBindingPolicy<StationaryGnssAppConfig::PrimaryGnssBinding,
+                                        StationaryGnssAppConfig::Logger>);
+    static_assert(!EmulatorBindingPolicy<NotABinding, StationaryGnssAppConfig::Logger>);
     static_assert(EmulatorBindingTuplePolicy<StationaryGnssAppConfig::EmulatorBindings,
                                              StationaryGnssAppConfig::NavKit::Sensors,
-                                             navkit::io::RunLogger>);
+                                             StationaryGnssAppConfig::Logger>);
     static_assert(!EmulatorBindingTuplePolicy<DuplicateSensorIdConfig::EmulatorBindings,
                                               DuplicateSensorIdConfig::NavKit::Sensors,
-                                              navkit::io::RunLogger>);
+                                              DuplicateSensorIdConfig::Logger>);
     static_assert(!EmulatorBindingTuplePolicy<MissingTargetSensorConfig::EmulatorBindings,
                                               MissingTargetSensorConfig::NavKit::Sensors,
-                                              navkit::io::RunLogger>);
+                                              MissingTargetSensorConfig::Logger>);
     static_assert(emulator_binding_ids_unique_v<StationaryGnssAppConfig::EmulatorBindings>);
     static_assert(std::is_same_v<EmulatorFromId_t<StationaryGnssAppConfig::PrimaryGnssEmulator::Id,
                                                   StationaryGnssAppConfig::EmulatorBindings>,
