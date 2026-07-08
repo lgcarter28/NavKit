@@ -9,8 +9,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from navkit_build_dirs import repo_root_from_tools_file
-from navkit_build_dirs import resolve_build_dir
+from navkit_build_dirs import DEFAULT_GENERATOR, repo_root_from_tools_file, resolve_build_dir
+from navkit_conan_env import run_with_optional_conan_env
 from perf_artifacts import DEFAULT_NAVKIT_CONFIG
 
 # Directories to ignore
@@ -106,9 +106,10 @@ def main() -> int:
         default=None,
         help=(
             "Build directory containing compile_commands.json. Defaults to "
-            "build/<build-type>/<navkit-config-without-.hpp>."
+            "build/<generator>/<build-type>/<navkit-config-without-.hpp>."
         ),
     )
+    parser.add_argument("--generator", default=DEFAULT_GENERATOR, help="CMake generator used.")
     parser.add_argument(
         "--navkit-config",
         default=DEFAULT_NAVKIT_CONFIG,
@@ -160,7 +161,9 @@ def main() -> int:
             print("ERROR: clang-tidy not found on PATH.")
             return 1
 
-        build_dir = resolve_build_dir(root, args.build_type, args.navkit_config, args.build_dir)
+        build_dir = resolve_build_dir(
+            root, args.build_type, args.navkit_config, args.build_dir, generator=args.generator
+        )
         compile_commands = build_dir / "compile_commands.json"
 
         if not compile_commands.exists():
@@ -188,7 +191,12 @@ def main() -> int:
             if args.tidy_warnings_as_errors:
                 cmd.append("--warnings-as-errors=*")
 
-            ret = run(cmd)
+            ret = run_with_optional_conan_env(
+                cmd,
+                cwd=root,
+                build_dir=build_dir,
+                build_type=args.build_type,
+            )
 
             if ret != 0:
                 return ret

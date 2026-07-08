@@ -69,7 +69,7 @@ public:
             Profiler::profile(navkit::core::profiling::ProfilePoint::NavigatorProcessMeasurements);
         static_cast<void>(profile_scope);
 
-        std::apply([this](auto&... sensor_obj) { (process_one_sensor(sensor_obj), ...); },
+        std::apply([this](auto&... sensor_obj) { (this->process_one_sensor(sensor_obj), ...); },
                    m_sensors);
         Update_t::filter_update(m_filter);
     }

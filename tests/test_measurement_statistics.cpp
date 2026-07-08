@@ -20,6 +20,8 @@ using Model = navkit::core::models::GnssPosModel<StateDef>;
 using Sensor = navkit::core::estimation::Sensor<0U, Model, 4U>;
 struct DisabledStatisticsDiagnostics
 {
+    // This member name is part of SensorDiagnosticsPolicy.
+    // NOLINTNEXTLINE(readability-identifier-naming)
     static constexpr bool enable_measurement_statistics = false;
 };
 using DisabledStatisticsSensor =

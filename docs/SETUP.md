@@ -353,9 +353,25 @@ Use a separate build directory for each selected compile-time configuration:
 python tools/build.py --build-type Debug --build-dir build/custom/stationary-gnss --navkit-config apps/navkit_sim/StationaryGnss.hpp
 ```
 
-This keeps each generated `navkit/SelectedConfig.hpp` isolated. Debug/Release
-and `NAVKIT_CONFIG` are independent: build type chooses compiler mode, while
-`NAVKIT_CONFIG` chooses the top-level compile-time build configuration.
+The wrapper defaults to the Ninja generator and derives build directories from
+generator, build type, and selected config, for example:
+
+```text
+build/Ninja/Debug/apps/navkit_sim/StationaryGnss
+build/Ninja/Debug/apps/navkit_sim/ProfiledStationaryGnss
+```
+
+This keeps each generated `navkit/SelectedConfig.hpp` isolated. Debug/Release,
+generator, and `NAVKIT_CONFIG` are independent: build type chooses compiler
+mode, generator chooses the CMake backend, and `NAVKIT_CONFIG` chooses the
+top-level compile-time build configuration. Use `--generator` only when
+deliberately diagnosing another generator, and use a clean or separate build
+directory when switching generator for an existing tree.
+
+On Windows, the wrapper runs CMake configure/build commands through Conan's
+generated `conanbuild.bat` when it is present. That lets ordinary PowerShell
+sessions use Ninja with MSVC without first opening a Visual Studio Developer
+Prompt.
 
 Run wrappers use `--build-type` to choose the Debug or Release executable from
 the default build tree. When you intentionally keep multiple build trees for
@@ -404,41 +420,49 @@ The Python wrapper is preferred, but the raw commands are useful for debugging.
 From the repository root, install dependencies with Conan:
 
 ```bash
-conan install . --output-folder build/Debug/apps/navkit_sim/StationaryGnss --build=missing -s build_type=Debug
+conan install . --output-folder build/Ninja/Debug/apps/navkit_sim/StationaryGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Debug
 ```
 
 Conan 2 usually writes the generated CMake toolchain file to:
 
 ```text
-build/Debug/apps/navkit_sim/StationaryGnss/build/generators/conan_toolchain.cmake
+build/Ninja/Debug/apps/navkit_sim/StationaryGnss/build/Debug/generators/conan_toolchain.cmake
+```
+
+On Windows with Ninja/MSVC, run the manual CMake configure and build commands
+from a Visual Studio Developer Prompt or first activate Conan's generated build
+environment:
+
+```powershell
+build\Ninja\Debug\apps\navkit_sim\StationaryGnss\build\Debug\generators\conanbuild.bat
 ```
 
 Configure CMake manually:
 
 ```bash
-cmake -S . -B build/Debug/apps/navkit_sim/StationaryGnss -DCMAKE_TOOLCHAIN_FILE=build/Debug/apps/navkit_sim/StationaryGnss/build/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
+cmake -S . -B build/Ninja/Debug/apps/navkit_sim/StationaryGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/Ninja/Debug/apps/navkit_sim/StationaryGnss/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
 ```
 
 To select a different compile-time config manually, use a matching build
 directory and `-DNAVKIT_CONFIG=...`:
 
 ```bash
-conan install . --output-folder build/Debug/apps/navkit_sim/ProfiledStationaryGnss --build=missing -s build_type=Debug
-cmake -S . -B build/Debug/apps/navkit_sim/ProfiledStationaryGnss -DCMAKE_TOOLCHAIN_FILE=build/Debug/apps/navkit_sim/ProfiledStationaryGnss/build/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/ProfiledStationaryGnss.hpp
+conan install . --output-folder build/Ninja/Debug/apps/navkit_sim/ProfiledStationaryGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Debug
+cmake -S . -B build/Ninja/Debug/apps/navkit_sim/ProfiledStationaryGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/Ninja/Debug/apps/navkit_sim/ProfiledStationaryGnss/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/ProfiledStationaryGnss.hpp
 ```
 
 Build manually:
 
 ```bash
-cmake --build build/Debug/apps/navkit_sim/StationaryGnss --config Debug
+cmake --build build/Ninja/Debug/apps/navkit_sim/StationaryGnss --config Debug
 ```
 
 For Release, replace `Debug` with `Release`:
 
 ```bash
-conan install . --output-folder build/Release/apps/navkit_sim/StationaryGnss --build=missing -s build_type=Release
-cmake -S . -B build/Release/apps/navkit_sim/StationaryGnss -DCMAKE_TOOLCHAIN_FILE=build/Release/apps/navkit_sim/StationaryGnss/build/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
-cmake --build build/Release/apps/navkit_sim/StationaryGnss --config Release
+conan install . --output-folder build/Ninja/Release/apps/navkit_sim/StationaryGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Release
+cmake -S . -B build/Ninja/Release/apps/navkit_sim/StationaryGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/Ninja/Release/apps/navkit_sim/StationaryGnss/build/Release/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
+cmake --build build/Ninja/Release/apps/navkit_sim/StationaryGnss --config Release
 ```
 
 Notes:
@@ -462,13 +486,13 @@ If the project has already been built, this runs CTest against the selected buil
 Equivalent raw CTest command:
 
 ```bash
-ctest --test-dir build/Debug/apps/navkit_sim/StationaryGnss --output-on-failure -C Debug
+ctest --test-dir build/Ninja/Debug/apps/navkit_sim/StationaryGnss --output-on-failure -C Debug
 ```
 
 For Release:
 
 ```bash
-ctest --test-dir build/Release/apps/navkit_sim/StationaryGnss --output-on-failure -C Release
+ctest --test-dir build/Ninja/Release/apps/navkit_sim/StationaryGnss --output-on-failure -C Release
 ```
 
 ---
@@ -486,19 +510,19 @@ Or manually, after building:
 Windows Debug:
 
 ```powershell
-build\Debug\apps\navkit_sim\StationaryGnss\apps\navkit_sim\Debug\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
+build\Ninja\Debug\apps\navkit_sim\StationaryGnss\apps\navkit_sim\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
 ```
 
 Windows Release:
 
 ```powershell
-build\Release\apps\navkit_sim\StationaryGnss\apps\navkit_sim\Release\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
+build\Ninja\Release\apps\navkit_sim\StationaryGnss\apps\navkit_sim\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
 ```
 
 Linux Debug:
 
 ```bash
-build/Debug/apps/navkit_sim/StationaryGnss/apps/navkit_sim/navkit_sim config/runtime/navkit_sim/stationary_gnss.json
+build/Ninja/Debug/apps/navkit_sim/StationaryGnss/apps/navkit_sim/navkit_sim config/runtime/navkit_sim/stationary_gnss.json
 ```
 
 The simulation generates logs under:

@@ -32,10 +32,10 @@ struct MissingSensorProcessing
     using State_t = NavigatorPolicyFilter::State_t;
     using P_t = NavigatorPolicyFilter::P_t;
 
-    State_t& state();
-    const State_t& state() const;
-    P_t& covariance();
-    const P_t& covariance() const;
+    [[nodiscard]] State_t& state();
+    [[nodiscard]] const State_t& state() const;
+    [[nodiscard]] P_t& covariance();
+    [[nodiscard]] const P_t& covariance() const;
     void set_state(const State_t&);
     void set_covariance(const P_t&);
     void inject();

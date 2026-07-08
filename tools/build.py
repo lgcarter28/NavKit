@@ -12,8 +12,10 @@ import sys
 import time
 from pathlib import Path
 
+from navkit_build_dirs import DEFAULT_GENERATOR
 from navkit_build_dirs import repo_root_from_tools_file
 from navkit_build_dirs import resolve_build_dir as resolve_config_build_dir
+from navkit_conan_env import run_with_optional_conan_env
 from perf_artifacts import (
     DEFAULT_NAVKIT_CONFIG,
     DEFAULT_RUN_NAME,
@@ -35,7 +37,7 @@ def repo_root() -> Path:
 
 
 def run(cmd: list[str], cwd: Path) -> None:
-    print("+", " ".join(str(c) for c in cmd))
+    print("+", " ".join(str(c) for c in cmd), flush=True)
     subprocess.check_call(cmd, cwd=cwd)
 
 
@@ -57,8 +59,9 @@ def find_executable_near_python(name: str) -> str:
     raise FileNotFoundError(f"Could not find executable: {name}")
 
 
-def find_conan_toolchain(build_dir: Path) -> Path:
+def find_conan_toolchain(build_dir: Path, build_type: str) -> Path:
     candidates = [
+        build_dir / "build" / build_type / "generators" / "conan_toolchain.cmake",
         build_dir / "build" / "generators" / "conan_toolchain.cmake",
         build_dir / "generators" / "conan_toolchain.cmake",
     ]
@@ -86,6 +89,18 @@ def read_cmake_cache_value(build_dir: Path, key: str) -> str | None:
             return value
 
     return None
+
+
+def validate_cached_generator(build_dir: Path, generator: str) -> None:
+    cached = read_cmake_cache_value(build_dir, "CMAKE_GENERATOR")
+    if cached is None or cached == generator:
+        return
+
+    raise ValueError(
+        f"Build directory {build_dir} was configured with generator {cached!r}, "
+        f"but this invocation requested {generator!r}. Use --clean or choose a "
+        "different --build-dir."
+    )
 
 
 def selected_navkit_config(build_dir: Path, navkit_config_arg: str | None) -> str:
@@ -145,11 +160,13 @@ def write_build_manifest(
     tests_enabled: bool,
     warnings_as_errors: bool,
     coverage_enabled: bool,
+    generator: str,
 ) -> Path:
     manifest_path = build_dir / "navkit_build_manifest.json"
     manifest = {
         "schema": "navkit.build_manifest.v1",
         "build_type": build_type,
+        "generator": generator,
         "navkit_config": navkit_config,
         "compiletime_config_metadata": compiletime_config_metadata,
         "tests_enabled": tests_enabled,
@@ -169,8 +186,14 @@ def main() -> int:
         type=Path,
         default=None,
         help=(
-            "Build directory. Defaults to build/<build-type>/<navkit-config-without-.hpp>."
+            "Build directory. Defaults to "
+            "build/<generator>/<build-type>/<navkit-config-without-.hpp>."
         ),
+    )
+    parser.add_argument(
+        "--generator",
+        default=DEFAULT_GENERATOR,
+        help="CMake generator to use. Defaults to Ninja.",
     )
     parser.add_argument("--clean", action="store_true")
     parser.add_argument("--skip-conan", action="store_true")
@@ -227,13 +250,18 @@ def main() -> int:
     root = repo_root()
     requested_navkit_config = args.navkit_config or DEFAULT_NAVKIT_CONFIG
     build_dir = resolve_config_build_dir(
-        root, args.build_type, requested_navkit_config, args.build_dir
+        root,
+        args.build_type,
+        requested_navkit_config,
+        args.build_dir,
+        generator=args.generator,
     )
 
     if args.clean and build_dir.exists():
         shutil.rmtree(build_dir)
 
     build_dir.mkdir(parents=True, exist_ok=True)
+    validate_cached_generator(build_dir, args.generator)
 
     if args.build_only and args.clean:
         raise ValueError("--clean cannot be used with --build-only")
@@ -251,6 +279,8 @@ def main() -> int:
                 "--output-folder",
                 str(build_dir),
                 "--build=missing",
+                "-c",
+                f"tools.cmake.cmaketoolchain:generator={args.generator}",
                 "-s",
                 f"build_type={args.build_type}",
             ],
@@ -258,24 +288,34 @@ def main() -> int:
         )
 
     if not args.build_only:
-        toolchain_file = find_conan_toolchain(build_dir)
-        run(
-            [
-                "cmake",
-                "-S",
-                str(root),
-                "-B",
-                str(build_dir),
-                f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file}",
-                f"-DCMAKE_BUILD_TYPE={args.build_type}",
-                "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-                f"-DNAVKIT_BUILD_TESTS={'OFF' if args.without_tests else 'ON'}",
-                f"-DNAVKIT_WARNINGS_AS_ERRORS={'ON' if args.warnings_as_errors else 'OFF'}",
-                f"-DNAVKIT_ENABLE_COVERAGE={'ON' if args.coverage else 'OFF'}",
-                f"-DNAVKIT_CONFIG={requested_navkit_config}",
-            ],
+        toolchain_file = find_conan_toolchain(build_dir, args.build_type)
+        configure_cmd = [
+            "cmake",
+            "-S",
+            str(root),
+            "-B",
+            str(build_dir),
+            "-G",
+            args.generator,
+            f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file}",
+            f"-DCMAKE_BUILD_TYPE={args.build_type}",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            f"-DNAVKIT_BUILD_TESTS={'OFF' if args.without_tests else 'ON'}",
+            f"-DNAVKIT_WARNINGS_AS_ERRORS={'ON' if args.warnings_as_errors else 'OFF'}",
+            f"-DNAVKIT_ENABLE_COVERAGE={'ON' if args.coverage else 'OFF'}",
+            f"-DNAVKIT_CONFIG={requested_navkit_config}",
+        ]
+        if args.generator == DEFAULT_GENERATOR:
+            configure_cmd.append(f"-DCMAKE_MAKE_PROGRAM={find_executable_near_python('ninja')}")
+
+        ret = run_with_optional_conan_env(
+            configure_cmd,
             cwd=root,
+            build_dir=build_dir,
+            build_type=args.build_type,
         )
+        if ret != 0:
+            raise subprocess.CalledProcessError(ret, configure_cmd)
 
     build_cmd = [
         "cmake",
@@ -288,7 +328,14 @@ def main() -> int:
     if args.jobs is not None:
         build_cmd += ["--parallel", str(args.jobs)]
 
-    run(build_cmd, cwd=root)
+    ret = run_with_optional_conan_env(
+        build_cmd,
+        cwd=root,
+        build_dir=build_dir,
+        build_type=args.build_type,
+    )
+    if ret != 0:
+        raise subprocess.CalledProcessError(ret, build_cmd)
     navkit_config = selected_navkit_config(build_dir, requested_navkit_config)
     compiletime_config_metadata = query_compiletime_config_metadata(build_dir, args.build_type)
     write_build_manifest(
@@ -299,6 +346,7 @@ def main() -> int:
         tests_enabled=not args.without_tests,
         warnings_as_errors=args.warnings_as_errors,
         coverage_enabled=args.coverage,
+        generator=args.generator,
     )
 
     command_name = f"build_{args.build_type.lower()}"

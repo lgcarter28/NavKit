@@ -164,10 +164,13 @@ struct StationaryGnssAppConfig
 
     using EmulatorBindings = std::tuple<PrimaryGnssBinding>;
 
-    using Logger = navkit::io::RunLogger<navkit::io::TruthLogProduct,
-                                         navkit::io::GnssPositionLogProduct,
-                                         navkit::io::NavEstimateLogProduct,
-                                         navkit::io::GnssPositionUpdateLogProduct>;
+    using PrimaryGnssStatistics =
+        navkit::core::estimation::MeasurementStatistics<PrimaryGnssSensor>;
+    using Logger =
+        navkit::io::RunLogger<navkit::io::TruthLogProduct,
+                              navkit::io::GnssPositionLogProduct,
+                              navkit::io::NavEstimateLogProduct,
+                              navkit::io::GnssPositionUpdateLogProduct<PrimaryGnssStatistics>>;
     using App = navkit::app_support::SimulationApp<StationaryGnssAppConfig>;
 };
 ```
@@ -249,7 +252,7 @@ using AppConfig = navkit::selected_config::Config;
 The CMake model is one compile-time configuration per build tree:
 
 ```text
-cmake -S . -B build/Debug/apps/navkit_sim/StationaryGnss -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
+cmake -S . -B build/Ninja/Debug/apps/navkit_sim/StationaryGnss -G Ninja -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
 ```
 
 `NAVKIT_CONFIG` is a CMake cache variable relative to `config/compiletime`. It
@@ -272,10 +275,10 @@ config header:
 
 ```text
 apps/navkit_sim/StationaryGnss.hpp
-    -> build/Debug/apps/navkit_sim/StationaryGnss
+    -> build/Ninja/Debug/apps/navkit_sim/StationaryGnss
 
 apps/navkit_sim/ProfiledStationaryGnss.hpp
-    -> build/Debug/apps/navkit_sim/ProfiledStationaryGnss
+    -> build/Ninja/Debug/apps/navkit_sim/ProfiledStationaryGnss
 ```
 
 Runtime JSON is still checked against the compiled app composition. For example,

@@ -73,9 +73,9 @@ TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
     static_assert(std::is_same_v<navkit::app_support::LoggerConfig_t<SelectedAppConfig>,
                                  SelectedAppConfig::Logger>);
     static_assert(std::is_same_v<
-                  typename SimConfig::Filter::MeasurementStatisticsTuple_t,
+                  SimConfig::Filter::MeasurementStatisticsTuple_t,
                   navkit::core::estimation::MeasurementStatisticsStorage_t<SimConfig::Sensors>>);
-    static_assert(std::is_same_v<typename SimConfig::PrimaryGnssSensor::Diagnostics_t,
+    static_assert(std::is_same_v<SimConfig::PrimaryGnssSensor::Diagnostics_t,
                                  SimConfig::PrimaryGnssDiagnostics>);
 
     static_assert(std::is_same_v<ExampleConfig::Numeric::Scalar_t, navkit::core::Scalar_t>);

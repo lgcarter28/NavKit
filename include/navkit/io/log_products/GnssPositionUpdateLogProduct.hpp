@@ -17,6 +17,7 @@
 namespace navkit::io
 {
 
+template<typename Statistics>
 class GnssPositionUpdateLogProduct
 {
 public:
@@ -27,19 +28,16 @@ public:
         m_csv.open(output_dir / "gnss_pos_update.csv", header());
     }
 
-    template<typename Statistics>
     void log(const MeasurementStatisticsLogPayload<Statistics>& payload)
     {
         const auto& stats = payload.statistics;
 
-        static_assert(Statistics::O_t::RowsAtCompileTime == MeasurementDimension,
+        static_assert(MeasurementDimension == 3,
                       "GNSS position update statistics must have measurement dimension 3.");
-        static_assert(
-            Statistics::H_t::ColsAtCompileTime == StateDimension,
-            "GNSS position update statistics schema currently expects state dimension 21.");
-        static_assert(
-            Statistics::K_t::RowsAtCompileTime == StateDimension,
-            "GNSS position update statistics schema currently expects state dimension 21.");
+        static_assert(Statistics::H_t::RowsAtCompileTime == MeasurementDimension,
+                      "GNSS position update H rows must match the measurement dimension.");
+        static_assert(Statistics::K_t::ColsAtCompileTime == MeasurementDimension,
+                      "GNSS position update K columns must match the measurement dimension.");
 
         std::vector<double> row = {stats.time,
                                    stats.accepted ? 1.0 : 0.0,
@@ -70,6 +68,8 @@ public:
         return {{"schema", "gnss_pos_update_v1"},
                 {"file", "gnss_pos_update.csv"},
                 {"model", "gnss_pos"},
+                {"measurement_dimension", MeasurementDimension},
+                {"state_dimension", StateDimension},
                 {"units",
                  {{"time", "s"},
                   {"innovation", "m"},
@@ -90,8 +90,8 @@ public:
     }
 
 private:
-    static constexpr int MeasurementDimension = 3;
-    static constexpr int StateDimension = 21;
+    static constexpr int MeasurementDimension = Statistics::O_t::RowsAtCompileTime;
+    static constexpr int StateDimension = Statistics::H_t::ColsAtCompileTime;
 
     static std::vector<std::string> header()
     {

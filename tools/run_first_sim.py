@@ -9,7 +9,7 @@ import platform
 import subprocess
 from pathlib import Path
 
-from navkit_build_dirs import resolve_build_dir
+from navkit_build_dirs import DEFAULT_GENERATOR, resolve_build_dir
 from perf_artifacts import (
     DEFAULT_NAVKIT_CONFIG,
     measure_call,
@@ -77,9 +77,11 @@ def main() -> int:
         type=Path,
         default=None,
         help=(
-            "Build directory. Defaults to build/<build-type>/<navkit-config-without-.hpp>."
+            "Build directory. Defaults to "
+            "build/<generator>/<build-type>/<navkit-config-without-.hpp>."
         ),
     )
+    parser.add_argument("--generator", default=DEFAULT_GENERATOR, help="CMake generator used.")
     parser.add_argument(
         "--navkit-config",
         default=DEFAULT_NAVKIT_CONFIG,
@@ -106,7 +108,9 @@ def main() -> int:
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
-    build_dir = resolve_build_dir(root, args.build_type, args.navkit_config, args.build_dir)
+    build_dir = resolve_build_dir(
+        root, args.build_type, args.navkit_config, args.build_dir, generator=args.generator
+    )
     build_manifest = load_build_manifest(build_dir)
     navkit_config = str(build_manifest.get("navkit_config", "unknown"))
 

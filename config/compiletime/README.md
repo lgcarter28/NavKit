@@ -54,10 +54,12 @@ struct ExampleAppConfig
 
     using EmulatorBindings = std::tuple<PrimaryBinding>;
 
-    using Logger = navkit::io::RunLogger<navkit::io::TruthLogProduct,
-                                         navkit::io::GnssPositionLogProduct,
-                                         navkit::io::NavEstimateLogProduct,
-                                         navkit::io::GnssPositionUpdateLogProduct>;
+    using PrimaryStatistics = navkit::core::estimation::MeasurementStatistics<PrimarySensor>;
+    using Logger =
+        navkit::io::RunLogger<navkit::io::TruthLogProduct,
+                              navkit::io::GnssPositionLogProduct,
+                              navkit::io::NavEstimateLogProduct,
+                              navkit::io::GnssPositionUpdateLogProduct<PrimaryStatistics>>;
     using App = navkit::app_support::SimulationApp<ExampleAppConfig>;
 };
 ```

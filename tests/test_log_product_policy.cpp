@@ -40,16 +40,15 @@ using Filter = navkit::core::estimation::KalmanFilter<
     Sensors>;
 using GnssMeasurement = navkit::core::estimation::Measurement<3>;
 using Statistics = navkit::core::estimation::MeasurementStatistics<Sensor>;
-using StationaryGnssTestRunLogger = RunLogger<TruthLogProduct,
-                                              GnssPositionLogProduct,
-                                              NavEstimateLogProduct,
-                                              GnssPositionUpdateLogProduct>;
+using GnssUpdateLogProduct = GnssPositionUpdateLogProduct<Statistics>;
+using StationaryGnssTestRunLogger =
+    RunLogger<TruthLogProduct, GnssPositionLogProduct, NavEstimateLogProduct, GnssUpdateLogProduct>;
 
 struct MissingOpen
 {
-    void log(const GnssMeasurement&) {}
+    void log(const GnssMeasurement& /*measurement*/) {}
     void flush() {}
-    nlohmann::json metadata()
+    static nlohmann::json metadata()
     {
         return {};
     }
@@ -61,10 +60,10 @@ struct MissingOpen
 
 struct MissingPayloadLog
 {
-    void open(const std::filesystem::path&) {}
+    void open(const std::filesystem::path& /*output_dir*/) {}
     void log() {}
     void flush() {}
-    nlohmann::json metadata()
+    static nlohmann::json metadata()
     {
         return {};
     }
@@ -76,10 +75,10 @@ struct MissingPayloadLog
 
 struct MissingManifest
 {
-    void open(const std::filesystem::path&) {}
-    void log(const GnssMeasurement&) {}
+    void open(const std::filesystem::path& /*output_dir*/) {}
+    void log(const GnssMeasurement& /*measurement*/) {}
     void flush() {}
-    nlohmann::json metadata()
+    static nlohmann::json metadata()
     {
         return {};
     }
@@ -119,7 +118,7 @@ public:
         ++m_flush_count;
     }
 
-    nlohmann::json metadata() const
+    [[nodiscard]] nlohmann::json metadata() const
     {
         return {{"schema", "fake_v1"}, {"log_count", m_log_count}};
     }
@@ -145,10 +144,10 @@ class OtherFakeLogProduct
 public:
     static constexpr std::string_view LogKey = "other";
 
-    void open(const std::filesystem::path&) {}
-    void log(const OtherFakePayload&) {}
+    void open(const std::filesystem::path& /*output_dir*/) {}
+    void log(const OtherFakePayload& /*payload*/) {}
     void flush() {}
-    nlohmann::json metadata() const
+    [[nodiscard]] static nlohmann::json metadata()
     {
         return {{"schema", "other_v1"}};
     }
@@ -163,10 +162,10 @@ class AmbiguousFakeLogProduct
 public:
     static constexpr std::string_view LogKey = "ambiguous";
 
-    void open(const std::filesystem::path&) {}
-    void log(const FakePayload&) {}
+    void open(const std::filesystem::path& /*output_dir*/) {}
+    void log(const FakePayload& /*payload*/) {}
     void flush() {}
-    nlohmann::json metadata() const
+    [[nodiscard]] static nlohmann::json metadata()
     {
         return {{"schema", "ambiguous_v1"}};
     }
@@ -183,8 +182,8 @@ TEST_CASE("log product policies describe concrete payload boundaries")
     static_assert(LogProductPolicy<TruthLogProduct, navkit::sim::TruthSample>);
     static_assert(LogProductPolicy<GnssPositionLogProduct, GnssMeasurement>);
     static_assert(LogProductPolicy<NavEstimateLogProduct, NavEstimateLogPayload<StateDef, Filter>>);
-    static_assert(LogProductPolicy<GnssPositionUpdateLogProduct,
-                                   MeasurementStatisticsLogPayload<Statistics>>);
+    static_assert(
+        LogProductPolicy<GnssUpdateLogProduct, MeasurementStatisticsLogPayload<Statistics>>);
 
     static_assert(!LogProductPolicy<MissingOpen, GnssMeasurement>);
     static_assert(!LogProductPolicy<MissingPayloadLog, GnssMeasurement>);
@@ -202,6 +201,7 @@ TEST_CASE("log product policies describe concrete payload boundaries")
     static_assert(LoggerPolicy<StationaryGnssTestRunLogger>);
     static_assert(LoggerPayloadPolicy<StationaryGnssTestRunLogger, GnssMeasurement>);
     static_assert(LoggerProductAccessPolicy<StationaryGnssTestRunLogger, GnssPositionLogProduct>);
+    static_assert(LoggerProductAccessPolicy<StationaryGnssTestRunLogger, GnssUpdateLogProduct>);
 
     CHECK(true);
 }

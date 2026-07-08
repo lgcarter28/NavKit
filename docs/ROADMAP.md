@@ -196,7 +196,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Support multiple configurations by using multiple build directories or CMake presets, not by making one executable dynamically switch among compile-time configurations.
 - [x] Add CMake presets or documented wrapper examples that pair common build types and selected configs for convenience while keeping those axes independent.
 - [x] Add a `tools/build.py` option such as `--navkit-config apps/navkit_sim/StationaryGnss.hpp` that forwards to `-DNAVKIT_CONFIG=...`.
-- [x] Make the default build directory derive from the selected compile-time config header, for example `apps/navkit_sim/StationaryGnss.hpp` maps to `build/Debug/apps/navkit_sim/StationaryGnss`, so switching configs does not overwrite another build tree's generated selected-config header.
+- [x] Make the default build directory derive from the selected compile-time config header, for example `apps/navkit_sim/StationaryGnss.hpp` maps to `build/Ninja/Debug/apps/navkit_sim/StationaryGnss`, so switching configs does not overwrite another build tree's generated selected-config header.
 - [x] Document how to add a new compile-time config header, how to select it with CMake or the build wrapper, and how to pair it with a runtime JSON input when an application needs one.
 - [x] Reconcile `README.md`, `docs/SETUP.md`, `docs/ARCHITECTURE.md`, and `AGENTS.md` so the default selected config, root config tree, and one-config-per-build-tree rule stay discoverable.
 - [x] Keep reusable NavKit library configs and app composition configs in dedicated directories so app and library configs can share descriptive names without coupling their ownership.
@@ -367,10 +367,11 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 #### Pass 3.2d — Log schema generalization and remaining product-specific assumptions
 
-- [ ] Begin removing hard-coded logging assumptions such as GNSS-only update-statistics plumbing, `StateDef::Pos` position extraction, and fixed `H`/`K` matrix dimensions where the selected product/log payload can own the schema more clearly.
-- [ ] Decide how optional runtime log-product enable/disable, verbosity, schema migration, and richer compatibility checks fit into the longer-term logging architecture. Keep them in Phase 8 unless a tiny prerequisite falls out naturally.
-- [ ] Revisit whether measurement-statistics logging should become product/model-specific log products beyond the current GNSS position update product once multiple measurement models are active.
-- [ ] Preserve stationary GNSS filenames, metadata schemas, run-manifest shape, profile export behavior, and downstream Python analysis compatibility while generalizing schemas.
+- [x] Make Ninja the default generator for repository Python build wrappers while keeping a deliberate generator override. Pass Ninja through Conan/CMake configuration, keep selected-config build directories isolated by generator/config, document the one-time clean rebuild expectation when switching existing MSBuild trees, and preserve CMake presets as Ninja-based examples. Treat faster incremental builds as a bonus; the main goal is consistent compile-database generation for optional local clang-tidy and CI-like diagnostics.
+- [x] Begin removing hard-coded logging assumptions such as GNSS-only update-statistics plumbing, `StateDef::Pos` position extraction, and fixed `H`/`K` matrix dimensions where the selected product/log payload can own the schema more clearly. Current scope keeps the GNSS position-update product GNSS-specific, but templates it on the selected statistics stream so state and matrix dimensions come from the configured payload.
+- [x] Decide how optional runtime log-product enable/disable, verbosity, schema migration, and richer compatibility checks fit into the longer-term logging architecture. Keep them in Phase 8 unless a tiny prerequisite falls out naturally.
+- [x] Revisit whether measurement-statistics logging should become product/model-specific log products beyond the current GNSS position update product once multiple measurement models are active. Current decision: keep the explicit GNSS update product for now and add additional typed products when additional measurement models are actually logged.
+- [x] Preserve stationary GNSS filenames, metadata schemas, run-manifest shape, profile export behavior, and downstream Python analysis compatibility while generalizing schemas.
 
 ### Pass 3.3 — Navigation initialization and transfer-alignment boundary
 

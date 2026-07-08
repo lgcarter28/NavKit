@@ -101,6 +101,8 @@ This project follows
 - Added sensor diagnostics configuration and disabled-statistics coverage while keeping measurement statistics keyed by configured sensor type.
 - Installed Ninja through bootstrap as a local compile-database convenience for optional Windows clang-tidy diagnostics.
 - Exposed sensor diagnostics aliases in reusable product configs and moved profiling clock metadata onto the selected clock type to avoid config metadata drift.
+- Made Ninja the default generator for Python build/test/sim/tidy wrappers and rooted default build directories by generator, build type, and selected compile-time config.
+- Parameterized the GNSS position-update log product on its selected measurement-statistics stream so matrix dimensions and metadata come from the configured payload instead of hard-coded schema constants.
 
 ### Removed
 
