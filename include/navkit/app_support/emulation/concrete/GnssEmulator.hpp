@@ -5,6 +5,7 @@
 
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
 #include "navkit/core/estimation/sensor/SensorId.hpp"
+#include "navkit/io/log_products/GnssPositionLogProduct.hpp"
 #include "navkit/sim/GnssSimulator.hpp"
 
 #include <nlohmann/json.hpp>
@@ -61,7 +62,8 @@ struct GnssEmulator
     static void configure_logger(Logger& logger, const nlohmann::json& cfg)
     {
         const auto gnss_cfg = runtime_config_from_json(cfg);
-        logger.set_gnss_metadata(gnss_cfg.sigma_h_m, gnss_cfg.sigma_v_m, gnss_cfg.seed);
+        logger.template product<navkit::io::GnssPositionLogProduct>().set_metadata(
+            gnss_cfg.sigma_h_m, gnss_cfg.sigma_v_m, gnss_cfg.seed);
     }
 
     static auto generate(Runtime& runtime, const sim::TruthSample& sample)
@@ -72,7 +74,7 @@ struct GnssEmulator
     template<typename Logger, typename Measurement>
     static void log_measurement(Logger& logger, const Measurement& measurement)
     {
-        logger.log_gnss(measurement);
+        logger.log(measurement);
     }
 };
 

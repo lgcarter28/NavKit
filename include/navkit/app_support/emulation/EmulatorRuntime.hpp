@@ -7,7 +7,6 @@
 #include "navkit/app_support/emulation/EmulatorBindingPolicy.hpp"
 #include "navkit/app_support/emulation/EmulatorBindingTuplePolicy.hpp"
 #include "navkit/core/estimation/sensor/SensorTupleTraits.hpp"
-#include "navkit/io/RunLogger.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
 #include <nlohmann/json.hpp>
@@ -19,7 +18,8 @@ namespace navkit::app_support
 {
 
 template<navkit::api::config::NavKitProductConfigPolicy NavKit,
-         EmulatorBindingTuplePolicy<typename NavKit::Sensors> EmulatorBindings>
+         typename Logger,
+         EmulatorBindingTuplePolicy<typename NavKit::Sensors, Logger> EmulatorBindings>
 class EmulatorRuntime
 {
 public:
@@ -31,7 +31,7 @@ public:
             cfg, std::make_index_sequence<std::tuple_size_v<EmulatorBindings>>{});
     }
 
-    static void configure(Navigator& navigator, io::RunLogger& logger, const nlohmann::json& cfg)
+    static void configure(Navigator& navigator, Logger& logger, const nlohmann::json& cfg)
     {
         configure_impl<EmulatorBindings>(
             navigator,
@@ -42,7 +42,7 @@ public:
 
     template<typename EmulatorRuntimes>
     static void process(Navigator& navigator,
-                        io::RunLogger& logger,
+                        Logger& logger,
                         EmulatorRuntimes& runtimes,
                         const sim::TruthSample& sample)
     {
@@ -64,23 +64,24 @@ private:
 
     template<typename BindingTuple, std::size_t... Is>
     static void configure_impl(Navigator& navigator,
-                               io::RunLogger& logger,
+                               Logger& logger,
                                const nlohmann::json& cfg,
                                std::index_sequence<Is...>)
     {
         (configure_one<std::tuple_element_t<Is, BindingTuple>>(navigator, logger, cfg), ...);
     }
 
-    template<EmulatorBindingPolicy Binding>
-    static void
-    configure_one(Navigator& navigator, io::RunLogger& logger, const nlohmann::json& cfg)
+    template<typename Binding>
+        requires EmulatorBindingPolicy<Binding, Logger>
+    static void configure_one(Navigator& navigator, Logger& logger, const nlohmann::json& cfg)
     {
         auto& sensor = sensor_for_binding<Binding>(navigator);
         Binding::Emulator_t::configure_sensor(sensor, cfg);
         Binding::Emulator_t::configure_logger(logger, cfg);
     }
 
-    template<EmulatorBindingPolicy Binding>
+    template<typename Binding>
+        requires EmulatorBindingPolicy<Binding, Logger>
     static auto& sensor_for_binding(Navigator& navigator)
     {
         constexpr auto SensorIndex =
@@ -90,7 +91,7 @@ private:
 
     template<typename BindingTuple, typename EmulatorRuntimes, std::size_t... Is>
     static void process_impl(Navigator& navigator,
-                             io::RunLogger& logger,
+                             Logger& logger,
                              EmulatorRuntimes& runtimes,
                              const sim::TruthSample& sample,
                              std::index_sequence<Is...>)
@@ -100,9 +101,10 @@ private:
          ...);
     }
 
-    template<EmulatorBindingPolicy Binding, typename Runtime>
+    template<typename Binding, typename Runtime>
+        requires EmulatorBindingPolicy<Binding, Logger>
     static void process_one(Navigator& navigator,
-                            io::RunLogger& logger,
+                            Logger& logger,
                             Runtime& runtime,
                             const sim::TruthSample& sample)
     {

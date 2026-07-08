@@ -9,6 +9,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+from navkit_build_dirs import repo_root_from_tools_file
+from navkit_build_dirs import resolve_build_dir
+from perf_artifacts import DEFAULT_NAVKIT_CONFIG
+
 # Directories to ignore
 EXCLUDE_DIRS = {
     ".git",
@@ -43,7 +47,7 @@ TIDY_SOURCE_EXTENSIONS = {
 def repo_root() -> Path:
     script = Path(__file__).resolve()
     if script.parent.name == "tools":
-        return script.parent.parent
+        return repo_root_from_tools_file(__file__)
     return Path.cwd().resolve()
 
 
@@ -89,6 +93,26 @@ def main() -> int:
         "--tidy-warnings-as-errors",
         action="store_true",
         help="Promote clang-tidy warnings to errors (requires --tidy).",
+    )
+    parser.add_argument(
+        "--build-type",
+        choices=["Release", "Debug"],
+        default="Debug",
+        help="Build type whose compilation database should be used for clang-tidy.",
+    )
+    parser.add_argument(
+        "--build-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Build directory containing compile_commands.json. Defaults to "
+            "build/<build-type>/<navkit-config-without-.hpp>."
+        ),
+    )
+    parser.add_argument(
+        "--navkit-config",
+        default=DEFAULT_NAVKIT_CONFIG,
+        help="Compile-time config header relative to config/compiletime for default build-dir resolution.",
     )
 
     args = parser.parse_args()
@@ -136,7 +160,7 @@ def main() -> int:
             print("ERROR: clang-tidy not found on PATH.")
             return 1
 
-        build_dir = root / "build" / "Debug"
+        build_dir = resolve_build_dir(root, args.build_type, args.navkit_config, args.build_dir)
         compile_commands = build_dir / "compile_commands.json"
 
         if not compile_commands.exists():

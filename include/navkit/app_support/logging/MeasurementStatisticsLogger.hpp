@@ -5,8 +5,10 @@
 
 #include "navkit/core/estimation/filter/FilterPolicy.hpp"
 #include "navkit/core/estimation/sensor/SensorPolicy.hpp"
+#include "navkit/io/log_payloads/MeasurementStatisticsLogPayload.hpp"
 
 #include <tuple>
+#include <type_traits>
 
 namespace navkit::app_support
 {
@@ -16,13 +18,12 @@ template<navkit::core::estimation::SensorPolicy Sensor,
          navkit::core::estimation::FilterPolicy Filter>
 void log_measurement_statistics_for_sensor(Logger& logger, const Filter& filter)
 {
-    if constexpr (requires {
-                      logger.log_gnss_pos_statistics(
-                          filter.template measurement_statistics<Sensor>());
-                  }) {
-        if (filter.template has_measurement_statistics<Sensor>()) {
-            logger.log_gnss_pos_statistics(filter.template measurement_statistics<Sensor>());
-        }
+    if (filter.template has_measurement_statistics<Sensor>()) {
+        const auto& stats = filter.template measurement_statistics<Sensor>();
+        logger.log(
+            navkit::io::MeasurementStatisticsLogPayload<std::remove_cvref_t<decltype(stats)>>{
+                .statistics = stats,
+            });
     }
 }
 

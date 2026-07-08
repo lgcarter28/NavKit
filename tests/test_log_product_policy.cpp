@@ -7,6 +7,7 @@
 #include "navkit/core/estimation/state/StateDefs.hpp"
 #include "navkit/core/models/GnssPosModel.hpp"
 #include "navkit/io/LogProductPolicy.hpp"
+#include "navkit/io/RunLogger.hpp"
 #include "navkit/io/log_payloads/MeasurementStatisticsLogPayload.hpp"
 #include "navkit/io/log_payloads/NavEstimateLogPayload.hpp"
 #include "navkit/io/log_products/GnssPositionLogProduct.hpp"
@@ -90,6 +91,13 @@ TEST_CASE("log product policies describe concrete payload boundaries")
     static_assert(!LogProductPolicy<MissingOpen, GnssMeasurement>);
     static_assert(!LogProductPolicy<MissingPayloadLog, GnssMeasurement>);
     static_assert(!LogProductPolicy<MissingManifest, GnssMeasurement>);
+
+    static_assert(RunLogger::MatchingProductCount<navkit::sim::TruthSample> == 1U);
+    static_assert(RunLogger::MatchingProductCount<GnssMeasurement> == 1U);
+    static_assert(RunLogger::MatchingProductCount<NavEstimateLogPayload<StateDef, Filter>> == 1U);
+    static_assert(RunLogger::MatchingProductCount<MeasurementStatisticsLogPayload<Statistics>> ==
+                  1U);
+    static_assert(RunLogger::MatchingProductCount<nlohmann::json> == 0U);
 
     CHECK(true);
 }

@@ -716,7 +716,10 @@ python tools/build.py --build-type Release --clean --without-tests --warnings-as
 
 CI runs clang-tidy on Linux as the canonical static-analysis gate. Local
 development does not require clang-tidy; run it locally only when explicitly
-debugging the CI static-analysis lane.
+debugging the CI static-analysis lane. Local clang-tidy requires a
+`compile_commands.json` in the selected config build directory, which generally
+means configuring with a compile-database-capable generator such as Ninja rather
+than the Visual Studio generator.
 
 CI also generates a Linux coverage artifact with `tools/coverage.py`. Local
 development does not require coverage reporting; use it only when reviewing

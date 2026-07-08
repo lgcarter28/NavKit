@@ -14,6 +14,7 @@
 #include "navkit/app_support/runtime/RunSettings.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigValidation.hpp"
 #include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
+#include "navkit/io/log_payloads/NavEstimateLogPayload.hpp"
 
 #include <cstdio>
 #include <filesystem>
@@ -31,8 +32,8 @@ public:
     using Filter = typename NavKit::Filter;
     using Navigator = typename NavKit::Navigator;
     using EmulatorBindings = typename Config::EmulatorBindings;
-    using Emulators = EmulatorRuntime<NavKit, EmulatorBindings>;
     using Logger = LoggerConfig_t<Config>;
+    using Emulators = EmulatorRuntime<NavKit, Logger, EmulatorBindings>;
 
     static int run(const std::filesystem::path& config_path)
     {
@@ -53,13 +54,17 @@ public:
         Emulators::configure(navigator, logger, cfg);
 
         for (const auto& sample : trajectory.truth_samples) {
-            logger.log_truth(sample);
+            logger.log(sample);
             Emulators::process(navigator, logger, emulator_runtimes, sample);
 
             navigator.process_measurements();
 
             log_measurement_statistics<typename NavKit::MeasurementStatisticsTuple>(logger, filter);
-            logger.log_nav<StateDef>(sample.time, filter, sample);
+            logger.log(io::NavEstimateLogPayload<StateDef, Filter>{
+                .time_s = sample.time,
+                .filter = filter,
+                .truth = sample,
+            });
         }
 
         logger.close();

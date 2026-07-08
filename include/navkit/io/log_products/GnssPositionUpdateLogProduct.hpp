@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace navkit::io
@@ -19,6 +20,8 @@ namespace navkit::io
 class GnssPositionUpdateLogProduct
 {
 public:
+    static constexpr std::string_view LogKey = "gnss_pos_update";
+
     void open(const std::filesystem::path& output_dir)
     {
         m_csv.open(output_dir / "gnss_pos_update.csv", header());

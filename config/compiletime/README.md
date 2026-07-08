@@ -59,6 +59,10 @@ struct ExampleAppConfig
 };
 ```
 
+`navkit::io::RunLogger` is the default stationary GNSS logger alias. Custom app
+configs may select a `navkit::io::BasicRunLogger<...>` composition when they need
+a different compile-time set of log products.
+
 Applications should include the generated `navkit/SelectedConfig.hpp` header and
 use `navkit::selected_config::Config` rather than including concrete config
 headers directly.

@@ -181,7 +181,9 @@ that this ID matches the selected sensor's configured `Sensor::Id`. This keeps
 duplicate sensors of the same model type, such as primary and backup GNSS
 receivers, unambiguous. App configs also select the logger adapter type at
 compile time; runtime JSON still owns run-specific choices such as run name and output
-directory.
+directory. Logger adapters may be composed from concrete log products with
+`navkit::io::BasicRunLogger<...>`. The default `navkit::io::RunLogger` alias is
+the stationary GNSS product set used by the shipped demo.
 
 The app and NavKit config trees are deliberately separate:
 

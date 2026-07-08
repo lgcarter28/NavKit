@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
+#include <string_view>
 
 namespace navkit::io
 {
@@ -15,6 +16,8 @@ namespace navkit::io
 class TruthLogProduct
 {
 public:
+    static constexpr std::string_view LogKey = "truth";
+
     void open(const std::filesystem::path& output_dir)
     {
         m_csv.open(output_dir / "truth.csv",

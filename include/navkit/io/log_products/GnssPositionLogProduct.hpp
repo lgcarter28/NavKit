@@ -3,10 +3,12 @@
 
 #pragma once
 
+#include "navkit/core/estimation/measurement/Measurement.hpp"
 #include "navkit/io/CsvWriter.hpp"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
+#include <string_view>
 
 namespace navkit::io
 {
@@ -14,6 +16,8 @@ namespace navkit::io
 class GnssPositionLogProduct
 {
 public:
+    static constexpr std::string_view LogKey = "gnss";
+
     void open(const std::filesystem::path& output_dir)
     {
         m_csv.open(output_dir / "gnss.csv", {"time_s", "p_e_x_m", "p_e_y_m", "p_e_z_m"});
@@ -24,8 +28,7 @@ public:
         m_noise = {{"sigma_h_m", sigma_h_m}, {"sigma_v_m", sigma_v_m}, {"seed", seed}};
     }
 
-    template<typename Measurement>
-    void log(const Measurement& meas)
+    void log(const core::estimation::Measurement<3>& meas)
     {
         m_csv.write_row(meas.time, meas.z.x(), meas.z.y(), meas.z.z());
     }

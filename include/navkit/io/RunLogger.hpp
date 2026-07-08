@@ -3,13 +3,11 @@
 
 #pragma once
 
-#include "navkit/io/log_payloads/MeasurementStatisticsLogPayload.hpp"
-#include "navkit/io/log_payloads/NavEstimateLogPayload.hpp"
+#include "navkit/io/LogProductPolicy.hpp"
 #include "navkit/io/log_products/GnssPositionLogProduct.hpp"
 #include "navkit/io/log_products/GnssPositionUpdateLogProduct.hpp"
 #include "navkit/io/log_products/NavEstimateLogProduct.hpp"
 #include "navkit/io/log_products/TruthLogProduct.hpp"
-#include "navkit/sim/TruthSample.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -17,59 +15,67 @@
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <utility>
 
 namespace navkit::io
 {
 
-class RunLogger
+namespace detail
+{
+
+template<typename Payload, typename Product>
+inline constexpr bool product_logs_payload_v = LogProductPolicy<Product, Payload>;
+
+template<typename Payload, typename... Products>
+inline constexpr std::size_t matching_log_product_count_v =
+    (std::size_t{0} + ... +
+     (product_logs_payload_v<Payload, Products> ? std::size_t{1} : std::size_t{0}));
+
+template<typename Product>
+std::filesystem::path metadata_path(const std::filesystem::path& output_dir)
+{
+    const auto manifest = Product::manifest_entry();
+    if (!manifest.contains("manifest") || !manifest.at("manifest").is_string()) {
+        throw std::runtime_error("Log product manifest entry must include a manifest file name");
+    }
+
+    return output_dir / manifest.at("manifest").template get<std::string>();
+}
+
+} // namespace detail
+
+template<typename... LogProducts>
+class BasicRunLogger
 {
 public:
-    RunLogger(std::filesystem::path output_dir, std::string run_name, nlohmann::json config)
+    static_assert(sizeof...(LogProducts) > 0, "RunLogger requires at least one log product.");
+
+    template<typename Payload>
+    static constexpr std::size_t MatchingProductCount =
+        detail::matching_log_product_count_v<Payload, LogProducts...>;
+
+    BasicRunLogger(std::filesystem::path output_dir, std::string run_name, nlohmann::json config)
         : m_output_dir(std::move(output_dir))
         , m_run_name(std::move(run_name))
         , m_config(std::move(config))
     {
         std::filesystem::create_directories(m_output_dir);
-
-        m_truth_log.open(m_output_dir);
-        m_gnss_log.open(m_output_dir);
-        m_nav_log.open(m_output_dir);
-        m_gnss_pos_update_log.open(m_output_dir);
+        open_products(std::make_index_sequence<sizeof...(LogProducts)>{});
     }
 
-    void set_gnss_metadata(double sigma_h_m, double sigma_v_m, unsigned int seed)
+    template<typename Product>
+    Product& product()
     {
-        m_gnss_log.set_metadata(sigma_h_m, sigma_v_m, seed);
+        return std::get<Product>(m_products);
     }
 
-    void log_truth(const sim::TruthSample& sample)
+    template<typename Payload>
+    void log(const Payload& payload)
     {
-        m_truth_log.log(sample);
-    }
-
-    template<typename Measurement>
-    void log_gnss(const Measurement& meas)
-    {
-        m_gnss_log.log(meas);
-    }
-
-    template<typename StateDef, typename Filter>
-    void log_nav(double time_s, const Filter& filter, const sim::TruthSample& truth)
-    {
-        m_nav_log.log(NavEstimateLogPayload<StateDef, Filter>{
-            .time_s = time_s,
-            .filter = filter,
-            .truth = truth,
-        });
-    }
-
-    template<typename Statistics>
-    void log_gnss_pos_statistics(const Statistics& stats)
-    {
-        m_gnss_pos_update_log.log(MeasurementStatisticsLogPayload<Statistics>{
-            .statistics = stats,
-        });
+        static_assert(MatchingProductCount<Payload> == 1,
+                      "RunLogger payload dispatch requires exactly one matching log product.");
+        log_payload(payload, std::make_index_sequence<sizeof...(LogProducts)>{});
     }
 
     void close()
@@ -78,16 +84,8 @@ public:
             return;
         }
 
-        m_truth_log.flush();
-        m_gnss_log.flush();
-        m_nav_log.flush();
-        m_gnss_pos_update_log.flush();
-
-        write_json_file(m_output_dir / "truth.meta.json", TruthLogProduct::metadata());
-        write_json_file(m_output_dir / "gnss.meta.json", m_gnss_log.metadata());
-        write_json_file(m_output_dir / "nav.meta.json", NavEstimateLogProduct::metadata());
-        write_json_file(m_output_dir / "gnss_pos_update.meta.json",
-                        GnssPositionUpdateLogProduct::metadata());
+        flush_products(std::make_index_sequence<sizeof...(LogProducts)>{});
+        write_metadata_files(std::make_index_sequence<sizeof...(LogProducts)>{});
         write_json_file(m_output_dir / "run_manifest.json", run_manifest());
 
         m_closed = true;
@@ -99,6 +97,47 @@ public:
     }
 
 private:
+    template<std::size_t... Is>
+    void open_products(std::index_sequence<Is...>)
+    {
+        (std::get<Is>(m_products).open(m_output_dir), ...);
+    }
+
+    template<std::size_t... Is>
+    void flush_products(std::index_sequence<Is...>)
+    {
+        (std::get<Is>(m_products).flush(), ...);
+    }
+
+    template<std::size_t... Is>
+    void write_metadata_files(std::index_sequence<Is...>) const
+    {
+        (write_product_metadata<std::tuple_element_t<Is, ProductTuple>>(std::get<Is>(m_products)),
+         ...);
+    }
+
+    template<typename Product>
+    void write_product_metadata(const Product& product) const
+    {
+        write_json_file(detail::metadata_path<Product>(m_output_dir), product.metadata());
+    }
+
+    template<typename Payload, std::size_t... Is>
+    void log_payload(const Payload& payload, std::index_sequence<Is...>)
+    {
+        (log_payload_if_supported<std::tuple_element_t<Is, ProductTuple>>(std::get<Is>(m_products),
+                                                                          payload),
+         ...);
+    }
+
+    template<typename Product, typename Payload>
+    static void log_payload_if_supported(Product& product, const Payload& payload)
+    {
+        if constexpr (LogProductPolicy<Product, Payload>) {
+            product.log(payload);
+        }
+    }
+
     static void write_json_file(const std::filesystem::path& path, const nlohmann::json& j)
     {
         std::ofstream f(path);
@@ -110,25 +149,38 @@ private:
 
     nlohmann::json run_manifest() const
     {
-        return {{"run_name", m_run_name},
-                {"config", m_config},
-                {"logs",
-                 {{"truth", TruthLogProduct::manifest_entry()},
-                  {"gnss", GnssPositionLogProduct::manifest_entry()},
-                  {"nav", NavEstimateLogProduct::manifest_entry()},
-                  {"gnss_pos_update", GnssPositionUpdateLogProduct::manifest_entry()}}}};
+        nlohmann::json logs = nlohmann::json::object();
+        append_manifest_entries(logs, std::make_index_sequence<sizeof...(LogProducts)>{});
+
+        return {{"run_name", m_run_name}, {"config", m_config}, {"logs", logs}};
     }
+
+    template<std::size_t... Is>
+    static void append_manifest_entries(nlohmann::json& logs, std::index_sequence<Is...>)
+    {
+        (append_manifest_entry<std::tuple_element_t<Is, ProductTuple>>(logs), ...);
+    }
+
+    template<typename Product>
+    static void append_manifest_entry(nlohmann::json& logs)
+    {
+        logs[std::string(Product::LogKey)] = Product::manifest_entry();
+    }
+
+    using ProductTuple = std::tuple<LogProducts...>;
 
     std::filesystem::path m_output_dir;
     std::string m_run_name;
     nlohmann::json m_config;
-
-    TruthLogProduct m_truth_log;
-    GnssPositionLogProduct m_gnss_log;
-    NavEstimateLogProduct m_nav_log;
-    GnssPositionUpdateLogProduct m_gnss_pos_update_log;
+    ProductTuple m_products;
 
     bool m_closed = false;
 };
+
+using StationaryGnssRunLogger = BasicRunLogger<TruthLogProduct,
+                                               GnssPositionLogProduct,
+                                               NavEstimateLogProduct,
+                                               GnssPositionUpdateLogProduct>;
+using RunLogger = StationaryGnssRunLogger;
 
 } // namespace navkit::io

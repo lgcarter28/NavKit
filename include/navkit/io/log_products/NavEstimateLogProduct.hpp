@@ -9,6 +9,7 @@
 #include <cmath>
 #include <filesystem>
 #include <nlohmann/json.hpp>
+#include <string_view>
 
 namespace navkit::io
 {
@@ -16,6 +17,8 @@ namespace navkit::io
 class NavEstimateLogProduct
 {
 public:
+    static constexpr std::string_view LogKey = "nav";
+
     void open(const std::filesystem::path& output_dir)
     {
         m_csv.open(output_dir / "nav.csv",

@@ -59,8 +59,10 @@ configured doctest executable. Simulation and analysis smoke tests are added
 when behavior affects logs, navigation results, or runtime app wiring.
 
 Clang-tidy is intentionally a CI static-analysis gate, not part of the normal
-local workflow. Coverage reporting is also CI-oriented; run it locally only when
-reviewing coverage gaps or debugging the CI coverage lane.
+local workflow. If run locally, it needs a `compile_commands.json` in the
+selected config build directory, so Visual Studio generator build trees are not
+sufficient by themselves. Coverage reporting is also CI-oriented; run it locally
+only when reviewing coverage gaps or debugging the CI coverage lane.
 
 ## Timing and resource artifacts
 

@@ -95,6 +95,7 @@ This project follows
 - Renamed compile-time config constants such as GNSS sensor IDs and buffer sizes to snake_case while keeping type aliases in PascalCase.
 - Refactored stationary simulation logging so `RunLogger` coordinates composable log-product adapters while app compile-time configs explicitly select the logger type.
 - Added payload-specific log-product concepts and CSV schema helpers so logging adapters expose explicit serialization boundaries.
+- Reworked `RunLogger` into a compile-time log-product tuple façade with typed payload dispatch, selected-product metadata emission, and generic app-support measurement-statistics logging.
 
 ### Removed
 

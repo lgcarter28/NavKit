@@ -4,6 +4,7 @@
 #pragma once
 
 #include "navkit/api/config/ConfigApi.hpp"
+#include "navkit/app_support/config/LoggingConfigTraits.hpp"
 #include "navkit/app_support/emulation/EmulatorBindingTuplePolicy.hpp"
 
 namespace navkit::app_support
@@ -15,6 +16,8 @@ concept SimulationAppConfigPolicy =
         typename Config::NavKit;
         typename Config::EmulatorBindings;
     } && navkit::api::config::NavKitProductConfigPolicy<typename Config::NavKit> &&
-    EmulatorBindingTuplePolicy<typename Config::EmulatorBindings, typename Config::NavKit::Sensors>;
+    EmulatorBindingTuplePolicy<typename Config::EmulatorBindings,
+                               typename Config::NavKit::Sensors,
+                               LoggerConfig_t<Config>>;
 
 } // namespace navkit::app_support
