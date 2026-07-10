@@ -5,6 +5,7 @@
 
 #include "navkit/app_support/runtime/RuntimeConfigError.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <nlohmann/json.hpp>
 #include <string>
@@ -102,6 +103,34 @@ inline void require_optional_vec3(const nlohmann::json& cfg, std::string_view pa
                                        " to be numeric");
         }
     }
+}
+
+inline void
+require_optional_numeric_array(const nlohmann::json& cfg, std::string_view path, std::size_t count)
+{
+    const auto iter = cfg.find(std::string(path));
+    if (iter == cfg.end()) {
+        return;
+    }
+    if (!iter->is_array() || iter->size() != count) {
+        throw_runtime_config_error("expected " + quoted_path(path) + " to be an array with " +
+                                   std::to_string(count) + " numeric entries");
+    }
+    for (const auto& value : *iter) {
+        if (!value.is_number()) {
+            throw_runtime_config_error("expected every entry in " + quoted_path(path) +
+                                       " to be numeric");
+        }
+    }
+}
+
+inline void
+require_numeric_array(const nlohmann::json& cfg, std::string_view path, std::size_t count)
+{
+    if (!cfg.contains(std::string(path))) {
+        throw_runtime_config_error("missing required numeric array " + quoted_path(path));
+    }
+    require_optional_numeric_array(cfg, path, count);
 }
 
 inline void require_vec3(const nlohmann::json& cfg, std::string_view path)

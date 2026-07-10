@@ -30,6 +30,8 @@ template<SimulationAppConfigPolicy Config>
 void validate_runtime_config(const nlohmann::json& cfg)
 {
     using EmulatorBindings = typename Config::EmulatorBindings;
+    using NavInitializationProvider = typename Config::NavInitializationProvider;
+    using TransferAlignmentProvider = typename Config::TransferAlignmentProvider;
 
     if (!cfg.is_object()) {
         detail::throw_runtime_config_error("root input must be a JSON object");
@@ -39,7 +41,8 @@ void validate_runtime_config(const nlohmann::json& cfg)
     allowed_keys.push_back("run_name");
     allowed_keys.push_back("output_dir");
     allowed_keys.push_back("trajectory");
-    allowed_keys.push_back("filter");
+    allowed_keys.push_back("initialization");
+    allowed_keys.push_back("transfer_alignment");
     detail::reject_unknown_top_level_keys(cfg, allowed_keys);
 
     detail::require_optional_string(cfg, "run_name");
@@ -59,13 +62,8 @@ void validate_runtime_config(const nlohmann::json& cfg)
     detail::validate_emulator_runtime_config<EmulatorBindings>(
         cfg, std::make_index_sequence<std::tuple_size_v<EmulatorBindings>>{});
 
-    if (const auto filter_iter = cfg.find("filter"); filter_iter != cfg.end()) {
-        if (!filter_iter->is_object()) {
-            detail::throw_runtime_config_error("expected 'filter' to be an object");
-        }
-        detail::require_optional_vec3(*filter_iter, "initial_position_offset_m");
-        detail::require_optional_nonnegative_number(*filter_iter, "initial_position_sigma_m");
-    }
+    NavInitializationProvider::validate_runtime_config(cfg);
+    TransferAlignmentProvider::validate_runtime_config(cfg);
 }
 
 } // namespace navkit::app_support

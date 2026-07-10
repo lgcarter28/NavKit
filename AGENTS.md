@@ -42,6 +42,7 @@ Concepts express capabilities; CRTP bases share implementation and are not manda
 - Use policy concepts at public or reused template boundaries when the role is known. Raw `typename` is fine for private tuple expansion helpers, local implementation details, or intentionally unconstrained generic utilities; it is a smell on primary policy surfaces when a clear concept already exists.
 - Keep context-dependent concepts candidate-first and parameterized by the context they actually need. A measurement model can be well-formed only relative to a state definition, so constrain it as a measurement-model policy at the consuming boundary rather than pushing unrelated state knowledge into the sensor container.
 - Prefer domain-specific names when generic names become vague. If `Model` no longer communicates the boundary, use clearer vocabulary such as `MeasurementModel` or `ProcessModel` and update the matching policy names when the rename improves API clarity.
+- Reserve PascalCase for types, concepts, templates, and type-like aliases. Value constants, including `static constexpr` dimensions, should use `snake_case` unless they intentionally follow established mathematical notation such as Kalman filter dimensions `M` for measurement dimension and `N` for state dimension. Do not name value constants like types.
 
 ## Current implementation reality
 

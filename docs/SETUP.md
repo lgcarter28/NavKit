@@ -553,9 +553,12 @@ timing artifacts. Runtime input bundles such as
 `config/runtime/navkit_sim/stationary_gnss.json` are executable inputs, not
 NavKit library compile-time configuration. The selected app validates the
 runtime JSON before running; for the stationary GNSS app, that means required
-`trajectory` and `gnss` sections must exist, unsupported `imu` or `baro`
-sections are rejected, and common vector/numeric fields must have the expected
-shape.
+`trajectory`, `gnss`, and `initialization` sections must exist, unsupported
+`imu`, `baro`, or disabled `transfer_alignment` sections are rejected, and common
+vector/numeric fields must have the expected shape. The current stationary GNSS
+initializer uses `"type": "pva_error"` with nested `pva_error` and `pva_cov`
+sections to keep startup PVA error/covariance input in app support while
+product-core code consumes only typed PVA navigation initialization data.
 
 ---
 

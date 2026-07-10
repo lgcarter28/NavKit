@@ -1,0 +1,39 @@
+// Copyright (c) 2026 William Gordon Carter.
+// All Rights Reserved.
+
+#pragma once
+
+#include "navkit/app_support/initialization/NavInitialization.hpp"
+#include "navkit/app_support/initialization/PvaInitializationJson.hpp"
+#include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
+
+#include <nlohmann/json.hpp>
+
+namespace navkit::app_support
+{
+
+struct PvaExplicitInitializationProvider
+{
+    static constexpr const char* runtime_type = "pva_error";
+
+    static void validate_runtime_config(const nlohmann::json& cfg)
+    {
+        const auto& initialization = detail::require_object(cfg, "initialization");
+        detail::require_initialization_type(initialization, runtime_type);
+        static_cast<void>(detail::pva_error_from_json(initialization));
+        detail::validate_pva_covariance_shape(initialization);
+    }
+
+    [[nodiscard]] static NavInitialization initialize(const nlohmann::json& cfg,
+                                                      const TrajectoryRun& trajectory)
+    {
+        const auto& initialization = cfg.at("initialization");
+
+        NavInitialization nav_init = detail::base_nav_initialization(trajectory);
+        detail::apply_pva_error(nav_init, detail::pva_error_from_json(initialization));
+        nav_init.pva_cov = detail::pva_covariance_from_json(initialization);
+        return nav_init;
+    }
+};
+
+} // namespace navkit::app_support

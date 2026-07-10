@@ -6,6 +6,8 @@
 #include "navkit/app_support/SimulationApp.hpp"
 #include "navkit/app_support/emulation/EmulatorBinding.hpp"
 #include "navkit/app_support/emulation/concrete/GnssEmulator.hpp"
+#include "navkit/app_support/initialization/NavInitializationProviders.hpp"
+#include "navkit/app_support/initialization/TransferAlignmentProviders.hpp"
 #include "navkit/core/estimation/filter/MeasurementStatistics.hpp"
 #include "navkit/io/RunLogger.hpp"
 #include "navkit/io/log_products/GnssPositionLogProduct.hpp"
@@ -31,6 +33,9 @@ struct ProfiledStationaryGnssConfig
         ::navkit::core::estimation::MeasurementStatistics<PrimaryGnssSensor>;
 
     using EmulatorBindings = std::tuple<PrimaryGnssBinding>;
+
+    using NavInitializationProvider = ::navkit::app_support::PvaExplicitInitializationProvider;
+    using TransferAlignmentProvider = ::navkit::app_support::NoTransferAlignmentProvider;
 
     using Logger =
         ::navkit::io::RunLogger<::navkit::io::TruthLogProduct,

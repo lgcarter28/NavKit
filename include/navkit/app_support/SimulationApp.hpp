@@ -32,6 +32,8 @@ public:
     using Filter = typename NavKit::Filter;
     using Navigator = typename NavKit::Navigator;
     using EmulatorBindings = typename Config::EmulatorBindings;
+    using NavInitializationProvider = typename Config::NavInitializationProvider;
+    using TransferAlignmentProvider = typename Config::TransferAlignmentProvider;
     using Logger = LoggerConfig_t<Config>;
     using Emulators = EmulatorRuntime<NavKit, Logger, EmulatorBindings>;
 
@@ -48,7 +50,9 @@ public:
 
         Navigator navigator;
         auto& filter = navigator.filter();
-        configure_initial_filter_state<StateDef>(filter, cfg, trajectory.initial_position_e_m);
+        const auto nav_initialization = NavInitializationProvider::initialize(cfg, trajectory);
+        initialize_navigator<StateDef>(navigator, nav_initialization);
+        TransferAlignmentProvider::template transfer_align<Navigator>(navigator, cfg, trajectory);
 
         Logger logger(run_settings.output_dir, run_settings.run_name, cfg);
         Emulators::configure(navigator, logger, cfg);

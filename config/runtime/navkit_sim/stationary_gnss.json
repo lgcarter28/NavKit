@@ -13,8 +13,15 @@
     "sigma_v_m": 5.0,
     "seed": 42
   },
-  "filter": {
-    "initial_position_offset_m": [25.0, -15.0, 10.0],
-    "initial_position_sigma_m": 100.0
+  "initialization": {
+    "type": "pva_error",
+    "pva_error": {
+      "pos_m": [25.0, -15.0, 10.0],
+      "vel_mps": [0.0, 0.0, 0.0],
+      "rpy_be_rad": [0.0, 0.0, 0.0]
+    },
+    "pva_cov": {
+      "diag": [10000.0, 10000.0, 10000.0, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001]
+    }
   }
 }

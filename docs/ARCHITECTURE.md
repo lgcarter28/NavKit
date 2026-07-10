@@ -44,12 +44,14 @@ include/navkit/
       sensor/
         noise/
       navigator/
+        PVA/TXA state vocabulary
         update/
         propagation/
     environment/
       planet/
       gravity/
     frames/
+    math/
     units/
     models/
     profiling/
@@ -172,12 +174,13 @@ selected-config portion of that manifest comes from C++: after building,
 application manifests and log metadata are written by C++ application/IO code.
 Application entry points should stay selected-config generic where practical.
 The selected app config composes a reusable NavKit library config with app-side
-sensor bindings and emulator policies. `navkit::app_support` owns reusable
+sensor bindings, emulator policies, navigation initialization providers, and
+optional transfer-alignment providers. `navkit::app_support` owns reusable
 selected-app runner and simulation-loop plumbing at the top level, with focused
 subdirectories for app compile-time config vocabulary, generic emulator binding
-and runtime dispatch, concrete emulators, JSON/runtime validation, current
-startup initialization helpers, app-side logging adapters, profile export, and
-trajectory providers. IO log products and typed payload wrappers live under
+and runtime dispatch, concrete emulators, JSON/runtime validation, PVA startup
+initialization and transfer-alignment seams, app-side logging adapters, profile
+export, and trajectory providers. IO log products and typed payload wrappers live under
 `include/navkit/io/log_products` and `include/navkit/io/log_payloads` so the
 serialization boundary is explicit without forcing logging into product-core
 code. `navkit::io::RunLogger<...>` is a small compile-time façade over the

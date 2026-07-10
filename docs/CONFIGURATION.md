@@ -164,6 +164,10 @@ struct StationaryGnssAppConfig
 
     using EmulatorBindings = std::tuple<PrimaryGnssBinding>;
 
+    using NavInitializationProvider =
+        navkit::app_support::PvaExplicitInitializationProvider;
+    using TransferAlignmentProvider = navkit::app_support::NoTransferAlignmentProvider;
+
     using PrimaryGnssStatistics =
         navkit::core::estimation::MeasurementStatistics<PrimaryGnssSensor>;
     using Logger =
@@ -189,6 +193,17 @@ receivers, unambiguous. App configs also select the logger adapter type at
 compile time; runtime JSON still owns run-specific choices such as run name and
 output directory. Logger adapters are composed from concrete log products with
 `navkit::io::RunLogger<...>`; the selected app config owns the product set.
+Startup navigation data is also an app boundary: `NavInitializationProvider`
+turns runtime input, simulated truth, saved state, or future embedded inputs
+into a typed PVA `NavInitialization` message. `TransferAlignmentProvider`
+describes optional timestamped aiding after construction and startup
+initialization. Disabled transfer alignment should be explicit, usually through
+`NoTransferAlignmentProvider`, so a runtime `transfer_alignment` section is not
+silently ignored.
+The built-in PVA initialization providers currently support deterministic
+`"type": "pva_error"` inputs and seeded random `"type": "pva_random"` draws
+from a configured `pva_cov`; selecting which provider is valid is a compile-time
+app-config decision.
 
 The app and NavKit config trees are deliberately separate:
 
@@ -282,11 +297,15 @@ apps/navkit_sim/ProfiledStationaryGnss.hpp
 ```
 
 Runtime JSON is still checked against the compiled app composition. For example,
-the stationary GNSS sim config currently requires `trajectory` and `gnss`
-sections, rejects unsupported `imu` and `baro` sections, and validates common
-numeric/vector fields before the simulation loop starts. This validation lives
-in `navkit::app_support` because it is app/runtime-input glue, not reusable
-product-core NavKit configuration.
+the stationary GNSS sim config currently requires `trajectory`, `gnss`, and
+`initialization` sections, rejects unsupported `imu`, `baro`, and disabled
+`transfer_alignment` sections, and validates common numeric/vector fields before
+the simulation loop starts. The current initialization provider uses
+`"type": "pva_error"` with nested `pva_error` and `pva_cov` sections so runtime
+inputs describe startup PVA error and covariance explicitly while still passing
+only typed PVA navigation data into the configured Navigator. This validation
+lives in `navkit::app_support` because it is app/runtime-input glue, not
+reusable product-core NavKit configuration.
 
 The Python build wrapper forwards the same selection:
 
