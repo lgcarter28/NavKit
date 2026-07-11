@@ -13,8 +13,7 @@ __pycache__/
 CMakeUserPresets.json
 install/
 artifacts/
-output/logs/*
-!output/logs/.gitkeep
+output/
 
 # LaTeX build artifacts
 *.aux
