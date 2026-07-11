@@ -230,6 +230,8 @@ TEST_CASE("ProfileRecord carries optional visualization metadata")
     static_assert(std::is_same_v<CompactRecord::Tick_t, std::uint32_t>);
     static_assert(std::is_same_v<CompactRecord::Sequence_t, std::uint16_t>);
     static_assert(std::is_same_v<CompactRecord::Depth_t, std::uint8_t>);
+    static_assert(std::is_trivially_copyable_v<CompactRecord>);
+    static_assert(std::is_standard_layout_v<CompactRecord>);
 }
 
 TEST_CASE("NullProfiler satisfies the profiler contract without recording")
@@ -238,7 +240,37 @@ TEST_CASE("NullProfiler satisfies the profiler contract without recording")
     static_cast<void>(scope);
 
     static_assert(ProfilerPolicy<NullProfiler>);
+    static_assert(std::is_empty_v<NullProfiler>);
+    static_assert(std::is_empty_v<NullProfileScope>);
+    static_assert(std::is_trivially_default_constructible_v<NullProfileScope>);
+    static_assert(std::is_trivially_destructible_v<NullProfileScope>);
+    static_assert(std::is_nothrow_destructible_v<NullProfileScope>);
+    static_assert(noexcept(NullProfiler::profile(ProfilePoint::PropagationUpdate)));
+    static_assert(std::is_same_v<decltype(NullProfiler::profile(ProfilePoint::PropagationUpdate)),
+                                 NullProfileScope>);
     CHECK(true);
+}
+
+TEST_CASE("Core profile sinks expose fixed-capacity embedded resource contracts")
+{
+    using RejectSink = RingBufferProfileSink<std::uint32_t, 4U>;
+    using OverwriteSink =
+        RingBufferProfileSink<std::uint32_t, 8U, containers::OverflowPolicy::OverwriteOldest>;
+
+    static_assert(ProfileSinkPolicy<RejectSink, FakeClock>);
+    static_assert(std::is_same_v<RejectSink::Record, ProfileRecord<std::uint32_t>>);
+    static_assert(std::is_trivially_copyable_v<RejectSink::Record>);
+    static_assert(std::is_standard_layout_v<RejectSink::Record>);
+    static_assert(!std::is_polymorphic_v<RejectSink>);
+    static_assert(RejectSink::capacity() == 4U);
+    static_assert(RejectSink::overflow_policy() == containers::OverflowPolicy::Reject);
+    static_assert(OverwriteSink::capacity() == 8U);
+    static_assert(OverwriteSink::overflow_policy() == containers::OverflowPolicy::OverwriteOldest);
+
+    RejectSink::reset();
+    CHECK(RejectSink::empty());
+    CHECK(RejectSink::size() == 0U);
+    CHECK(RejectSink::dropped_count() == 0U);
 }
 
 TEST_CASE("RingBufferProfileSink rejects overflow and records dropped count")

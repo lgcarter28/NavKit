@@ -35,6 +35,31 @@ RTOS, ISR-safe, multi-producer, lock-free, or atomic sinks should be added later
 as separate sink policies when a concrete target requires them. They should not
 be hidden inside the baseline sink.
 
+## Hot-path resource expectations
+
+Profiling is designed to be zero-overhead by default and fixed-resource when
+enabled.
+
+- `NullProfiler` is the default profiler. It returns an empty
+  `NullProfileScope`, owns no state, and is expected to compile away in optimized
+  builds.
+- Active core profiling records only fixed-size values. It does not allocate,
+  own strings, write files, format JSON/CSV, or use runtime polymorphism.
+- Fixed-capacity sinks make storage costs explicit at compile time. Overflow
+  behavior is part of the sink type, not hidden runtime policy.
+- Desktop timing, trace, and binary-size artifacts are trend signals. They are
+  useful for catching regressions early, but they are not a substitute for
+  target-specific resource evidence.
+
+Current tests check the contract shape that can be verified portably: the no-op
+profiler path is empty/trivial/noexcept, profile records are standard-layout
+fixed-size values, and ring-buffer sinks expose fixed capacity and overflow
+policy. Hard embedded claims require target profiles: selected compiler,
+optimization flags, clock/counter source, memory map, and concurrency model.
+Assembly inspection, active-vs-no-op cycle counting, allocation/high-water
+instrumentation, and hardware microbenchmarks belong in those target-specific
+passes.
+
 ## Export path
 
 Core sinks do not write files or strings. Desktop export adapters live in
