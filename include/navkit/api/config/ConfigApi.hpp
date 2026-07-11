@@ -11,6 +11,7 @@
 #include "navkit/core/estimation/filter/injection/InjectionPolicies.hpp"
 #include "navkit/core/estimation/filter/reset/ResetPolicies.hpp"
 #include "navkit/core/estimation/navigator/Navigator.hpp"
+#include "navkit/core/estimation/navigator/propagation/PropagationPolicies.hpp"
 #include "navkit/core/estimation/navigator/update/UpdatePolicies.hpp"
 #include "navkit/core/estimation/sensor/Sensor.hpp"
 #include "navkit/core/estimation/sensor/SensorConfigPolicy.hpp"

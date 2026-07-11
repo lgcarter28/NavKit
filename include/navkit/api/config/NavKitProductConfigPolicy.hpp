@@ -7,6 +7,7 @@
 #include "navkit/core/estimation/filter/FilterPolicy.hpp"
 #include "navkit/core/estimation/navigator/NavigatorUpdatePolicy.hpp"
 #include "navkit/core/estimation/navigator/SensorCollectionPolicy.hpp"
+#include "navkit/core/estimation/navigator/propagation/PropagationPolicy.hpp"
 #include "navkit/core/estimation/sensor/SensorTupleTraits.hpp"
 #include "navkit/core/estimation/state/StateDefPolicy.hpp"
 #include "navkit/core/profiling/ProfilerPolicy.hpp"
@@ -23,6 +24,7 @@ concept NavKitProductConfigPolicy = requires {
     typename Candidate::Sensors;
     typename Candidate::Profiler;
     typename Candidate::Filter;
+    typename Candidate::Propagation;
     typename Candidate::NavigatorUpdate;
     typename Candidate::Navigator;
 
@@ -33,9 +35,19 @@ concept NavKitProductConfigPolicy = requires {
     requires navkit::core::estimation::FilterPolicy<typename Candidate::Filter>;
     requires std::same_as<typename Candidate::Filter::Sensors_t, typename Candidate::Sensors>;
     requires navkit::core::profiling::ProfilerPolicy<typename Candidate::Profiler>;
+    requires navkit::core::estimation::PropagationPolicy<typename Candidate::Propagation,
+                                                         typename Candidate::Filter,
+                                                         typename Candidate::Sensors>;
     requires navkit::core::estimation::NavigatorUpdatePolicy<typename Candidate::NavigatorUpdate,
                                                              typename Candidate::Filter,
                                                              typename Candidate::Sensors>;
+    requires std::same_as<typename Candidate::Navigator::Filter_t, typename Candidate::Filter>;
+    requires std::same_as<typename Candidate::Navigator::Sensors_t, typename Candidate::Sensors>;
+    requires std::same_as<typename Candidate::Navigator::Propagation_t,
+                          typename Candidate::Propagation>;
+    requires std::same_as<typename Candidate::Navigator::Update_t,
+                          typename Candidate::NavigatorUpdate>;
+    requires std::same_as<typename Candidate::Navigator::Profiler_t, typename Candidate::Profiler>;
 };
 
 } // namespace navkit::api::config

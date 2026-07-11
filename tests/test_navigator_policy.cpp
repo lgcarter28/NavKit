@@ -5,6 +5,8 @@
 #include "navkit/core/estimation/navigator/Navigator.hpp"
 #include "navkit/core/estimation/navigator/NavigatorUpdatePolicy.hpp"
 #include "navkit/core/estimation/navigator/SensorCollectionPolicy.hpp"
+#include "navkit/core/estimation/navigator/propagation/PropagationPolicies.hpp"
+#include "navkit/core/estimation/navigator/propagation/PropagationPolicy.hpp"
 #include "navkit/core/estimation/navigator/update/UpdatePolicy.hpp"
 #include "navkit/core/estimation/sensor/Sensor.hpp"
 #include "navkit/core/estimation/state/StateDefs.hpp"
@@ -22,6 +24,7 @@ using NavigatorPolicyModel = navkit::core::models::GnssPosModel<NavigatorPolicyS
 using NavigatorPolicySensor = Sensor<0U, NavigatorPolicyModel, 4>;
 using NavigatorPolicyFilter = KalmanFilter<NavigatorPolicyStateDef>;
 using NavigatorPolicySensors = std::tuple<NavigatorPolicySensor>;
+using NavigatorPolicyPropagation = NoOpPropagation;
 using NavigatorPolicyUpdate = UpdatePostFilter<NavigatorPolicyFilter>;
 
 struct MissingFilterLifecycle
@@ -60,8 +63,42 @@ struct MissingFilterUpdate
     }
 };
 
+struct MissingPropagate
+{};
+
+struct WrongPropagateReturn
+{
+    static int propagate(NavigatorPolicyFilter& filter, NavigatorPolicySensors& sensors)
+    {
+        static_cast<void>(filter);
+        static_cast<void>(sensors);
+        return 0;
+    }
+};
+
+struct RecordingPropagation
+{
+    static inline int call_count{0};
+
+    static void reset()
+    {
+        call_count = 0;
+    }
+
+    static void propagate(NavigatorPolicyFilter& filter, NavigatorPolicySensors& sensors)
+    {
+        static_cast<void>(filter);
+        static_cast<void>(sensors);
+        ++call_count;
+    }
+};
+
 template<typename Filter, typename Sensors>
 concept CanInstantiateNavigator = requires { typename Navigator<Filter, Sensors>; };
+
+template<typename Propagation>
+concept CanInstantiateNavigatorWithPropagation =
+    requires { typename Navigator<NavigatorPolicyFilter, NavigatorPolicySensors, Propagation>; };
 
 TEST_CASE("FilterPolicy captures the standalone filter lifecycle")
 {
@@ -120,7 +157,23 @@ TEST_CASE("NavigatorUpdatePolicy captures tuple-wide Navigator update compatibil
     CHECK(true);
 }
 
-TEST_CASE("Navigator is constrained by filter, sensor collection, and update boundaries")
+TEST_CASE("PropagationPolicy captures the Navigator prediction hook")
+{
+    static_assert(PropagationPolicy<NavigatorPolicyPropagation,
+                                    NavigatorPolicyFilter,
+                                    NavigatorPolicySensors>);
+    static_assert(
+        PropagationPolicy<RecordingPropagation, NavigatorPolicyFilter, NavigatorPolicySensors>);
+    static_assert(
+        !PropagationPolicy<MissingPropagate, NavigatorPolicyFilter, NavigatorPolicySensors>);
+    static_assert(
+        !PropagationPolicy<WrongPropagateReturn, NavigatorPolicyFilter, NavigatorPolicySensors>);
+
+    CHECK(true);
+}
+
+TEST_CASE(
+    "Navigator is constrained by filter, sensor collection, propagation, and update boundaries")
 {
     using Nav = Navigator<NavigatorPolicyFilter, NavigatorPolicySensors>;
 
@@ -129,8 +182,23 @@ TEST_CASE("Navigator is constrained by filter, sensor collection, and update bou
     static_assert(!CanInstantiateNavigator<MissingFilterLifecycle, NavigatorPolicySensors>);
     static_assert(!CanInstantiateNavigator<MissingSensorProcessing, NavigatorPolicySensors>);
     static_assert(!CanInstantiateNavigator<NavigatorPolicyFilter, NavigatorPolicySensor>);
+    static_assert(CanInstantiateNavigatorWithPropagation<NavigatorPolicyPropagation>);
+    static_assert(!CanInstantiateNavigatorWithPropagation<MissingPropagate>);
+    static_assert(!CanInstantiateNavigatorWithPropagation<WrongPropagateReturn>);
 
     CHECK(true);
+}
+
+TEST_CASE("Navigator invokes propagation during measurement processing")
+{
+    using Nav = Navigator<NavigatorPolicyFilter, NavigatorPolicySensors, RecordingPropagation>;
+
+    RecordingPropagation::reset();
+    Nav navigator;
+
+    navigator.process_measurements();
+
+    CHECK(RecordingPropagation::call_count == 1);
 }
 
 } // namespace navkit::core::estimation::test

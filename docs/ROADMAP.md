@@ -20,7 +20,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 - The task to move WGS-84 constants into `Earth.hpp` is superseded. The implemented direction is the generic `navkit::core::environment::Wgs84` policy under `include/navkit/core/environment/planet`, consistent with ADR-002.
 - Environment-policy Pass 1 is substantially implemented: planet/gravity concepts, CRTP bases, frame tags, WGS-84, Moon, Mars, spherical gravity, J2 gravity, and environment tests exist.
-- The estimator policy refactor is partially complete. `StateDefPolicy`, `InjectionPolicy`, `ResetPolicy`, `MeasurementModelPolicy`, `NoisePolicy`, `FilterPolicy`, `FilterSensorPolicy`, `SensorCollectionPolicy`, `UpdatePolicy`, and `NavigatorUpdatePolicy` exist. `KalmanFilter` is constrained on state, injection, reset, measurement-model, and sensor-dependent filter boundaries; `Sensor` is constrained on noise-policy and diagnostics compatibility; and `Navigator` is constrained on current filter, sensor-collection, and update-policy boundaries. Propagation remains future work.
+- The estimator policy refactor is partially complete. `StateDefPolicy`, `InjectionPolicy`, `ResetPolicy`, `MeasurementModelPolicy`, `NoisePolicy`, `FilterPolicy`, `FilterSensorPolicy`, `SensorCollectionPolicy`, `UpdatePolicy`, `NavigatorUpdatePolicy`, and `PropagationPolicy` exist. `KalmanFilter` is constrained on state, injection, reset, measurement-model, and sensor-dependent filter boundaries; `Sensor` is constrained on noise-policy and diagnostics compatibility; and `Navigator` is constrained on current filter, sensor-collection, propagation, and update-policy boundaries. Real propagation/mechanization remains future work.
 - Public headers are organized by product boundary first, then engineering domain. `include/navkit/core` is the reusable product core, with estimation/navigation domains under `core/estimation`, environment models under `core/environment`, and reusable support domains such as `config`, `containers`, `frames`, `units`, and `models` also under `core`. Desktop simulation support remains under `include/navkit/sim`; desktop logging/file/JSON support remains under `include/navkit/io`.
 - CMake targets now separate product boundaries: `navkit_core`/`navkit::core` is the reusable product-core interface library, `navkit_sim`/`navkit::sim` is the compiled simulator support library, `navkit_io`/`navkit::io` is the desktop logging/file/JSON interface library, `navkit_app_support`/`navkit::app_support` owns reusable selected-config/profile-export app plumbing, and runnable executables own their concrete application flow under `apps/`.
 - `core/config` contains shared product-core compile-time configuration vocabulary such as foundational scalar/time aliases and `NumericConfigPolicy`. Domain-specific configuration concepts live beside the domains that consume them, following the general pattern `include/navkit/<product-or-domain>/.../*ConfigPolicy.hpp`; estimator buffer and measurement-statistics configuration concepts are the first concrete examples.
@@ -498,13 +498,13 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Define the minimum `FilterPolicy` actually required by Navigator.
 - [x] Define `SensorCollectionPolicy` only around operations Navigator truly uses.
 - [x] Formalize the existing update-policy capability.
-- [ ] Define candidate-first `PropagationPolicy` using concrete prediction inputs rather than speculative APIs.
-- [ ] Implement `NoOpPropagation` to preserve current GNSS-only behavior.
-- [ ] Refactor Navigator to orchestrate prediction, sensor processing, and update policy application.
+- [x] Define candidate-first `PropagationPolicy` using the current concrete Navigator context, `Filter&` and `Sensors&`, rather than inventing IMU/mechanization input types before the first algorithm spec exists.
+- [x] Implement `NoOpPropagation` to preserve current GNSS-only behavior.
+- [x] Refactor Navigator to orchestrate propagation, sensor processing, and update policy application.
 - [ ] Revisit whether a standalone `NavigatorPolicy` is useful once Navigator owns construction, initialization handoff, propagation, sensor processing, and update orchestration. Expected requirements would include aliases such as `Filter_t`, `Sensors_t`, `Update_t`, and `Profiler_t`, accessors for filter and sensors, and `process_measurements()` or its propagation-aware successor; do not implement this concept until a real consumer needs it.
-- [ ] Keep Navigator unaware of planet, gravity, and frame types; those belong inside propagation/mechanization configuration.
-- [ ] Add valid and invalid compile-time tests for filter, sensor collection, propagation, and update boundaries.
-- [ ] Verify the stationary GNSS numerical baseline remains unchanged with `NoOpPropagation`.
+- [x] Keep Navigator unaware of planet, gravity, and frame types; those belong inside propagation/mechanization configuration.
+- [x] Add valid and invalid compile-time tests for filter, sensor collection, propagation, and update boundaries.
+- [x] Verify the stationary GNSS numerical baseline remains unchanged with `NoOpPropagation`.
 
 **Exit criteria:** Navigator accepts a propagation policy, the no-op configuration reproduces current behavior, and the public orchestration boundary is concept-tested.
 
@@ -513,6 +513,21 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 # Phase 5 — Navigation physics and simulation contracts
 
 **Goal:** Establish correct truth and sensor contracts before trusting an INS implementation.
+
+## Pass 5a — Focused ECEF navigator algorithm document
+
+- [ ] Create a dedicated LaTeX algorithm-spec folder, `docs/algorithms/navigator_ecef_v1/`, with a `main.tex` entry point and separate section/chapter `.tex` files.
+- [ ] Scope the first mechanization narrowly: one IMU, body frame collocated with the IMU and navigation center, no lever arm, no multiple-IMU fusion, no arbitrary center of navigation, and no runtime-polymorphic algorithm selection.
+- [ ] Define the first concrete ECEF navigation algorithm contract before implementation: frames, state, IMU input semantics, timing/discretization assumptions, nominal propagation equations, error-state propagation expectations, covariance propagation, and normalization/reset conventions.
+- [ ] Explicitly mark deferred generalizations: multiple IMUs, lever arms, non-collocated centers of navigation, alternate mechanization frames, higher-order integration, and target-specific numerical/performance budgets.
+- [ ] Link the spec back to the implementation passes that will consume it so real propagation policy work is driven by written math rather than aspirational generic APIs.
+- [ ] Treat this pass as a documentation/design gate. Do not implement the real ECEF mechanization, IMU buffering, covariance propagation, or public INS Navigator API until this algorithm document exists.
+
+## Pass 5b — Navigator API and implementation contract from the algorithm spec
+
+- [ ] Define the intended Navigator runtime API shape from the completed `navigator_ecef_v1` algorithm document. Preferred direction: clients push timestamped data into typed internal buffers through simple methods such as `push_data(...)` or explicitly named variants like `push_imu(...)` / `push_gnss(...)`, then call a simple `Navigator::update()` that orchestrates high-rate strapdown integration, medium-rate covariance/STM propagation, and low-rate asynchronous aiding updates from those buffers.
+- [ ] Preserve explicit stage methods for testing, profiling, and advanced control, such as `process_strapdown_integration()`, `process_covariance()`, and `process_measurements()`, but keep the normal client path centered on data ingestion plus `update()`.
+- [ ] Decide exact public names only after the algorithm spec defines the data contracts, buffering ownership, timing rules, and replay/latency behavior. Do not let the temporary Phase 4 `process_measurements()` shape become the final INS Navigator API by accident.
 
 ## Frames, coordinates, and environment
 
@@ -523,11 +538,14 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Truth generation
 
-- [ ] Correct stationary ECEF truth, including Earth rotation and nonzero stationary gyro truth.
 - [ ] Define acceleration versus specific-force semantics in `TruthSample`.
-- [ ] Add straight-line truth.
-- [ ] Add constant-rate-turn truth.
-- [ ] Add circular motion only if it adds distinct validation value.
+- [ ] Add a trajectory-source abstraction so generated trajectories and CSV/playback trajectories feed the same downstream hooks. Do not create a separate playback driver unless the shared trajectory-provider path cannot express the required replay behavior.
+- [ ] Priority 1: flesh out stationary ECEF truth with proper Earth rotation, nonzero stationary gyro truth such as `w_ib_b`, and physically meaningful acceleration/specific-force fields such as `acc_ib_b`/specific-force equivalents. This scenario should support future gyrocompassing, coarse alignment, and ZUPT validation.
+- [ ] Priority 2: add a simple ballistic trajectory: stationary launch-pad initialization, optional transfer-alignment window, initial heading/pitch definition, and a simple axial body-x boost profile before ballistic/coast behavior. Keep this intentionally simple before adding aero or guidance complexity.
+- [ ] Priority 3: add a constant-altitude, constant-speed trajectory on the curved Earth rather than flat-Earth kinematics, suitable for longer-duration navigation validation.
+- [ ] Add a calibration-maneuver trajectory after the first three truth modes are stable: horizontal S-turn, vertical S-turn, and bank-left/bank-right excitation for observability and calibration studies.
+- [ ] Add a basic waypoint trajectory with simple bank-to-turn behavior once coordinate, attitude, and trajectory-source contracts are stable.
+- [ ] Add straight-line, constant-rate-turn, or circular-motion helpers only when they provide distinct validation value beyond the prioritized scenarios above.
 
 ## Sensor contracts
 

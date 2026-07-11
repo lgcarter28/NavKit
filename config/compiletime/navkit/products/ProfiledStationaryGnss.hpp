@@ -67,8 +67,10 @@ struct ProductConfig
                                        core::estimation::DefaultResetPolicy<StateDef>,
                                        Sensors,
                                        Profiler>;
+    using Propagation = core::estimation::NoOpPropagation;
     using NavigatorUpdate = core::estimation::UpdatePostFilter<Filter>;
-    using Navigator = core::estimation::Navigator<Filter, Sensors, NavigatorUpdate, Profiler>;
+    using Navigator =
+        core::estimation::Navigator<Filter, Sensors, Propagation, NavigatorUpdate, Profiler>;
 };
 
 static_assert(api::config::NavKitProductConfigPolicy<ProductConfig>);

@@ -125,6 +125,7 @@ struct StationaryGnssConfig
     using Sensors = std::tuple<PrimaryGnssSensor>;
     using Profiler = navkit::core::profiling::NullProfiler;
     using Filter = /* concrete filter type */;
+    using Propagation = navkit::core::estimation::NoOpPropagation;
     using NavigatorUpdate = /* concrete update policy type */;
     using Navigator = /* concrete navigator type */;
 };
@@ -139,6 +140,12 @@ teach or customize the graph. The filter derives its own diagnostic storage
 from the sensor graph. This keeps the user-facing config focused on the product
 graph while still allowing filter-owned measurement statistics to remain keyed
 by the configured sensor type.
+
+`Propagation` is the selected propagation/mechanization behavior for the
+configured `Filter` and `Sensors`. Current stationary GNSS configs use
+`NoOpPropagation` so the Navigator can own the propagation seam without
+changing the existing measurement-only behavior. Real mechanization policies
+belong behind this alias once their equations and inputs are defined.
 
 `NavigatorUpdate` is the selected concrete update behavior for the configured
 `Filter` and `Sensors`, such as `UpdatePostFilter<Filter>`. The lower-level

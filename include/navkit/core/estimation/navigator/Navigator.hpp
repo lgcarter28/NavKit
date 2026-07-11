@@ -7,6 +7,8 @@
 #include "navkit/core/estimation/filter/KalmanFilter.hpp"
 #include "navkit/core/estimation/navigator/NavigatorUpdatePolicy.hpp"
 #include "navkit/core/estimation/navigator/SensorCollectionPolicy.hpp"
+#include "navkit/core/estimation/navigator/propagation/PropagationPolicies.hpp"
+#include "navkit/core/estimation/navigator/propagation/PropagationPolicy.hpp"
 #include "navkit/core/estimation/navigator/update/UpdatePolicies.hpp"
 #include "navkit/core/estimation/sensor/SensorPolicy.hpp"
 #include "navkit/core/profiling/NullProfiler.hpp"
@@ -22,6 +24,7 @@ namespace navkit::core::estimation
 
 template<FilterPolicy Filter,
          SensorCollectionPolicy SensorTuple,
+         PropagationPolicy<Filter, SensorTuple> Propagation = NoOpPropagation,
          NavigatorUpdatePolicy<Filter, SensorTuple> Update = UpdatePostFilter<Filter>,
          navkit::core::profiling::ProfilerPolicy Profiler = navkit::core::profiling::NullProfiler>
 class Navigator
@@ -29,6 +32,7 @@ class Navigator
 public:
     using Filter_t = Filter;
     using Sensors_t = SensorTuple;
+    using Propagation_t = Propagation;
     using Update_t = Update;
     using Profiler_t = Profiler;
 
@@ -63,12 +67,18 @@ public:
         Update_t::template sensor_update<Sensor>(m_filter, sensor_obj);
     }
 
+    void propagate()
+    {
+        Propagation_t::propagate(m_filter, m_sensors);
+    }
+
     void process_measurements()
     {
         auto profile_scope =
             Profiler::profile(navkit::core::profiling::ProfilePoint::NavigatorProcessMeasurements);
         static_cast<void>(profile_scope);
 
+        propagate();
         std::apply([this](auto&... sensor_obj) { (this->process_one_sensor(sensor_obj), ...); },
                    m_sensors);
         Update_t::filter_update(m_filter);

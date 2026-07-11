@@ -126,9 +126,11 @@ using ProfiledFilter = navkit::core::estimation::KalmanFilter<
     SteppingProfiler>;
 using ProfiledSensor = navkit::core::estimation::Sensor<0U, ProfiledModel, 4>;
 using ProfiledNavigatorFilter = navkit::core::estimation::KalmanFilter<ProfiledStateDef>;
+using ProfiledNavigatorPropagation = navkit::core::estimation::NoOpPropagation;
 using ProfiledNavigatorUpdate = navkit::core::estimation::UpdatePostFilter<ProfiledNavigatorFilter>;
 using ProfiledNavigator = navkit::core::estimation::Navigator<ProfiledNavigatorFilter,
                                                               std::tuple<ProfiledSensor>,
+                                                              ProfiledNavigatorPropagation,
                                                               ProfiledNavigatorUpdate,
                                                               SteppingProfiler>;
 

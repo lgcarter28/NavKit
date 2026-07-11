@@ -216,8 +216,10 @@ not current behavior.
 
 - `KalmanFilter` performs measurement updates, stores optional per-model
   statistics, and delegates injection/reset.
-- `Navigator` processes a tuple-like sensor collection and applies an update
-  policy.
+- `Navigator` orchestrates the selected propagation policy, processes a
+  tuple-like sensor collection, and applies the selected update policy. Current
+  product configs use `NoOpPropagation`, so behavior remains measurement-only
+  until a real mechanization policy is implemented.
 - Planet and gravity policies are the most complete examples of the intended
   concept -> optional CRTP base -> concrete policy layering.
 - Product-core profiling now provides the embedded-facing vocabulary for future
@@ -260,8 +262,7 @@ already exists and improves readability or diagnostics.
 
 ## Explicitly not implemented yet
 
-- INS propagation/mechanization.
-- A propagation policy and `NoOpPropagation` seam in Navigator.
+- INS propagation/mechanization beyond the current `NoOpPropagation` seam.
 - Correct stationary Earth-rotation IMU truth.
 - General coordinate conversions and local-vertical altitude modeling.
 - Barometer and IMU simulator behavior beyond current shells/placeholders.
