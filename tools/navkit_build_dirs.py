@@ -25,20 +25,19 @@ def validate_navkit_config(navkit_config: str) -> Path:
     return config_path
 
 
-def generator_slug(generator: str) -> str:
-    """Return a filesystem-safe, readable generator name for build directories."""
-    slug = "".join(char if char.isalnum() else "-" for char in generator).strip("-")
-    while "--" in slug:
-        slug = slug.replace("--", "-")
-    return slug or "generator"
-
-
 def default_build_dir(
     root: Path, build_type: str, navkit_config: str, generator: str = DEFAULT_GENERATOR
 ) -> Path:
-    """Derive the default build tree from generator, build type, and selected config header."""
+    """Derive the default build tree from build type and selected config header."""
+    _ = generator
     config_path = validate_navkit_config(navkit_config)
-    return root / "build" / generator_slug(generator) / build_type / config_path.with_suffix("")
+    return root / "build" / build_type.lower() / config_path.with_suffix("")
+
+
+def default_install_dir(root: Path, build_type: str, navkit_config: str) -> Path:
+    """Derive the default staged install tree from build type and selected config header."""
+    config_path = validate_navkit_config(navkit_config)
+    return root / "install" / build_type.lower() / config_path.with_suffix("")
 
 
 def resolve_build_dir(
@@ -49,7 +48,7 @@ def resolve_build_dir(
     *,
     generator: str = DEFAULT_GENERATOR,
 ) -> Path:
-    """Resolve an explicit build directory or the generator/config-rooted default."""
+    """Resolve an explicit build directory or the config-rooted default."""
     if build_dir_arg is None:
         return default_build_dir(root, build_type, navkit_config, generator)
 

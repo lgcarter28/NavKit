@@ -25,8 +25,11 @@ EXCLUDE_DIRS = {
     ".vs",
     ".vscode",
     ".venv",
+    "artifacts",
     "build",
+    "install",
     "out",
+    "output",
     "__pycache__",
 }
 

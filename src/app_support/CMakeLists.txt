@@ -6,9 +6,10 @@ add_library(navkit::app_support ALIAS navkit_app_support)
 
 target_include_directories(navkit_app_support
     INTERFACE
-        ${PROJECT_SOURCE_DIR}/include
-        ${PROJECT_SOURCE_DIR}/config/compiletime
-        ${NAVKIT_GENERATED_INCLUDE_DIR}
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/config/compiletime>
+        $<BUILD_INTERFACE:${NAVKIT_GENERATED_INCLUDE_DIR}>
+        $<INSTALL_INTERFACE:include>
 )
 
 target_link_libraries(navkit_app_support

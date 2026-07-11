@@ -70,7 +70,7 @@ tests/                Doctest unit and compile-time tests
 python/               Offline analysis package
 tools/                Cross-platform developer commands
 docs/                 Setup, architecture, ADRs, roadmap, and reference material
-data/                 Generated logs and datasets
+output/               Generated logs and datasets
 ```
 
 The reusable product core is currently header-only/template-heavy and is modeled
@@ -154,7 +154,7 @@ Run the working demonstration and analysis:
 
 ```text
 python tools/run_first_sim.py --build-type Debug
-python tools/run_analysis.py data/logs/stationary_gnss_demo --show
+python tools/run_analysis.py output/logs/stationary_gnss_demo --show
 ```
 
 ## Documentation

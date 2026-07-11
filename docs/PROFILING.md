@@ -96,9 +96,9 @@ python tools/run_first_sim.py --build-type Debug
 
 That writes:
 
-- `data/logs/stationary_gnss_demo/profile.csv`
-- `data/logs/stationary_gnss_demo/profile_run_manifest.json`
-- `data/logs/stationary_gnss_demo/profile.trace.json`
+- `output/logs/stationary_gnss_demo/profile.csv`
+- `output/logs/stationary_gnss_demo/profile_run_manifest.json`
+- `output/logs/stationary_gnss_demo/profile.trace.json`
 
 `run_first_sim.py` reads the selected compile-time config from the build
 manifest written by `tools/build.py`; the compile-time config does not need to
@@ -113,33 +113,33 @@ to select the tree to run.
 Use `tools/profile_report.py` to inspect exported profile CSVs:
 
 ```bash
-python tools/profile_report.py data/logs/<run_name>/profile.csv
+python tools/profile_report.py output/logs/<run_name>/profile.csv
 ```
 
 To generate Chrome Trace / Perfetto-compatible JSON from an existing profile:
 
 ```bash
-python tools/profile_report.py data/logs/<run_name>/profile.csv \
-  --build-manifest build/Ninja/Debug/apps/navkit_sim/ProfiledStationaryGnss/navkit_build_manifest.json \
-  --chrome-trace data/logs/<run_name>/profile.trace.json
+python tools/profile_report.py output/logs/<run_name>/profile.csv \
+  --build-manifest build/debug/apps/navkit_sim/ProfiledStationaryGnss/navkit_build_manifest.json \
+  --chrome-trace output/logs/<run_name>/profile.trace.json
 ```
 
 Trace conversion requires both the runtime profile manifest and the build
 manifest so compile-time and runtime facts remain separate:
 
 ```bash
-python tools/profile_report.py data/logs/<run_name>/profile.csv \
-  --profile-run-manifest data/logs/<run_name>/profile_run_manifest.json \
-  --build-manifest build/Ninja/Debug/apps/navkit_sim/ProfiledStationaryGnss/navkit_build_manifest.json \
-  --chrome-trace data/logs/<run_name>/profile.trace.json
+python tools/profile_report.py output/logs/<run_name>/profile.csv \
+  --profile-run-manifest output/logs/<run_name>/profile_run_manifest.json \
+  --build-manifest build/debug/apps/navkit_sim/ProfiledStationaryGnss/navkit_build_manifest.json \
+  --chrome-trace output/logs/<run_name>/profile.trace.json
 ```
 
 Use `--tick-period-us` only as an explicit diagnostic override:
 
 ```bash
-python tools/profile_report.py data/logs/<run_name>/profile.csv \
+python tools/profile_report.py output/logs/<run_name>/profile.csv \
   --tick-period-us 0.5 \
-  --chrome-trace data/logs/<run_name>/profile.trace.json
+  --chrome-trace output/logs/<run_name>/profile.trace.json
 ```
 
 The JSON can be loaded into Chrome's tracing viewer or Perfetto for timeline

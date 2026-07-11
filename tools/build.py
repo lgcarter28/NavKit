@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 from navkit_build_dirs import DEFAULT_GENERATOR
+from navkit_build_dirs import default_install_dir
 from navkit_build_dirs import repo_root_from_tools_file
 from navkit_build_dirs import resolve_build_dir as resolve_config_build_dir
 from navkit_conan_env import run_with_optional_conan_env
@@ -187,13 +188,13 @@ def main() -> int:
         default=None,
         help=(
             "Build directory. Defaults to "
-            "build/<generator>/<build-type>/<navkit-config-without-.hpp>."
+            "build/<build-type-lower>/<navkit-config-without-.hpp>."
         ),
     )
     parser.add_argument(
         "--generator",
         default=DEFAULT_GENERATOR,
-        help="CMake generator to use. Defaults to Ninja.",
+        help="CMake generator to use. Defaults to Ninja; non-default generators require --build-dir.",
     )
     parser.add_argument("--clean", action="store_true")
     parser.add_argument("--skip-conan", action="store_true")
@@ -210,6 +211,20 @@ def main() -> int:
         help="Enable coverage instrumentation for supported Debug builds.",
     )
     parser.add_argument("--jobs", "-j", type=int, default=None)
+    parser.add_argument(
+        "--install",
+        action="store_true",
+        help="Install the built targets into the default or selected install prefix.",
+    )
+    parser.add_argument(
+        "--install-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Install prefix. Defaults to "
+            "install/<build-type-lower>/<navkit-config-without-.hpp> when --install is used."
+        ),
+    )
     parser.add_argument(
         "--navkit-config",
         default=None,
@@ -236,7 +251,7 @@ def main() -> int:
         "--resource-output",
         type=Path,
         default=None,
-        help="Resource report output path. Defaults to data/logs/stationary_gnss_demo/resources-<build>-local.json.",
+        help="Resource report output path. Defaults to output/logs/stationary_gnss_demo/resources-<build>-local.json.",
     )
     parser.add_argument(
         "--no-resource-report",
@@ -249,6 +264,12 @@ def main() -> int:
 
     root = repo_root()
     requested_navkit_config = args.navkit_config or DEFAULT_NAVKIT_CONFIG
+    if args.generator != DEFAULT_GENERATOR and args.build_dir is None:
+        raise ValueError(
+            "The official wrapper layout requires Ninja. Use --build-dir when selecting "
+            "a non-default generator explicitly."
+        )
+
     build_dir = resolve_config_build_dir(
         root,
         args.build_type,
@@ -375,6 +396,34 @@ def main() -> int:
         )
         print()
         print_resource_report(load_resource_report(resource_output), max_artifacts=8)
+
+    if args.install:
+        if args.install_dir is None:
+            install_dir = default_install_dir(root, args.build_type, navkit_config)
+        else:
+            install_dir = args.install_dir if args.install_dir.is_absolute() else root / args.install_dir
+            install_dir = install_dir.resolve()
+            if not install_dir.is_relative_to(root):
+                raise ValueError(f"--install-dir must stay inside the repository: {args.install_dir}")
+
+        install_cmd = [
+            "cmake",
+            "--install",
+            str(build_dir),
+            "--config",
+            args.build_type,
+            "--prefix",
+            str(install_dir),
+        ]
+        ret = run_with_optional_conan_env(
+            install_cmd,
+            cwd=root,
+            build_dir=build_dir,
+            build_type=args.build_type,
+        )
+        if ret != 0:
+            raise subprocess.CalledProcessError(ret, install_cmd)
+        print(f"Installed NavKit to: {install_dir}")
     return 0
 
 

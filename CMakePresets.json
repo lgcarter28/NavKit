@@ -2,83 +2,57 @@
   "version": 4,
   "configurePresets": [
     {
-      "name": "conan-release",
-      "displayName": "Conan Release",
-      "binaryDir": "${sourceDir}/build/Ninja/Release/apps/navkit_sim/StationaryGnss",
-      "generator": "Ninja",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/Ninja/Release/apps/navkit_sim/StationaryGnss/build/Release/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "apps/navkit_sim/StationaryGnss.hpp"
-      }
-    },
-    {
-      "name": "conan-debug",
-      "displayName": "Conan Debug",
-      "binaryDir": "${sourceDir}/build/Ninja/Debug/apps/navkit_sim/StationaryGnss",
-      "generator": "Ninja",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/Ninja/Debug/apps/navkit_sim/StationaryGnss/build/Debug/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "apps/navkit_sim/StationaryGnss.hpp"
-      }
-    },
-    {
       "name": "debug-stationary-gnss",
       "displayName": "Debug - navkit_sim StationaryGnss",
-      "binaryDir": "${sourceDir}/build/Ninja/Debug/apps/navkit_sim/StationaryGnss",
+      "binaryDir": "${sourceDir}/build/debug/apps/navkit_sim/StationaryGnss",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/Ninja/Debug/apps/navkit_sim/StationaryGnss/build/Debug/generators/conan_toolchain.cmake",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/debug/apps/navkit_sim/StationaryGnss/build/Debug/generators/conan_toolchain.cmake",
         "NAVKIT_CONFIG": "apps/navkit_sim/StationaryGnss.hpp"
       }
     },
     {
       "name": "debug-profiled-stationary-gnss",
       "displayName": "Debug - navkit_sim ProfiledStationaryGnss",
-      "binaryDir": "${sourceDir}/build/Ninja/Debug/apps/navkit_sim/ProfiledStationaryGnss",
+      "binaryDir": "${sourceDir}/build/debug/apps/navkit_sim/ProfiledStationaryGnss",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/Ninja/Debug/apps/navkit_sim/ProfiledStationaryGnss/build/Debug/generators/conan_toolchain.cmake",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/debug/apps/navkit_sim/ProfiledStationaryGnss/build/Debug/generators/conan_toolchain.cmake",
         "NAVKIT_CONFIG": "apps/navkit_sim/ProfiledStationaryGnss.hpp"
       }
     },
     {
       "name": "release-stationary-gnss",
       "displayName": "Release - navkit_sim StationaryGnss",
-      "binaryDir": "${sourceDir}/build/Ninja/Release/apps/navkit_sim/StationaryGnss",
+      "binaryDir": "${sourceDir}/build/release/apps/navkit_sim/StationaryGnss",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/Ninja/Release/apps/navkit_sim/StationaryGnss/build/Release/generators/conan_toolchain.cmake",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/release/apps/navkit_sim/StationaryGnss/build/Release/generators/conan_toolchain.cmake",
         "NAVKIT_CONFIG": "apps/navkit_sim/StationaryGnss.hpp"
       }
     },
     {
       "name": "release-profiled-stationary-gnss",
       "displayName": "Release - navkit_sim ProfiledStationaryGnss",
-      "binaryDir": "${sourceDir}/build/Ninja/Release/apps/navkit_sim/ProfiledStationaryGnss",
+      "binaryDir": "${sourceDir}/build/release/apps/navkit_sim/ProfiledStationaryGnss",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/Ninja/Release/apps/navkit_sim/ProfiledStationaryGnss/build/Release/generators/conan_toolchain.cmake",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/release/apps/navkit_sim/ProfiledStationaryGnss/build/Release/generators/conan_toolchain.cmake",
         "NAVKIT_CONFIG": "apps/navkit_sim/ProfiledStationaryGnss.hpp"
       }
     }
   ],
   "buildPresets": [
-    { "name": "conan-release", "configurePreset": "conan-release" },
-    { "name": "conan-debug", "configurePreset": "conan-debug" },
     { "name": "debug-stationary-gnss", "configurePreset": "debug-stationary-gnss" },
     { "name": "debug-profiled-stationary-gnss", "configurePreset": "debug-profiled-stationary-gnss" },
     { "name": "release-stationary-gnss", "configurePreset": "release-stationary-gnss" },
     { "name": "release-profiled-stationary-gnss", "configurePreset": "release-profiled-stationary-gnss" }
   ],
   "testPresets": [
-    { "name": "conan-release", "configurePreset": "conan-release" },
-    { "name": "conan-debug", "configurePreset": "conan-debug" },
     { "name": "debug-stationary-gnss", "configurePreset": "debug-stationary-gnss" },
     { "name": "debug-profiled-stationary-gnss", "configurePreset": "debug-profiled-stationary-gnss" },
     { "name": "release-stationary-gnss", "configurePreset": "release-stationary-gnss" },

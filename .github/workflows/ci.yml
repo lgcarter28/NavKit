@@ -80,17 +80,17 @@ jobs:
           sudo apt-get install --yes clang-tidy
 
       - name: Build Debug
-        run: ${{ matrix.python }} tools/build.py --build-type Debug --clean --warnings-as-errors --timing-output data/logs/stationary_gnss_demo/timing.json
+        run: ${{ matrix.python }} tools/build.py --build-type Debug --clean --warnings-as-errors --timing-output output/logs/stationary_gnss_demo/timing.json
 
       - name: Record Debug artifact sizes
-        run: ${{ matrix.python }} tools/resource_report.py --build-type Debug --output data/logs/stationary_gnss_demo/resources-debug-${{ runner.os }}.json
+        run: ${{ matrix.python }} tools/resource_report.py --build-type Debug --output output/logs/stationary_gnss_demo/resources-debug-${{ runner.os }}.json
 
       - name: Run clang-tidy
         if: runner.os == 'Linux'
         run: ${{ matrix.python }} tools/format.py --check --tidy --tidy-warnings-as-errors
 
       - name: Run unit tests
-        run: ${{ matrix.python }} tools/run_tests.py --build-type Debug --timing-output data/logs/stationary_gnss_demo/timing.json
+        run: ${{ matrix.python }} tools/run_tests.py --build-type Debug --timing-output output/logs/stationary_gnss_demo/timing.json
 
       - name: Run stationary simulation
         run: ${{ matrix.python }} tools/run_first_sim.py --build-type Debug
@@ -98,20 +98,20 @@ jobs:
       - name: Run headless analysis
         env:
           MPLBACKEND: Agg
-        run: ${{ matrix.python }} tools/run_analysis.py data/logs/stationary_gnss_demo
+        run: ${{ matrix.python }} tools/run_analysis.py output/logs/stationary_gnss_demo
 
       - name: Build Release
-        run: ${{ matrix.python }} tools/build.py --build-type Release --clean --without-tests --warnings-as-errors --timing-output data/logs/stationary_gnss_demo/timing.json
+        run: ${{ matrix.python }} tools/build.py --build-type Release --clean --without-tests --warnings-as-errors --timing-output output/logs/stationary_gnss_demo/timing.json
 
       - name: Record Release artifact sizes
-        run: ${{ matrix.python }} tools/resource_report.py --build-type Release --output data/logs/stationary_gnss_demo/resources-release-${{ runner.os }}.json
+        run: ${{ matrix.python }} tools/resource_report.py --build-type Release --output output/logs/stationary_gnss_demo/resources-release-${{ runner.os }}.json
 
       - name: Upload timing and resource artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: stationary-gnss-runtime-${{ runner.os }}
-          path: data/logs/stationary_gnss_demo
+          path: output/logs/stationary_gnss_demo
 
   coverage:
     name: Coverage report

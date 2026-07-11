@@ -122,10 +122,10 @@ For changes affecting the simulation or navigation results, also run:
 
 ```powershell
 python tools/run_first_sim.py --build-type Debug
-python tools/run_analysis.py data/logs/stationary_gnss_demo --show
+python tools/run_analysis.py output/logs/stationary_gnss_demo --show
 ```
 
-Simulation logs belong under `data/logs/<run_name>/`. The analysis package is deliberately separate from the embedded C++ library.
+Simulation logs belong under `output/logs/<run_name>/`. The analysis package is deliberately separate from the embedded C++ library.
 
 Use `python tools/format.py` to apply formatting. Do not include clang-tidy in the normal local agentic workflow; it is intentionally a CI-only gate because Eigen-heavy translation units make local runs slow. Run `python tools/format.py --tidy` locally only when the user explicitly asks for clang-tidy or when diagnosing a clang-tidy CI failure. CI runs `python tools/format.py --check --tidy --tidy-warnings-as-errors` on the Linux Debug compilation database. Do not apply automatic tidy fixes broadly without reviewing their scope.
 

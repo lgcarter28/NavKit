@@ -59,16 +59,17 @@ configured doctest executable. Simulation and analysis smoke tests are added
 when behavior affects logs, navigation results, or runtime app wiring.
 
 Clang-tidy is intentionally a CI static-analysis gate, not part of the normal
-local workflow. The Python build wrappers default to Ninja, which produces the
-`compile_commands.json` needed by tidy in the selected config build directory.
-If you override the generator locally, choose one that emits a compilation
-database before running tidy. Coverage reporting is also CI-oriented; run it
+local workflow. The Python build wrappers use Ninja for the official default
+layout, which produces the `compile_commands.json` needed by tidy in the
+selected config build directory. If you override the generator locally with an
+explicit build directory, choose one that emits a compilation database before
+running tidy. Coverage reporting is also CI-oriented; run it
 locally only when reviewing coverage gaps or debugging the CI coverage lane.
 
 ## Timing and resource artifacts
 
 Simulation and analysis smoke tests write lightweight timing data to
-`data/logs/<run_name>/timing.json`. CI also preserves coarse Debug and Release
+`output/logs/<run_name>/timing.json`. CI also preserves coarse Debug and Release
 executable/library size reports from `tools/resource_report.py` with the
 stationary GNSS logs. These artifacts are intended for trend review and future
 Monte Carlo summaries; they are not pass/fail tests because local machines and
@@ -80,9 +81,9 @@ For a local timing smoke pass:
 python tools/build.py --build-type Debug --skip-conan
 python tools/run_tests.py --build-type Debug
 python tools/run_first_sim.py --build-type Debug
-python tools/run_analysis.py data/logs/stationary_gnss_demo
-python tools/timing_report.py data/logs/stationary_gnss_demo/timing.json
-python tools/resource_report.py --build-type Debug --output data/logs/stationary_gnss_demo/resources-debug-local.json
+python tools/run_analysis.py output/logs/stationary_gnss_demo
+python tools/timing_report.py output/logs/stationary_gnss_demo/timing.json
+python tools/resource_report.py --build-type Debug --output output/logs/stationary_gnss_demo/resources-debug-local.json
 ```
 
 Build, test, simulation, and analysis wrappers update the default timing

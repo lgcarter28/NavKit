@@ -78,7 +78,7 @@ def main() -> int:
         default=None,
         help=(
             "Build directory. Defaults to "
-            "build/<generator>/<build-type>/<navkit-config-without-.hpp>."
+            "build/<build-type-lower>/<navkit-config-without-.hpp>."
         ),
     )
     parser.add_argument("--generator", default=DEFAULT_GENERATOR, help="CMake generator used.")
@@ -116,7 +116,7 @@ def main() -> int:
 
     runtime_config = json.loads(args.config.read_text(encoding="utf-8"))
     run_name = runtime_config.get("run_name", "stationary_gnss_demo")
-    output_dir = Path(runtime_config.get("output_dir", f"data/logs/{run_name}"))
+    output_dir = Path(runtime_config.get("output_dir", f"output/logs/{run_name}"))
     timing_path = output_dir / "timing.json"
 
     if not remove_stale_profile_artifacts(output_dir):

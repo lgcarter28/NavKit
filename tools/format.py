@@ -19,9 +19,12 @@ EXCLUDE_DIRS = {
     ".vs",
     ".vscode",
     ".venv",
+    "artifacts",
     "build",
-    "out",
     "data",
+    "install",
+    "out",
+    "output",
     "__pycache__",
 }
 
@@ -106,7 +109,7 @@ def main() -> int:
         default=None,
         help=(
             "Build directory containing compile_commands.json. Defaults to "
-            "build/<generator>/<build-type>/<navkit-config-without-.hpp>."
+            "build/<build-type-lower>/<navkit-config-without-.hpp>."
         ),
     )
     parser.add_argument("--generator", default=DEFAULT_GENERATOR, help="CMake generator used.")

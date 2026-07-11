@@ -32,11 +32,10 @@ public:
     {
         const auto& stats = payload.statistics;
 
-        static_assert(MeasurementDimension == 3,
-                      "GNSS position update statistics must have measurement dimension 3.");
-        static_assert(Statistics::H_t::RowsAtCompileTime == MeasurementDimension,
+        static_assert(M == 3, "GNSS position update statistics must have measurement dimension 3.");
+        static_assert(Statistics::H_t::RowsAtCompileTime == M,
                       "GNSS position update H rows must match the measurement dimension.");
-        static_assert(Statistics::K_t::ColsAtCompileTime == MeasurementDimension,
+        static_assert(Statistics::K_t::ColsAtCompileTime == M,
                       "GNSS position update K columns must match the measurement dimension.");
 
         std::vector<double> row = {stats.time,
@@ -68,8 +67,8 @@ public:
         return {{"schema", "gnss_pos_update_v1"},
                 {"file", "gnss_pos_update.csv"},
                 {"model", "gnss_pos"},
-                {"measurement_dimension", MeasurementDimension},
-                {"state_dimension", StateDimension},
+                {"measurement_dimension", M},
+                {"state_dimension", N},
                 {"units",
                  {{"time", "s"},
                   {"innovation", "m"},
@@ -90,8 +89,8 @@ public:
     }
 
 private:
-    static constexpr int MeasurementDimension = Statistics::O_t::RowsAtCompileTime;
-    static constexpr int StateDimension = Statistics::H_t::ColsAtCompileTime;
+    static constexpr int M = Statistics::O_t::RowsAtCompileTime;
+    static constexpr int N = Statistics::H_t::ColsAtCompileTime;
 
     static std::vector<std::string> header()
     {
@@ -105,10 +104,10 @@ private:
                                            "sigma_nu_p_e_y_m",
                                            "sigma_nu_p_e_z_m"};
 
-        detail::append_matrix_header(result, "S", MeasurementDimension, MeasurementDimension);
-        detail::append_matrix_header(result, "R", MeasurementDimension, MeasurementDimension);
-        detail::append_matrix_header(result, "H", MeasurementDimension, StateDimension);
-        detail::append_matrix_header(result, "K", StateDimension, MeasurementDimension);
+        detail::append_matrix_header(result, "S", M, M);
+        detail::append_matrix_header(result, "R", M, M);
+        detail::append_matrix_header(result, "H", M, N);
+        detail::append_matrix_header(result, "K", N, M);
 
         return result;
     }

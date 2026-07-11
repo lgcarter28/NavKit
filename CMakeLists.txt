@@ -4,6 +4,9 @@
 cmake_minimum_required(VERSION 3.23)
 project(navkit VERSION 0.1.0 LANGUAGES CXX)
 
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -55,3 +58,56 @@ if(NAVKIT_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+set_target_properties(navkit_core PROPERTIES EXPORT_NAME core)
+set_target_properties(navkit_io PROPERTIES EXPORT_NAME io)
+set_target_properties(navkit_sim PROPERTIES EXPORT_NAME sim)
+set_target_properties(navkit_app_support PROPERTIES EXPORT_NAME app_support)
+set_target_properties(navkit_sim_app PROPERTIES EXPORT_NAME sim_app)
+set_target_properties(navkit_replay PROPERTIES EXPORT_NAME replay)
+
+install(
+    DIRECTORY "${PROJECT_SOURCE_DIR}/include/navkit"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+)
+
+install(
+    TARGETS
+        navkit_core
+        navkit_io
+        navkit_sim
+        navkit_app_support
+        navkit_sim_app
+        navkit_replay
+    EXPORT NavKitTargets
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+)
+
+configure_package_config_file(
+    "${PROJECT_SOURCE_DIR}/cmake/NavKitConfig.cmake.in"
+    "${PROJECT_BINARY_DIR}/NavKitConfig.cmake"
+    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/NavKit"
+)
+
+write_basic_package_version_file(
+    "${PROJECT_BINARY_DIR}/NavKitConfigVersion.cmake"
+    VERSION "${PROJECT_VERSION}"
+    COMPATIBILITY SameMajorVersion
+)
+
+install(
+    EXPORT NavKitTargets
+    FILE NavKitTargets.cmake
+    NAMESPACE navkit::
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/NavKit"
+)
+
+install(
+    FILES
+        "${PROJECT_BINARY_DIR}/NavKitConfig.cmake"
+        "${PROJECT_BINARY_DIR}/NavKitConfigVersion.cmake"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/NavKit"
+)

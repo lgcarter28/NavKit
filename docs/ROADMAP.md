@@ -196,7 +196,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Support multiple configurations by using multiple build directories or CMake presets, not by making one executable dynamically switch among compile-time configurations.
 - [x] Add CMake presets or documented wrapper examples that pair common build types and selected configs for convenience while keeping those axes independent.
 - [x] Add a `tools/build.py` option such as `--navkit-config apps/navkit_sim/StationaryGnss.hpp` that forwards to `-DNAVKIT_CONFIG=...`.
-- [x] Make the default build directory derive from the selected compile-time config header, for example `apps/navkit_sim/StationaryGnss.hpp` maps to `build/Ninja/Debug/apps/navkit_sim/StationaryGnss`, so switching configs does not overwrite another build tree's generated selected-config header.
+- [x] Make the default build directory derive from the selected compile-time config header, for example `apps/navkit_sim/StationaryGnss.hpp` maps to `build/debug/apps/navkit_sim/StationaryGnss`, so switching configs does not overwrite another build tree's generated selected-config header.
 - [x] Document how to add a new compile-time config header, how to select it with CMake or the build wrapper, and how to pair it with a runtime JSON input when an application needs one.
 - [x] Reconcile `README.md`, `docs/SETUP.md`, `docs/ARCHITECTURE.md`, and `AGENTS.md` so the default selected config, root config tree, and one-config-per-build-tree rule stay discoverable.
 - [x] Keep reusable NavKit library configs and app composition configs in dedicated directories so app and library configs can share descriptive names without coupling their ownership.
@@ -367,7 +367,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 #### Pass 3.2d — Log schema generalization and remaining product-specific assumptions
 
-- [x] Make Ninja the default generator for repository Python build wrappers while keeping a deliberate generator override. Pass Ninja through Conan/CMake configuration, keep selected-config build directories isolated by generator/config, document the one-time clean rebuild expectation when switching existing MSBuild trees, and preserve CMake presets as Ninja-based examples. Treat faster incremental builds as a bonus; the main goal is consistent compile-database generation for optional local clang-tidy and CI-like diagnostics.
+- [x] Make Ninja the default generator for repository Python build wrappers while keeping a deliberate generator override behind explicit `--build-dir`. Pass Ninja through Conan/CMake configuration, keep selected-config build directories isolated by build type/config, document the one-time clean rebuild expectation when replacing existing MSBuild trees, and preserve CMake presets as Ninja-based examples. Treat faster incremental builds as a bonus; the main goal is consistent compile-database generation for optional local clang-tidy and CI-like diagnostics.
 - [x] Begin removing hard-coded logging assumptions such as GNSS-only update-statistics plumbing, `StateDef::Pos` position extraction, and fixed `H`/`K` matrix dimensions where the selected product/log payload can own the schema more clearly. Current scope keeps the GNSS position-update product GNSS-specific, but templates it on the selected statistics stream so state and matrix dimensions come from the configured payload.
 - [x] Decide how optional runtime log-product enable/disable, verbosity, schema migration, and richer compatibility checks fit into the longer-term logging architecture. Keep them in Phase 8 unless a tiny prerequisite falls out naturally.
 - [x] Revisit whether measurement-statistics logging should become product/model-specific log products beyond the current GNSS position update product once multiple measurement models are active. Current decision: keep the explicit GNSS update product for now and add additional typed products when additional measurement models are actually logged.
@@ -406,15 +406,15 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ### Pass 3.3b — Build, install, and generated-output layout cleanup
 
-- [ ] Make Ninja the required generator for repository Python wrappers and CI. Keep raw CMake generator overrides possible only through explicit user-selected build directories; do not optimize the official wrapper layout around Visual Studio/Ninja generator swapping.
-- [ ] Remove the generator segment from default wrapper build directories. Use the simpler convention `build/<build-type-lower>/apps/navkit_sim/<ConfigStem>`, for example `build/debug/apps/navkit_sim/StationaryGnss`, while preserving `--build-dir` for advanced/manual layouts.
-- [ ] Update Python build helpers, CMake presets, VS Code launch/docs, CI paths, timing/resource helpers, and setup/configuration documentation away from `build/Ninja/<BuildType>/...` toward the new `build/debug/...` and `build/release/...` convention.
-- [ ] Add a deliberate CMake install/staging path rooted at `install/<build-type-lower>/apps/navkit_sim/<ConfigStem>` for local package validation. Install public headers, exported CMake targets, compiled libraries, and runnable app executables; do not install source-tree runtime JSON examples by default.
-- [ ] Keep unit tests primarily build-tree based for local development speed. Add install-tree smoke validation separately, such as running the installed `navkit_sim` executable against the source-tree runtime JSON and/or compiling a tiny downstream `find_package(NavKit CONFIG REQUIRED)` consumer against the staged install.
-- [ ] Reserve `artifacts/` for CI/CD bundles, uploaded reports, packages, and release-style outputs rather than normal local build trees or local simulation logs.
-- [ ] Rename generated run-output root from `data/` to `output/`, especially `data/logs/<run_name>` to `output/logs/<run_name>`, and update runtime defaults, checked-in runtime JSON, Python tools, CI artifact paths, docs, and tests accordingly.
-- [ ] Sweep compile-time value constants that are currently PascalCase. For log-product/filter dimensions such as `MeasurementDimension` and `StateDimension`, use Kalman-standard notation `M` for measurement dimension and `N` for state dimension, and update guidance/tests where helpful.
-- [ ] Preserve the conceptual split: `build/` is for developer build trees, `install/` is for staged installed software, `output/` is for local/generated run outputs, `artifacts/` is for CI/CD packaged evidence, and `config/` is for input configuration.
+- [x] Make Ninja the required generator for repository Python wrappers and CI. Keep raw CMake generator overrides possible only through explicit user-selected build directories; do not optimize the official wrapper layout around Visual Studio/Ninja generator swapping.
+- [x] Remove the generator segment from default wrapper build directories. Use the simpler convention `build/<build-type-lower>/apps/navkit_sim/<ConfigStem>`, for example `build/debug/apps/navkit_sim/StationaryGnss`, while preserving `--build-dir` for advanced/manual layouts.
+- [x] Update Python build helpers, CMake presets, VS Code launch/docs, CI paths, timing/resource helpers, and setup/configuration documentation away from `build/Ninja/<BuildType>/...` toward the new `build/debug/...` and `build/release/...` convention.
+- [x] Add a deliberate CMake install/staging path rooted at `install/<build-type-lower>/apps/navkit_sim/<ConfigStem>` for local package validation. Install public headers, exported CMake targets, compiled libraries, and runnable app executables; do not install source-tree runtime JSON examples by default.
+- [x] Keep unit tests primarily build-tree based for local development speed. Add install-tree smoke validation separately, such as running the installed `navkit_sim` executable against the source-tree runtime JSON and/or compiling a tiny downstream `find_package(NavKit CONFIG REQUIRED)` consumer against the staged install.
+- [x] Reserve `artifacts/` for CI/CD bundles, uploaded reports, packages, and release-style outputs rather than normal local build trees or local simulation logs.
+- [x] Rename generated run-output root from `data/` to `output/`, especially `data/logs/<run_name>` to `output/logs/<run_name>`, and update runtime defaults, checked-in runtime JSON, Python tools, CI artifact paths, docs, and tests accordingly.
+- [x] Sweep compile-time value constants that are currently PascalCase. For log-product/filter dimensions such as `MeasurementDimension` and `StateDimension`, use Kalman-standard notation `M` for measurement dimension and `N` where helpful.
+- [x] Preserve the conceptual split: `build/` is for developer build trees, `install/` is for staged installed software, `output/` is for local/generated run outputs, `artifacts/` is for CI/CD packaged evidence, and `config/` is for input configuration.
 
 ## Compiler flags and static-analysis hardening
 
@@ -439,7 +439,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 ### Pass 3.4a — Desktop workflow timing artifacts
 
 - [x] Add simple script-level timing around build/test/demo/analysis commands without forcing desktop-only dependencies into `navkit::core`.
-- [x] Record stationary simulation wall time and analysis wall time in a machine-readable artifact, such as `data/logs/<run_name>/timing.json`.
+- [x] Record stationary simulation wall time and analysis wall time in a machine-readable artifact, such as `output/logs/<run_name>/timing.json`.
 - [x] Include metadata needed for trend review: schema version, run name, selected `NAVKIT_CONFIG`, build type, command names, start/end timestamps or elapsed seconds, and tool version where practical.
 - [x] Add executable/library size reporting for Debug and Release artifacts as an early coarse resource signal.
 - [x] Add CI or tool-wrapper hooks that preserve timing/resource artifacts as uploaded artifacts without making stochastic or machine-dependent values brittle pass/fail gates.

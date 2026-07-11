@@ -64,7 +64,7 @@ struct NotABinding
 [[nodiscard]] nlohmann::json valid_stationary_gnss_runtime_config()
 {
     return {{"run_name", "stationary_gnss_demo"},
-            {"output_dir", "data/logs/stationary_gnss_demo"},
+            {"output_dir", "output/logs/stationary_gnss_demo"},
             {"trajectory",
              {{"type", "stationary"},
               {"duration_s", 60.0},

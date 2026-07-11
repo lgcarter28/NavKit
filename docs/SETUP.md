@@ -342,7 +342,7 @@ python tools/run_first_sim.py --build-type Debug
 ```
 
 That writes `profile.csv` and `profile.trace.json` under
-`data/logs/stationary_gnss_demo/`. The run wrapper reads the selected
+`output/logs/stationary_gnss_demo/`. The run wrapper reads the selected
 compile-time config from the build manifest written by `build.py`; it does not
 reselect compile-time configuration at run time. Use `--no-profile-trace` when
 you want only the compact CSV profile export.
@@ -353,20 +353,19 @@ Use a separate build directory for each selected compile-time configuration:
 python tools/build.py --build-type Debug --build-dir build/custom/stationary-gnss --navkit-config apps/navkit_sim/StationaryGnss.hpp
 ```
 
-The wrapper defaults to the Ninja generator and derives build directories from
-generator, build type, and selected config, for example:
+The wrapper requires Ninja for its official default layout and derives build
+directories from build type and selected config, for example:
 
 ```text
-build/Ninja/Debug/apps/navkit_sim/StationaryGnss
-build/Ninja/Debug/apps/navkit_sim/ProfiledStationaryGnss
+build/debug/apps/navkit_sim/StationaryGnss
+build/debug/apps/navkit_sim/ProfiledStationaryGnss
 ```
 
-This keeps each generated `navkit/SelectedConfig.hpp` isolated. Debug/Release,
-generator, and `NAVKIT_CONFIG` are independent: build type chooses compiler
-mode, generator chooses the CMake backend, and `NAVKIT_CONFIG` chooses the
-top-level compile-time build configuration. Use `--generator` only when
-deliberately diagnosing another generator, and use a clean or separate build
-directory when switching generator for an existing tree.
+This keeps each generated `navkit/SelectedConfig.hpp` isolated. Debug/Release
+and `NAVKIT_CONFIG` are independent: build type chooses compiler mode, and
+`NAVKIT_CONFIG` chooses the top-level compile-time build configuration. Use
+`--generator` only with an explicit `--build-dir` when deliberately diagnosing
+another generator.
 
 On Windows, the wrapper runs CMake configure/build commands through Conan's
 generated `conanbuild.bat` when it is present. That lets ordinary PowerShell
@@ -382,6 +381,11 @@ different selected configs, pass the matching `--build-dir` to the run wrapper.
 `release-stationary-gnss`, and `release-profiled-stationary-gnss`. As with any
 Conan-backed CMake preset, install dependencies into the preset binary directory
 before configuring if the toolchain file does not exist yet.
+
+Conan may generate a local `CMakeUserPresets.json` that includes dependency
+toolchain presets for whichever build trees you configured. Treat that file as
+local machine state; it is ignored by git. The repository-owned preset examples
+live in `CMakePresets.json`.
 
 ---
 
@@ -420,13 +424,13 @@ The Python wrapper is preferred, but the raw commands are useful for debugging.
 From the repository root, install dependencies with Conan:
 
 ```bash
-conan install . --output-folder build/Ninja/Debug/apps/navkit_sim/StationaryGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Debug
+conan install . --output-folder build/debug/apps/navkit_sim/StationaryGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Debug
 ```
 
 Conan 2 usually writes the generated CMake toolchain file to:
 
 ```text
-build/Ninja/Debug/apps/navkit_sim/StationaryGnss/build/Debug/generators/conan_toolchain.cmake
+build/debug/apps/navkit_sim/StationaryGnss/build/Debug/generators/conan_toolchain.cmake
 ```
 
 On Windows with Ninja/MSVC, run the manual CMake configure and build commands
@@ -434,35 +438,52 @@ from a Visual Studio Developer Prompt or first activate Conan's generated build
 environment:
 
 ```powershell
-build\Ninja\Debug\apps\navkit_sim\StationaryGnss\build\Debug\generators\conanbuild.bat
+build\debug\apps\navkit_sim\StationaryGnss\build\Debug\generators\conanbuild.bat
 ```
 
 Configure CMake manually:
 
 ```bash
-cmake -S . -B build/Ninja/Debug/apps/navkit_sim/StationaryGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/Ninja/Debug/apps/navkit_sim/StationaryGnss/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
+cmake -S . -B build/debug/apps/navkit_sim/StationaryGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/debug/apps/navkit_sim/StationaryGnss/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
 ```
 
 To select a different compile-time config manually, use a matching build
 directory and `-DNAVKIT_CONFIG=...`:
 
 ```bash
-conan install . --output-folder build/Ninja/Debug/apps/navkit_sim/ProfiledStationaryGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Debug
-cmake -S . -B build/Ninja/Debug/apps/navkit_sim/ProfiledStationaryGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/Ninja/Debug/apps/navkit_sim/ProfiledStationaryGnss/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/ProfiledStationaryGnss.hpp
+conan install . --output-folder build/debug/apps/navkit_sim/ProfiledStationaryGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Debug
+cmake -S . -B build/debug/apps/navkit_sim/ProfiledStationaryGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/debug/apps/navkit_sim/ProfiledStationaryGnss/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/ProfiledStationaryGnss.hpp
 ```
 
 Build manually:
 
 ```bash
-cmake --build build/Ninja/Debug/apps/navkit_sim/StationaryGnss --config Debug
+cmake --build build/debug/apps/navkit_sim/StationaryGnss --config Debug
 ```
+
+Install a staged local build when validating the deployable layout:
+
+```bash
+python tools/build.py --build-type Debug --build-only --install
+```
+
+The default install prefix mirrors the selected build:
+
+```text
+install/debug/apps/navkit_sim/StationaryGnss
+```
+
+The install tree contains public headers, exported CMake package files,
+compiled libraries, and runnable application executables. Runtime JSON examples
+remain source-tree inputs under `config/runtime/` and are not installed by
+default.
 
 For Release, replace `Debug` with `Release`:
 
 ```bash
-conan install . --output-folder build/Ninja/Release/apps/navkit_sim/StationaryGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Release
-cmake -S . -B build/Ninja/Release/apps/navkit_sim/StationaryGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/Ninja/Release/apps/navkit_sim/StationaryGnss/build/Release/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
-cmake --build build/Ninja/Release/apps/navkit_sim/StationaryGnss --config Release
+conan install . --output-folder build/release/apps/navkit_sim/StationaryGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Release
+cmake -S . -B build/release/apps/navkit_sim/StationaryGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/release/apps/navkit_sim/StationaryGnss/build/Release/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
+cmake --build build/release/apps/navkit_sim/StationaryGnss --config Release
 ```
 
 Notes:
@@ -486,13 +507,13 @@ If the project has already been built, this runs CTest against the selected buil
 Equivalent raw CTest command:
 
 ```bash
-ctest --test-dir build/Ninja/Debug/apps/navkit_sim/StationaryGnss --output-on-failure -C Debug
+ctest --test-dir build/debug/apps/navkit_sim/StationaryGnss --output-on-failure -C Debug
 ```
 
 For Release:
 
 ```bash
-ctest --test-dir build/Ninja/Release/apps/navkit_sim/StationaryGnss --output-on-failure -C Release
+ctest --test-dir build/release/apps/navkit_sim/StationaryGnss --output-on-failure -C Release
 ```
 
 ---
@@ -510,25 +531,25 @@ Or manually, after building:
 Windows Debug:
 
 ```powershell
-build\Ninja\Debug\apps\navkit_sim\StationaryGnss\apps\navkit_sim\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
+build\debug\apps\navkit_sim\StationaryGnss\apps\navkit_sim\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
 ```
 
 Windows Release:
 
 ```powershell
-build\Ninja\Release\apps\navkit_sim\StationaryGnss\apps\navkit_sim\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
+build\release\apps\navkit_sim\StationaryGnss\apps\navkit_sim\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
 ```
 
 Linux Debug:
 
 ```bash
-build/Ninja/Debug/apps/navkit_sim/StationaryGnss/apps/navkit_sim/navkit_sim config/runtime/navkit_sim/stationary_gnss.json
+build/debug/apps/navkit_sim/StationaryGnss/apps/navkit_sim/navkit_sim config/runtime/navkit_sim/stationary_gnss.json
 ```
 
 The simulation generates logs under:
 
 ```text
-data/logs/<run_name>/
+output/logs/<run_name>/
 ```
 
 Expected outputs:
@@ -567,12 +588,12 @@ product-core code consumes only typed PVA navigation initialization data.
 Example:
 
 ```bash
-python python/navkit_analysis/plots.py data/logs/stationary_gnss_demo
+python python/navkit_analysis/plots.py output/logs/stationary_gnss_demo
 ```
 
 Or, to display an interactive browser of the figures:
 ```bash
-python python/navkit_analysis/plots.py data/logs/stationary_gnss_demo --show
+python python/navkit_analysis/plots.py output/logs/stationary_gnss_demo --show
 ```
 
 Future plotting utilities will include:
@@ -594,14 +615,14 @@ The analysis package is intentionally separated from the embedded navigation lib
 The simulation and analysis wrappers automatically update:
 
 ```text
-data/logs/<run_name>/timing.json
+output/logs/<run_name>/timing.json
 ```
 
 For the default stationary GNSS workflow:
 
 ```bash
 python tools/run_first_sim.py --build-type Debug
-python tools/run_analysis.py data/logs/stationary_gnss_demo
+python tools/run_analysis.py output/logs/stationary_gnss_demo
 ```
 
 Both commands update `timing.json` and print a compact timing summary for the
@@ -611,7 +632,7 @@ output needs to stay quiet.
 To view the timing artifact as a compact terminal report:
 
 ```bash
-python tools/timing_report.py data/logs/stationary_gnss_demo/timing.json
+python tools/timing_report.py output/logs/stationary_gnss_demo/timing.json
 ```
 
 Build, test, simulation, and analysis wrappers update the default timing
@@ -621,7 +642,7 @@ artifact during normal use:
 python tools/build.py --build-type Debug --skip-conan
 python tools/run_tests.py --build-type Debug
 python tools/run_first_sim.py --build-type Debug
-python tools/run_analysis.py data/logs/stationary_gnss_demo
+python tools/run_analysis.py output/logs/stationary_gnss_demo
 ```
 
 Use `--timing-output <path>` on `build.py` or `run_tests.py` to write to a
@@ -635,7 +656,7 @@ terminal output should stay quiet.
 To write a coarse executable/library size report for a build tree:
 
 ```bash
-python tools/resource_report.py --build-type Debug --output data/logs/stationary_gnss_demo/resources-debug-local.json
+python tools/resource_report.py --build-type Debug --output output/logs/stationary_gnss_demo/resources-debug-local.json
 ```
 
 `build.py` writes and displays the same coarse artifact-size report by default
@@ -646,7 +667,7 @@ For a Release size snapshot:
 
 ```bash
 python tools/build.py --build-type Release --clean --without-tests
-python tools/resource_report.py --build-type Release --output data/logs/stationary_gnss_demo/resources-release-local.json
+python tools/resource_report.py --build-type Release --output output/logs/stationary_gnss_demo/resources-release-local.json
 ```
 
 These files are intended for trend review and future Monte Carlo summaries.
@@ -756,7 +777,7 @@ development does not require coverage reporting; use it only when reviewing
 coverage gaps or debugging the coverage lane.
 
 Build, test, simulation, and analysis wrappers write a lightweight
-`timing.json` artifact under `data/logs/<run_name>/` during normal use. CI
+`timing.json` artifact under `output/logs/<run_name>/` during normal use. CI
 uploads those logs along with Debug and Release resource-size reports produced by
 `tools/resource_report.py`. These artifacts are trend evidence only; wall-clock
 timing and hosted-runner binary sizes are intentionally not pass/fail gates.
@@ -845,7 +866,7 @@ python tools/run_tests.py --build-type Debug
 
 python tools/run_first_sim.py --build-type Debug
 
-python tools/run_analysis.py data/logs/stationary_gnss_demo --show
+python tools/run_analysis.py output/logs/stationary_gnss_demo --show
 
 update CHANGELOG.md for changes worth tracking
 
