@@ -8,7 +8,6 @@
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
 #include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
 #include "navkit/core/estimation/navigator/PvaStateDef.hpp"
-#include "navkit/core/estimation/state/Segment.hpp"
 
 #include <Eigen/Eigenvalues>
 #include <algorithm>
@@ -42,14 +41,14 @@ inline void require_initialization_type(const nlohmann::json& initialization,
 {
     NavInitialization nav_init;
     if (trajectory.truth_samples.empty()) {
-        nav_init.p_e_m = trajectory.initial_position_e_m;
+        core::estimation::pos_e_m(nav_init.pva) = trajectory.initial_position_e_m;
         return nav_init;
     }
 
     const auto& truth = trajectory.truth_samples.front();
     nav_init.time_s = truth.time;
-    nav_init.p_e_m = truth.p_e;
-    nav_init.v_e_mps = truth.v_e;
+    core::estimation::pos_e_m(nav_init.pva) = truth.p_e;
+    core::estimation::vel_e_mps(nav_init.pva) = truth.v_e;
     return nav_init;
 }
 
@@ -66,12 +65,9 @@ pva_error_from_json(const nlohmann::json& initialization)
     const auto& pva_error = require_object(initialization, "pva_error");
 
     core::estimation::PvaState error = core::estimation::PvaState::Zero();
-    navkit::core::estimation::segment<core::estimation::PvaStateDef::Pos>(error) =
-        required_vec3_from_object(pva_error, "pos_m");
-    navkit::core::estimation::segment<core::estimation::PvaStateDef::Vel>(error) =
-        required_vec3_from_object(pva_error, "vel_mps");
-    navkit::core::estimation::segment<core::estimation::PvaStateDef::Rpy>(error) =
-        required_vec3_from_object(pva_error, "rpy_be_rad");
+    core::estimation::pos_e_m(error) = required_vec3_from_object(pva_error, "pos_m");
+    core::estimation::vel_e_mps(error) = required_vec3_from_object(pva_error, "vel_mps");
+    core::estimation::rpy_e2b_rad(error) = required_vec3_from_object(pva_error, "rpy_e2b_rad");
     return error;
 }
 
@@ -122,11 +118,7 @@ pva_covariance_from_json(const nlohmann::json& initialization)
 
 inline void apply_pva_error(NavInitialization& nav_init, const core::estimation::PvaState& error)
 {
-    nav_init.p_e_m += navkit::core::estimation::segment<core::estimation::PvaStateDef::Pos>(error);
-    nav_init.v_e_mps +=
-        navkit::core::estimation::segment<core::estimation::PvaStateDef::Vel>(error);
-    nav_init.rpy_be_rad +=
-        navkit::core::estimation::segment<core::estimation::PvaStateDef::Rpy>(error);
+    nav_init.pva += error;
 }
 
 [[nodiscard]] inline core::estimation::PvaState

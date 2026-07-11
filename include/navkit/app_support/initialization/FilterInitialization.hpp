@@ -85,9 +85,10 @@ template<navkit::core::estimation::StateDefPolicy StateDef,
 void initialize_filter_from_nav_initialization(Filter& filter, const NavInitialization& nav_init)
 {
     typename Filter::State_t initial_state = Filter::State_t::Zero();
-    initial_state.template segment<3>(StateDef::Pos::i) = nav_init.p_e_m;
-    initial_state.template segment<3>(StateDef::Vel::i) = nav_init.v_e_mps;
-    initial_state.template segment<3>(StateDef::Att::i) = nav_init.rpy_be_rad;
+    initial_state.template segment<3>(StateDef::Pos::i) = core::estimation::pos_e_m(nav_init.pva);
+    initial_state.template segment<3>(StateDef::Vel::i) = core::estimation::vel_e_mps(nav_init.pva);
+    initial_state.template segment<3>(StateDef::Att::i) =
+        core::estimation::rpy_e2b_rad(nav_init.pva);
 
     filter.set_state(initial_state);
 

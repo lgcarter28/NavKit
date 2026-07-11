@@ -76,7 +76,7 @@ struct NotABinding
               {"pva_error",
                {{"pos_m", {25.0, -15.0, 10.0}},
                 {"vel_mps", {0.0, 0.0, 0.0}},
-                {"rpy_be_rad", {0.0, 0.0, 0.0}}}},
+                {"rpy_e2b_rad", {0.0, 0.0, 0.0}}}},
               {"pva_cov",
                {{"diag",
                  {10000.0, 10000.0, 10000.0, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6}}}}}}};
@@ -226,11 +226,11 @@ TEST_CASE("Explicit PVA initialization provider preserves stationary demo behavi
         StationaryGnssAppConfig::NavInitializationProvider::initialize(cfg, trajectory);
 
     CHECK(nav_init.time_s == doctest::Approx(0.0));
-    CHECK(nav_init.p_e_m(0) == doctest::Approx(6378137.0 + 25.0));
-    CHECK(nav_init.p_e_m(1) == doctest::Approx(-15.0));
-    CHECK(nav_init.p_e_m(2) == doctest::Approx(10.0));
-    CHECK(nav_init.v_e_mps.isZero());
-    CHECK(nav_init.rpy_be_rad.isZero());
+    CHECK(core::estimation::pos_e_m(nav_init.pva)(0) == doctest::Approx(6378137.0 + 25.0));
+    CHECK(core::estimation::pos_e_m(nav_init.pva)(1) == doctest::Approx(-15.0));
+    CHECK(core::estimation::pos_e_m(nav_init.pva)(2) == doctest::Approx(10.0));
+    CHECK(core::estimation::vel_e_mps(nav_init.pva).isZero());
+    CHECK(core::estimation::rpy_e2b_rad(nav_init.pva).isZero());
     CHECK(nav_init.pva_cov(0, 0) == doctest::Approx(10000.0));
     CHECK(nav_init.pva_cov(3, 3) == doctest::Approx(1.0e-6));
     CHECK(nav_init.pva_cov(6, 6) == doctest::Approx(1.0e-6));
@@ -273,10 +273,11 @@ TEST_CASE("Random PVA initialization provider produces deterministic colored dra
     const auto first = PvaRandomInitializationProvider::initialize(cfg, trajectory);
     const auto second = PvaRandomInitializationProvider::initialize(cfg, trajectory);
 
-    CHECK(first.p_e_m.isApprox(second.p_e_m));
-    CHECK(first.v_e_mps.isApprox(second.v_e_mps));
-    CHECK(first.rpy_be_rad.isApprox(second.rpy_be_rad));
-    CHECK_FALSE((first.p_e_m - trajectory.initial_position_e_m).isZero());
+    CHECK(core::estimation::pos_e_m(first.pva).isApprox(core::estimation::pos_e_m(second.pva)));
+    CHECK(core::estimation::vel_e_mps(first.pva).isApprox(core::estimation::vel_e_mps(second.pva)));
+    CHECK(core::estimation::rpy_e2b_rad(first.pva).isApprox(
+        core::estimation::rpy_e2b_rad(second.pva)));
+    CHECK_FALSE((core::estimation::pos_e_m(first.pva) - trajectory.initial_position_e_m).isZero());
     CHECK(first.pva_cov(0, 0) == doctest::Approx(1.0));
 }
 

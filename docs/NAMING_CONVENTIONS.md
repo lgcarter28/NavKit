@@ -26,6 +26,19 @@ q_eb     quaternion that transforms b-frame components into e-frame components
 v_eb_e   velocity of body/object b with respect to ECEF e, resolved in ECEF e
 ```
 
+For coordinate transforms and attitude parameterizations where transform
+direction is the primary meaning, prefer explicit `from2to` naming in code:
+
+``` text
+dcm_e2b        DCM that transforms ECEF-frame components into body-frame components
+rpy_e2b_rad    roll/pitch/yaw parameterization of the ECEF-to-body transform
+q_e2b          quaternion with the same ECEF-to-body transform convention
+```
+
+This avoids ambiguity around superscript/subscript conventions in code. Vector
+kinematics keep the Groves-style object/reference/resolved-frame suffix, for
+example `w_ib_b`.
+
 ## Simplified notation
 
 When the object/wrt/resolving-frame meaning is obvious or redundant,

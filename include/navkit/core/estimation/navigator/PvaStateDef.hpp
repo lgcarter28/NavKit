@@ -15,6 +15,10 @@ struct PvaStateDef
 {
     using Scalar_t = navkit::core::Scalar_t;
 
+    // Current PVA convention is ECEF-only:
+    // - position resolved in ECEF, meters
+    // - velocity resolved in ECEF, meters/second
+    // - roll/pitch/yaw parameterizing the ECEF-to-body transform, radians
     using Pos = Segment<0, 3>;
     using Vel = Segment<3, 3>;
     using Rpy = Segment<6, 3>;
@@ -24,6 +28,36 @@ struct PvaStateDef
 
 using PvaState = State<PvaStateDef>;
 using PvaCovariance = StateCov<PvaStateDef>;
+
+inline auto pos_e_m(PvaState& pva)
+{
+    return segment<PvaStateDef::Pos>(pva);
+}
+
+inline auto pos_e_m(const PvaState& pva)
+{
+    return segment<PvaStateDef::Pos>(pva);
+}
+
+inline auto vel_e_mps(PvaState& pva)
+{
+    return segment<PvaStateDef::Vel>(pva);
+}
+
+inline auto vel_e_mps(const PvaState& pva)
+{
+    return segment<PvaStateDef::Vel>(pva);
+}
+
+inline auto rpy_e2b_rad(PvaState& pva)
+{
+    return segment<PvaStateDef::Rpy>(pva);
+}
+
+inline auto rpy_e2b_rad(const PvaState& pva)
+{
+    return segment<PvaStateDef::Rpy>(pva);
+}
 
 static_assert(StateDefPolicy<PvaStateDef>);
 
