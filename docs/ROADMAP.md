@@ -532,13 +532,36 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Replace the Van Loan implementation direction with an analytical discrete-transition/process-noise formulation suitable for code implementation.
 - [x] Add loosely coupled GNSS position and velocity observation equations with configured antenna lever arm and explicit `H` matrix blocks.
 
-## Pass 5b — Navigator API and implementation contract from the algorithm spec
+## Pass 5b — IMU increment contract and emulator model
+
+- [ ] Create a standalone LaTeX IMU emulator/error-model algorithm document, similar in structure to `docs/algorithms/navigator_ecef_v1/`, before implementing the emulator. Use `docs/navigation_reference` section 2.2 as source material, but clean up the notation and make the document a code-ready implementation reference: define frames, units, continuous truth inputs, raw triad outputs, increment generation, calibration/error-model ordering, noise/random-walk semantics, runtime configuration fields, and required tests. Include all equations needed for software implementation; defer full appendix-style derivations until later.
+- [ ] Define the product-core IMU increment sample type consumed by `navigator_ecef_v1`, including timestamp, sample interval, incremental angle `delta_theta_ib_b_rad`, incremental velocity `delta_v_ib_b_mps`, and explicit pre/post-correction semantics.
+- [ ] Update truth generation enough to support ideal stationary ECEF IMU truth: nonzero Earth-rate gyro truth, physically meaningful specific force, and clear acceleration-versus-specific-force fields.
+- [ ] Implement an ideal IMU emulator first: deterministic timestamped increments from truth with no bias, noise, scale factor, misalignment, non-orthogonality, or quantization.
+- [ ] Define an IMU triad error-model vocabulary for gyro and accelerometer independently. The model should preserve the substance of `docs/navigation_reference` section 2.2 without inheriting its notation:
+  - [ ] bias and optional bias random walk;
+  - [ ] diagonal scale factor;
+  - [ ] installation/mounting misalignment;
+  - [ ] internal non-orthogonality;
+  - [ ] white measurement noise;
+  - [ ] quantization/noise increment behavior when needed.
+- [ ] Document and test the calibration ordering explicitly, using clear code-facing names. A suitable first-order forward model is `raw = (I + scale) * nonorthogonality * misalignment * truth + bias + noise`, with separate gyro and accelerometer parameter sets.
+- [ ] Add deterministic runtime configuration for IMU emulator parameters and random seeds, validated against the selected app config.
+- [ ] Add focused emulator tests before navigator integration: ideal output, constant bias, scale-factor response, cross-axis response from misalignment/non-orthogonality, deterministic seeded noise, increment units, and sample timing.
+- [ ] Keep IMU lever arms, multiple IMUs, online scale-factor/misalignment estimation, and latency/replay handling out of v1 unless a later pass deliberately expands scope.
+
+## Pass 5c — Strapdown aided navigator implementation
 
 - [x] Add the initial Navigator API seam from the completed `navigator_ecef_v1` algorithm document: `Navigator::update()` is the normal orchestration call, and the explicit stage methods are `process_strapdown_integration()`, `process_covariance()`, and `process_measurements()`.
 - [x] Split the propagation policy boundary into explicit strapdown-integration and covariance-prediction hooks while keeping `NoOpPropagation` behavior-preserving for current GNSS-only products.
 - [x] Move the selected simulation app loop to `Navigator::update()` so executable orchestration no longer couples itself to the temporary measurements-only path.
-- [ ] Define typed data ingestion after the IMU/GNSS sample contracts are implemented. Preferred direction: clients push timestamped data into typed internal buffers through simple methods such as `push_data(...)` or explicitly named variants like `push_imu(...)` / `push_gnss(...)`, then call `Navigator::update()`.
-- [ ] Define buffer ownership, timing rules, replay/latency behavior, and delayed-measurement semantics after the first IMU and GNSS data contracts are real.
+- [ ] Implement the first real INS path from the `navigator_ecef_v1` equation-to-code map, using the Pass 5b IMU emulator as the primary data source:
+  - [ ] Mechanization primitives: rotation-vector/quaternion conversion, quaternion propagation sign tests, two-sample coning/sculling, ECEF PVA nominal propagation, and gravity/gravity-gradient policy calls.
+  - [ ] Covariance prediction primitives: build `F_k`, build `G_k`, first-order `Phi_k`, first-order `Q_d`, covariance prediction, symmetry checks, and equation-block sanity tests.
+  - [ ] Navigator integration: typed IMU and aiding ingestion hooks, fixed-capacity internal buffers, `update()` orchestration, and explicit stage-method tests.
+  - [ ] Aiding integration: GNSS position and velocity observations with configured antenna lever arm and finite-difference Jacobian tests.
+- [ ] Define typed data ingestion using the real IMU/GNSS sample contracts. Preferred direction: clients push timestamped data into typed internal buffers through simple methods such as `push_data(...)` or explicitly named variants like `push_imu(...)` / `push_gnss(...)`, then call `Navigator::update()`.
+- [ ] Define buffer ownership and timing rules for v1. Simple history buffers for inspection and future replay support are acceptable, but full latency handling, measurement replay, and delayed-measurement correction are explicitly out of scope.
 
 ## Frames, coordinates, and environment
 
