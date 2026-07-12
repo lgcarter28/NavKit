@@ -32,6 +32,7 @@ This project follows
 - Generic `SimulationApp<Config>` support with app-configured sensor bindings, unsigned sensor IDs, emulator tuples, and tuple-derived runtime validation.
 - Public `include/navkit/api/config` contracts for user-facing product config graphs, including `NavKitProductConfigPolicy`.
 - App-side navigation initialization and transfer-alignment provider seams, including typed PVA/TXA startup and alignment vocabulary, deterministic and random PVA initialization providers, transfer-alignment sample validity flags, and validation for the selected stationary GNSS app config.
+- Focused ECEF navigator v1 algorithm specification under `docs/algorithms/navigator_ecef_v1`, covering the first one-IMU quaternion mechanization, coning/sculling baseline, analytical covariance prediction contract, GNSS position/velocity antenna-lever-arm observations, runtime API contract, and validation gate.
 
 ### Changed
 

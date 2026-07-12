@@ -1,0 +1,149 @@
+\chapter{Filter Correction, Injection, and Reset}
+\label{chap:filter_correction_reset}
+
+\section{Aiding Updates}
+
+Low-rate aiding sensors produce timestamped measurements. The update path owns
+the standard error-state EKF lifecycle \cite{groves2013,simon2006}:
+\begin{itemize}
+    \item selecting measurements eligible for the current update time;
+    \item computing residuals and Jacobians against the nominal state;
+    \item applying Kalman correction to the error state;
+    \item injecting the correction into the nominal state;
+    \item resetting the error-state mean and covariance coordinates.
+\end{itemize}
+
+\section{Error-State EKF Correction}
+
+For a measurement model with predicted measurement $\hat{\mathbf{z}}$,
+measurement $\tilde{\mathbf{z}}$, Jacobian $H$, and covariance $R$, use the
+residual convention
+\begin{equation}
+\mathbf{r}
+=
+\tilde{\mathbf{z}}
+-
+\hat{\mathbf{z}}.
+\label{eq:v1_measurement_residual}
+\end{equation}
+The innovation covariance and Kalman gain are
+\begin{align}
+S
+&=
+H P^{-} H^T + R,
+\label{eq:v1_innovation_covariance}\\
+K
+&=
+P^{-} H^T S^{-1}.
+\label{eq:v1_kalman_gain}
+\end{align}
+The correction applied to the error state is
+\begin{equation}
+\delta\hat{\xb}^{+}
+=
+K\mathbf{r}.
+\label{eq:v1_error_state_correction}
+\end{equation}
+The posterior covariance before nominal-state injection and reset is computed
+with the Joseph form:
+\begin{equation}
+\boxed{
+P^{+}
+=
+\left(\I-KH\right)P^{-}\left(\I-KH\right)^T
++
+K R K^T.
+}
+\label{eq:v1_joseph_covariance_update}
+\end{equation}
+
+\section{Nominal-State Injection}
+
+After an aiding update estimates $\delta\hat{\xb}^{+}$, apply translational and
+bias corrections additively:
+\begin{align}
+\hat{\pb}_{eb}^{e,+} &\leftarrow \hat{\pb}_{eb}^{e,-} + \delta\hat{\pb}^{e},\\
+\hat{\vb}_{eb}^{e,+} &\leftarrow \hat{\vb}_{eb}^{e,-} + \delta\hat{\vb}^{e},\\
+\hat{\bb}_g^{+} &\leftarrow \hat{\bb}_g^{-} + \delta\hat{\bb}_g,\\
+\hat{\bb}_a^{+} &\leftarrow \hat{\bb}_a^{-} + \delta\hat{\bb}_a.
+\end{align}
+
+For attitude, convert the small-angle correction into a scalar-first quaternion
+correction:
+\begin{equation}
+\delta\hat{\quat}
+\approx
+\begin{bmatrix}
+1\\
+\frac{1}{2}\delta\hat{\boldsymbol{\theta}}
+\end{bmatrix}.
+\end{equation}
+
+The NavKit v1 convention is left-multiplicative correction of the whole nominal
+body-to-ECEF quaternion:
+\begin{equation}
+\boxed{
+\hat{\quat}_{b}^{e,+}
+\leftarrow
+\delta\hat{\quat}
+\otimes
+\hat{\quat}_{b}^{e,-}.
+}
+\label{eq:v1_quat_injection}
+\end{equation}
+Then normalize:
+\begin{equation}
+\hat{\quat}_{b}^{e,+}
+\leftarrow
+\frac{\hat{\quat}_{b}^{e,+}}{\norm{\hat{\quat}_{b}^{e,+}}}.
+\end{equation}
+
+\begin{warningbox}
+The left-multiplication convention in \cref{eq:v1_quat_injection} fixes the
+meaning of $\delta\boldsymbol{\theta}$ and matches
+\cref{eq:v1_attitude_error_dcm_relation}. If implementation chooses right
+multiplication instead, the prediction, measurement Jacobians, injection, reset
+Jacobian, and tests must be updated together.
+\end{warningbox}
+
+\section{Reset}
+
+After injection, reset the error-state mean to zero. Because attitude-error
+coordinates change after multiplicative injection, reset the covariance with a
+reset Jacobian:
+\begin{equation}
+P^{+}
+\leftarrow
+G_{\text{reset}}P^{+}G_{\text{reset}}^T.
+\label{eq:v1_reset_covariance_update}
+\end{equation}
+
+For small attitude corrections, the attitude reset block is
+\begin{equation}
+G_{\text{reset},\theta}
+\approx
+\I-\frac{1}{2}\crossmat{\delta\hat{\boldsymbol{\theta}}}.
+\label{eq:v1_attitude_reset_block}
+\end{equation}
+For the v1 state ordering, the full reset Jacobian is
+\begin{equation}
+\boxed{
+G_{\text{reset}}
+=
+\begin{bmatrix}
+\I & \zero & \zero & \zero & \zero\\
+\zero & \I & \zero & \zero & \zero\\
+\zero & \zero & G_{\text{reset},\theta} & \zero & \zero\\
+\zero & \zero & \zero & \I & \zero\\
+\zero & \zero & \zero & \zero & \I
+\end{bmatrix}.
+}
+\label{eq:v1_full_reset_jacobian}
+\end{equation}
+Resolving the attitude error in ECEF keeps the error coordinates tied to the
+navigation frame convention, but multiplicative attitude injection still
+changes the local perturbation coordinates. The reset operation and reset
+Jacobian therefore remain part of the filter/injection policy contract, not a
+hidden side effect of a measurement model. This approximation follows the same
+small-rotation convention as the broader NavKit reference and Sola's
+error-state quaternion treatment \cite{sola2018}.

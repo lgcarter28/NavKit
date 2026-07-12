@@ -26,6 +26,7 @@ All three are currently marked **Proposed**. They guide discussion but do not ov
 ## Reference material
 
 - [`navigation_reference/`](navigation_reference/) is the mathematical navigation reference in development.
+- [`algorithms/`](algorithms/) contains focused implementation-oriented algorithm specifications; `navigator_ecef_v1/` is the first concrete INS/GNSS mechanization contract.
 
 ## Source-of-truth rule
 

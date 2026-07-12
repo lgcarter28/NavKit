@@ -1,0 +1,115 @@
+\chapter{Navigator Runtime API Contract}
+
+\section{Normal Client Path}
+
+The intended user-facing Navigator shape is data ingestion plus a simple update
+call:
+\begin{equation*}
+\text{push timestamped data} \quad \rightarrow \quad \texttt{Navigator::update()}.
+\end{equation*}
+
+The exact names remain implementation choices, but the preferred direction is:
+\begin{itemize}
+    \item typed ingestion such as \texttt{push\_imu(...)} and
+    \texttt{push\_gnss(...)}, or a constrained \texttt{push\_data(...)} family;
+    \item internal fixed-capacity buffers owned by the configured Navigator or
+    sensor graph;
+    \item \texttt{Navigator::update()} as the ordinary client call that
+    orchestrates all eligible work.
+\end{itemize}
+
+\section{Explicit Stages}
+
+For tests, profiling, and advanced embedded scheduling, expose explicit stages:
+\begin{itemize}
+    \item \texttt{process\_strapdown\_integration()} for high-rate nominal IMU
+    integration;
+    \item \texttt{process\_covariance()} for medium-rate STM/covariance
+    propagation and history buffering;
+    \item \texttt{process\_measurements()} for low-rate asynchronous aiding.
+\end{itemize}
+For the first INS/GNSS implementation, the measurement stage must include
+loosely coupled GNSS position and velocity updates with the configured antenna
+lever arm from \cref{eq:v1_gnss_pos_pred,eq:v1_gnss_vel_pred}.
+
+The temporary Phase 4 \texttt{process\_measurements()} path is not the final
+INS Navigator API. It exists to preserve the current GNSS-only behavior while
+the propagation seam is introduced.
+
+\section{V1 Cadence Rules}
+
+The first INS Navigator should keep the timing model explicit:
+\begin{itemize}
+    \item IMU increments are ingested and integrated at the IMU rate.
+    \item Covariance prediction runs at the configured medium-rate prediction
+    cadence. It uses the latest nominal state, the elapsed prediction interval,
+    and the interval-average specific force from
+    \cref{eq:v1_interval_average_specific_force}.
+    \item Aiding measurements are processed when their timestamp and sensor
+    policy make them eligible for the current update.
+    \item V1 may store history for future delayed-measurement support, but it
+    does not extrapolate latent measurements to the current time.
+\end{itemize}
+
+\section{History Buffer Semantics}
+
+The v1 implementation should make history products inspectable even before
+delayed-measurement replay is implemented:
+\begin{itemize}
+    \item IMU history stores timestamped corrected increments or the raw
+    increments plus the bias state needed to reproduce the correction.
+    \item Nominal-state history stores timestamped
+    $(\hat{\pb}_{eb}^{e},\hat{\vb}_{eb}^{e},\hat{\quat}_{b}^{e},
+    \hat{\bb}_g,\hat{\bb}_a)$ samples.
+    \item Prediction history stores the covariance prediction node:
+    timestamp, $\Ph_k$, $\mathbf{Q}_{d,k}$, and the interval endpoints.
+\end{itemize}
+These buffers are a runtime/debugging contract for v1 and a foundation for v2
+measurement-time replay; they are not allowed to silently change the v1 update
+math.
+
+\section{Ownership Boundaries}
+
+\begin{center}
+\begin{tabular}{p{0.30\textwidth}p{0.58\textwidth}}
+\toprule
+Owner & Responsibility \\
+\midrule
+Navigator & public orchestration API, buffer scheduling, stage ordering \\
+Mechanization policy & nominal quaternion/PVA integration from IMU data \\
+Filter prediction policy & STM, process noise, covariance prediction/history \\
+Update policy & aiding update lifecycle, injection, reset \\
+Sensor/emulator/app support & data production, runtime validation, desktop simulation inputs \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{implbox}
+The product config should continue to expose explicit graph aliases. A likely
+future shape is \texttt{Mechanization}, \texttt{Propagation}, \texttt{Filter},
+\texttt{NavigatorUpdate}, and \texttt{Navigator}, where \texttt{Propagation}
+coordinates mechanization and filter prediction without exposing planet/gravity
+details directly to \texttt{Navigator}.
+\end{implbox}
+
+\section{Equation-to-Code Map}
+
+\begin{center}
+\begin{tabular}{p{0.28\textwidth}p{0.22\textwidth}p{0.38\textwidth}}
+\toprule
+Implementation piece & Equations & Notes \\
+\midrule
+IMU input correction & \cref{sec:imu_input_contract} & Biases are applied before coning/sculling. \\
+Coning/sculling & \cref{eq:v1_coning_two_sample,eq:v1_sculling_two_sample} & Tests must lock sub-sample ordering. \\
+Quaternion propagation & \cref{eq:v1_discrete_earth_rate_attitude_increment,eq:v1_discrete_attitude_delta_quat,eq:v1_discrete_quat_update,eq:v1_discrete_quat_normalization,eq:v1_quaternion_sign_sanity} & Implements the nominal attitude advance. \\
+Velocity/position propagation & \cref{eq:v1_gravity_policy_contract,eq:v1_discrete_velocity_update,eq:v1_discrete_position_update} & Gravity comes from the configured gravity policy. \\
+Specific-force input to $F_k$ & \cref{eq:v1_interval_average_specific_force} & Reuses the same sculling-corrected increment as mechanization. \\
+Build $F_k$ and $G_k$ & \cref{eq:v1_fk_matrix,eq:v1_gk_matrix} & No hidden derivation is allowed in code. \\
+STM and process noise & \cref{eq:v1_phi_first_order,eq:v1_qd_integral,eq:v1_qd_series,eq:v1_qd_first_order} & First-order is the v1 baseline and must be validated. \\
+Covariance prediction & \cref{eq:v1_covariance_prediction} & Uses the same $\Ph_k$ and $\mathbf{Q}_{d,k}$ products buffered by prediction history. \\
+EKF correction & \cref{eq:v1_measurement_residual,eq:v1_innovation_covariance,eq:v1_kalman_gain,eq:v1_error_state_correction,eq:v1_joseph_covariance_update} & Measurement models own $\hat{\mathbf{z}}$, $H$, and $R$. \\
+Injection/reset & \cref{eq:v1_quat_injection,eq:v1_reset_covariance_update,eq:v1_attitude_reset_block,eq:v1_full_reset_jacobian} & Injection and covariance reset are one convention-locked unit. \\
+GNSS aiding & \cref{eq:v1_gnss_pos_pred,eq:v1_gnss_pos_h,eq:v1_gnss_vel_pred,eq:v1_gnss_vel_h,eq:v1_gnss_vel_perturbation} & Includes antenna lever arm for position and velocity. \\
+\bottomrule
+\end{tabular}
+\end{center}

@@ -1,0 +1,357 @@
+\chapter{Error-State Prediction}
+\label{chap:error_state_prediction}
+
+\section{Continuous-Time Error-State Equations}
+
+The v1 reduced error state is
+\begin{equation}
+\deltax =
+\begin{bmatrix}
+\delta\pb^{eT} &
+\delta\vb^{eT} &
+\delta\boldsymbol{\theta}^{T} &
+\delta\bb_g^{T} &
+\delta\bb_a^{T}
+\end{bmatrix}^{T}
+\in\R^{15},
+\end{equation}
+where $\delta\boldsymbol{\theta}$ is resolved in ECEF and follows
+\cref{eq:v1_attitude_error_dcm_relation}. The linearized model is
+\begin{equation}
+\dot{\deltax}
+=
+F\deltax+G\wb.
+\label{eq:v1_error_state_space}
+\end{equation}
+
+Define
+\begin{align}
+\Omega_{ie}^{e} &= \crossmat{\omegab_{ie}^{e}},\\
+\hat{\fb}_{ib}^{e} &= \hat{C}_b^e\hat{\fb}_{ib}^{b},\\
+G_p^e &=
+\left.\frac{\partial\gb^e}{\partial\pb_{eb}^e}\right|_{\hat{\pb}_{eb}^{e}}.
+\end{align}
+For Earth products, $G_p^e$ should come from the selected WGS-84/J2-capable
+gravity policy rather than a hard-coded spherical approximation.
+
+\subsection{Navigation Error Equations}
+
+Using the convention above, the position, velocity, and attitude error
+equations are grouped separately from the IMU bias equations:
+\begin{align}
+\delta\dot{\pb}^{e}
+&=
+\delta\vb^{e},\\
+\delta\dot{\vb}^{e}
+&=
+G_p^e\delta\pb^{e}
+-
+2\Omega_{ie}^{e}\delta\vb^{e}
++
+\crossmat{\hat{\fb}_{ib}^{e}}\delta\boldsymbol{\theta}
+-
+\hat{C}_b^e\delta\bb_a
++
+\hat{C}_b^e\mathbf{w}_a,\\
+\delta\dot{\boldsymbol{\theta}}
+&=
+-
+\Omega_{ie}^{e}\delta\boldsymbol{\theta}
++
+\hat{C}_b^e\delta\bb_g
+-
+\hat{C}_b^e\mathbf{w}_g.
+\end{align}
+
+\subsection{IMU Error Models}
+
+The v1 IMU error model separates white measurement noise from bias random walk:
+\begin{align}
+\delta\omegab_{ib}^{b}
+&\approx
+-
+\delta\bb_g
++
+\mathbf{w}_g,\\
+\delta\fb_{ib}^{b}
+&\approx
+-
+\delta\bb_a
++
+\mathbf{w}_a.
+\end{align}
+The corresponding IMU bias error equations are
+\begin{align}
+\delta\dot{\bb}_g
+&=
+\mathbf{w}_{bg},\\
+\delta\dot{\bb}_a
+&=
+\mathbf{w}_{ba}.
+\end{align}
+These signs match the attitude-error convention in
+\cref{eq:v1_attitude_error_dcm_relation} and the derivation in the broader
+NavKit reference \cite{groves2013,sola2018}.
+
+\section{Continuous-Time Matrices}
+
+For
+\begin{equation}
+\wb=
+\begin{bmatrix}
+\mathbf{w}_g^T &
+\mathbf{w}_a^T &
+\mathbf{w}_{bg}^T &
+\mathbf{w}_{ba}^T
+\end{bmatrix}^{T},
+\end{equation}
+the reduced v1 continuous-time matrices are
+\begin{equation}
+F =
+\begin{bmatrix}
+\zero & \I & \zero & \zero & \zero\\
+G_p^e & -2\Omega_{ie}^{e} & \crossmat{\hat{\fb}_{ib}^{e}} & \zero & -\hat{C}_b^e\\
+\zero & \zero & -\Omega_{ie}^{e} & \hat{C}_b^e & \zero\\
+\zero & \zero & \zero & \zero & \zero\\
+\zero & \zero & \zero & \zero & \zero
+\end{bmatrix},
+\label{eq:v1_f_matrix}
+\end{equation}
+and
+\begin{equation}
+G =
+\begin{bmatrix}
+\zero & \zero & \zero & \zero\\
+\zero & \hat{C}_b^e & \zero & \zero\\
+-\hat{C}_b^e & \zero & \zero & \zero\\
+\zero & \zero & \I & \zero\\
+\zero & \zero & \zero & \I
+\end{bmatrix}.
+\label{eq:v1_g_matrix}
+\end{equation}
+Let the continuous spectral-density matrix be
+\begin{equation}
+\Qc =
+\operatorname{diag}
+\left(
+S_g,\,
+S_a,\,
+S_{bg},\,
+S_{ba}
+\right).
+\end{equation}
+Here $S_g$ is gyro white-noise spectral density, $S_a$ is accelerometer
+white-noise spectral density, and $S_{bg}$ and $S_{ba}$ are the gyro- and
+accelerometer-bias random-walk spectral densities.
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Block & Meaning & Units \\
+\midrule
+$S_g$ & gyro white angular-rate noise PSD & $\si{\radian^2\per\second}$ \\
+$S_a$ & accelerometer white specific-force noise PSD & $\si{\meter^2\per\second^3}$ \\
+$S_{bg}$ & gyro-bias random-walk PSD & $\si{\radian^2\per\second^3}$ \\
+$S_{ba}$ & accelerometer-bias random-walk PSD & $\si{\meter^2\per\second^5}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The word ``reduced'' here means the v1 fifteen-state error model: position,
+velocity, ECEF-resolved attitude perturbation, gyro bias, and accelerometer
+bias. It does not refer to the later first-order discretization approximation.
+The continuous-time equations are already a first-order linearization of the
+nonlinear navigation dynamics.
+
+\begin{warningbox}
+The signs in \cref{eq:v1_f_matrix,eq:v1_g_matrix} are a convention lock. If
+the implementation changes the attitude-error definition or quaternion
+correction side, the prediction equations, measurement Jacobians, injection,
+reset, and tests must be changed together.
+\end{warningbox}
+
+\section{Analytical Discretization}
+
+Let $F_k$ denote the continuous-time error-state dynamics matrix from
+\cref{eq:v1_f_matrix} evaluated at the nominal state for interval $k$ and held
+constant over $[t_k,t_k+\Delta t]$.
+With
+\begin{align}
+\hat{C}_{b,k}^{e} &= C_b^e\left(\hat{\quat}_{b,k}^{e}\right),\\
+\hat{\fb}_{ib,k}^{e} &= \hat{C}_{b,k}^{e}\hat{\fb}_{ib,k}^{b},
+\qquad
+\hat{\fb}_{ib,k}^{b}
+=
+\frac{\Delta\mathbf{V}_{ib,k}^{b}}{\Delta t}
+\quad\text{from \cref{eq:v1_interval_average_specific_force}},\\
+G_{p,k}^{e} &=
+\left.
+\frac{\partial\gb^e}{\partial\pb_{eb}^{e}}
+\right|_{\hat{\pb}_{eb,k}^{e}},
+\end{align}
+the v1 interval-specific continuous-time dynamics matrix is
+\begin{equation}
+\boxed{
+F_k =
+\begin{bmatrix}
+\zero & \I & \zero & \zero & \zero\\
+G_{p,k}^{e} & -2\Omega_{ie}^{e} & \crossmat{\hat{\fb}_{ib,k}^{e}} & \zero & -\hat{C}_{b,k}^{e}\\
+\zero & \zero & -\Omega_{ie}^{e} & \hat{C}_{b,k}^{e} & \zero\\
+\zero & \zero & \zero & \zero & \zero\\
+\zero & \zero & \zero & \zero & \zero
+\end{bmatrix}.
+}
+\label{eq:v1_fk_matrix}
+\end{equation}
+
+The state transition matrix (STM) over a covariance-prediction interval is the
+matrix exponential of $F_k$:
+\begin{equation}
+\Ph_k
+=
+\exp(F_k\Delta t).
+\end{equation}
+
+The corresponding frozen noise-input matrix is built directly from
+\cref{eq:v1_g_matrix}. The v1 interval-specific noise-input matrix is
+\begin{equation}
+\boxed{
+G_k =
+\begin{bmatrix}
+\zero & \zero & \zero & \zero\\
+\zero & \hat{C}_{b,k}^{e} & \zero & \zero\\
+-\hat{C}_{b,k}^{e} & \zero & \zero & \zero\\
+\zero & \zero & \I & \zero\\
+\zero & \zero & \zero & \I
+\end{bmatrix}.
+}
+\label{eq:v1_gk_matrix}
+\end{equation}
+Thus $\Ph_k$ is derived from $F_k$, while $G_k$ is evaluated directly from the
+nominal attitude at interval $k$.
+
+The general Taylor expansion for the frozen $F_k$ matrix is
+\begin{equation}
+\Ph_k
+\approx
+\I
++
+F_k\Delta t
++
+\frac{1}{2}F_k^2\Delta t^2
++
+\frac{1}{6}F_k^3\Delta t^3
++
+\cdots.
+\end{equation}
+The v1 baseline implementation should use the first-order state-transition
+approximation
+\begin{equation}
+\boxed{
+\Ph_k
+\approx
+\I+F_k\Delta t.
+}
+\label{eq:v1_phi_first_order}
+\end{equation}
+
+The discrete process-noise covariance must correspond to the same frozen
+dynamics:
+\begin{equation}
+\mathbf{Q}_{d,k}
+=
+\int_0^{\Delta t}
+\Ph_k(\tau)G_k\Qc G_k^T\Ph_k^T(\tau)d\tau.
+\label{eq:v1_qd_integral}
+\end{equation}
+For implementation, expand the integral analytically as
+\begin{equation}
+\mathbf{Q}_{d,k}
+\approx
+\sum_{i=0}^{n}
+\sum_{j=0}^{n}
+\frac{
+F_k^i
+G_k\Qc G_k^T
+\left(F_k^T\right)^j
+\Delta t^{i+j+1}
+}{
+i!\,j!\,(i+j+1)
+}.
+\label{eq:v1_qd_series}
+\end{equation}
+This continuous-to-discrete process-noise integral and series form is the
+analytical frozen-system result used in standard Kalman-filter covariance
+prediction \cite{simon2006,brown2012,palumbo2010}. The v1 baseline should start
+with the first-order process-noise approximation
+\begin{equation}
+\boxed{
+\mathbf{Q}_{d,k}
+\approx
+G_k\Qc G_k^T\Delta t.
+}
+\label{eq:v1_qd_first_order}
+\end{equation}
+This first-order $\mathbf{Q}_{d,k}$ is the v1 implementation baseline, not a
+claim that higher-order terms are physically negligible. Validation must compare
+the baseline against \cref{eq:v1_qd_series} or equivalent analytical block
+specializations over representative medium-rate prediction intervals. If the
+first-order approximation is not adequate for the selected prediction cadence,
+higher-order analytical truncation must be implemented before treating the path
+as production quality.
+
+\section{Useful First-Order Noise Blocks}
+
+For tests and code review, the following frozen-attitude, frozen-noise blocks
+are useful sanity checks. Define
+$S_a^e=\hat{C}_b^eS_a\hat{C}_e^b$ and
+$S_{ba}^e=\hat{C}_b^eS_{ba}\hat{C}_e^b$. If only accelerometer white noise
+and accelerometer-bias random walk are considered in the
+$[\delta\pb^e,\delta\vb^e,\delta\bb_a]$ substate, then
+\begin{equation}
+Q_{pva}
+\approx
+\begin{bmatrix}
+\frac{\Delta t^3}{3}S_a^e+\frac{\Delta t^5}{20}S_{ba}^e &
+\frac{\Delta t^2}{2}S_a^e+\frac{\Delta t^4}{8}S_{ba}^e &
+-\frac{\Delta t^3}{6}\hat{C}_b^eS_{ba}\\
+\frac{\Delta t^2}{2}S_a^e+\frac{\Delta t^4}{8}S_{ba}^e &
+\Delta t\,S_a^e+\frac{\Delta t^3}{3}S_{ba}^e &
+-\frac{\Delta t^2}{2}\hat{C}_b^eS_{ba}\\
+-\frac{\Delta t^3}{6}S_{ba}\hat{C}_e^b &
+-\frac{\Delta t^2}{2}S_{ba}\hat{C}_e^b &
+\Delta t\,S_{ba}
+\end{bmatrix}.
+\end{equation}
+Similarly, for the $[\delta\boldsymbol{\theta},\delta\bb_g]$ substate,
+\begin{equation}
+Q_{\theta g}
+\approx
+\begin{bmatrix}
+\Delta t\,S_g^e+\frac{\Delta t^3}{3}S_{bg}^e &
+\frac{\Delta t^2}{2}\hat{C}_b^eS_{bg}\\
+\frac{\Delta t^2}{2}S_{bg}\hat{C}_e^b &
+\Delta t\,S_{bg}
+\end{bmatrix},
+\end{equation}
+where $S_g^e=\hat{C}_b^eS_g\hat{C}_e^b$ and
+$S_{bg}^e=\hat{C}_b^eS_{bg}\hat{C}_e^b$. The full implementation should use
+\cref{eq:v1_qd_series} or an equivalent analytical specialization so Earth
+rate, gravity-gradient, and specific-force attitude coupling are handled
+consistently.
+
+\section{Covariance Prediction}
+
+The covariance prediction is
+\begin{equation}
+\boxed{
+P_{k+1}^{-}
+=
+\Ph_k P_k^{+}\Ph_k^T + \mathbf{Q}_{d,k}.
+}
+\label{eq:v1_covariance_prediction}
+\end{equation}
+
+If the Navigator buffers history for delayed or asynchronous aiding, it should
+store the transition information needed to relate a measurement time to the
+current filter time. The first version may keep this history short and
+explicit.

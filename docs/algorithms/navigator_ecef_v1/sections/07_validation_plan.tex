@@ -1,0 +1,86 @@
+\chapter{Validation Plan}
+
+\section{First Truth Scenarios}
+
+The first implementation should be validated in this order:
+\begin{enumerate}
+    \item stationary ECEF truth with Earth rotation and nonzero stationary gyro
+    truth;
+    \item simple ballistic trajectory with launch-pad initialization and axial
+    body-x boost;
+    \item constant-altitude, constant-speed curved-Earth trajectory.
+\end{enumerate}
+
+Calibration maneuvers, waypoint/bank-to-turn trajectories, lever-arm
+calibration states, and multiple IMUs follow after the first three scenarios
+are stable.
+
+\section{Mechanization Tests}
+
+Minimum tests:
+\begin{itemize}
+    \item stationary body on rotating Earth produces expected gyro truth;
+    \item zero-motion/no-noise ideal case remains bounded;
+    \item quaternion norm remains one after propagation;
+    \item position/velocity propagation agrees with a trusted reference for a
+    short deterministic trajectory;
+    \item sign conventions for Earth-rate compensation are tested by reversing
+    or disabling Earth rotation in a controlled case.
+\end{itemize}
+
+Equation coverage:
+\begin{itemize}
+    \item verify coning/sculling ordering against
+    \cref{eq:v1_coning_two_sample,eq:v1_sculling_two_sample};
+    \item verify quaternion propagation sign and normalization against
+    \cref{eq:v1_discrete_earth_rate_attitude_increment,eq:v1_discrete_quat_update,eq:v1_quaternion_sign_sanity,eq:v1_discrete_quat_normalization};
+    \item verify velocity and position propagation against
+    \cref{eq:v1_discrete_velocity_update,eq:v1_discrete_position_update};
+    \item verify the specific-force value passed to covariance prediction
+    against \cref{eq:v1_interval_average_specific_force}.
+\end{itemize}
+
+\section{Filter Prediction and Update Tests}
+
+Minimum tests:
+\begin{itemize}
+    \item covariance prediction preserves symmetry within tolerance;
+    \item covariance prediction remains positive semidefinite for the first
+    nominal cases;
+    \item attitude small-angle injection changes the nominal quaternion in the
+    expected direction;
+    \item reset Jacobian behavior is verified for small attitude corrections;
+    \item GNSS position aiding reproduces the current stationary-GNSS baseline
+    when propagation is disabled or idealized;
+    \item GNSS velocity aiding and GNSS antenna lever-arm Jacobians are checked
+    against finite differences.
+\end{itemize}
+
+Equation coverage:
+\begin{itemize}
+    \item verify $F_k$ block placement, signs, and dimensions from
+    \cref{eq:v1_fk_matrix};
+    \item verify $G_k$ block placement, signs, and dimensions from
+    \cref{eq:v1_gk_matrix};
+    \item verify $\Ph_k$ and $\mathbf{Q}_{d,k}$ symmetry/PSD behavior from
+    \cref{eq:v1_phi_first_order,eq:v1_qd_integral,eq:v1_qd_series,eq:v1_qd_first_order,eq:v1_covariance_prediction};
+    \item compare the v1 first-order $\mathbf{Q}_{d,k}$ baseline against the
+    series form in \cref{eq:v1_qd_series} over representative medium-rate
+    intervals;
+    \item verify residual, innovation covariance, Kalman gain, correction, and
+    Joseph covariance update against
+    \cref{eq:v1_measurement_residual,eq:v1_innovation_covariance,eq:v1_kalman_gain,eq:v1_error_state_correction,eq:v1_joseph_covariance_update};
+    \item verify quaternion injection and covariance reset against
+    \cref{eq:v1_quat_injection,eq:v1_reset_covariance_update,eq:v1_attitude_reset_block,eq:v1_full_reset_jacobian};
+    \item verify GNSS position and velocity Jacobians, including antenna lever
+    arm terms, against
+    \cref{eq:v1_gnss_pos_h,eq:v1_gnss_vel_h,eq:v1_gnss_vel_perturbation}.
+\end{itemize}
+
+\section{Implementation Gate}
+
+\begin{implbox}
+Do not claim the first INS path is complete until the algorithm equations,
+runtime API, truth generation, ideal IMU simulation, covariance propagation, and
+GNSS aiding validation are all tested through repository tooling.
+\end{implbox}

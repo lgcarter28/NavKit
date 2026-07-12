@@ -1,0 +1,64 @@
+\chapter{Purpose and Scope}
+
+This document is the implementation contract for the first real NavKit
+inertial navigator. It is deliberately narrower than the general
+\texttt{navigation\_reference} text. The goal is to define the first physically
+meaningful, testable, and maintainable ECEF INS/GNSS path before writing the
+mechanization code.
+
+The primary reference convention is strapdown inertial navigation notation
+\cite{groves2013,titterton2004}, with covariance and filtering support from
+\cite{simon2006} and the existing NavKit navigation reference. Quaternion
+notation and multiplicative attitude-error handling are informed by
+\cite{sola2018}.
+
+\begin{scopebox}
+Version 1 targets a standard body-collocated IMU mechanization with GNSS
+antenna lever-arm aiding:
+\begin{itemize}
+    \item one IMU;
+    \item IMU frame collocated with the body/navigation state point;
+    \item no lever arm between IMU and navigation state;
+    \item configured lever arms for non-IMU aiding sensors, beginning with the
+    GNSS antenna;
+    \item ECEF/PCPF nominal mechanization;
+    \item quaternion nominal attitude propagation;
+    \item small-angle attitude error state;
+    \item Kalman covariance/error-state propagation separate from the nominal quaternion state.
+\end{itemize}
+\end{scopebox}
+
+\section{Primary Departure from Textbook DCM Mechanization}
+
+Many textbook derivations present the nominal attitude mechanization directly
+with direction cosine matrices. NavKit v1 will use a unit quaternion as the
+nominal attitude state and derive the equivalent DCM from the quaternion when
+rotating vectors. This is an implementation choice, not a different physical
+model.
+
+The error-state filter still carries a three-component small-angle attitude
+perturbation. During correction, that small-angle vector is converted into a
+small quaternion correction and applied multiplicatively to the nominal
+quaternion. The quaternion is then normalized and the attitude error state is
+reset.
+
+\section{Explicit Non-Goals}
+
+The following are important, but intentionally deferred:
+\begin{itemize}
+    \item multiple IMUs;
+    \item arbitrary navigation reference point distinct from the IMU/body frame;
+    \item IMU lever-arm correction;
+    \item local-level and wander-azimuth mechanizations;
+    \item PCI/ECI mechanization;
+    \item estimating lever arms as calibration states;
+    \item higher-order coning/sculling compensation beyond the first validated
+    two-sample implementation;
+    \item runtime-polymorphic mechanization selection.
+\end{itemize}
+
+\begin{implbox}
+This document gates implementation. The first production code should implement
+this scope before reintroducing the more general origin-frame and lever-arm
+formulation from the broader navigation reference.
+\end{implbox}

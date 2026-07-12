@@ -1,0 +1,276 @@
+\chapter{Nominal ECEF Mechanization}
+
+\section{Corrected IMU Increment Inputs}
+
+The high-rate mechanization consumes the bias-corrected increments
+$\Delta\hat{\boldsymbol\theta}_{ib}^{b}$ and
+$\Delta\hat{\mathbf{v}}_{ib}^{b}$ defined by the input contract in
+\cref{sec:imu_input_contract}. These estimated bias states are part of the
+nominal state and must be used in the strapdown integration loop, not only in
+the lower-rate Kalman update path \cite{groves2013,titterton2004}.
+
+\section{Coning and Sculling Compensation}
+
+For a two-sample update over one mechanization interval, let
+$(\Delta\hat{\boldsymbol\theta}_1,\Delta\hat{\mathbf{v}}_1)$ and
+$(\Delta\hat{\boldsymbol\theta}_2,\Delta\hat{\mathbf{v}}_2)$ be the two
+bias-corrected sub-sample increments, where sample 1 precedes sample 2 within
+the interval $[t_k,t_k+\Delta t]$. The first v1 implementation should use the
+standard two-sample coning correction
+\begin{equation}
+\Delta\boldsymbol\Theta
+=
+\Delta\hat{\boldsymbol\theta}_1
++
+\Delta\hat{\boldsymbol\theta}_2
++
+\frac{2}{3}
+\Delta\hat{\boldsymbol\theta}_1
+\times
+\Delta\hat{\boldsymbol\theta}_2,
+\label{eq:v1_coning_two_sample}
+\end{equation}
+and a two-sample sculling-corrected specific-force velocity increment
+\begin{align}
+\Delta\mathbf{V}^{b}
+&=
+\Delta\hat{\mathbf{v}}_1
++
+\Delta\hat{\mathbf{v}}_2
++
+\frac{1}{2}
+\left(
+\Delta\hat{\boldsymbol\theta}_1
++
+\Delta\hat{\boldsymbol\theta}_2
+\right)
+\times
+\left(
+\Delta\hat{\mathbf{v}}_1
++
+\Delta\hat{\mathbf{v}}_2
+\right) \nonumber\\
+&\quad+
+\frac{2}{3}
+\left(
+\Delta\hat{\boldsymbol\theta}_1
+\times
+\Delta\hat{\mathbf{v}}_2
++
+\Delta\hat{\mathbf{v}}_1
+\times
+\Delta\hat{\boldsymbol\theta}_2
+\right).
+\label{eq:v1_sculling_two_sample}
+\end{align}
+The exact coefficient convention must be verified against the selected IMU
+increment ordering in tests. Higher-order multi-sample algorithms are deferred
+until the two-sample path is correct and profiled. The v1 formulas are the
+standard two-sample coning and sculling corrections used for incremental IMU
+mechanization \cite{groves2013,titterton2004}.
+
+\section{Quaternion Attitude Propagation}
+
+For continuous-time notation, the relative angular rate of the body frame with
+respect to ECEF, resolved in body, is
+\begin{equation}
+\omegab_{eb}^{b}
+=
+\hat{\omegab}_{ib}^{b}
+-
+C_e^b\omegab_{ie}^{e}.
+\end{equation}
+In the discrete implementation, $\Delta\boldsymbol\Theta$ from
+\cref{eq:v1_coning_two_sample} represents the corresponding body-frame
+increment over the interval after Earth-rate handling.
+
+For v1, evaluate Earth rate with the attitude at the beginning of the
+mechanization interval:
+\begin{equation}
+\Delta\boldsymbol\Theta_{eb,k}^{b}
+=
+\Delta\boldsymbol\Theta_{ib,k}^{b}
+-
+\hat{C}_{e,k}^{b}\omegab_{ie}^{e}\Delta t,
+\qquad
+\hat{C}_{e,k}^{b}=\left(\hat{C}_{b,k}^{e}\right)^T.
+\label{eq:v1_discrete_earth_rate_attitude_increment}
+\end{equation}
+Here $\Delta\boldsymbol\Theta_{ib,k}^{b}$ is the coning-corrected body wrt
+inertial increment from \cref{eq:v1_coning_two_sample}, and
+$\Delta\boldsymbol\Theta_{eb,k}^{b}$ is the body wrt ECEF increment used for
+the quaternion update.
+
+Convert the corrected rotation vector to a scalar-first quaternion with
+\cref{eq:v1_rotation_vector_quaternion}:
+\begin{equation}
+\delta\quat_{eb,k}^{b}
+=
+q\left(\Delta\boldsymbol\Theta_{eb,k}^{b}\right).
+\label{eq:v1_discrete_attitude_delta_quat}
+\end{equation}
+
+Let a scalar-first quaternion use product $\otimes$ and let
+$\boldsymbol\omega_q=[0,\ \omegab_{eb}^{bT}]^T$. The body-to-ECEF quaternion is
+propagated with right multiplication by the relative angular-rate quaternion:
+\begin{equation}
+\boxed{
+\dot{\quat}_{b}^{e}
+=
+\frac{1}{2}
+\quat_b^e
+\otimes
+\boldsymbol\omega_q.
+}
+\label{eq:v1_quat_propagation}
+\end{equation}
+The corresponding v1 discrete quaternion update is
+\begin{equation}
+\boxed{
+\hat{\quat}_{b,k+1}^{e,-}
+=
+\hat{\quat}_{b,k}^{e,+}
+\otimes
+\delta\quat_{eb,k}^{b}.
+}
+\label{eq:v1_discrete_quat_update}
+\end{equation}
+As a sign sanity check, if $\hat{\quat}_{b,k}^{e,+}=[1,0,0,0]^T$,
+$\omegab_{ie}^{e}=\zero$, and
+$\Delta\boldsymbol\Theta_{eb,k}^{b}=[0,0,\epsilon]^T$ for small positive
+$\epsilon$, then
+\begin{equation}
+\hat{\quat}_{b,k+1}^{e,-}
+\approx
+\begin{bmatrix}
+1 & 0 & 0 & \epsilon/2
+\end{bmatrix}^{T},
+\label{eq:v1_quaternion_sign_sanity}
+\end{equation}
+before normalization. This simple case pins the scalar-first quaternion
+ordering, the right-multiplication propagation side, and the positive
+body-frame yaw increment convention used by the implementation tests.
+After discrete propagation, normalize:
+\begin{equation}
+\hat{\quat}_{b,k+1}^{e,-}
+\leftarrow
+\frac{\hat{\quat}_{b,k+1}^{e,-}}{\norm{\hat{\quat}_{b,k+1}^{e,-}}}.
+\label{eq:v1_discrete_quat_normalization}
+\end{equation}
+
+\section{Velocity and Position Propagation}
+
+Using plumb-bob gravity $\gb^{e}(\pb_{eb}^{e})$, the ECEF velocity equation is
+\begin{equation}
+\boxed{
+\dot{\vb}_{eb}^{e}
+=
+C_b^e\hat{\fb}_{ib}^{b}
++
+\gb^{e}\left(\pb_{eb}^{e}\right)
+-
+2\omegab_{ie}^{e}\times\vb_{eb}^{e}.
+}
+\label{eq:v1_velocity_mechanization}
+\end{equation}
+The corresponding position equation is
+\begin{equation}
+\boxed{
+\dot{\pb}_{eb}^{e}
+=
+\vb_{eb}^{e}.
+}
+\end{equation}
+
+The gravity vector and gravity gradient used by the mechanization and
+covariance prediction must come from the configured gravity policy. For Earth
+products, the intended v1 baseline is a WGS-84/J2-capable gravity model rather
+than a hard-coded spherical approximation \cite{groves2013}.
+
+For implementation, the configured gravity policy must provide both
+\begin{equation}
+\gb_k^e=\gb^e\left(\hat{\pb}_{eb,k}^{e}\right),
+\qquad
+G_{p,k}^{e}
+=
+\left.
+\frac{\partial\gb^e}{\partial\pb_{eb}^{e}}
+\right|_{\hat{\pb}_{eb,k}^{e}}.
+\label{eq:v1_gravity_policy_contract}
+\end{equation}
+The mechanization uses $\gb_k^e$; the covariance prediction uses
+$G_{p,k}^{e}$.
+
+\section{Discrete Velocity and Position Update}
+
+Using the sculling-corrected specific-force increment
+$\Delta\mathbf{V}_{ib,k}^{b}$ from \cref{eq:v1_sculling_two_sample}, the v1
+velocity update is
+\begin{equation}
+\boxed{
+\hat{\vb}_{eb,k+1}^{e,-}
+=
+\hat{\vb}_{eb,k}^{e,+}
++
+\hat{C}_{b,k}^{e}\Delta\mathbf{V}_{ib,k}^{b}
++
+\left(
+\gb_k^e
+-
+2\omegab_{ie}^{e}\times\hat{\vb}_{eb,k}^{e,+}
+\right)\Delta t.
+}
+\label{eq:v1_discrete_velocity_update}
+\end{equation}
+The v1 position update uses trapezoidal velocity integration:
+\begin{equation}
+\boxed{
+\hat{\pb}_{eb,k+1}^{e,-}
+=
+\hat{\pb}_{eb,k}^{e,+}
++
+\frac{1}{2}
+\left(
+\hat{\vb}_{eb,k}^{e,+}
++
+\hat{\vb}_{eb,k+1}^{e,-}
+\right)
+\Delta t.
+}
+\label{eq:v1_discrete_position_update}
+\end{equation}
+The superscript $+$ denotes the post-correction state entering the propagation
+interval, and $-$ denotes the predicted state after propagation.
+
+For covariance prediction over the same interval, use the interval-average
+specific force corresponding to the same sculling-corrected velocity increment:
+\begin{equation}
+\boxed{
+\hat{\fb}_{ib,k}^{b}
+=
+\frac{\Delta\mathbf{V}_{ib,k}^{b}}{\Delta t}.
+}
+\label{eq:v1_interval_average_specific_force}
+\end{equation}
+This is the body-frame quantity used to form
+$\hat{\fb}_{ib,k}^{e}=\hat{C}_{b,k}^{e}\hat{\fb}_{ib,k}^{b}$ in the
+interval-specific $F_k$ matrix.
+
+\section{Discrete Integration}
+
+The first implementation should state:
+\begin{itemize}
+    \item the IMU increment ordering used by coning/sculling compensation;
+    \item where biases are subtracted;
+    \item whether Earth rate is evaluated at the beginning, midpoint, or end of
+    the interval;
+    \item when the quaternion is normalized;
+    \item how gravity and the gravity gradient are evaluated.
+\end{itemize}
+
+\begin{implbox}
+The concrete mechanization may expose an internal \texttt{integrate} operation.
+The Navigator-level policy remains a broader propagation/time-advance seam
+because the same step may also coordinate filter prediction, state-transition
+history, and aiding-measurement buffering.
+\end{implbox}

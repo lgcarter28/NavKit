@@ -1,0 +1,97 @@
+\chapter{Frames and Notation}
+
+\section{Frames}
+
+The first implementation uses three frames:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Symbol & Frame & Meaning \\
+\midrule
+$i$ & inertial & non-rotating inertial reference frame \\
+$e$ & ECEF/PCPF & Earth-fixed frame rotating with Earth \\
+$b$ & body/IMU & vehicle body frame, collocated with the IMU and navigation state \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The body frame $b$ is the first implementation's navigation state point. This
+collocation assumption intentionally removes the origin-frame and IMU-lever-arm
+terms derived in the broader navigation reference. A non-IMU aiding sensor
+$s$, such as a GNSS antenna, may still have a configured body-frame lever arm
+$l_{bs}^{b}$ from the body/IMU point to the sensor measurement point
+\cite{groves2013}.
+
+\section{Vector and Transform Conventions}
+
+The nominal navigation variables are:
+\begin{align}
+\pb_{eb}^{e} &\in \R^3 && \text{position of body with respect to ECEF, resolved in ECEF},\\
+\vb_{eb}^{e} &\in \R^3 && \text{velocity of body with respect to ECEF, resolved in ECEF},\\
+\quat_b^e &\in \R^4 && \text{unit quaternion mapping body components into ECEF components}.
+\end{align}
+
+Let $C_b^e(\quat_b^e)$ denote the DCM corresponding to $\quat_b^e$ that maps
+body-resolved components into ECEF-resolved components:
+\begin{equation}
+\mathbf{a}^{e}=C_b^e\mathbf{a}^{b}.
+\end{equation}
+The inverse mapping is
+\begin{equation}
+C_e^b=\left(C_b^e\right)^{T}.
+\end{equation}
+
+\begin{warningbox}
+Code identifiers sometimes use explicit \texttt{from2to} names such as
+\texttt{q\_e2b} or \texttt{rpy\_e2b\_rad} when transform direction is the
+primary meaning. This document's mathematical notation follows the compact
+Groves-style convention: $C_b^e$ maps from $b$ to $e$.
+\end{warningbox}
+
+\section{Truth, Estimate, Measurement, and Error Notation}
+
+Unadorned variables represent the true physical quantity. A hat denotes the
+current nominal estimate, and a tilde denotes a measured sensor quantity:
+\begin{align}
+\pb_{eb}^{e} & && \text{true position},&
+\hat{\pb}_{eb}^{e} & && \text{estimated/nominal position},\\
+\Delta\tilde{\boldsymbol\theta}_{ib}^{b} & && \text{measured gyro angle increment},&
+\Delta\tilde{\mathbf{v}}_{ib}^{b} & && \text{measured accelerometer velocity increment}.
+\end{align}
+
+The additive error-state convention is truth minus estimate:
+\begin{align}
+\delta\pb^{e} &= \pb_{eb}^{e}-\hat{\pb}_{eb}^{e},\\
+\delta\vb^{e} &= \vb_{eb}^{e}-\hat{\vb}_{eb}^{e},\\
+\delta\bb_g &= \bb_g-\hat{\bb}_g,\\
+\delta\bb_a &= \bb_a-\hat{\bb}_a.
+\end{align}
+
+For attitude, the error state is a three-component small rotation vector
+resolved in ECEF. Following the convention used in the broader NavKit
+reference, the true body-to-ECEF DCM is related to the nominal DCM by
+\begin{equation}
+C_b^{e,true}
+\approx
+\left(\I-\crossmat{\delta\boldsymbol\theta}\right)
+\hat{C}_b^e.
+\label{eq:v1_attitude_error_dcm_relation}
+\end{equation}
+This convention is intentionally selected to match the left-multiplicative
+small-quaternion correction in \cref{chap:filter_correction_reset}
+\cite{groves2013,sola2018}.
+
+\section{Earth Rate}
+
+The ECEF frame rotates with respect to the inertial frame at
+\begin{equation}
+\omegab_{ie}^{e}
+=
+\begin{bmatrix}
+0 & 0 & \omega_{ie}
+\end{bmatrix}^{T}.
+\end{equation}
+For Earth/WGS-84, $\omega_{ie}$ is supplied by the selected planet policy. The
+Navigator must not know that value directly; the concrete mechanization or
+propagation policy owns the planet and gravity configuration.

@@ -1,0 +1,182 @@
+\chapter{GNSS Observation Models}
+
+\section{Antenna Lever Arm}
+
+The v1 GNSS model is loosely coupled and must support both antenna position and
+antenna velocity measurements. Let $g$ denote the GNSS antenna phase center and
+let
+\begin{equation}
+l_{bg}^{b}
+\end{equation}
+be the configured lever arm from the body/IMU navigation point to the GNSS
+antenna, resolved in body coordinates. The lever arm is treated as known in
+v1; estimating it as a calibration state is deferred.
+
+The predicted antenna position is
+\begin{equation}
+\hat{\pb}_{eg}^{e}
+=
+\hat{\pb}_{eb}^{e}
++
+\hat{C}_b^e l_{bg}^{b}.
+\label{eq:v1_gnss_pos_pred}
+\end{equation}
+The predicted antenna velocity is
+\begin{equation}
+\hat{\vb}_{eg}^{e}
+=
+\hat{\vb}_{eb}^{e}
++
+\hat{C}_b^e
+\left(
+\hat{\omegab}_{eb}^{b}
+\times
+l_{bg}^{b}
+\right),
+\label{eq:v1_gnss_vel_pred}
+\end{equation}
+where
+\begin{equation}
+\hat{\omegab}_{eb}^{b}
+=
+\hat{\omegab}_{ib}^{b}
+-
+\hat{C}_e^b\omegab_{ie}^{e}.
+\end{equation}
+The lever-arm velocity term is small for benign motion, but it is standard and
+must be present for high-angular-rate trajectories \cite{groves2013}.
+
+\section{Position Update}
+
+For an ECEF GNSS position measurement $\tilde{\pb}_{eg,gnss}^{e}$, define the
+residual
+\begin{equation}
+\mathbf{r}_p
+=
+\tilde{\pb}_{eg,gnss}^{e}
+-
+\hat{\pb}_{eg}^{e}.
+\end{equation}
+With the v1 state ordering
+$[\delta\pb^e,\delta\vb^e,\delta\boldsymbol{\theta},\delta\bb_g,\delta\bb_a]^T$,
+the position Jacobian is
+\begin{equation}
+H_p
+=
+\begin{bmatrix}
+\I &
+\zero &
+\crossmat{\hat{C}_b^e l_{bg}^{b}} &
+\zero &
+\zero
+\end{bmatrix}.
+\label{eq:v1_gnss_pos_h}
+\end{equation}
+This attitude sensitivity is the main practical reason the lever arm belongs
+in the first implementation even though IMU lever arms and multiple IMUs are
+deferred.
+
+\section{Velocity Update}
+
+For an ECEF GNSS velocity measurement $\tilde{\vb}_{eg,gnss}^{e}$, define the
+residual
+\begin{equation}
+\mathbf{r}_v
+=
+\tilde{\vb}_{eg,gnss}^{e}
+-
+\hat{\vb}_{eg}^{e}.
+\end{equation}
+Let
+\begin{equation}
+u_g^b
+=
+\hat{\omegab}_{eb}^{b}
+\times
+l_{bg}^{b}.
+\end{equation}
+The v1 velocity Jacobian is
+\begin{equation}
+H_v
+=
+\begin{bmatrix}
+\zero &
+\I &
+\crossmat{\hat{C}_b^e u_g^b}
+-
+\hat{C}_b^e\crossmat{l_{bg}^{b}}\hat{C}_e^b\crossmat{\omegab_{ie}^{e}} &
+\hat{C}_b^e\crossmat{l_{bg}^{b}} &
+\zero
+\end{bmatrix}.
+\label{eq:v1_gnss_vel_h}
+\end{equation}
+The attitude block includes both the perturbation of the outer DCM and the
+perturbation of the Earth-rate subtraction inside $\omegab_{eb}^{b}$. The
+gyro-bias block follows from the same bias-error convention used in
+\cref{eq:v1_f_matrix}: the true angular-rate error entering the lever-arm
+velocity is approximately $-\delta\bb_g$. The first-order perturbation of the
+predicted antenna velocity is
+\begin{align}
+\delta\hat{\vb}_{eg}^{e}
+&=
+\delta\vb_{eb}^{e}
++
+\left(
+\crossmat{\hat{C}_b^e u_g^b}
+-
+\hat{C}_b^e\crossmat{l_{bg}^{b}}\hat{C}_e^b\crossmat{\omegab_{ie}^{e}}
+\right)
+\delta\boldsymbol{\theta}
++
+\hat{C}_b^e\crossmat{l_{bg}^{b}}\delta\bb_g.
+\label{eq:v1_gnss_vel_perturbation}
+\end{align}
+If this sign convention changes, the velocity lever-arm Jacobian must change
+with it.
+
+\section{Combined Position/Velocity Update}
+
+If a receiver provides time-aligned position and velocity, the combined
+measurement is
+\begin{equation}
+\tilde{\mathbf{z}}_{gnss}
+=
+\begin{bmatrix}
+\tilde{\pb}_{eg,gnss}^{e}\\
+\tilde{\vb}_{eg,gnss}^{e}
+\end{bmatrix},
+\qquad
+\hat{\mathbf{z}}_{gnss}
+=
+\begin{bmatrix}
+\hat{\pb}_{eg}^{e}\\
+\hat{\vb}_{eg}^{e}
+\end{bmatrix},
+\end{equation}
+with residual and Jacobian
+\begin{equation}
+\mathbf{r}_{gnss}
+=
+\tilde{\mathbf{z}}_{gnss}
+-
+\hat{\mathbf{z}}_{gnss},
+\qquad
+H_{gnss}
+=
+\begin{bmatrix}
+H_p\\
+H_v
+\end{bmatrix}.
+\end{equation}
+The measurement covariance is
+\begin{equation}
+R_{gnss}
+=
+\begin{bmatrix}
+R_p & R_{pv}\\
+R_{pv}^T & R_v
+\end{bmatrix}.
+\end{equation}
+The first implementation may use block-diagonal $R_{gnss}$ when the runtime
+receiver/noise model does not provide position--velocity cross covariance, but
+the schema should not make correlated GNSS errors impossible to express later.

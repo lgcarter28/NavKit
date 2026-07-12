@@ -133,6 +133,14 @@ NavKit-owned C++ targets use warning/profile settings from `cmake/NavKitWarnings
 
 VS Code launch configurations assume that a Debug build already exists; they do not build automatically. Build with the wrapper before starting a debugging session.
 
+For LaTeX algorithm/reference documentation, verify the document with the same backend VS Code LaTeX Workshop normally drives:
+
+```powershell
+latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex
+```
+
+Run it from the document folder, inspect the `.log` for real LaTeX errors, undefined references, and undefined citations, and rerun until the PDF is up to date. If a failed build leaves stale `*-SAVE-ERROR`, `pdflatex*.fls`, or other temporary artifacts, remove only the generated LaTeX debris after confirming the paths are inside the document folder. Do not stage generated auxiliary files such as `.aux`, `.bcf`, `.bbl`, `.blg`, `.fdb_latexmk`, `.fls`, `.log`, `.out`, `.run.xml`, `.synctex.gz`, or `.toc`. Stage the `.tex`/documentation source changes; keep generated PDFs untracked unless the repository deliberately tracks that document's PDF.
+
 ## Change discipline
 
 - For architectural work, use the sequence: inspect relevant ADRs and code, define a small pass, implement it, add compile-time and runtime tests, build, test, update the changelog, and reconcile documentation.

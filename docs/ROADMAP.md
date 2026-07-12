@@ -516,12 +516,21 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Pass 5a — Focused ECEF navigator algorithm document
 
-- [ ] Create a dedicated LaTeX algorithm-spec folder, `docs/algorithms/navigator_ecef_v1/`, with a `main.tex` entry point and separate section/chapter `.tex` files.
-- [ ] Scope the first mechanization narrowly: one IMU, body frame collocated with the IMU and navigation center, no lever arm, no multiple-IMU fusion, no arbitrary center of navigation, and no runtime-polymorphic algorithm selection.
-- [ ] Define the first concrete ECEF navigation algorithm contract before implementation: frames, state, IMU input semantics, timing/discretization assumptions, nominal propagation equations, error-state propagation expectations, covariance propagation, and normalization/reset conventions.
-- [ ] Explicitly mark deferred generalizations: multiple IMUs, lever arms, non-collocated centers of navigation, alternate mechanization frames, higher-order integration, and target-specific numerical/performance budgets.
-- [ ] Link the spec back to the implementation passes that will consume it so real propagation policy work is driven by written math rather than aspirational generic APIs.
-- [ ] Treat this pass as a documentation/design gate. Do not implement the real ECEF mechanization, IMU buffering, covariance propagation, or public INS Navigator API until this algorithm document exists.
+- [x] Create a dedicated LaTeX algorithm-spec folder, `docs/algorithms/navigator_ecef_v1/`, with a `main.tex` entry point and separate section/chapter `.tex` files.
+- [x] Scope the first mechanization narrowly: one IMU, body frame collocated with the IMU and navigation center, no IMU lever arm, no multiple-IMU fusion, no arbitrary center of navigation, and no runtime-polymorphic algorithm selection. Non-IMU aiding sensor lever arms, beginning with GNSS antenna position/velocity, are in scope.
+- [x] Define the first concrete ECEF navigation algorithm contract before implementation: frames, state, IMU input semantics, timing/discretization assumptions, nominal propagation equations, error-state propagation expectations, covariance propagation, and normalization/reset conventions.
+- [x] Explicitly mark deferred generalizations: multiple IMUs, IMU lever arms, estimated sensor lever-arm calibration states, non-collocated centers of navigation, alternate mechanization frames, higher-order integration beyond the first coning/sculling baseline, and target-specific numerical/performance budgets.
+- [x] Link the spec back to the implementation passes that will consume it so real propagation policy work is driven by written math rather than aspirational generic APIs.
+- [x] Treat this pass as a documentation/design gate. Do not implement the real ECEF mechanization, IMU buffering, covariance propagation, or public INS Navigator API until this algorithm document exists.
+
+## Pass 5a.1 — Code-ready ECEF/GNSS math refinement
+
+- [x] Refine the `navigator_ecef_v1` notation so formal LaTeX uses conventional DCM/quaternion frame notation such as `C_b^e` and `q_b^e`, while code remains free to use explicit `b2e`/`e2b` variable names where clearer.
+- [x] Define truth, estimate, measured, and error-state notation explicitly, including the Groves-style ECEF-resolved small-angle attitude error convention and left-multiplicative quaternion correction.
+- [x] Change the IMU contract to increment-based inputs with coning and sculling compensation in scope for the first implementation.
+- [x] Show the full reduced continuous-time `F` and `G` matrices for the v1 15-state INS error model, including configured gravity-gradient/J2 expectations.
+- [x] Replace the Van Loan implementation direction with an analytical discrete-transition/process-noise formulation suitable for code implementation.
+- [x] Add loosely coupled GNSS position and velocity observation equations with configured antenna lever arm and explicit `H` matrix blocks.
 
 ## Pass 5b — Navigator API and implementation contract from the algorithm spec
 

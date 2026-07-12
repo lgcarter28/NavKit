@@ -1,0 +1,169 @@
+\chapter{State, Inputs, and Timing}
+
+\section{Nominal State}
+
+The nominal state is nonlinear:
+\begin{equation}
+\xb_n =
+\left(
+\pb_{eb}^{e},
+\vb_{eb}^{e},
+\quat_b^e,
+\bb_g,
+\bb_a
+\right),
+\end{equation}
+where $\bb_g$ and $\bb_a$ are the estimated gyro and accelerometer biases. The
+quaternion is not stored in the linear Kalman error state as four independent
+components, but rather is represented in the filter as a three-component
+small-angle perturbation about the nominal quaternion attitude state.
+
+\section{Error State}
+
+The first error-state vector is
+\begin{equation}
+\deltax =
+\begin{bmatrix}
+\delta\pb^{e}\\
+\delta\vb^{e}\\
+\delta\boldsymbol{\theta}\\
+\delta\bb_g\\
+\delta\bb_a
+\end{bmatrix}
+\in \R^{15}.
+\end{equation}
+
+The attitude error $\delta\boldsymbol{\theta}$ is a small-angle perturbation
+resolved in ECEF and defined by \cref{eq:v1_attitude_error_dcm_relation}. The
+same convention must be used by propagation, measurement Jacobians, injection,
+and reset.
+
+\section{Rotation-Vector Maps}
+
+The implementation will repeatedly map small rotation vectors into attitude
+updates. For a rotation vector $\boldsymbol\alpha\in\R^3$, define
+$\alpha=\norm{\boldsymbol\alpha}$ and, for $\alpha>0$,
+$\mathbf{u}=\boldsymbol\alpha/\alpha$. Rodrigues' formula gives the direction
+cosine matrix
+\begin{equation}
+C(\boldsymbol\alpha)
+=
+\I
++
+\frac{\sin\alpha}{\alpha}\crossmat{\boldsymbol\alpha}
++
+\frac{1-\cos\alpha}{\alpha^2}
+\crossmat{\boldsymbol\alpha}^2,
+\label{eq:v1_rodrigues_dcm}
+\end{equation}
+with the small-angle limit
+\begin{equation}
+C(\boldsymbol\alpha)
+\approx
+\I+\crossmat{\boldsymbol\alpha}.
+\end{equation}
+The corresponding scalar-first quaternion is
+\begin{equation}
+q(\boldsymbol\alpha)
+=
+\begin{bmatrix}
+\cos\left(\alpha/2\right)\\
+\mathbf{u}\sin\left(\alpha/2\right)
+\end{bmatrix},
+\label{eq:v1_rotation_vector_quaternion}
+\end{equation}
+with small-angle limit
+\begin{equation}
+q(\boldsymbol\alpha)
+\approx
+\begin{bmatrix}
+1\\
+\frac{1}{2}\boldsymbol\alpha
+\end{bmatrix}.
+\end{equation}
+The sign of $\boldsymbol\alpha$ must follow the same attitude-error convention
+as \cref{eq:v1_attitude_error_dcm_relation}; the maps above define the
+rotation-vector-to-attitude primitives used by mechanization, correction, and
+tests \cite{groves2013,sola2018}.
+
+\section{Continuous-Time IMU Model}
+
+Before discretization into increments, the basic v1 IMU measurement model is
+\begin{align}
+\tilde{\omegab}_{ib}^{b}
+&=
+\omegab_{ib}^{b}
++
+\bb_g
++
+\mathbf{w}_g,\\
+\tilde{\fb}_{ib}^{b}
+&=
+\fb_{ib}^{b}
++
+\bb_a
++
+\mathbf{w}_a,\\
+\dot{\bb}_g
+&=
+\mathbf{w}_{bg},\\
+\dot{\bb}_a
+&=
+\mathbf{w}_{ba}.
+\end{align}
+Scale factors, misalignment, $g$-sensitivity, and other higher-order IMU
+calibration terms are intentionally deferred, but this section is the expected
+home for those terms when the model grows.
+
+\section{IMU Input Contract}
+\label{sec:imu_input_contract}
+
+The first implementation consumes timestamped IMU increments with:
+\begin{align}
+\Delta\tilde{\boldsymbol\theta}_{ib}^{b} & && \text{measured body wrt inertial angle increment, resolved in body},\\
+\Delta\tilde{\mathbf{v}}_{ib}^{b} & && \text{measured specific-force velocity increment, resolved in body},\\
+t_k & && \text{sample time}.
+\end{align}
+
+The simulator may generate these increments by integrating ideal angular rate
+and specific force over the sample interval, but the mechanization contract is
+increment-based. Bias correction is applied before coning/sculling compensation:
+\begin{align}
+\Delta\hat{\boldsymbol\theta}_{ib}^{b}
+&=
+\Delta\tilde{\boldsymbol\theta}_{ib}^{b}
+-
+\hat{\bb}_g\Delta t,\\
+\Delta\hat{\mathbf{v}}_{ib}^{b}
+&=
+\Delta\tilde{\mathbf{v}}_{ib}^{b}
+-
+\hat{\bb}_a\Delta t.
+\end{align}
+The simple $\hat{\bb}\Delta t$ correction assumes the estimated bias is constant
+over the interval, or equivalently that $\hat{\bb}$ represents the interval
+average used by the discrete mechanization. Scale factors and misalignments are
+deferred from v1, but the interface should not make them impossible to add.
+
+\section{Timing Architecture}
+
+The Navigator API should support three time scales:
+\begin{itemize}
+    \item high-rate strapdown integration from IMU data, typically
+    \SIrange{600}{1000}{\hertz};
+    \item medium-rate covariance/state-transition propagation, typically
+    \SIrange{100}{200}{\hertz} or event/time driven;
+    \item low-rate asynchronous aiding updates, such as GNSS, barometer, or
+    future sensors.
+\end{itemize}
+
+The implementation should buffer enough timing information to align aiding
+measurements to the propagated state. The v1 implementation should include
+fixed-capacity high-rate IMU increment buffers and medium-rate nominal-state
+and STM history buffers. Those buffers are stored for validation, profiling, and
+future latency support; v1 does not yet extrapolate delayed aiding measurements
+to the current time. Delayed-measurement extrapolation is a v2 feature.
+
+The first version may keep the buffering simple, but ownership must be explicit:
+IMU samples feed the mechanization path, state-transition data feeds the
+filter-prediction/history path, and aiding measurements feed the update path.
