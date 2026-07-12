@@ -1,0 +1,62 @@
+\chapter{Runtime Configuration Contract}
+
+\section{Configuration Shape}
+
+The exact JSON names are implementation details, but the runtime config should
+make the emulator mode and every enabled error source explicit. A v1 shape is:
+\begin{verbatim}
+"imu": {
+  "type": "ideal" | "error_model",
+  "sample_rate_hz": 200.0,
+  "seed": 12345,
+  "gyro": {
+    "bias_radps": [0, 0, 0],
+    "bias_rw_psd_rad2ps3": [0, 0, 0],
+    "white_noise_psd_rad2ps": [0, 0, 0],
+    "scale_factor": [0, 0, 0],
+    "misalignment_rad": [0, 0, 0],
+    "nonorthogonality": [0, 0, 0],
+    "quantization_rad": [0, 0, 0]
+  },
+  "accel": {
+    "bias_mps2": [0, 0, 0],
+    "bias_rw_psd_m2ps5": [0, 0, 0],
+    "white_noise_psd_m2ps3": [0, 0, 0],
+    "scale_factor": [0, 0, 0],
+    "misalignment_rad": [0, 0, 0],
+    "nonorthogonality": [0, 0, 0],
+    "quantization_mps": [0, 0, 0]
+  }
+}
+\end{verbatim}
+
+\section{Validation Rules}
+
+Runtime validation must reject:
+\begin{itemize}
+    \item nonpositive sample rates;
+    \item missing gyro or accelerometer sections when \texttt{type} is
+    \texttt{error\_model};
+    \item vectors with dimension other than three;
+    \item negative spectral densities;
+    \item negative quantization steps;
+    \item unsupported emulator types.
+\end{itemize}
+
+The ideal mode is equivalent to
+\begin{equation}
+\Kmat_g=\Kmat_a=\I,
+\qquad
+\bb_g=\bb_a=\zero,
+\qquad
+S_g=S_a=S_{bg}=S_{ba}=\zero,
+\end{equation}
+with quantization disabled.
+
+\section{Compile-Time and Runtime Ownership}
+
+The selected app compile-time config determines whether an IMU emulator exists
+and which NavKit sensor or Navigator input stream it feeds. Runtime JSON
+selects numerical error parameters and seeds for that configured emulator. A
+runtime \texttt{imu} section must not be silently ignored when the compiled app
+does not provide an IMU emulator.

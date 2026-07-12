@@ -1,0 +1,171 @@
+\chapter{Continuous Truth Inputs}
+
+\section{Body-Collocated IMU Truth From ECEF Trajectory}
+
+For a body-collocated IMU, the ideal continuous IMU signals are the body-frame
+truth angular rate and specific force:
+\begin{align}
+\yb_g(t) &= \omegab_{ib}^{b}(t),\\
+\yb_a(t) &= \fb_{ib}^{b}(t).
+\end{align}
+
+The trajectory provider supplies ECEF position, velocity, and attitude truth.
+The emulator derives the inertial IMU signals from consecutive trajectory
+states. For the gyro,
+\begin{equation}
+\omegab_{ib}^{b}
+=
+C_e^b\omegab_{ie}^{e}
+\;+\;
+\omegab_{eb}^{b}.
+\label{eq:imu_stationary_earth_rate_truth}
+\end{equation}
+The first term is Earth rotation resolved in body, and the second term is the
+body rotation with respect to ECEF resolved in body. For a body fixed in ECEF,
+$\omegab_{eb}^{b}=\zero$, so
+$\omegab_{ib}^{b}=C_e^b\omegab_{ie}^{e}$. This is why stationary ECEF truth
+still produces a nonzero gyro measurement.
+
+\section{Discrete Gyro Truth From Successive Attitudes}
+
+Given two consecutive ECEF-to-body attitudes, define the body-with-respect-to
+ECEF relative attitude over the interval as
+\begin{equation}
+C_{b_k}^{b_{k+1}}
+=
+C_{e,k+1}^{b}C_{b,k}^{e},
+\qquad
+C_{b,k}^{e}=(C_{e,k}^{b})^T.
+\label{eq:imu_body_relative_attitude}
+\end{equation}
+Let $\operatorname{Log}(\cdot)$ map a small relative attitude to its rotation
+vector using the same sign convention tested by the Navigator attitude
+utilities. The v1 first-order interval gyro truth is
+\begin{equation}
+\boxed{
+\Delta\boldsymbol{\theta}_{ib,k}^{b}
+\approx
+\operatorname{Log}
+\left(
+C_{b_k}^{b_{k+1}}
+\right)
+\;+\;
+\bar{C}_{e,k}^{b}\omegab_{ie}^{e}\Delta t_k.
+}
+\label{eq:imu_delta_theta_from_ecef_truth}
+\end{equation}
+Here $\bar{C}_{e,k}^{b}$ is the interval attitude used to resolve Earth
+rotation into body. The v1 implementation may use the midpoint attitude or a
+documented normalized interpolation between $C_{e,k}^{b}$ and
+$C_{e,k+1}^{b}$. The corresponding interval-average gyro truth is
+\begin{equation}
+\bar{\omegab}_{ib,k}^{b}
+=
+\frac{1}{\Delta t_k}
+\Delta\boldsymbol{\theta}_{ib,k}^{b}.
+\label{eq:imu_average_gyro_from_delta_theta}
+\end{equation}
+
+\section{Specific Force From ECEF Truth}
+
+The accelerometer does not measure coordinate acceleration directly. It measures
+specific force. In ECEF coordinates,
+\begin{equation}
+\dot{\mathbf{v}}_{eb}^{e}
+=
+C_b^e\fb_{ib}^{b}
+\;+\;
+\mathbf{g}^{e}(\mathbf{p}_{eb}^{e})
+-
+2\omegab_{ie}^{e}\times\mathbf{v}_{eb}^{e}.
+\end{equation}
+Solving for the ideal body-frame specific force gives
+\begin{equation}
+\boxed{
+\fb_{ib}^{b}
+=
+C_e^b
+\left(
+\dot{\mathbf{v}}_{eb}^{e}
+\;+\;
+2\omegab_{ie}^{e}\times\mathbf{v}_{eb}^{e}
+-
+\mathbf{g}^{e}(\mathbf{p}_{eb}^{e})
+\right).
+}
+\label{eq:imu_truth_specific_force_from_ecef}
+\end{equation}
+
+For endpoint trajectory truth, use the v1 interval approximations
+\begin{align}
+\bar{\mathbf{a}}_{eb,k}^{e}
+&=
+\frac{\mathbf{v}_{eb,k+1}^{e}-\mathbf{v}_{eb,k}^{e}}{\Delta t_k},
+&
+\bar{\mathbf{v}}_{eb,k}^{e}
+&=
+\frac{1}{2}
+\left(
+\mathbf{v}_{eb,k}^{e}
++\mathbf{v}_{eb,k+1}^{e}
+\right),\\
+\bar{\mathbf{p}}_{eb,k}^{e}
+&=
+\frac{1}{2}
+\left(
+\mathbf{p}_{eb,k}^{e}
++\mathbf{p}_{eb,k+1}^{e}
+\right),
+&
+\bar{\mathbf{g}}_{k}^{e}
+&=
+\mathbf{g}^{e}(\bar{\mathbf{p}}_{eb,k}^{e}).
+\end{align}
+Then the interval-average specific force is
+\begin{equation}
+\boxed{
+\bar{\fb}_{ib,k}^{b}
+\approx
+\bar{C}_{e,k}^{b}
+\left(
+\bar{\mathbf{a}}_{eb,k}^{e}
+\;+\;
+2\omegab_{ie}^{e}\times\bar{\mathbf{v}}_{eb,k}^{e}
+-
+\bar{\mathbf{g}}_{k}^{e}
+\right).
+}
+\label{eq:imu_average_specific_force_from_ecef_truth}
+\end{equation}
+
+For a stationary body fixed in ECEF, $\mathbf{v}_{eb}^{e}=\zero$ and
+$\dot{\mathbf{v}}_{eb}^{e}=\zero$, so
+\begin{equation}
+\fb_{ib}^{b}
+=
+-C_e^b\mathbf{g}^{e}(\mathbf{p}_{eb}^{e}).
+\label{eq:imu_stationary_specific_force}
+\end{equation}
+This sign is a required stationary-truth test.
+
+\section{Interval-Average Truth Inputs}
+
+The raw triad error model consumes interval-average ideal inputs:
+\begin{align}
+\bar{\omegab}_{ib,k}^{b}
+&=
+\frac{1}{\Delta t_k}
+\int_{t_k}^{t_{k+1}}
+\omegab_{ib}^{b}(t)\,dt,\\
+\bar{\fb}_{ib,k}^{b}
+&=
+\frac{1}{\Delta t_k}
+\int_{t_k}^{t_{k+1}}
+\fb_{ib}^{b}(t)\,dt.
+\end{align}
+
+For v1, these averages are derived from consecutive ECEF trajectory samples
+using \cref{eq:imu_delta_theta_from_ecef_truth,eq:imu_average_specific_force_from_ecef_truth}.
+Hidden interpolation is not allowed; if the implementation changes the
+midpoint/trapezoidal choices above, it must update this document and the
+equation-tied tests.

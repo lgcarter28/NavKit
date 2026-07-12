@@ -1,0 +1,81 @@
+\chapter{Frames, Units, and Notation}
+
+\section{Frames}
+
+The emulator uses the same first-pass frame convention as
+\texttt{navigator\_ecef\_v1}:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Symbol & Frame & Meaning \\
+\midrule
+$i$ & inertial & non-rotating inertial reference frame \\
+$e$ & ECEF/PCPF & Earth-fixed frame rotating with Earth \\
+$b$ & body/IMU & body frame collocated with the IMU and navigation state \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The v1 IMU emulator produces body-frame increments. It does not apply a lever
+arm correction because the IMU point and body/navigation state point are the
+same point by scope.
+
+\section{Trajectory Truth Contract}
+
+The v1 trajectory provider emits timestamped ECEF truth states:
+\begin{align}
+t_k, \qquad
+\mathbf{p}_{eb,k}^{e}, \qquad
+\mathbf{v}_{eb,k}^{e}, \qquad
+C_{e,k}^{b}.
+\label{eq:imu_trajectory_truth_contract}
+\end{align}
+Here $C_{e,k}^{b}$ maps ECEF-resolved vectors into the body frame at sample
+$k$. If an implementation stores the inverse attitude, it must invert it before
+using the equations in this document. The trajectory provider should not emit
+$\omegab_{ib}^{b}$, $\fb_{ib}^{b}$, or IMU increments as primary truth fields.
+Those are emulator outputs derived from the ECEF truth states.
+
+\section{Signals and Code-Facing Names}
+
+Truth inputs:
+\begin{align}
+\omegab_{ib}^{b} &\in \R^3
+&& \text{angular rate of body wrt inertial, resolved in body},\\
+\fb_{ib}^{b} &\in \R^3
+&& \text{specific force of body wrt inertial, resolved in body}.
+\end{align}
+
+Raw interval outputs:
+\begin{align}
+\Delta\tilde{\boldsymbol{\theta}}_{ib,k}^{b}
+&\leftrightarrow
+\texttt{delta\_theta\_ib\_b\_rad},\\
+\Delta\tilde{\mathbf{v}}_{ib,k}^{b}
+&\leftrightarrow
+\texttt{delta\_v\_ib\_b\_mps}.
+\end{align}
+
+The output sample timestamp is the interval end time $t_{k+1}$ unless a runtime
+format explicitly states otherwise. The interval duration is
+\begin{equation}
+\Delta t_k=t_{k+1}-t_k.
+\end{equation}
+
+\section{Truth, Raw, and Calibrated Quantities}
+
+Unadorned symbols are true physical inputs. A tilde denotes raw measured IMU
+outputs. A hat denotes calibrated or estimated quantities used downstream:
+\begin{align}
+\omegab_{ib}^{b} &&& \text{true angular rate},&
+\tilde{\omegab}_{ib}^{b} &&& \text{raw gyro rate},&
+\hat{\omegab}_{ib}^{b} &&& \text{calibrated gyro rate},\\
+\fb_{ib}^{b} &&& \text{true specific force},&
+\tilde{\fb}_{ib}^{b} &&& \text{raw accelerometer specific force},&
+\hat{\fb}_{ib}^{b} &&& \text{calibrated accelerometer specific force}.
+\end{align}
+
+The emulator produces raw increments. The Navigator may apply inverse
+calibration and estimated-bias correction before coning/sculling and
+mechanization.

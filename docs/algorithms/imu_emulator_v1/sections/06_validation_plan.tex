@@ -1,0 +1,48 @@
+\chapter{Validation Plan}
+
+\section{Equation-Coverage Tests}
+
+Required focused tests:
+\begin{itemize}
+    \item ideal emulator output follows
+    \cref{eq:imu_raw_increment_generation} with $\Kmat=\I$, zero bias, and zero
+    noise;
+    \item stationary ECEF gyro truth follows
+    \cref{eq:imu_stationary_earth_rate_truth};
+    \item stationary specific force follows
+    \cref{eq:imu_stationary_specific_force};
+    \item scale-factor response follows
+    \cref{eq:imu_scale_factor_matrix};
+    \item non-orthogonality cross-axis response follows
+    \cref{eq:imu_nonorthogonality_matrix};
+    \item misalignment cross-axis response follows
+    \cref{eq:imu_misalignment_matrix};
+    \item bias random-walk sample covariance trends with
+    \cref{eq:imu_bias_random_walk_discrete};
+    \item white increment-noise covariance trends with
+    \cref{eq:imu_increment_white_noise_covariance};
+    \item quantized increments follow
+    \cref{eq:imu_increment_quantization}.
+\end{itemize}
+
+\section{Runtime Validation Tests}
+
+Runtime config validation should cover:
+\begin{itemize}
+    \item ideal mode with minimal fields;
+    \item full error-model mode with deterministic seed;
+    \item missing required gyro/accelerometer section;
+    \item vector dimension mismatch;
+    \item negative spectral density;
+    \item negative quantization;
+    \item unsupported \texttt{type}.
+\end{itemize}
+
+\section{Integration Gate}
+
+\begin{implbox}
+Do not start the full strapdown aided Navigator implementation until the IMU
+emulator can generate deterministic ideal stationary ECEF increments and
+focused unit tests cover the triad error model, random draws, increment units,
+and timestamp convention.
+\end{implbox}

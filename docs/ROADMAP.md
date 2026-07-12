@@ -532,11 +532,23 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Replace the Van Loan implementation direction with an analytical discrete-transition/process-noise formulation suitable for code implementation.
 - [x] Add loosely coupled GNSS position and velocity observation equations with configured antenna lever arm and explicit `H` matrix blocks.
 
-## Pass 5b — IMU increment contract and emulator model
+## Pass 5b — IMU emulator/error-model algorithm document
 
-- [ ] Create a standalone LaTeX IMU emulator/error-model algorithm document, similar in structure to `docs/algorithms/navigator_ecef_v1/`, before implementing the emulator. Use `docs/navigation_reference` section 2.2 as source material, but clean up the notation and make the document a code-ready implementation reference: define frames, units, continuous truth inputs, raw triad outputs, increment generation, calibration/error-model ordering, noise/random-walk semantics, runtime configuration fields, and required tests. Include all equations needed for software implementation; defer full appendix-style derivations until later.
+- [x] Create a standalone LaTeX IMU emulator/error-model algorithm document under `docs/algorithms/`, similar in structure to `docs/algorithms/navigator_ecef_v1/`.
+- [x] Use `docs/navigation_reference` section 2.2 as source material, but clean up the notation into a narrow code-ready implementation reference rather than copying the broader reference notation.
+- [x] Define the v1 scope explicitly: one body-collocated IMU, body-frame truth inputs, no IMU lever arm, no multiple IMUs, and no online calibration-state estimation.
+- [x] Define frames, units, truth inputs, raw triad outputs, calibrated quantities, and increment output fields with code-facing names.
+- [x] Lay out the full forward triad error model for gyro and accelerometer independently: bias, optional bias random walk, diagonal scale factor, installation/mounting misalignment, internal non-orthogonality, white measurement noise, and optional quantization.
+- [x] Specify the calibration/error-model ordering explicitly, including the inverse calibration form used by downstream navigator correction paths.
+- [x] Include discrete-time algorithm requirements for software implementation: interval averaging, bias random-walk update, white-noise discretization, raw rate/specific-force generation, increment integration, optional quantization, timestamp convention, and deterministic seeded random draws.
+- [x] Define runtime configuration fields and validation expectations for ideal and non-ideal IMU emulator modes.
+- [x] Define required tests tied to equations: ideal output, constant bias, scale-factor response, cross-axis response from misalignment/non-orthogonality, seeded noise reproducibility, bias random walk statistics, quantization behavior, increment units, and sample timing.
+- [x] Include all equations needed for software implementation; defer full appendix-style line-by-line derivations until later.
+
+## Pass 5c — IMU increment contract and emulator implementation
+
 - [ ] Define the product-core IMU increment sample type consumed by `navigator_ecef_v1`, including timestamp, sample interval, incremental angle `delta_theta_ib_b_rad`, incremental velocity `delta_v_ib_b_mps`, and explicit pre/post-correction semantics.
-- [ ] Update truth generation enough to support ideal stationary ECEF IMU truth: nonzero Earth-rate gyro truth, physically meaningful specific force, and clear acceleration-versus-specific-force fields.
+- [ ] Update truth generation enough to support ideal stationary ECEF IMU truth: trajectory providers should emit ECEF truth states only (`t`, `p_eb_e`, `v_eb_e`, and ECEF-to-body attitude), while the IMU emulator derives body-frame inertial angular increments and specific-force increments from successive truth samples with explicit Earth-rotation compensation.
 - [ ] Implement an ideal IMU emulator first: deterministic timestamped increments from truth with no bias, noise, scale factor, misalignment, non-orthogonality, or quantization.
 - [ ] Define an IMU triad error-model vocabulary for gyro and accelerometer independently. The model should preserve the substance of `docs/navigation_reference` section 2.2 without inheriting its notation:
   - [ ] bias and optional bias random walk;
@@ -550,12 +562,12 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [ ] Add focused emulator tests before navigator integration: ideal output, constant bias, scale-factor response, cross-axis response from misalignment/non-orthogonality, deterministic seeded noise, increment units, and sample timing.
 - [ ] Keep IMU lever arms, multiple IMUs, online scale-factor/misalignment estimation, and latency/replay handling out of v1 unless a later pass deliberately expands scope.
 
-## Pass 5c — Strapdown aided navigator implementation
+## Pass 5d — Strapdown aided navigator implementation
 
 - [x] Add the initial Navigator API seam from the completed `navigator_ecef_v1` algorithm document: `Navigator::update()` is the normal orchestration call, and the explicit stage methods are `process_strapdown_integration()`, `process_covariance()`, and `process_measurements()`.
 - [x] Split the propagation policy boundary into explicit strapdown-integration and covariance-prediction hooks while keeping `NoOpPropagation` behavior-preserving for current GNSS-only products.
 - [x] Move the selected simulation app loop to `Navigator::update()` so executable orchestration no longer couples itself to the temporary measurements-only path.
-- [ ] Implement the first real INS path from the `navigator_ecef_v1` equation-to-code map, using the Pass 5b IMU emulator as the primary data source:
+- [ ] Implement the first real INS path from the `navigator_ecef_v1` equation-to-code map, using the Pass 5c IMU emulator as the primary data source:
   - [ ] Mechanization primitives: rotation-vector/quaternion conversion, quaternion propagation sign tests, two-sample coning/sculling, ECEF PVA nominal propagation, and gravity/gravity-gradient policy calls.
   - [ ] Covariance prediction primitives: build `F_k`, build `G_k`, first-order `Phi_k`, first-order `Q_d`, covariance prediction, symmetry checks, and equation-block sanity tests.
   - [ ] Navigator integration: typed IMU and aiding ingestion hooks, fixed-capacity internal buffers, `update()` orchestration, and explicit stage-method tests.
@@ -719,6 +731,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [ ] Add embedded toolchain profiles and a hardware abstraction boundary when a target is selected.
 - [ ] Add target-specific hot-path evidence: inspect optimized assembly for no-op profiler elision, compare active-vs-no-op profiling cycle counts, and run hardware/compiler-specific microbenchmarks once target clocks and toolchains exist.
 - [ ] Extend allocation/resource checks to sensor queues, estimator update operations, and propagation/mechanization once those hot paths exist.
+- [ ] Extend IMU error models beyond the v1 bias-random-walk/white-noise emulator with first-order Gauss-Markov dynamics for biases and other calibration/error states once the ideal and random-walk IMU paths are validated.
 - [ ] Add runtime and memory budgets to CI or target qualification tests.
 
 ## Documentation

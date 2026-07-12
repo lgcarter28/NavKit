@@ -1,0 +1,130 @@
+\chapter{Discrete-Time Increment Algorithm}
+
+\section{Output Sample}
+
+The emulator output for interval $[t_k,t_{k+1}]$ is:
+\begin{align}
+t_{k+1} & && \text{sample timestamp},\\
+\Delta t_k & && \text{sample interval},\\
+\Delta\tilde{\boldsymbol{\theta}}_{ib,k}^{b}
+& && \text{raw gyro angle increment},\\
+\Delta\tilde{\mathbf{v}}_{ib,k}^{b}
+& && \text{raw accelerometer velocity increment}.
+\end{align}
+
+\section{Truth Differencing and Interval Averaging}
+
+For v1, the emulator derives ideal interval quantities from consecutive ECEF
+trajectory samples. Gyro truth uses the attitude-delta/Earth-rotation equation
+in \cref{eq:imu_delta_theta_from_ecef_truth}. Specific-force truth uses the
+trapezoidal/midpoint interval approximation in
+\cref{eq:imu_average_specific_force_from_ecef_truth}. These choices are part of
+the software contract and must be covered by deterministic tests.
+
+\section{Rate-to-Increment Conversion}
+
+Given interval-average truth inputs, independently update gyro and accelerometer
+bias states using \cref{eq:imu_bias_random_walk_discrete}. Then generate raw
+interval-average triad outputs:
+\begin{align}
+\tilde{\omegab}_{ib,k}^{b}
+&=
+\Kmat_g\bar{\omegab}_{ib,k}^{b}
+\;+\;
+\bb_{g,k}
+\;+\;
+\nb_{g,k},\\
+\tilde{\fb}_{ib,k}^{b}
+&=
+\Kmat_a\bar{\fb}_{ib,k}^{b}
+\;+\;
+\bb_{a,k}
+\;+\;
+\nb_{a,k}.
+\end{align}
+The raw increments are
+\begin{equation}
+\boxed{
+\Delta\tilde{\boldsymbol{\theta}}_{ib,k}^{b}
+=
+\tilde{\omegab}_{ib,k}^{b}\Delta t_k,
+\qquad
+\Delta\tilde{\mathbf{v}}_{ib,k}^{b}
+=
+\tilde{\fb}_{ib,k}^{b}\Delta t_k.
+}
+\label{eq:imu_raw_increment_generation}
+\end{equation}
+
+\section{Optional Quantization}
+
+If increment quantization is enabled, apply it after raw increment generation:
+\begin{equation}
+\boxed{
+\mathcal{Q}_{\mathbf{q}}(\mathbf{z})
+=
+\mathbf{q}\odot
+\round\left(
+\mathbf{z}\oslash\mathbf{q}
+\right),
+}
+\label{eq:imu_increment_quantization}
+\end{equation}
+where $\odot$ and $\oslash$ are elementwise multiply and divide. Then
+\begin{align}
+\Delta\tilde{\boldsymbol{\theta}}_{ib,k}^{b}
+&\leftarrow
+\mathcal{Q}_{\mathbf{q}_{\theta}}
+\left(
+\Delta\tilde{\boldsymbol{\theta}}_{ib,k}^{b}
+\right),\\
+\Delta\tilde{\mathbf{v}}_{ib,k}^{b}
+&\leftarrow
+\mathcal{Q}_{\mathbf{q}_{v}}
+\left(
+\Delta\tilde{\mathbf{v}}_{ib,k}^{b}
+\right).
+\end{align}
+
+\section{Deterministic Random Draws}
+
+For reproducibility, the emulator owns deterministic random streams. A valid
+implementation must make these draws repeatable for a fixed seed, runtime
+config, and truth input sequence:
+\begin{align}
+\etab_{bg,k} &\sim \mathcal{N}(\zero,S_{bg}\Delta t_k),&
+\etab_{ba,k} &\sim \mathcal{N}(\zero,S_{ba}\Delta t_k),\\
+\nb_{g,k} &\sim \mathcal{N}\left(\zero,S_g/\Delta t_k\right),&
+\nb_{a,k} &\sim \mathcal{N}\left(\zero,S_a/\Delta t_k\right).
+\end{align}
+
+\begin{implbox}
+For v1, generate increments from interval-average rates and specific forces.
+Coning and sculling compensation belong to the Navigator mechanization path,
+not inside the IMU emulator. The emulator is responsible for producing the raw
+increment stream that a real IMU would provide.
+\end{implbox}
+
+\section{Algorithm Summary}
+
+For each interval $k$:
+\begin{enumerate}
+    \item Read consecutive ECEF truth samples
+    $(t_k,\mathbf{p}_{eb,k}^{e},\mathbf{v}_{eb,k}^{e},C_{e,k}^{b})$ and
+    $(t_{k+1},\mathbf{p}_{eb,k+1}^{e},\mathbf{v}_{eb,k+1}^{e},C_{e,k+1}^{b})$.
+    \item Compute $\Delta t_k$, derive
+    $\bar{\omegab}_{ib,k}^{b}$ from
+    \cref{eq:imu_delta_theta_from_ecef_truth}, and derive
+    $\bar{\fb}_{ib,k}^{b}$ from
+    \cref{eq:imu_average_specific_force_from_ecef_truth}.
+    \item Propagate gyro and accelerometer biases with
+    \cref{eq:imu_bias_random_walk_discrete}, if enabled.
+    \item Draw interval-average white measurement noise from
+    \cref{eq:imu_interval_average_white_noise}, if enabled.
+    \item Apply the forward triad model in \cref{eq:imu_forward_triad_model}.
+    \item Convert interval-average raw outputs to increments with
+    \cref{eq:imu_raw_increment_generation}.
+    \item Apply optional quantization with
+    \cref{eq:imu_increment_quantization}.
+    \item Emit a timestamped IMU increment sample at $t_{k+1}$.
+\end{enumerate}

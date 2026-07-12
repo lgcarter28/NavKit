@@ -1,0 +1,57 @@
+\chapter{Purpose and Scope}
+
+\section{Purpose}
+
+This document defines the first NavKit IMU emulator contract. It is a
+code-ready specification for turning truth angular-rate and specific-force
+signals into timestamped IMU increments consumed by
+\texttt{navigator\_ecef\_v1}. It extracts the useful triad error-model content
+from the broader navigation reference while using cleaner implementation-facing
+notation \cite{groves2013,titterton2004,grewal2020}.
+
+\begin{scopebox}
+The goal is not to prove every equation from first principles. The goal is to
+state every equation and convention needed to implement, configure, and test
+the IMU emulator without inventing math in C++.
+\end{scopebox}
+
+\section{V1 Scope}
+
+Version 1 assumes:
+\begin{itemize}
+    \item one IMU;
+    \item IMU frame collocated with the body frame and navigation state point;
+    \item truth angular rate and specific force already resolved in body;
+    \item no IMU lever arm;
+    \item no multiple-IMU voting or fusion;
+    \item no online estimation of scale-factor, misalignment, or
+    non-orthogonality states;
+    \item deterministic seeded random draws for repeatable simulation.
+\end{itemize}
+
+The emulator may still model fixed calibration errors, time-varying biases,
+white measurement noise, and quantization because those are needed to exercise
+the downstream Navigator realistically.
+
+\begin{implbox}
+Trajectory providers supply ECEF truth states only. They do not supply IMU truth
+directly. The IMU emulator derives ideal inertial IMU increments from successive
+ECEF truth states, including the Earth-rotation correction needed to convert
+body-with-respect-to-ECEF attitude changes into body-with-respect-to-inertial
+gyro increments.
+\end{implbox}
+
+\section{Deferred Generalizations}
+
+The following are explicitly deferred:
+\begin{itemize}
+    \item IMU lever-arm correction;
+    \item multiple IMUs;
+    \item temperature-dependent error models;
+    \item vibration/colored-noise models beyond simple bias random walk;
+    \item online calibration-state estimation;
+    \item sensor-frame mounting distinct from the body frame in the
+    mechanization itself.
+\end{itemize}
+
+Those features can be added after the single body-collocated IMU path is tested.

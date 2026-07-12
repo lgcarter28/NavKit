@@ -1,0 +1,167 @@
+\chapter{Triad Error Model}
+
+\section{Forward Calibration and Error Model}
+
+For either gyro or accelerometer, let $\xb$ be the true interval-average
+physical input entering the triad:
+\begin{equation}
+\xb_g=\bar{\omegab}_{ib,k}^{b},
+\qquad
+\xb_a=\bar{\fb}_{ib,k}^{b}.
+\end{equation}
+
+The v1 forward triad model is
+\begin{equation}
+\boxed{
+\tilde{\yb}
+=
+\Kmat\mathbf{x}
+\;+\;
+\bb
+\;+\;
+\nb,
+\qquad
+\Kmat
+=
+(\I+\Smat)\Nmat\Mmat.
+}
+\label{eq:imu_forward_triad_model}
+\end{equation}
+The gyro and accelerometer use independent parameter sets:
+\begin{align}
+\tilde{\omegab}_{ib}^{b}
+&=
+\Kmat_g\bar{\omegab}_{ib}^{b}
+\;+\;
+\bb_g
+\;+\;
+\nb_g,\\
+\tilde{\fb}_{ib}^{b}
+&=
+\Kmat_a\bar{\fb}_{ib}^{b}
+\;+\;
+\bb_a
+\;+\;
+\nb_a.
+\end{align}
+
+The diagonal scale-factor matrix is shown explicitly:
+\begin{equation}
+\Smat
+=
+\begin{bmatrix}
+s_x & 0 & 0\\
+0 & s_y & 0\\
+0 & 0 & s_z
+\end{bmatrix}.
+\label{eq:imu_scale_factor_matrix}
+\end{equation}
+A positive $s_x$ makes the x-axis raw output too large for a positive x-axis
+truth input.
+
+The v1 first-order internal non-orthogonality matrix is lower triangular:
+\begin{equation}
+\Nmat
+=
+\begin{bmatrix}
+1 & 0 & 0\\
+n_{yx} & 1 & 0\\
+n_{zx} & n_{zy} & 1
+\end{bmatrix}.
+\label{eq:imu_nonorthogonality_matrix}
+\end{equation}
+This convention means an x-axis truth input can leak into the y and z raw
+outputs through $n_{yx}$ and $n_{zx}$.
+
+For small mounting misalignment vector
+$\boldsymbol{\alpha}=[\alpha_x,\alpha_y,\alpha_z]^T$, use
+\begin{equation}
+\Mmat
+\approx
+\I-\crossmat{\boldsymbol{\alpha}}
+=
+\begin{bmatrix}
+1 & \alpha_z & -\alpha_y\\
+-\alpha_z & 1 & \alpha_x\\
+\alpha_y & -\alpha_x & 1
+\end{bmatrix}.
+\label{eq:imu_misalignment_matrix}
+\end{equation}
+This sign convention is part of the emulator contract and must be tested with
+single-axis cross-coupling cases.
+
+\section{Bias and Bias Random Walk}
+
+Bias is modeled in physical rate units:
+\begin{align}
+\bb_g &\in \R^3 && [\si{\radian\per\second}],\\
+\bb_a &\in \R^3 && [\si{\meter\per\second\squared}].
+\end{align}
+
+If enabled, bias random walk follows
+\begin{equation}
+\dot{\bb}=\wb_b,
+\qquad
+\E[\wb_b(t)\wb_b^T(\tau)]=S_b\delta(t-\tau).
+\label{eq:imu_bias_random_walk_continuous}
+\end{equation}
+The discrete update over $\Delta t_k$ is
+\begin{equation}
+\boxed{
+\bb_{k+1}
+=
+\bb_k
++
+\etab_{b,k},
+\qquad
+\etab_{b,k}\sim
+\mathcal{N}(\zero,S_b\Delta t_k).
+}
+\label{eq:imu_bias_random_walk_discrete}
+\end{equation}
+
+\section{White Measurement Noise}
+
+White measurement noise is represented by spectral density $S_y$ in physical
+rate units. For an interval-average raw signal,
+\begin{equation}
+\nb_k\sim
+\mathcal{N}
+\left(
+\zero,
+\frac{S_y}{\Delta t_k}
+\right).
+\label{eq:imu_interval_average_white_noise}
+\end{equation}
+Equivalently, the integrated increment noise covariance is
+\begin{equation}
+\boxed{
+\Cov(\nb_k\Delta t_k)=S_y\Delta t_k.
+}
+\label{eq:imu_increment_white_noise_covariance}
+\end{equation}
+For the gyro, $S_y=S_g$ with increment covariance in
+$\si{\radian^2}$. For the accelerometer, $S_y=S_a$ with increment covariance in
+$\si{\meter^2\per\second^2}$.
+
+\section{Inverse Calibration}
+
+If downstream code needs to recover a calibrated physical input from raw
+measurements, the inverse calibration is
+\begin{equation}
+\boxed{
+\hat{\xb}
+=
+\Kmat^{-1}
+\left(
+\tilde{\yb}-\hat{\bb}
+\right),
+\qquad
+\Kmat^{-1}
+=
+\Mmat^{-1}\Nmat^{-1}(\I+\Smat)^{-1}.
+}
+\label{eq:imu_inverse_calibration}
+\end{equation}
+The emulator outputs raw increments; this inverse form is documented so the
+Navigator correction path uses the same ordering as the forward emulator.
