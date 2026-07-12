@@ -17,9 +17,7 @@ std::vector<TruthSample> TrajectoryGenerator::stationary(const StationaryTraject
         s.time = static_cast<Time_t>(k) * cfg.dt_s;
         s.p_e = cfg.p_e;
         s.v_e.setZero();
-        s.a_e.setZero();
         s.q_eb.setIdentity();
-        s.w_ib_b.setZero();
         samples.push_back(s);
     }
 

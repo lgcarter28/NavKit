@@ -29,7 +29,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - Debug and Release build flags are now treated as explicit engineering products for NavKit-owned targets. CI enables warnings-as-errors, Release uses an embedded-oriented optimization profile, Linux Debug CI runs clang-tidy against the compilation database, and local agentic workflows intentionally do not run clang-tidy unless diagnosing that CI lane. Target-specific embedded toolchain flags remain future work until a target profile is selected.
 - `GnssPosModel`, `GnssVelModel`, and `BaroAltModel` exist, but only GNSS position is integrated into the current simulation. The barometer model currently selects the third position component; it is not yet a general ECEF-to-local-vertical altitude model.
 - The current trajectory generator supports only a simplistic stationary ECEF trajectory. It sets body rate to zero and therefore does not model Earth rotation correctly for stationary IMU truth.
-- `ImuSimulator` and `BaroSimulator` are empty shells, and the IMU process model is a placeholder.
+- `ImuSimulator` can generate deterministic raw IMU increments from consecutive ECEF truth samples, including Earth-rate gyro truth, specific force, bias, bias random walk, white noise, scale factor, misalignment, non-orthogonality, and quantization. It is not yet wired into the selected simulation app loop or Navigator ingestion path. `BaroSimulator` remains an empty shell, and the IMU process model is still a placeholder.
 - Analysis already provides position error/covariance, innovation, NIS, p-value, mean p-value, and innovation histogram plots. More formal statistics and consistency tests remain future work.
 - Desktop timing and coarse binary-size artifacts now exist for the stationary simulation/analysis workflow and CI artifact upload. Product-core embedded profiling vocabulary now exists under `include/navkit/core/profiling`, and the first coarse `Navigator` and `KalmanFilter` integration points are instrumented. Profile export/visualization and memory/resource budgets remain future work.
 - The documented and configured language standard is C++23.
@@ -547,20 +547,21 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Pass 5c — IMU increment contract and emulator implementation
 
-- [ ] Define the product-core IMU increment sample type consumed by `navigator_ecef_v1`, including timestamp, sample interval, incremental angle `delta_theta_ib_b_rad`, incremental velocity `delta_v_ib_b_mps`, and explicit pre/post-correction semantics.
-- [ ] Update truth generation enough to support ideal stationary ECEF IMU truth: trajectory providers should emit ECEF truth states only (`t`, `p_eb_e`, `v_eb_e`, and ECEF-to-body attitude), while the IMU emulator derives body-frame inertial angular increments and specific-force increments from successive truth samples with explicit Earth-rotation compensation.
-- [ ] Implement an ideal IMU emulator first: deterministic timestamped increments from truth with no bias, noise, scale factor, misalignment, non-orthogonality, or quantization.
-- [ ] Define an IMU triad error-model vocabulary for gyro and accelerometer independently. The model should preserve the substance of `docs/navigation_reference` section 2.2 without inheriting its notation:
-  - [ ] bias and optional bias random walk;
-  - [ ] diagonal scale factor;
-  - [ ] installation/mounting misalignment;
-  - [ ] internal non-orthogonality;
-  - [ ] white measurement noise;
-  - [ ] quantization/noise increment behavior when needed.
-- [ ] Document and test the calibration ordering explicitly, using clear code-facing names. A suitable first-order forward model is `raw = (I + scale) * nonorthogonality * misalignment * truth + bias + noise`, with separate gyro and accelerometer parameter sets.
-- [ ] Add deterministic runtime configuration for IMU emulator parameters and random seeds, validated against the selected app config.
-- [ ] Add focused emulator tests before navigator integration: ideal output, constant bias, scale-factor response, cross-axis response from misalignment/non-orthogonality, deterministic seeded noise, increment units, and sample timing.
-- [ ] Keep IMU lever arms, multiple IMUs, online scale-factor/misalignment estimation, and latency/replay handling out of v1 unless a later pass deliberately expands scope.
+- [x] Define the product-core IMU increment sample type consumed by `navigator_ecef_v1`, including timestamp, sample interval, incremental angle `delta_theta_ib_b_rad`, incremental velocity `delta_v_ib_b_mps`, and explicit pre/post-correction semantics.
+- [x] Update truth generation enough to support ideal stationary ECEF IMU truth: trajectory providers should emit ECEF truth states only (`t`, `p_eb_e`, `v_eb_e`, and ECEF-to-body attitude), while the IMU emulator derives body-frame inertial angular increments and specific-force increments from successive truth samples with explicit Earth-rotation compensation.
+- [x] Implement an ideal IMU emulator first: deterministic timestamped increments from truth with no bias, noise, scale factor, misalignment, non-orthogonality, or quantization.
+- [x] Define an IMU triad error-model vocabulary for gyro and accelerometer independently. The model should preserve the substance of `docs/navigation_reference` section 2.2 without inheriting its notation:
+  - [x] bias and optional bias random walk;
+  - [x] diagonal scale factor;
+  - [x] installation/mounting misalignment;
+  - [x] internal non-orthogonality;
+  - [x] white measurement noise;
+  - [x] quantization/noise increment behavior when needed.
+- [x] Document and test the calibration ordering explicitly, using clear code-facing names. A suitable first-order forward model is `raw = (I + scale) * nonorthogonality * misalignment * truth + bias + noise`, with separate gyro and accelerometer parameter sets.
+- [x] Add deterministic runtime configuration for IMU emulator parameters and random seeds, with a reusable parser/validator ready for the selected app config that will first wire IMU into the simulation loop.
+- [x] Add focused emulator tests before navigator integration: ideal output, constant bias, scale-factor response, cross-axis response from misalignment/non-orthogonality, deterministic seeded noise, increment units, and sample timing.
+- [x] Tighten the embedded-facing simulator contract: keep `TruthSample` trajectory-only, move reusable quaternion/skew helpers out of the IMU implementation, prefer `bool`/out-parameter runtime failure handling over exceptions and `std::optional`, and rename `ideal_interval_from_truth_ecef()` with frame suffix ordering.
+- [x] Keep IMU lever arms, multiple IMUs, online scale-factor/misalignment estimation, and latency/replay handling out of v1 unless a later pass deliberately expands scope.
 
 ## Pass 5d — Strapdown aided navigator implementation
 
@@ -584,9 +585,9 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Truth generation
 
-- [ ] Define acceleration versus specific-force semantics in `TruthSample`.
+- [x] Keep `TruthSample` trajectory-only for v1: timestamp, ECEF position, ECEF velocity, and ECEF-to-body attitude. Acceleration, angular-rate, and specific-force truth are derived by simulator/emulator components rather than stored as primary trajectory fields.
 - [ ] Add a trajectory-source abstraction so generated trajectories and CSV/playback trajectories feed the same downstream hooks. Do not create a separate playback driver unless the shared trajectory-provider path cannot express the required replay behavior.
-- [ ] Priority 1: flesh out stationary ECEF truth with proper Earth rotation, nonzero stationary gyro truth such as `w_ib_b`, and physically meaningful acceleration/specific-force fields such as `acc_ib_b`/specific-force equivalents. This scenario should support future gyrocompassing, coarse alignment, and ZUPT validation.
+- [ ] Priority 1: flesh out stationary ECEF trajectory and emulator validation with proper Earth rotation, nonzero stationary IMU gyro increments, and physically meaningful derived specific-force increments. This scenario should support future gyrocompassing, coarse alignment, and ZUPT validation.
 - [ ] Priority 2: add a simple ballistic trajectory: stationary launch-pad initialization, optional transfer-alignment window, initial heading/pitch definition, and a simple axial body-x boost profile before ballistic/coast behavior. Keep this intentionally simple before adding aero or guidance complexity.
 - [ ] Priority 3: add a constant-altitude, constant-speed trajectory on the curved Earth rather than flat-Earth kinematics, suitable for longer-duration navigation validation.
 - [ ] Add a calibration-maneuver trajectory after the first three truth modes are stable: horizontal S-turn, vertical S-turn, and bank-left/bank-right excitation for observability and calibration studies.
@@ -596,8 +597,8 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 ## Sensor contracts
 
 - [ ] Define a timestamped IMU sample type with documented increment/rate semantics.
-- [ ] Implement an ideal IMU simulator first.
-- [ ] Add IMU white noise, bias, bias random walk, scale factor, misalignment, and quantization incrementally with deterministic seeds.
+- [x] Implement an ideal IMU simulator first.
+- [x] Add IMU white noise, bias, bias random walk, scale factor, misalignment, non-orthogonality, and quantization incrementally with deterministic seeds.
 - [ ] Implement the barometer simulator and a physically meaningful altitude model/Jacobian.
 - [ ] Integrate the existing GNSS velocity model into simulation.
 - [ ] Add explicit sensor scheduling and multi-rate behavior.

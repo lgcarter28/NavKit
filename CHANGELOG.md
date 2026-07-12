@@ -33,6 +33,7 @@ This project follows
 - Public `include/navkit/api/config` contracts for user-facing product config graphs, including `NavKitProductConfigPolicy`.
 - App-side navigation initialization and transfer-alignment provider seams, including typed PVA/TXA startup and alignment vocabulary, deterministic and random PVA initialization providers, transfer-alignment sample validity flags, and validation for the selected stationary GNSS app config.
 - Focused ECEF navigator v1 algorithm specification under `docs/algorithms/navigator_ecef_v1`, covering the first one-IMU quaternion mechanization, coning/sculling baseline, analytical covariance prediction contract, GNSS position/velocity antenna-lever-arm observations, runtime API contract, and validation gate.
+- Focused IMU emulator v1 algorithm specification and first working simulator implementation, including a product-core IMU increment sample, ECEF-truth-derived ideal increments, deterministic gyro/accelerometer error-model parameters, seeded noise, bias random walk, quantization, runtime config parsing helpers, and equation-shaped tests.
 
 ### Changed
 
@@ -106,6 +107,8 @@ This project follows
 - Made Ninja the default generator for Python build/test/sim/tidy wrappers and rooted default build directories by generator, build type, and selected compile-time config.
 - Parameterized the GNSS position-update log product on its selected measurement-statistics stream so matrix dimensions and metadata come from the configured payload instead of hard-coded schema constants.
 - Split the Navigator propagation seam into explicit strapdown-integration and covariance-prediction hooks, added `Navigator::update()` as the normal orchestration call, and moved the simulation app loop to that API while preserving current GNSS-only `NoOpPropagation` behavior.
+- Corrected the truth-log metadata convention for `q_eb` so it matches the ECEF-to-body attitude used by trajectory truth and IMU derivation.
+- Tightened the IMU emulator API and truth schema: `TruthSample` now carries only trajectory truth, truth logs no longer include IMU-derived acceleration/angular-rate fields, reusable quaternion/skew helpers live under core math, and IMU generation uses explicit `bool`/out-parameter failure handling instead of exceptions or `std::optional`.
 
 ### Removed
 

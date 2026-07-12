@@ -23,6 +23,7 @@ add_executable(navkit_tests
     test_csv_writer.cpp
     test_environment_policies.cpp
     test_gnss_pos_update.cpp
+    test_imu_simulator.cpp
     test_navigator_compile.cpp
     test_navigator_policy.cpp
     test_trajectory_generator.cpp

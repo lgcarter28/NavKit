@@ -233,6 +233,13 @@ not current behavior.
   the first coarse algorithm integration points and both default to
   `NullProfiler`. Sequencing/nesting semantics are not owned by the generic
   record type and remain future profiler/sink policy work.
+- `sim::ImuSimulator` generates raw timestamped IMU increments from consecutive
+  ECEF truth samples. It derives ideal body-frame inertial angular increments
+  and specific-force increments, then applies deterministic gyro/accelerometer
+  error-model parameters such as bias, bias random walk, white noise, scale
+  factor, misalignment, non-orthogonality, and quantization. It is tested as a
+  simulator component but is not yet wired into the selected app loop or
+  Navigator ingestion path.
 - Simulation currently contains desktop-oriented support and may use runtime
   polymorphism where practical.
 - Python analysis is deliberately outside the embedded-facing C++ product core.
@@ -266,9 +273,9 @@ already exists and improves readability or diagnostics.
 ## Explicitly not implemented yet
 
 - INS propagation/mechanization beyond the current `NoOpPropagation` seam.
-- Correct stationary Earth-rotation IMU truth.
+- Navigator ingestion and buffering of IMU increments.
 - General coordinate conversions and local-vertical altitude modeling.
-- Barometer and IMU simulator behavior beyond current shells/placeholders.
+- Barometer simulator behavior beyond current shells/placeholders.
 - Embedded target profiles, resource budgets, and hardware abstraction layers.
 
 Use `docs/ROADMAP.md` for sequencing and status, and update this document when

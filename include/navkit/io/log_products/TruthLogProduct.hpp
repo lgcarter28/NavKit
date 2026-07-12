@@ -28,16 +28,10 @@ public:
                     "v_e_x_mps",
                     "v_e_y_mps",
                     "v_e_z_mps",
-                    "a_e_x_mps2",
-                    "a_e_y_mps2",
-                    "a_e_z_mps2",
                     "q_eb_w",
                     "q_eb_x",
                     "q_eb_y",
-                    "q_eb_z",
-                    "w_ib_b_x_radps",
-                    "w_ib_b_y_radps",
-                    "w_ib_b_z_radps"});
+                    "q_eb_z"});
     }
 
     void log(const sim::TruthSample& sample)
@@ -49,16 +43,10 @@ public:
                         sample.v_e.x(),
                         sample.v_e.y(),
                         sample.v_e.z(),
-                        sample.a_e.x(),
-                        sample.a_e.y(),
-                        sample.a_e.z(),
                         sample.q_eb.w(),
                         sample.q_eb.x(),
                         sample.q_eb.y(),
-                        sample.q_eb.z(),
-                        sample.w_ib_b.x(),
-                        sample.w_ib_b.y(),
-                        sample.w_ib_b.z());
+                        sample.q_eb.z());
     }
 
     void flush()
@@ -68,17 +56,12 @@ public:
 
     static nlohmann::json metadata()
     {
-        return {{"schema", "truth_v1"},
-                {"file", "truth.csv"},
-                {"units",
-                 {{"time", "s"},
-                  {"p_e", "m"},
-                  {"v_e", "m/s"},
-                  {"a_e", "m/s^2"},
-                  {"q_eb", "unit quaternion"},
-                  {"w_ib_b", "rad/s"}}},
-                {"frame_convention",
-                 "Groves-style; q_eb transforms b-frame components to e-frame components"}};
+        return {
+            {"schema", "truth_v1"},
+            {"file", "truth.csv"},
+            {"units", {{"time", "s"}, {"p_e", "m"}, {"v_e", "m/s"}, {"q_eb", "unit quaternion"}}},
+            {"frame_convention",
+             "Groves-style; q_eb transforms e-frame components to b-frame components"}};
     }
 
     static nlohmann::json manifest_entry()
