@@ -216,10 +216,13 @@ not current behavior.
 
 - `KalmanFilter` performs measurement updates, stores optional per-model
   statistics, and delegates injection/reset.
-- `Navigator` orchestrates the selected propagation policy, processes a
-  tuple-like sensor collection, and applies the selected update policy. Current
-  product configs use `NoOpPropagation`, so behavior remains measurement-only
-  until a real mechanization policy is implemented.
+- `Navigator` exposes `update()` as the normal orchestration call and explicit
+  stage methods for `process_strapdown_integration()`, `process_covariance()`,
+  and `process_measurements()`. The selected propagation policy owns the
+  strapdown-integration and covariance-prediction hooks, while the update policy
+  owns measurement update behavior. Current product configs use
+  `NoOpPropagation`, so behavior remains measurement-only until a real
+  mechanization/prediction policy is implemented.
 - Planet and gravity policies are the most complete examples of the intended
   concept -> optional CRTP base -> concrete policy layering.
 - Product-core profiling now provides the embedded-facing vocabulary for future

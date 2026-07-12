@@ -12,9 +12,15 @@ namespace navkit::core::estimation
 struct NoOpPropagation
 {
     template<FilterPolicy Filter, SensorCollectionPolicy SensorTuple>
-    static void propagate(Filter&, SensorTuple&)
+    static void process_strapdown_integration(Filter&, SensorTuple&)
     {
-        // default: preserve current measurement-only Navigator behavior
+        // default: no nominal IMU mechanization for measurement-only products
+    }
+
+    template<FilterPolicy Filter, SensorCollectionPolicy SensorTuple>
+    static void process_covariance(Filter&, SensorTuple&)
+    {
+        // default: no covariance prediction for measurement-only products
     }
 };
 

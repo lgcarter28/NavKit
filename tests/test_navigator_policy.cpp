@@ -63,33 +63,60 @@ struct MissingFilterUpdate
     }
 };
 
-struct MissingPropagate
+struct MissingStrapdownIntegration
 {};
 
-struct WrongPropagateReturn
+struct WrongStrapdownIntegrationReturn
 {
-    static int propagate(NavigatorPolicyFilter& filter, NavigatorPolicySensors& sensors)
+    static int process_strapdown_integration(NavigatorPolicyFilter& filter,
+                                             NavigatorPolicySensors& sensors)
     {
         static_cast<void>(filter);
         static_cast<void>(sensors);
         return 0;
     }
+
+    static void process_covariance(NavigatorPolicyFilter& filter, NavigatorPolicySensors& sensors)
+    {
+        static_cast<void>(filter);
+        static_cast<void>(sensors);
+    }
+};
+
+struct MissingCovariancePrediction
+{
+    static void process_strapdown_integration(NavigatorPolicyFilter& filter,
+                                              NavigatorPolicySensors& sensors)
+    {
+        static_cast<void>(filter);
+        static_cast<void>(sensors);
+    }
 };
 
 struct RecordingPropagation
 {
-    static inline int call_count{0};
+    static inline int strapdown_call_count{0};
+    static inline int covariance_call_count{0};
 
     static void reset()
     {
-        call_count = 0;
+        strapdown_call_count = 0;
+        covariance_call_count = 0;
     }
 
-    static void propagate(NavigatorPolicyFilter& filter, NavigatorPolicySensors& sensors)
+    static void process_strapdown_integration(NavigatorPolicyFilter& filter,
+                                              NavigatorPolicySensors& sensors)
     {
         static_cast<void>(filter);
         static_cast<void>(sensors);
-        ++call_count;
+        ++strapdown_call_count;
+    }
+
+    static void process_covariance(NavigatorPolicyFilter& filter, NavigatorPolicySensors& sensors)
+    {
+        static_cast<void>(filter);
+        static_cast<void>(sensors);
+        ++covariance_call_count;
     }
 };
 
@@ -157,17 +184,22 @@ TEST_CASE("NavigatorUpdatePolicy captures tuple-wide Navigator update compatibil
     CHECK(true);
 }
 
-TEST_CASE("PropagationPolicy captures the Navigator prediction hook")
+TEST_CASE("PropagationPolicy captures explicit Navigator propagation stages")
 {
     static_assert(PropagationPolicy<NavigatorPolicyPropagation,
                                     NavigatorPolicyFilter,
                                     NavigatorPolicySensors>);
     static_assert(
         PropagationPolicy<RecordingPropagation, NavigatorPolicyFilter, NavigatorPolicySensors>);
-    static_assert(
-        !PropagationPolicy<MissingPropagate, NavigatorPolicyFilter, NavigatorPolicySensors>);
-    static_assert(
-        !PropagationPolicy<WrongPropagateReturn, NavigatorPolicyFilter, NavigatorPolicySensors>);
+    static_assert(!PropagationPolicy<MissingStrapdownIntegration,
+                                     NavigatorPolicyFilter,
+                                     NavigatorPolicySensors>);
+    static_assert(!PropagationPolicy<MissingCovariancePrediction,
+                                     NavigatorPolicyFilter,
+                                     NavigatorPolicySensors>);
+    static_assert(!PropagationPolicy<WrongStrapdownIntegrationReturn,
+                                     NavigatorPolicyFilter,
+                                     NavigatorPolicySensors>);
 
     CHECK(true);
 }
@@ -183,13 +215,40 @@ TEST_CASE(
     static_assert(!CanInstantiateNavigator<MissingSensorProcessing, NavigatorPolicySensors>);
     static_assert(!CanInstantiateNavigator<NavigatorPolicyFilter, NavigatorPolicySensor>);
     static_assert(CanInstantiateNavigatorWithPropagation<NavigatorPolicyPropagation>);
-    static_assert(!CanInstantiateNavigatorWithPropagation<MissingPropagate>);
-    static_assert(!CanInstantiateNavigatorWithPropagation<WrongPropagateReturn>);
+    static_assert(!CanInstantiateNavigatorWithPropagation<MissingStrapdownIntegration>);
+    static_assert(!CanInstantiateNavigatorWithPropagation<WrongStrapdownIntegrationReturn>);
 
     CHECK(true);
 }
 
-TEST_CASE("Navigator invokes propagation during measurement processing")
+TEST_CASE("Navigator explicit propagation stages dispatch through the propagation policy")
+{
+    using Nav = Navigator<NavigatorPolicyFilter, NavigatorPolicySensors, RecordingPropagation>;
+
+    RecordingPropagation::reset();
+    Nav navigator;
+
+    navigator.process_strapdown_integration();
+    navigator.process_covariance();
+
+    CHECK(RecordingPropagation::strapdown_call_count == 1);
+    CHECK(RecordingPropagation::covariance_call_count == 1);
+}
+
+TEST_CASE("Navigator update orchestrates propagation stages before measurement processing")
+{
+    using Nav = Navigator<NavigatorPolicyFilter, NavigatorPolicySensors, RecordingPropagation>;
+
+    RecordingPropagation::reset();
+    Nav navigator;
+
+    navigator.update();
+
+    CHECK(RecordingPropagation::strapdown_call_count == 1);
+    CHECK(RecordingPropagation::covariance_call_count == 1);
+}
+
+TEST_CASE("Navigator measurement processing does not invoke propagation stages")
 {
     using Nav = Navigator<NavigatorPolicyFilter, NavigatorPolicySensors, RecordingPropagation>;
 
@@ -198,7 +257,8 @@ TEST_CASE("Navigator invokes propagation during measurement processing")
 
     navigator.process_measurements();
 
-    CHECK(RecordingPropagation::call_count == 1);
+    CHECK(RecordingPropagation::strapdown_call_count == 0);
+    CHECK(RecordingPropagation::covariance_call_count == 0);
 }
 
 } // namespace navkit::core::estimation::test

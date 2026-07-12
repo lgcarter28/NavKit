@@ -22,6 +22,6 @@ TEST_CASE("Navigator compiles and processes GNSS sensor")
     meas.time = 0.0;
     meas.z << 1.0, 2.0, 3.0;
     CHECK(nav.template sensor<0>().push(meas));
-    nav.process_measurements();
+    nav.update();
     CHECK(nav.filter().state()(StateDef::Pos::i) != doctest::Approx(0.0));
 }

@@ -32,9 +32,10 @@ For the first INS/GNSS implementation, the measurement stage must include
 loosely coupled GNSS position and velocity updates with the configured antenna
 lever arm from \cref{eq:v1_gnss_pos_pred,eq:v1_gnss_vel_pred}.
 
-The temporary Phase 4 \texttt{process\_measurements()} path is not the final
-INS Navigator API. It exists to preserve the current GNSS-only behavior while
-the propagation seam is introduced.
+The explicit \texttt{process\_measurements()} stage is not the normal client
+entry point for the INS Navigator. It remains available for tests, profiling,
+and advanced scheduling; ordinary clients should call \texttt{update()} once
+the required timestamped data has been ingested.
 
 \section{V1 Cadence Rules}
 

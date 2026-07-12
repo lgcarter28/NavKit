@@ -61,7 +61,7 @@ public:
             logger.log(sample);
             Emulators::process(navigator, logger, emulator_runtimes, sample);
 
-            navigator.process_measurements();
+            navigator.update();
 
             log_measurement_statistics<typename NavKit::Sensors>(logger, filter);
             logger.log(io::NavEstimateLogPayload<StateDef, Filter>{

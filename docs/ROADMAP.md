@@ -534,9 +534,11 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Pass 5b — Navigator API and implementation contract from the algorithm spec
 
-- [ ] Define the intended Navigator runtime API shape from the completed `navigator_ecef_v1` algorithm document. Preferred direction: clients push timestamped data into typed internal buffers through simple methods such as `push_data(...)` or explicitly named variants like `push_imu(...)` / `push_gnss(...)`, then call a simple `Navigator::update()` that orchestrates high-rate strapdown integration, medium-rate covariance/STM propagation, and low-rate asynchronous aiding updates from those buffers.
-- [ ] Preserve explicit stage methods for testing, profiling, and advanced control, such as `process_strapdown_integration()`, `process_covariance()`, and `process_measurements()`, but keep the normal client path centered on data ingestion plus `update()`.
-- [ ] Decide exact public names only after the algorithm spec defines the data contracts, buffering ownership, timing rules, and replay/latency behavior. Do not let the temporary Phase 4 `process_measurements()` shape become the final INS Navigator API by accident.
+- [x] Add the initial Navigator API seam from the completed `navigator_ecef_v1` algorithm document: `Navigator::update()` is the normal orchestration call, and the explicit stage methods are `process_strapdown_integration()`, `process_covariance()`, and `process_measurements()`.
+- [x] Split the propagation policy boundary into explicit strapdown-integration and covariance-prediction hooks while keeping `NoOpPropagation` behavior-preserving for current GNSS-only products.
+- [x] Move the selected simulation app loop to `Navigator::update()` so executable orchestration no longer couples itself to the temporary measurements-only path.
+- [ ] Define typed data ingestion after the IMU/GNSS sample contracts are implemented. Preferred direction: clients push timestamped data into typed internal buffers through simple methods such as `push_data(...)` or explicitly named variants like `push_imu(...)` / `push_gnss(...)`, then call `Navigator::update()`.
+- [ ] Define buffer ownership, timing rules, replay/latency behavior, and delayed-measurement semantics after the first IMU and GNSS data contracts are real.
 
 ## Frames, coordinates, and environment
 

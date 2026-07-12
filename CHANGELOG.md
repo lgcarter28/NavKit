@@ -105,6 +105,7 @@ This project follows
 - Exposed sensor diagnostics aliases in reusable product configs and moved profiling clock metadata onto the selected clock type to avoid config metadata drift.
 - Made Ninja the default generator for Python build/test/sim/tidy wrappers and rooted default build directories by generator, build type, and selected compile-time config.
 - Parameterized the GNSS position-update log product on its selected measurement-statistics stream so matrix dimensions and metadata come from the configured payload instead of hard-coded schema constants.
+- Split the Navigator propagation seam into explicit strapdown-integration and covariance-prediction hooks, added `Navigator::update()` as the normal orchestration call, and moved the simulation app loop to that API while preserving current GNSS-only `NoOpPropagation` behavior.
 
 ### Removed
 

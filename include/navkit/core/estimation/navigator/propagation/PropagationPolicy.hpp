@@ -14,7 +14,12 @@ namespace navkit::core::estimation
 template<typename Candidate, typename Filter, typename SensorTuple>
 concept PropagationPolicy = FilterPolicy<Filter> && SensorCollectionPolicy<SensorTuple> &&
                             requires(Filter& filter, SensorTuple& sensors) {
-                                { Candidate::propagate(filter, sensors) } -> std::same_as<void>;
+                                {
+                                    Candidate::process_strapdown_integration(filter, sensors)
+                                } -> std::same_as<void>;
+                                {
+                                    Candidate::process_covariance(filter, sensors)
+                                } -> std::same_as<void>;
                             };
 
 } // namespace navkit::core::estimation

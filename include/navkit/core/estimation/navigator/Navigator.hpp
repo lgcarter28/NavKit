@@ -67,9 +67,14 @@ public:
         Update_t::template sensor_update<Sensor>(m_filter, sensor_obj);
     }
 
-    void propagate()
+    void process_strapdown_integration()
     {
-        Propagation_t::propagate(m_filter, m_sensors);
+        Propagation_t::process_strapdown_integration(m_filter, m_sensors);
+    }
+
+    void process_covariance()
+    {
+        Propagation_t::process_covariance(m_filter, m_sensors);
     }
 
     void process_measurements()
@@ -78,10 +83,16 @@ public:
             Profiler::profile(navkit::core::profiling::ProfilePoint::NavigatorProcessMeasurements);
         static_cast<void>(profile_scope);
 
-        propagate();
         std::apply([this](auto&... sensor_obj) { (this->process_one_sensor(sensor_obj), ...); },
                    m_sensors);
         Update_t::filter_update(m_filter);
+    }
+
+    void update()
+    {
+        process_strapdown_integration();
+        process_covariance();
+        process_measurements();
     }
 
 private:
