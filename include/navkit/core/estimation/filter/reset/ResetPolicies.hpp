@@ -9,8 +9,8 @@ namespace navkit::core::estimation
 template<typename StateDef>
 struct DefaultResetPolicy
 {
-    template<typename State_t, typename P_t>
-    static void reset_covariance(State_t&, const State_t&, P_t&)
+    template<typename NominalState_t, typename ErrorState_t, typename P_t>
+    static void reset_covariance(NominalState_t&, const ErrorState_t&, P_t&)
     {
         // no-op in V1; covariance reset mapping belongs in a later attitude-aware version.
     }

@@ -24,6 +24,7 @@ concept FilterPolicy =
                                                   const typename Candidate::State_t& state,
                                                   const typename Candidate::P_t& covariance) {
         typename Candidate::State_t;
+        typename Candidate::ErrorState_t;
         typename Candidate::P_t;
         typename Candidate::StateDef_t;
 

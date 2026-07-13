@@ -33,6 +33,7 @@ class Navigator
 {
 public:
     using Filter_t = Filter;
+    using StateDef_t = typename Filter_t::StateDef_t;
     using Sensors_t = SensorTuple;
     using Propagation_t = Propagation;
     using Update_t = Update;
@@ -41,9 +42,15 @@ public:
         navkit::core::containers::RingBuffer<ImuIncrement, Propagation_t::imu_buffer_capacity>;
     struct CovarianceStep
     {
+        Time_t time_s{0.0};
+        Time_t dt_s{0.0};
         typename Filter_t::P_t phi{Filter_t::P_t::Identity()};
         typename Filter_t::P_t qd{Filter_t::P_t::Zero()};
     };
+    using CovarianceHistory_t = navkit::core::containers::RingBuffer<
+        CovarianceStep,
+        Propagation_t::covariance_history_capacity,
+        navkit::core::containers::OverflowPolicy::OverwriteOldest>;
 
     Filter_t& filter()
     {
@@ -96,6 +103,26 @@ public:
         return m_has_pending_covariance_step ? 1U : 0U;
     }
 
+    [[nodiscard]] Time_t pending_covariance_dt_s() const
+    {
+        return m_has_pending_covariance_step ? m_pending_covariance_step.dt_s : 0.0;
+    }
+
+    [[nodiscard]] std::size_t covariance_history_size() const
+    {
+        return m_covariance_history.size();
+    }
+
+    [[nodiscard]] constexpr std::size_t covariance_history_capacity() const
+    {
+        return Propagation_t::covariance_history_capacity;
+    }
+
+    [[nodiscard]] static constexpr Time_t covariance_update_period_s()
+    {
+        return 1.0 / Propagation_t::covariance_update_rate_hz;
+    }
+
     bool process_strapdown_integration()
     {
         m_last_propagation_success = true;
@@ -123,9 +150,10 @@ public:
 
     bool propagate_covariance()
     {
-        if (m_has_pending_covariance_step) {
+        if (covariance_step_ready()) {
             m_filter.propagate_covariance(m_pending_covariance_step.phi,
                                           m_pending_covariance_step.qd);
+            static_cast<void>(m_covariance_history.push(m_pending_covariance_step));
             m_pending_covariance_step = {};
             m_has_pending_covariance_step = false;
         }
@@ -154,14 +182,16 @@ public:
 private:
     bool process_imu_single(const ImuIncrement& increment)
     {
-        using StateDef = typename Filter_t::StateDef_t;
         const auto state_before = m_filter.state();
         CovarianceStep step{};
-        if (!Propagation_t::template covariance_step_from_increment<StateDef>(
+        step.time_s = increment.time_s;
+        step.dt_s = increment.dt_s;
+        if (!Propagation_t::template covariance_step_from_increment<StateDef_t>(
                 state_before, increment, step.phi, step.qd)) {
             return false;
         }
-        if (!Propagation_t::template process_imu_increment<StateDef>(m_filter.state(), increment)) {
+        if (!Propagation_t::template process_imu_increment<StateDef_t>(increment,
+                                                                       m_filter.state())) {
             return false;
         }
         accumulate_covariance_step(step);
@@ -170,15 +200,16 @@ private:
 
     bool process_imu_pair(const ImuIncrement& first, const ImuIncrement& second)
     {
-        using StateDef = typename Filter_t::StateDef_t;
         const auto state_before = m_filter.state();
         CovarianceStep step{};
-        if (!Propagation_t::template covariance_step_from_increment_pair<StateDef>(
+        step.time_s = second.time_s;
+        step.dt_s = first.dt_s + second.dt_s;
+        if (!Propagation_t::template covariance_step_from_increment_pair<StateDef_t>(
                 state_before, first, second, step.phi, step.qd)) {
             return false;
         }
-        if (!Propagation_t::template process_imu_increment_pair<StateDef>(
-                m_filter.state(), first, second)) {
+        if (!Propagation_t::template process_imu_increment_pair<StateDef_t>(
+                first, second, m_filter.state())) {
             return false;
         }
         accumulate_covariance_step(step);
@@ -198,11 +229,21 @@ private:
         m_pending_covariance_step.qd =
             0.5 * (m_pending_covariance_step.qd + m_pending_covariance_step.qd.transpose());
         m_pending_covariance_step.phi = step.phi * m_pending_covariance_step.phi;
+        m_pending_covariance_step.time_s = step.time_s;
+        m_pending_covariance_step.dt_s += step.dt_s;
+    }
+
+    [[nodiscard]] bool covariance_step_ready() const
+    {
+        constexpr Time_t epsilon_s = 1.0e-12;
+        return m_has_pending_covariance_step &&
+               ((m_pending_covariance_step.dt_s + epsilon_s) >= covariance_update_period_s());
     }
 
     Filter_t m_filter{};
     Sensors_t m_sensors{};
     ImuBuffer_t m_imu_buffer{};
+    CovarianceHistory_t m_covariance_history{};
     CovarianceStep m_pending_covariance_step{};
     bool m_has_pending_covariance_step{false};
     bool m_last_propagation_success{true};

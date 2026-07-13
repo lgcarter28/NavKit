@@ -17,8 +17,10 @@
 #include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
 #include "navkit/io/log_payloads/NavEstimateLogPayload.hpp"
 
+#include <Eigen/Dense>
 #include <cstdio>
 #include <filesystem>
+#include <memory>
 #include <nlohmann/json.hpp>
 
 namespace navkit::app_support
@@ -52,7 +54,8 @@ public:
 
         reset_profile_sink_if_configured<NavKit>();
 
-        Navigator navigator;
+        auto navigator_storage = std::make_unique<Navigator>();
+        auto& navigator = *navigator_storage;
         auto& filter = navigator.filter();
         const auto nav_initialization = NavInitializationProvider::initialize(cfg, trajectory);
         initialize_navigator<StateDef>(navigator, nav_initialization);
@@ -61,8 +64,15 @@ public:
         Logger logger(run_settings.output_dir, run_settings.run_name, cfg);
         Emulators::configure(navigator, logger, cfg);
 
+        core::Time_t next_console_log_s{0.0};
+        core::Time_t next_truth_log_s{0.0};
+        core::Time_t next_nav_log_s{0.0};
+        core::Time_t next_measurement_statistics_log_s{0.0};
+
         for (const auto& sample : trajectory.truth_samples) {
-            logger.log(sample);
+            if (should_log_at(sample.time, run_settings.logging.truth_dt_s, next_truth_log_s)) {
+                logger.log(sample);
+            }
             if (!imu_runtime.process(navigator, sample)) {
                 std::printf("IMU runtime failure at t=%f: %s\n",
                             sample.time,
@@ -76,12 +86,21 @@ public:
                 return 4;
             }
 
-            log_measurement_statistics<typename NavKit::Sensors>(logger, filter);
-            logger.log(io::NavEstimateLogPayload<StateDef, Filter>{
-                .time_s = sample.time,
-                .filter = filter,
-                .truth = sample,
-            });
+            if (should_log_at(sample.time,
+                              run_settings.logging.measurement_statistics_dt_s,
+                              next_measurement_statistics_log_s)) {
+                log_measurement_statistics<typename NavKit::Sensors>(logger, filter);
+            }
+            if (should_log_at(sample.time, run_settings.logging.nav_dt_s, next_nav_log_s)) {
+                logger.log(io::NavEstimateLogPayload<StateDef, Filter>{
+                    .time_s = sample.time,
+                    .filter = filter,
+                    .truth = sample,
+                });
+            }
+            if (should_log_at(sample.time, run_settings.logging.console_dt_s, next_console_log_s)) {
+                print_console_status(sample.time, filter);
+            }
         }
 
         logger.close();
@@ -90,6 +109,46 @@ public:
         std::printf("Wrote NavKit simulation logs to: %s\n",
                     run_settings.output_dir.string().c_str());
         return 0;
+    }
+
+private:
+    [[nodiscard]] static bool
+    should_log_at(const core::Time_t time_s, const core::Time_t dt_s, core::Time_t& next_time_s)
+    {
+        constexpr core::Time_t epsilon_s = 1.0e-12;
+        if (dt_s <= 0.0 || (time_s + epsilon_s) < next_time_s) {
+            return false;
+        }
+        while (next_time_s <= (time_s + epsilon_s)) {
+            next_time_s += dt_s;
+        }
+        return true;
+    }
+
+    static void print_console_status(const core::Time_t time_s, const Filter& filter)
+    {
+        const auto p_e = filter.state().template segment<3>(StateDef::Pos::i);
+        const auto v_e = filter.state().template segment<3>(StateDef::Vel::i);
+        Eigen::Matrix<core::Scalar_t, 4, 1> q_e2b{};
+        if constexpr (requires { typename StateDef::Quat; }) {
+            q_e2b = filter.state().template segment<4>(StateDef::Quat::i);
+        }
+        else {
+            q_e2b << 1.0, 0.0, 0.0, 0.0;
+        }
+        std::printf("t=%8.3f s | p_e=[%.3f %.3f %.3f] m | v_e=[%.6f %.6f %.6f] m/s | q_e2b=[%.6e "
+                    "%.6e %.6e %.6e]\n",
+                    time_s,
+                    p_e.x(),
+                    p_e.y(),
+                    p_e.z(),
+                    v_e.x(),
+                    v_e.y(),
+                    v_e.z(),
+                    q_e2b(0),
+                    q_e2b(1),
+                    q_e2b(2),
+                    q_e2b(3));
     }
 };
 

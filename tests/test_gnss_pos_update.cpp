@@ -8,11 +8,11 @@
 
 TEST_CASE("GNSS position update moves state toward measurement")
 {
-    using StateDef = navkit::core::estimation::InsStateDef;
+    using StateDef = navkit::core::estimation::DefaultInsStateDef;
     using Model = navkit::core::models::GnssPosModel<StateDef>;
     navkit::core::estimation::KalmanFilter<StateDef> kf;
 
-    navkit::core::estimation::State<StateDef> x = navkit::core::estimation::State<StateDef>::Zero();
+    decltype(kf)::State_t x = decltype(kf)::State_t::Zero();
     x.template segment<3>(StateDef::Pos::i) << 10.0, 0.0, 0.0;
     kf.set_state(x);
 

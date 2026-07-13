@@ -46,7 +46,7 @@ struct ProductConfig
     using Numeric = NumericConfig;
 
     // Public product graph.
-    using StateDef = core::estimation::InsStateDef;
+    using StateDef = core::estimation::DefaultInsStateDef;
     using PrimaryGnssMeasurementModel = core::models::GnssPosModel<StateDef>;
     static constexpr core::estimation::SensorId primary_gnss_sensor_id = 0U;
     static constexpr std::size_t primary_gnss_buffer_size = 16U;
@@ -66,11 +66,15 @@ struct ProductConfig
     using Planet = core::environment::Wgs84;
     using Gravity = core::environment::J2<Planet>;
     static constexpr std::size_t imu_buffer_capacity = 1024U;
+    static constexpr std::size_t covariance_history_capacity = 256U;
+    static constexpr core::Time_t covariance_update_rate_hz = 100.0;
     using Propagation =
         core::estimation::EcefInsPropagation<Planet,
                                              Gravity,
                                              core::estimation::EcefInsZeroProcessNoise,
-                                             imu_buffer_capacity>;
+                                             imu_buffer_capacity,
+                                             covariance_history_capacity,
+                                             covariance_update_rate_hz>;
 
     using Filter =
         core::estimation::KalmanFilter<StateDef,

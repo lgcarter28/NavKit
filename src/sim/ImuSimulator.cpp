@@ -64,7 +64,7 @@ bool ImuSimulator::ideal_interval_from_truth_ecef(const TruthSample& previous,
     const auto q_prev = previous.q_eb.normalized();
     const auto q_current = current.q_eb.normalized();
     const auto q_body_relative = q_current * q_prev.conjugate();
-    const auto delta_theta_eb_b = core::math::rotation_vector_from_quaternion(q_body_relative);
+    const auto delta_theta_eb_b = core::math::rotvec_rad_from_quaternion(q_body_relative);
 
     const auto q_mid = q_prev.slerp(0.5, q_current).normalized();
     const auto omega_ie_b = q_mid * navkit::core::environment::planet_rate_fixed_radps<Wgs84>();

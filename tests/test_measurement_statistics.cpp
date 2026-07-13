@@ -15,7 +15,7 @@ namespace navkit::core::estimation::test
 namespace
 {
 
-using StateDef = InsStateDef;
+using StateDef = DefaultInsStateDef;
 using Model = navkit::core::models::GnssPosModel<StateDef>;
 using Sensor = navkit::core::estimation::Sensor<0U, Model, 4U>;
 struct DisabledStatisticsDiagnostics
@@ -41,7 +41,7 @@ using DisabledStatisticsFilter = KalmanFilter<StateDef,
 struct StatisticsFixture
 {
     Filter filter;
-    State<StateDef> initial_error_state{State<StateDef>::Zero()};
+    Filter::ErrorState_t initial_error_state{Filter::ErrorState_t::Zero()};
     StateCov<StateDef> initial_covariance{StateCov<StateDef>::Identity()};
     Model::O_t measurement{Model::O_t::Zero()};
     Model::NoiseContext noise{};
@@ -49,7 +49,7 @@ struct StatisticsFixture
 
     StatisticsFixture()
     {
-        State<StateDef> x = State<StateDef>::Zero();
+        Filter::State_t x = Filter::State_t::Zero();
         x.template segment<3>(StateDef::Pos::i) << 10.0, -2.0, 5.0;
         filter.set_state(x);
 
@@ -161,7 +161,7 @@ TEST_CASE("sensor diagnostics can disable measurement statistics storage")
     Measurement<Model::M> measurement{};
     Model::NoiseContext noise{};
 
-    State<StateDef> x = State<StateDef>::Zero();
+    DisabledStatisticsFilter::State_t x = DisabledStatisticsFilter::State_t::Zero();
     x.template segment<3>(StateDef::Pos::i) << 10.0, -2.0, 5.0;
     filter.set_state(x);
     filter.set_covariance(StateCov<StateDef>::Identity() * 100.0);

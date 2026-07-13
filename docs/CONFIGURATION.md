@@ -109,7 +109,7 @@ apps consume:
 ```cpp
 struct StationaryGnssConfig
 {
-    using StateDef = navkit::core::estimation::InsStateDef;
+    using StateDef = navkit::core::estimation::DefaultInsStateDef;
     using PrimaryGnssMeasurementModel = navkit::core::models::GnssPosModel<StateDef>;
     static constexpr navkit::core::estimation::SensorId primary_gnss_sensor_id = 0U;
     static constexpr std::size_t primary_gnss_buffer_size = 16U;
@@ -147,7 +147,10 @@ the discrete covariance inputs (`Phi` and `Qd`) from the selected dynamics, but
 it does not own the filter covariance update itself. `KalmanFilter` applies
 `P = Phi P Phi^T + Qd`, and `Navigator` orchestrates when the selected
 propagation policy and filter are called. Measurement-only products can still
-select `NoOpPropagation`.
+select `NoOpPropagation`. Concrete propagation choices also expose compile-time
+buffer/cadence constants such as IMU buffer capacity, medium-rate covariance
+update rate, and covariance-step history capacity. These remain compile-time
+because they affect fixed storage requirements.
 
 `NavigatorUpdate` is the selected concrete update behavior for the configured
 `Filter` and `Sensors`, such as `UpdatePostFilter<Filter>`. The lower-level

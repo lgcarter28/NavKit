@@ -11,10 +11,11 @@ namespace navkit::core::estimation
 {
 
 template<typename Candidate, typename StateDef>
-concept ResetPolicy = StateDefPolicy<StateDef> &&
-                      requires(State<StateDef>& x, State<StateDef>& dx, StateCov<StateDef>& P) {
-                          { Candidate::reset_covariance(x, dx, P) } -> std::same_as<void>;
-                          { Candidate::reset_dx(dx) } -> std::same_as<void>;
-                      };
+concept ResetPolicy =
+    StateDefPolicy<StateDef> &&
+    requires(NominalState<StateDef>& x, State<StateDef>& dx, StateCov<StateDef>& P) {
+        { Candidate::reset_covariance(x, dx, P) } -> std::same_as<void>;
+        { Candidate::reset_dx(dx) } -> std::same_as<void>;
+    };
 
 } // namespace navkit::core::estimation

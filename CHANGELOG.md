@@ -38,6 +38,8 @@ This project follows
 - Navigator typed IMU ingestion through `push_imu(...)`, fixed-capacity IMU buffering, propagation success reporting, and explicit stage-method coverage.
 - Simulation app IMU runtime validation and app-configured IMU simulator selection for feeding generated IMU increments into the selected Navigator.
 - Shared runtime cadence parsing for `rate_hz` or `dt_s`, plus a small IMU runtime helper that keeps IMU simulator initialization/generation details out of the central simulation loop.
+- Compile-time medium-rate covariance cadence and bounded covariance-step history configuration for Navigator propagation products.
+- Runtime-configurable console, truth, nav-estimate, and measurement-statistics logging cadences so high-rate simulation no longer forces high-rate file or console output.
 
 ### Changed
 
@@ -114,6 +116,7 @@ This project follows
 - Corrected the truth-log metadata convention for `q_eb` so it matches the ECEF-to-body attitude used by trajectory truth and IMU derivation.
 - Tightened the IMU emulator API and truth schema: `TruthSample` now carries only trajectory truth, truth logs no longer include IMU-derived acceleration/angular-rate fields, reusable quaternion/skew helpers live under core math, and IMU generation uses explicit `bool`/out-parameter failure handling instead of exceptions or `std::optional`.
 - Selected stationary GNSS product configs now use the first ECEF INS propagation policy instead of `NoOpPropagation`, while `NoOpPropagation` remains available for measurement-only products.
+- Added `DefaultInsStateDef` for the ECEF INS path so the selected product stores nominal attitude in a `Quat` segment while covariance, Jacobians, and injection continue to use a 3D small-angle `Att` error state.
 - Extended MSVC NavKit-owned compile options with `/bigobj` so template-heavy selected-config application translation units compile reliably on Windows.
 - Corrected the propagation/filter ownership boundary: propagation policies now operate on configured state definitions, build discrete covariance inputs, and leave `KalmanFilter` responsible for applying covariance propagation.
 - Reduced the v1 INS state definitions to bias-only PVA/IMU-error states by removing stale gyro and accelerometer scale-factor segments.

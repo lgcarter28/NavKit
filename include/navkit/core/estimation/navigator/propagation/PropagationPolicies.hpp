@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "navkit/core/config/Types.hpp"
 #include "navkit/core/estimation/navigator/ImuIncrement.hpp"
 #include "navkit/core/estimation/state/State.hpp"
 
@@ -14,24 +15,27 @@ namespace navkit::core::estimation
 struct NoOpPropagation
 {
     static constexpr std::size_t imu_buffer_capacity = 1U; // NOLINT(readability-identifier-naming)
+    static constexpr Time_t covariance_update_rate_hz = 100.0;
+    static constexpr std::size_t covariance_history_capacity =
+        1U; // NOLINT(readability-identifier-naming)
 
     template<StateDefPolicy StateDef>
-    static bool process_imu_increment(State<StateDef>&, const ImuIncrement& increment)
+    static bool process_imu_increment(const ImuIncrement& increment, NominalState<StateDef>&)
     {
         return increment.dt_s >= 0.0;
     }
 
     template<StateDefPolicy StateDef>
-    static bool process_imu_increment_pair(State<StateDef>& state,
-                                           const ImuIncrement& first,
-                                           const ImuIncrement& second)
+    static bool process_imu_increment_pair(const ImuIncrement& first,
+                                           const ImuIncrement& second,
+                                           NominalState<StateDef>& state)
     {
-        return process_imu_increment<StateDef>(state, first) &&
-               process_imu_increment<StateDef>(state, second);
+        return process_imu_increment<StateDef>(first, state) &&
+               process_imu_increment<StateDef>(second, state);
     }
 
     template<StateDefPolicy StateDef>
-    static bool covariance_step_from_increment(const State<StateDef>&,
+    static bool covariance_step_from_increment(const NominalState<StateDef>&,
                                                const ImuIncrement& increment,
                                                StateCov<StateDef>& phi,
                                                StateCov<StateDef>& qd)
@@ -42,7 +46,7 @@ struct NoOpPropagation
     }
 
     template<StateDefPolicy StateDef>
-    static bool covariance_step_from_increment_pair(const State<StateDef>& state,
+    static bool covariance_step_from_increment_pair(const NominalState<StateDef>& state,
                                                     const ImuIncrement& first,
                                                     const ImuIncrement& second,
                                                     StateCov<StateDef>& phi,

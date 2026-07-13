@@ -225,18 +225,22 @@ roadmap items, not current behavior.
   stage methods for `process_strapdown_integration()`, `propagate_covariance()`,
   and `process_measurements()`. It owns a fixed-capacity FIFO of timestamped IMU
   increments fed through `push_imu(...)` and composes one pending discrete
-  covariance step while draining that buffer. The selected propagation policy
-  owns state propagation plus `F_k`/`G_k`/`Phi_k`/`Q_d` construction; the filter
-  owns applying the covariance propagation; and the update policy owns
+  covariance step while draining that buffer. The pending covariance step is
+  applied at the selected compile-time medium-rate cadence, and recent applied
+  covariance steps are retained in a bounded history buffer for inspection and
+  future delayed-measurement support. The selected propagation policy owns state
+  propagation plus `F_k`/`G_k`/`Phi_k`/`Q_d` construction; the filter owns
+  applying the covariance propagation; and the update policy owns
   measurement update behavior. `NoOpPropagation` remains available for
   measurement-only products, while the selected stationary GNSS products now use
   the first ECEF INS propagation policy.
 - `EcefInsPropagation` implements the first single-IMU ECEF propagation path. It
-  uses quaternion math internally for nominal attitude propagation, writes the
-  propagated ECEF-to-body attitude back to the current RPY `Att` segment, builds
+  propagates nominal ECEF-to-body attitude as a unit quaternion, keeps the
+  covariance attitude state as a 3D small-angle `Att` perturbation, builds
   first-order `F_k`/`G_k`/`Phi_k`/`Q_d` products, and applies the v1
-  PVA+gyro-bias+accelerometer-bias dynamics to the matching bias-only
-  `InsStateDef` segments.
+  PVA+gyro-bias+accelerometer-bias dynamics to the selected `DefaultInsStateDef`
+  layout, whose nominal state stores `Quat` while its covariance/error state
+  keeps a 3D `Att` perturbation.
 - Planet and gravity policies are the most complete examples of the intended
   concept -> optional CRTP base -> concrete policy layering.
 - Product-core profiling now provides the embedded-facing vocabulary for future
@@ -288,9 +292,6 @@ already exists and improves readability or diagnostics.
 
 - GNSS velocity aiding and configured non-IMU sensor lever-arm observations in
   the selected simulation app.
-- Nominal quaternion state storage in the filter state. The first ECEF INS
-  propagation policy uses quaternion math internally but stores attitude in the
-  current RPY segment.
 - IMU history/replay, delayed-measurement handling, and latency compensation.
 - General coordinate conversions and local-vertical altitude modeling.
 - Barometer simulator behavior beyond current shells/placeholders.

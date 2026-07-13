@@ -17,6 +17,7 @@
 #include "navkit/sim/ImuSimulatorPolicy.hpp"
 #include "test_main.hpp"
 
+#include <memory>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <tuple>
@@ -68,6 +69,11 @@ struct NotABinding
 {
     return {{"run_name", "stationary_gnss_demo"},
             {"output_dir", "output/logs/stationary_gnss_demo"},
+            {"logging",
+             {{"console", {{"rate_hz", 1.0}}},
+              {"truth", {{"rate_hz", 10.0}}},
+              {"nav", {{"rate_hz", 10.0}}},
+              {"measurement_statistics", {{"rate_hz", 1.0}}}}},
             {"trajectory",
              {{"type", "stationary"},
               {"duration_s", 60.0},
@@ -227,6 +233,14 @@ TEST_CASE("Stationary GNSS runtime validator rejects ambiguous runtime rates")
     CHECK_THROWS_AS(validate_runtime_config<StationaryGnssAppConfig>(cfg), std::runtime_error);
 }
 
+TEST_CASE("Stationary GNSS runtime validator rejects ambiguous logging rates")
+{
+    auto cfg = valid_stationary_gnss_runtime_config();
+    cfg.at("logging").at("nav").emplace("dt_s", 0.1);
+
+    CHECK_THROWS_AS(validate_runtime_config<StationaryGnssAppConfig>(cfg), std::runtime_error);
+}
+
 TEST_CASE("Stationary GNSS runtime validator keeps numeric tuning runtime-configurable")
 {
     auto cfg = valid_stationary_gnss_runtime_config();
@@ -275,11 +289,11 @@ TEST_CASE("Explicit PVA initialization provider accepts full row-major covarianc
 
     using NavKit = StationaryGnssAppConfig::NavKit;
     using StateDef = NavKit::StateDef;
-    NavKit::Navigator navigator;
-    initialize_navigator<StateDef>(navigator, nav_init);
-    CHECK(navigator.filter().covariance()(StateDef::Pos::i, StateDef::Vel::i) ==
+    auto navigator = std::make_unique<NavKit::Navigator>();
+    initialize_navigator<StateDef>(*navigator, nav_init);
+    CHECK(navigator->filter().covariance()(StateDef::Pos::i, StateDef::Vel::i) ==
           doctest::Approx(0.25));
-    CHECK(navigator.filter().covariance()(StateDef::Vel::i, StateDef::Pos::i) ==
+    CHECK(navigator->filter().covariance()(StateDef::Vel::i, StateDef::Pos::i) ==
           doctest::Approx(0.25));
 }
 
@@ -312,15 +326,17 @@ TEST_CASE("NavInitialization maps into the configured Navigator filter state")
     const auto nav_init =
         StationaryGnssAppConfig::NavInitializationProvider::initialize(cfg, trajectory);
 
-    NavKit::Navigator navigator;
-    initialize_navigator<StateDef>(navigator, nav_init);
+    auto navigator = std::make_unique<NavKit::Navigator>();
+    initialize_navigator<StateDef>(*navigator, nav_init);
 
-    const auto& filter = navigator.filter();
+    const auto& filter = navigator->filter();
     CHECK(filter.state()(StateDef::Pos::i + 0) == doctest::Approx(6378137.0 + 25.0));
     CHECK(filter.state()(StateDef::Pos::i + 1) == doctest::Approx(-15.0));
     CHECK(filter.state()(StateDef::Pos::i + 2) == doctest::Approx(10.0));
     CHECK(filter.state().template segment<3>(StateDef::Vel::i).isZero());
-    CHECK(filter.state().template segment<3>(StateDef::Att::i).isZero());
+    CHECK(filter.state()
+              .template segment<4>(StateDef::Quat::i)
+              .isApprox(Eigen::Matrix<core::Scalar_t, 4, 1>{1.0, 0.0, 0.0, 0.0}));
     CHECK(filter.covariance()(StateDef::Pos::i, StateDef::Pos::i) == doctest::Approx(10000.0));
     CHECK(filter.covariance()(StateDef::Vel::i, StateDef::Vel::i) == doctest::Approx(1.0e-6));
     CHECK(filter.covariance()(StateDef::Att::i, StateDef::Att::i) == doctest::Approx(1.0e-6));

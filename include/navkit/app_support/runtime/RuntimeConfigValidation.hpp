@@ -6,6 +6,7 @@
 #include "navkit/app_support/config/SimulationAppConfigPolicy.hpp"
 #include "navkit/app_support/emulation/EmulatorRuntimeKeys.hpp"
 #include "navkit/app_support/emulation/concrete/ImuRuntimeConfig.hpp"
+#include "navkit/app_support/runtime/RunSettings.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
 #include "navkit/app_support/runtime/RuntimeRate.hpp"
 
@@ -42,6 +43,7 @@ void validate_runtime_config(const nlohmann::json& cfg)
     auto allowed_keys = EmulatorRuntimeKeys<EmulatorBindings>::values();
     allowed_keys.push_back("run_name");
     allowed_keys.push_back("output_dir");
+    allowed_keys.push_back("logging");
     allowed_keys.push_back("trajectory");
     allowed_keys.push_back("imu");
     allowed_keys.push_back("initialization");
@@ -50,6 +52,7 @@ void validate_runtime_config(const nlohmann::json& cfg)
 
     detail::require_optional_string(cfg, "run_name");
     detail::require_optional_string(cfg, "output_dir");
+    validate_logging_runtime_config(cfg);
 
     const auto& trajectory = detail::require_object(cfg, "trajectory");
     detail::require_optional_string(trajectory, "type");

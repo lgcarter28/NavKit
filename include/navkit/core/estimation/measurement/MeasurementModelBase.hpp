@@ -16,7 +16,7 @@ class MeasurementModelBase
 {
 public:
     static constexpr int M = M_;
-    using State_t = State<StateDef>;
+    using State_t = NominalState<StateDef>;
     using O_t = Eigen::Matrix<Scalar_t, M, 1>;
     using H_t = Eigen::Matrix<Scalar_t, M, StateDef::N>;
     using R_t = Eigen::Matrix<Scalar_t, M, M>;

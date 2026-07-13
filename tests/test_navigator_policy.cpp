@@ -34,6 +34,7 @@ struct MissingSensorProcessing
 {
     using StateDef_t = NavigatorPolicyStateDef;
     using State_t = NavigatorPolicyFilter::State_t;
+    using ErrorState_t = NavigatorPolicyFilter::ErrorState_t;
     using P_t = NavigatorPolicyFilter::P_t;
 
     [[nodiscard]] State_t& state();
@@ -71,9 +72,15 @@ struct MissingStrapdownIntegration
 struct WrongStrapdownIntegrationReturn
 {
     static constexpr std::size_t imu_buffer_capacity = 2U; // NOLINT(readability-identifier-naming)
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr std::size_t covariance_history_capacity =
+        2U; // NOLINT(readability-identifier-naming)
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr Time_t covariance_update_rate_hz =
+        1.0; // NOLINT(readability-identifier-naming)
 
     template<typename StateDef>
-    static int process_imu_increment(State<StateDef>& state, const ImuIncrement& increment)
+    static int process_imu_increment(const ImuIncrement& increment, NominalState<StateDef>& state)
     {
         static_cast<void>(state);
         static_cast<void>(increment);
@@ -81,9 +88,9 @@ struct WrongStrapdownIntegrationReturn
     }
 
     template<typename StateDef>
-    static bool process_imu_increment_pair(State<StateDef>& state,
-                                           const ImuIncrement& first,
-                                           const ImuIncrement& second)
+    static bool process_imu_increment_pair(const ImuIncrement& first,
+                                           const ImuIncrement& second,
+                                           NominalState<StateDef>& state)
     {
         static_cast<void>(state);
         static_cast<void>(first);
@@ -92,7 +99,7 @@ struct WrongStrapdownIntegrationReturn
     }
 
     template<typename StateDef>
-    static bool covariance_step_from_increment(const State<StateDef>& state,
+    static bool covariance_step_from_increment(const NominalState<StateDef>& state,
                                                const ImuIncrement& increment,
                                                StateCov<StateDef>& phi,
                                                StateCov<StateDef>& qd)
@@ -105,7 +112,7 @@ struct WrongStrapdownIntegrationReturn
     }
 
     template<typename StateDef>
-    static bool covariance_step_from_increment_pair(const State<StateDef>& state,
+    static bool covariance_step_from_increment_pair(const NominalState<StateDef>& state,
                                                     const ImuIncrement& first,
                                                     const ImuIncrement& second,
                                                     StateCov<StateDef>& phi,
@@ -123,9 +130,15 @@ struct WrongStrapdownIntegrationReturn
 struct MissingCovariancePrediction
 {
     static constexpr std::size_t imu_buffer_capacity = 2U; // NOLINT(readability-identifier-naming)
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr std::size_t covariance_history_capacity =
+        2U; // NOLINT(readability-identifier-naming)
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr Time_t covariance_update_rate_hz =
+        1.0; // NOLINT(readability-identifier-naming)
 
     template<typename StateDef>
-    static bool process_imu_increment(State<StateDef>& state, const ImuIncrement& increment)
+    static bool process_imu_increment(const ImuIncrement& increment, NominalState<StateDef>& state)
     {
         static_cast<void>(state);
         static_cast<void>(increment);
@@ -133,9 +146,9 @@ struct MissingCovariancePrediction
     }
 
     template<typename StateDef>
-    static bool process_imu_increment_pair(State<StateDef>& state,
-                                           const ImuIncrement& first,
-                                           const ImuIncrement& second)
+    static bool process_imu_increment_pair(const ImuIncrement& first,
+                                           const ImuIncrement& second,
+                                           NominalState<StateDef>& state)
     {
         static_cast<void>(state);
         static_cast<void>(first);
@@ -147,9 +160,15 @@ struct MissingCovariancePrediction
 struct MissingImuProcessing
 {
     static constexpr std::size_t imu_buffer_capacity = 2U; // NOLINT(readability-identifier-naming)
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr std::size_t covariance_history_capacity =
+        2U; // NOLINT(readability-identifier-naming)
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr Time_t covariance_update_rate_hz =
+        1.0; // NOLINT(readability-identifier-naming)
 
     template<typename StateDef>
-    static bool covariance_step_from_increment(const State<StateDef>& state,
+    static bool covariance_step_from_increment(const NominalState<StateDef>& state,
                                                const ImuIncrement& increment,
                                                StateCov<StateDef>& phi,
                                                StateCov<StateDef>& qd)
@@ -162,7 +181,7 @@ struct MissingImuProcessing
     }
 
     template<typename StateDef>
-    static bool covariance_step_from_increment_pair(const State<StateDef>& state,
+    static bool covariance_step_from_increment_pair(const NominalState<StateDef>& state,
                                                     const ImuIncrement& first,
                                                     const ImuIncrement& second,
                                                     StateCov<StateDef>& phi,
@@ -180,6 +199,12 @@ struct MissingImuProcessing
 struct RecordingPropagation
 {
     static constexpr std::size_t imu_buffer_capacity = 4U; // NOLINT(readability-identifier-naming)
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr std::size_t covariance_history_capacity =
+        4U; // NOLINT(readability-identifier-naming)
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr Time_t covariance_update_rate_hz =
+        1.0; // NOLINT(readability-identifier-naming)
     static inline int imu_increment_call_count{0};
     static inline int imu_pair_call_count{0};
     static inline int covariance_increment_call_count{0};
@@ -196,7 +221,7 @@ struct RecordingPropagation
     }
 
     template<typename StateDef>
-    static bool process_imu_increment(State<StateDef>& state, const ImuIncrement& increment)
+    static bool process_imu_increment(const ImuIncrement& increment, NominalState<StateDef>& state)
     {
         static_cast<void>(state);
         ++imu_increment_call_count;
@@ -205,9 +230,9 @@ struct RecordingPropagation
     }
 
     template<typename StateDef>
-    static bool process_imu_increment_pair(State<StateDef>& state,
-                                           const ImuIncrement& first,
-                                           const ImuIncrement& second)
+    static bool process_imu_increment_pair(const ImuIncrement& first,
+                                           const ImuIncrement& second,
+                                           NominalState<StateDef>& state)
     {
         static_cast<void>(state);
         ++imu_pair_call_count;
@@ -216,7 +241,7 @@ struct RecordingPropagation
     }
 
     template<typename StateDef>
-    static bool covariance_step_from_increment(const State<StateDef>& state,
+    static bool covariance_step_from_increment(const NominalState<StateDef>& state,
                                                const ImuIncrement& increment,
                                                StateCov<StateDef>& phi,
                                                StateCov<StateDef>& qd)
@@ -229,7 +254,7 @@ struct RecordingPropagation
     }
 
     template<typename StateDef>
-    static bool covariance_step_from_increment_pair(const State<StateDef>& state,
+    static bool covariance_step_from_increment_pair(const NominalState<StateDef>& state,
                                                     const ImuIncrement& first,
                                                     const ImuIncrement& second,
                                                     StateCov<StateDef>& phi,
@@ -349,7 +374,30 @@ TEST_CASE("Navigator covariance stage drains pending covariance steps")
     CHECK(navigator.propagate_covariance());
 
     CHECK(navigator.pending_covariance_step_count() == 0U);
+    CHECK(navigator.covariance_history_size() == 1U);
     CHECK(RecordingPropagation::covariance_increment_call_count == 1);
+}
+
+TEST_CASE("Navigator defers covariance propagation until the configured medium-rate interval")
+{
+    using Nav = Navigator<NavigatorPolicyFilter, NavigatorPolicySensors, RecordingPropagation>;
+
+    RecordingPropagation::reset();
+    Nav navigator;
+
+    CHECK(navigator.push_imu(ImuIncrement{.time_s = 0.25, .dt_s = 0.25}));
+    CHECK(navigator.update());
+
+    CHECK(navigator.pending_covariance_step_count() == 1U);
+    CHECK(navigator.pending_covariance_dt_s() == doctest::Approx(0.25));
+    CHECK(navigator.covariance_history_size() == 0U);
+
+    CHECK(navigator.push_imu(ImuIncrement{.time_s = 1.0, .dt_s = 0.75}));
+    CHECK(navigator.update());
+
+    CHECK(navigator.pending_covariance_step_count() == 0U);
+    CHECK(navigator.pending_covariance_dt_s() == doctest::Approx(0.0));
+    CHECK(navigator.covariance_history_size() == 1U);
 }
 
 TEST_CASE("Navigator consumes queued IMU increments through propagation policy")

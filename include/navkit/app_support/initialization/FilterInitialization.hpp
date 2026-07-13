@@ -8,6 +8,7 @@
 #include "navkit/core/estimation/filter/FilterPolicy.hpp"
 #include "navkit/core/estimation/navigator/PvaStateDef.hpp"
 #include "navkit/core/estimation/state/StateDefPolicy.hpp"
+#include "navkit/core/math/Quaternion.hpp"
 
 #include <Eigen/Dense>
 
@@ -87,8 +88,16 @@ void initialize_filter_from_nav_initialization(Filter& filter, const NavInitiali
     typename Filter::State_t initial_state = Filter::State_t::Zero();
     initial_state.template segment<3>(StateDef::Pos::i) = core::estimation::pos_e_m(nav_init.pva);
     initial_state.template segment<3>(StateDef::Vel::i) = core::estimation::vel_e_mps(nav_init.pva);
-    initial_state.template segment<3>(StateDef::Att::i) =
-        core::estimation::rpy_e2b_rad(nav_init.pva);
+    if constexpr (requires { typename StateDef::Quat; }) {
+        const auto q_e2b =
+            core::math::quaternion_from_rpy_rad(core::estimation::rpy_e2b_rad(nav_init.pva));
+        initial_state.template segment<4>(StateDef::Quat::i) << q_e2b.w(), q_e2b.x(), q_e2b.y(),
+            q_e2b.z();
+    }
+    else {
+        initial_state.template segment<3>(StateDef::Att::i) =
+            core::estimation::rpy_e2b_rad(nav_init.pva);
+    }
 
     filter.set_state(initial_state);
 

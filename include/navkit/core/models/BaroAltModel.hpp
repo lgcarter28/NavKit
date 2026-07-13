@@ -4,6 +4,7 @@
 #pragma once
 
 #include "navkit/core/estimation/measurement/MeasurementModelBase.hpp"
+#include "navkit/core/estimation/state/Segment.hpp"
 #include "navkit/core/estimation/state/StateDefPolicy.hpp"
 
 #include <string_view>
@@ -12,6 +13,7 @@ namespace navkit::core::models
 {
 
 using navkit::core::estimation::MeasurementModelBase;
+using navkit::core::estimation::segment;
 
 template<navkit::core::estimation::StateDefPolicy StateDef>
 class BaroAltModel : public MeasurementModelBase<BaroAltModel<StateDef>, StateDef, 1>
@@ -47,7 +49,7 @@ public:
     static O_t obs_impl(const State_t& x)
     {
         O_t out{};
-        out(0) = x(StateDef::Pos::i + 2);
+        out(0) = segment<typename StateDef::Pos>(x).z();
         return out;
     }
 };

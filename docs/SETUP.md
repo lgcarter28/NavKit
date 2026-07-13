@@ -578,8 +578,10 @@ runtime JSON before running; for the stationary GNSS app, that means required
 unsupported `baro` or disabled `transfer_alignment` sections are rejected, and
 common vector/numeric fields must have the expected shape. Runtime sections
 that describe update cadence may specify either `rate_hz` or `dt_s`, but not
-both. The current stationary GNSS initializer uses `"type": "pva_error"` with
-nested `pva_error` and `pva_cov`
+both. The optional `logging` section uses the same cadence shape for independent
+console, truth, nav, and measurement-statistics output rates, so simulation
+system rates do not force file or console logging rates. The current stationary
+GNSS initializer uses `"type": "pva_error"` with nested `pva_error` and `pva_cov`
 sections to keep startup PVA error/covariance input in app support while
 product-core code consumes only typed PVA navigation initialization data. The
 `imu` section selects the simulator runtime mode, such as `"type": "ideal"` or a

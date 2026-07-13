@@ -12,7 +12,7 @@ namespace navkit::core::estimation
 
 template<typename Candidate, typename StateDef>
 concept InjectionPolicy =
-    StateDefPolicy<StateDef> && requires(State<StateDef>& x, const State<StateDef>& dx) {
+    StateDefPolicy<StateDef> && requires(NominalState<StateDef>& x, const State<StateDef>& dx) {
         { Candidate::apply(x, dx) } -> std::same_as<void>;
     };
 

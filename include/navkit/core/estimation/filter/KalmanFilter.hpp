@@ -12,7 +12,9 @@
 #include "navkit/core/estimation/measurement/MeasurementModelPolicy.hpp"
 #include "navkit/core/estimation/sensor/SensorTuplePolicy.hpp"
 #include "navkit/core/estimation/sensor/SensorTupleTraits.hpp"
+#include "navkit/core/estimation/state/Segment.hpp"
 #include "navkit/core/estimation/state/State.hpp"
+#include "navkit/core/math/Quaternion.hpp"
 #include "navkit/core/profiling/NullProfiler.hpp"
 #include "navkit/core/profiling/ProfilePoint.hpp"
 #include "navkit/core/profiling/ProfilerPolicy.hpp"
@@ -34,7 +36,8 @@ class KalmanFilter
 public:
     using StateDef_t = StateDef;
     using Sensors_t = Sensors;
-    using State_t = State<StateDef>;
+    using State_t = NominalState<StateDef>;
+    using ErrorState_t = State<StateDef>;
     using P_t = StateCov<StateDef>;
     using MeasurementStatisticsTuple_t = MeasurementStatisticsStorage_t<Sensors>;
     using Profiler_t = Profiler;
@@ -44,6 +47,7 @@ public:
         m_x.setZero();
         m_dx.setZero();
         m_P.setIdentity();
+        normalize_nominal_attitude(m_x);
     }
 
     static const P_t& I()
@@ -62,12 +66,12 @@ public:
         return m_x;
     }
 
-    State_t& error_state()
+    ErrorState_t& error_state()
     {
         return m_dx;
     }
 
-    [[nodiscard]] const State_t& error_state() const
+    [[nodiscard]] const ErrorState_t& error_state() const
     {
         return m_dx;
     }
@@ -85,6 +89,7 @@ public:
     void set_state(const State_t& x)
     {
         m_x = x;
+        normalize_nominal_attitude(m_x);
     }
 
     void set_covariance(const P_t& P)
@@ -138,7 +143,7 @@ public:
                            const typename MeasurementModel::O_t& innovation,
                            typename MeasurementModel::R_t& S,
                            typename MeasurementModel::K_t& K,
-                           State_t& dx,
+                           ErrorState_t& dx,
                            P_t& P_f)
     {
         S = H * P_i * H.transpose() + R;
@@ -192,6 +197,21 @@ public:
     }
 
 private:
+    static void normalize_nominal_attitude(State_t& x)
+    {
+        if constexpr (requires { typename StateDef::Quat; }) {
+            auto q_segment = segment<typename StateDef::Quat>(x);
+            Eigen::Quaternion<Scalar_t> q{q_segment(0), q_segment(1), q_segment(2), q_segment(3)};
+            if (q.norm() <= 0.0) {
+                q.setIdentity();
+            }
+            else {
+                q = navkit::core::math::normalized_with_positive_scalar(q);
+            }
+            q_segment << q.w(), q.x(), q.y(), q.z();
+        }
+    }
+
     template<MeasurementModelPolicy<StateDef> MeasurementModel, typename Sensor>
     void observation_update_impl(const typename MeasurementModel::O_t& z,
                                  Time_t time,
@@ -208,7 +228,7 @@ private:
 
         typename MeasurementModel::R_t S{};
         typename MeasurementModel::K_t K{};
-        State_t dx{};
+        ErrorState_t dx{};
         P_t P_f{};
 
         covariance_update<MeasurementModel>(m_P, H, R, innov, S, K, dx, P_f);
@@ -252,7 +272,7 @@ private:
     }
 
     State_t m_x{};
-    State_t m_dx{};
+    ErrorState_t m_dx{};
     P_t m_P{};
     MeasurementStatisticsTuple_t m_measurement_stats{};
 };

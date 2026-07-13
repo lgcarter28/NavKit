@@ -38,7 +38,9 @@ struct MechanizedImuInterval
 template<environment::RotatingPlanetPolicy Planet,
          environment::GravityPolicy Gravity,
          typename ProcessNoise = EcefInsZeroProcessNoise,
-         std::size_t ImuBufferCapacity = 512U>
+         std::size_t ImuBufferCapacity = 512U,
+         std::size_t CovarianceHistoryCapacity = 256U,
+         Time_t CovarianceUpdateRateHz = 100.0>
 struct EcefInsPropagation
 {
     static_assert(std::is_same_v<typename Gravity::Planet_t, Planet>,
@@ -46,25 +48,28 @@ struct EcefInsPropagation
 
     static constexpr std::size_t imu_buffer_capacity =
         ImuBufferCapacity; // NOLINT(readability-identifier-naming)
+    static constexpr std::size_t covariance_history_capacity =
+        CovarianceHistoryCapacity; // NOLINT(readability-identifier-naming)
+    static constexpr Time_t covariance_update_rate_hz = CovarianceUpdateRateHz;
 
     template<StateDefPolicy StateDef>
-    static bool process_imu_increment(State<StateDef>& state, const ImuIncrement& increment)
+    static bool process_imu_increment(const ImuIncrement& increment, NominalState<StateDef>& state)
     {
         const auto interval = corrected_interval_from_single<StateDef>(state, increment);
-        return propagate_nominal_state<StateDef>(state, interval);
+        return propagate_nominal_state<StateDef>(interval, state);
     }
 
     template<StateDefPolicy StateDef>
-    static bool process_imu_increment_pair(State<StateDef>& state,
-                                           const ImuIncrement& first,
-                                           const ImuIncrement& second)
+    static bool process_imu_increment_pair(const ImuIncrement& first,
+                                           const ImuIncrement& second,
+                                           NominalState<StateDef>& state)
     {
         const auto interval = corrected_interval_from_pair<StateDef>(state, first, second);
-        return propagate_nominal_state<StateDef>(state, interval);
+        return propagate_nominal_state<StateDef>(interval, state);
     }
 
     template<StateDefPolicy StateDef>
-    static bool covariance_step_from_increment(const State<StateDef>& state,
+    static bool covariance_step_from_increment(const NominalState<StateDef>& state,
                                                const ImuIncrement& increment,
                                                StateCov<StateDef>& phi,
                                                StateCov<StateDef>& qd)
@@ -74,7 +79,7 @@ struct EcefInsPropagation
     }
 
     template<StateDefPolicy StateDef>
-    static bool covariance_step_from_increment_pair(const State<StateDef>& state,
+    static bool covariance_step_from_increment_pair(const NominalState<StateDef>& state,
                                                     const ImuIncrement& first,
                                                     const ImuIncrement& second,
                                                     StateCov<StateDef>& phi,
@@ -97,16 +102,29 @@ struct EcefInsPropagation
     }
 
     template<typename StateDef, typename State_t>
-    [[nodiscard]] static Vec3 rpy_e2b_rad(const State_t& state)
+    [[nodiscard]] static Eigen::Quaternion<Scalar_t> quaternion_e2b(const State_t& state)
     {
-        return segment<typename StateDef::Att>(state);
+        if constexpr (requires { typename StateDef::Quat; }) {
+            const auto q_segment = segment<typename StateDef::Quat>(state);
+            return navkit::core::math::normalized_with_positive_scalar(Eigen::Quaternion<Scalar_t>{
+                q_segment(0), q_segment(1), q_segment(2), q_segment(3)});
+        }
+        else {
+            return navkit::core::math::quaternion_from_rpy_rad(
+                segment<typename StateDef::Att>(state));
+        }
     }
 
     template<typename StateDef, typename State_t>
     [[nodiscard]] static Vec3 gyro_bias_radps(const State_t& state)
     {
         if constexpr (requires { typename StateDef::GyroB; }) {
-            return segment<typename StateDef::GyroB>(state);
+            if constexpr (requires { typename StateDef::GyroBias; }) {
+                return segment<typename StateDef::GyroBias>(state);
+            }
+            else {
+                return segment<typename StateDef::GyroB>(state);
+            }
         }
         else {
             return Vec3::Zero();
@@ -117,7 +135,12 @@ struct EcefInsPropagation
     [[nodiscard]] static Vec3 accel_bias_mps2(const State_t& state)
     {
         if constexpr (requires { typename StateDef::AccB; }) {
-            return segment<typename StateDef::AccB>(state);
+            if constexpr (requires { typename StateDef::AccelBias; }) {
+                return segment<typename StateDef::AccelBias>(state);
+            }
+            else {
+                return segment<typename StateDef::AccB>(state);
+            }
         }
         else {
             return Vec3::Zero();
@@ -137,20 +160,25 @@ struct EcefInsPropagation
     }
 
     template<typename StateDef, typename State_t>
-    static void set_rpy_e2b_rad(State_t& state, const Vec3& value)
+    static void set_quaternion_e2b(State_t& state, const Eigen::Quaternion<Scalar_t>& value)
     {
-        segment<typename StateDef::Att>(state) = value;
+        const auto q = navkit::core::math::normalized_with_positive_scalar(value);
+        if constexpr (requires { typename StateDef::Quat; }) {
+            segment<typename StateDef::Quat>(state) << q.w(), q.x(), q.y(), q.z();
+        }
+        else {
+            segment<typename StateDef::Att>(state) = navkit::core::math::rpy_rad_from_quaternion(q);
+        }
     }
 
     template<typename StateDef>
     [[nodiscard]] static Eigen::Matrix<Scalar_t, StateDef::N, StateDef::N>
-    build_f_matrix(const State<StateDef>& state, const MechanizedImuInterval& interval)
+    build_f_matrix(const NominalState<StateDef>& state, const MechanizedImuInterval& interval)
     {
         Eigen::Matrix<Scalar_t, StateDef::N, StateDef::N> F =
             Eigen::Matrix<Scalar_t, StateDef::N, StateDef::N>::Zero();
 
-        const auto q_e2b =
-            navkit::core::math::quaternion_from_rpy_zyx_rad(rpy_e2b_rad<StateDef>(state));
+        const auto q_e2b = quaternion_e2b<StateDef>(state);
         const auto C_b_e = q_e2b.conjugate().toRotationMatrix();
         const auto omega_ie_e = environment::planet_rate_fixed_radps<Planet>();
         const auto Omega_ie_e = navkit::core::math::skew_symmetric(omega_ie_e);
@@ -175,12 +203,11 @@ struct EcefInsPropagation
 
     template<typename StateDef>
     [[nodiscard]] static Eigen::Matrix<Scalar_t, StateDef::N, 12>
-    build_g_matrix(const State<StateDef>& state)
+    build_g_matrix(const NominalState<StateDef>& state)
     {
         Eigen::Matrix<Scalar_t, StateDef::N, 12> G =
             Eigen::Matrix<Scalar_t, StateDef::N, 12>::Zero();
-        const auto q_e2b =
-            navkit::core::math::quaternion_from_rpy_zyx_rad(rpy_e2b_rad<StateDef>(state));
+        const auto q_e2b = quaternion_e2b<StateDef>(state);
         const auto C_b_e = q_e2b.conjugate().toRotationMatrix();
 
         G.template block<3, 3>(StateDef::Vel::i, 3) = C_b_e;
@@ -221,7 +248,8 @@ struct EcefInsPropagation
 private:
     template<StateDefPolicy StateDef>
     [[nodiscard]] static MechanizedImuInterval
-    corrected_interval_from_single(const State<StateDef>& state, const ImuIncrement& increment)
+    corrected_interval_from_single(const NominalState<StateDef>& state,
+                                   const ImuIncrement& increment)
     {
         const auto delta_theta =
             increment.delta_theta_ib_b_rad - (gyro_bias_radps<StateDef>(state) * increment.dt_s);
@@ -234,7 +262,7 @@ private:
 
     template<StateDefPolicy StateDef>
     [[nodiscard]] static MechanizedImuInterval corrected_interval_from_pair(
-        const State<StateDef>& state, const ImuIncrement& first, const ImuIncrement& second)
+        const NominalState<StateDef>& state, const ImuIncrement& first, const ImuIncrement& second)
     {
         if (first.dt_s <= 0.0 || second.dt_s <= 0.0 || second.time_s <= first.time_s) {
             return {};
@@ -253,7 +281,7 @@ private:
     }
 
     template<StateDefPolicy StateDef>
-    [[nodiscard]] static bool covariance_step_from_interval(const State<StateDef>& state,
+    [[nodiscard]] static bool covariance_step_from_interval(const NominalState<StateDef>& state,
                                                             const MechanizedImuInterval& interval,
                                                             StateCov<StateDef>& phi,
                                                             StateCov<StateDef>& qd)
@@ -272,8 +300,8 @@ private:
     }
 
     template<StateDefPolicy StateDef>
-    [[nodiscard]] static bool propagate_nominal_state(State<StateDef>& state,
-                                                      const MechanizedImuInterval& interval)
+    [[nodiscard]] static bool propagate_nominal_state(const MechanizedImuInterval& interval,
+                                                      NominalState<StateDef>& state)
     {
         if (interval.dt_s <= 0.0) {
             return false;
@@ -286,14 +314,13 @@ private:
     }
 
     template<StateDefPolicy StateDef>
-    static void propagate_nominal(const State<StateDef>& state_before,
+    static void propagate_nominal(const NominalState<StateDef>& state_before,
                                   const MechanizedImuInterval& interval,
-                                  State<StateDef>& state_after)
+                                  NominalState<StateDef>& state_after)
     {
         const auto p_k = position_e_m<StateDef>(state_before);
         const auto v_k = velocity_e_mps<StateDef>(state_before);
-        const auto q_e2b_k =
-            navkit::core::math::quaternion_from_rpy_zyx_rad(rpy_e2b_rad<StateDef>(state_before));
+        const auto q_e2b_k = quaternion_e2b<StateDef>(state_before);
         const auto q_b2e_k = q_e2b_k.conjugate();
         const auto C_b2e_k = q_b2e_k.toRotationMatrix();
 
@@ -304,19 +331,18 @@ private:
         const auto p_next = p_k + (0.5 * (v_k + v_next) * interval.dt_s);
 
         const auto delta_q_e2b =
-            navkit::core::math::quaternion_from_rotation_vector(interval.delta_theta_eb_b_rad);
+            navkit::core::math::quaternion_from_rotvec_rad(interval.delta_theta_eb_b_rad);
         const auto q_e2b_next =
             navkit::core::math::normalized_with_positive_scalar(delta_q_e2b * q_e2b_k);
 
         set_position_e_m<StateDef>(state_after, p_next);
         set_velocity_e_mps<StateDef>(state_after, v_next);
-        set_rpy_e2b_rad<StateDef>(state_after,
-                                  navkit::core::math::rpy_zyx_rad_from_quaternion(q_e2b_next));
+        set_quaternion_e2b<StateDef>(state_after, q_e2b_next);
     }
 
     template<typename StateDef>
     [[nodiscard]] static MechanizedImuInterval
-    mechanized_interval_from_corrected(const State<StateDef>& state,
+    mechanized_interval_from_corrected(const NominalState<StateDef>& state,
                                        const Time_t time_s,
                                        const Time_t dt_s,
                                        const ConingSculling& corrected)
@@ -325,8 +351,7 @@ private:
             return {};
         }
 
-        const auto q_e2b =
-            navkit::core::math::quaternion_from_rpy_zyx_rad(rpy_e2b_rad<StateDef>(state));
+        const auto q_e2b = quaternion_e2b<StateDef>(state);
         const auto delta_theta_eb_b =
             corrected.delta_theta_ib_b_rad -
             ((q_e2b * environment::planet_rate_fixed_radps<Planet>()) * dt_s);

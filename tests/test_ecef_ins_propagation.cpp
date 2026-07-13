@@ -24,7 +24,7 @@ using navkit::core::Vec3;
 using navkit::core::environment::J2;
 using navkit::core::environment::Wgs84;
 using StationaryPropagation = EcefInsPropagation<Wgs84, J2<Wgs84>>;
-using StationaryFilter = KalmanFilter<InsStateDef>;
+using StationaryFilter = KalmanFilter<DefaultInsStateDef>;
 
 struct NonzeroProcessNoise
 {
@@ -64,9 +64,9 @@ using NoisyPropagation = EcefInsPropagation<Wgs84, J2<Wgs84>, NonzeroProcessNois
 void initialize_stationary_filter(StationaryFilter& filter)
 {
     StationaryFilter::State_t state = StationaryFilter::State_t::Zero();
-    segment<InsStateDef::Pos>(state) = Vec3{Wgs84::a_m, 0.0, 0.0};
-    segment<InsStateDef::Vel>(state).setZero();
-    segment<InsStateDef::Att>(state).setZero();
+    segment<DefaultInsStateDef::Pos>(state) = Vec3{Wgs84::a_m, 0.0, 0.0};
+    segment<DefaultInsStateDef::Vel>(state).setZero();
+    segment<DefaultInsStateDef::Quat>(state) << 1.0, 0.0, 0.0, 0.0;
     filter.set_state(state);
 
     StationaryFilter::P_t covariance = StationaryFilter::P_t::Zero();
@@ -84,12 +84,12 @@ void initialize_stationary_filter(StationaryFilter& filter)
 
 TEST_CASE("Rotation-vector quaternion helper round-trips small attitude corrections")
 {
-    static_assert(PropagationPolicy<StationaryPropagation, InsStateDef>);
-    static_assert(PropagationPolicy<NoisyPropagation, InsStateDef>);
+    static_assert(PropagationPolicy<StationaryPropagation, DefaultInsStateDef>);
+    static_assert(PropagationPolicy<NoisyPropagation, DefaultInsStateDef>);
 
     const Vec3 phi{0.01, -0.02, 0.03};
-    const auto q = navkit::core::math::quaternion_from_rotation_vector(phi);
-    const auto recovered = navkit::core::math::rotation_vector_from_quaternion(q);
+    const auto q = navkit::core::math::quaternion_from_rotvec_rad(phi);
+    const auto recovered = navkit::core::math::rotvec_rad_from_quaternion(q);
 
     CHECK(recovered.isApprox(phi, 1.0e-12));
 }
@@ -119,12 +119,38 @@ TEST_CASE("Ideal stationary ECEF IMU increment preserves nominal PVA")
     ImuIncrement increment;
     REQUIRE(ideal_stationary_increment(increment));
 
-    REQUIRE(StationaryPropagation::process_imu_increment<InsStateDef>(filter.state(), increment));
+    REQUIRE(StationaryPropagation::process_imu_increment<DefaultInsStateDef>(increment,
+                                                                             filter.state()));
 
     const auto& state = filter.state();
-    CHECK(segment<InsStateDef::Pos>(state).isApprox(Vec3{Wgs84::a_m, 0.0, 0.0}, 1.0e-8));
-    CHECK(segment<InsStateDef::Vel>(state).isZero(1.0e-10));
-    CHECK(segment<InsStateDef::Att>(state).isZero(1.0e-12));
+    CHECK(segment<DefaultInsStateDef::Pos>(state).isApprox(Vec3{Wgs84::a_m, 0.0, 0.0}, 1.0e-8));
+    CHECK(segment<DefaultInsStateDef::Vel>(state).isZero(1.0e-10));
+    CHECK(segment<DefaultInsStateDef::Quat>(state).isApprox(
+        Eigen::Matrix<Scalar_t, 4, 1>{1.0, 0.0, 0.0, 0.0}, 1.0e-12));
+}
+
+TEST_CASE("Ideal stationary ECEF IMU increments keep pure strapdown bounded at 1000 Hz")
+{
+    StationaryFilter filter;
+    initialize_stationary_filter(filter);
+
+    sim::ImuSimulator simulator;
+    simulator.initialize(stationary_sample(0.0));
+
+    constexpr Time_t dt_s = 0.001;
+    constexpr int sample_count = 10000;
+    for (int k = 1; k <= sample_count; ++k) {
+        ImuIncrement increment;
+        REQUIRE(simulator.generate(stationary_sample(static_cast<Time_t>(k) * dt_s), increment));
+        REQUIRE(StationaryPropagation::process_imu_increment<DefaultInsStateDef>(increment,
+                                                                                 filter.state()));
+    }
+
+    const auto& state = filter.state();
+    CHECK(segment<DefaultInsStateDef::Pos>(state).isApprox(Vec3{Wgs84::a_m, 0.0, 0.0}, 1.0e-3));
+    CHECK(segment<DefaultInsStateDef::Vel>(state).isZero(1.0e-6));
+    CHECK(segment<DefaultInsStateDef::Quat>(state).isApprox(
+        Eigen::Matrix<Scalar_t, 4, 1>{1.0, 0.0, 0.0, 0.0}, 1.0e-10));
 }
 
 TEST_CASE("ECEF INS covariance prediction remains symmetric and process-noise driven")
@@ -136,17 +162,17 @@ TEST_CASE("ECEF INS covariance prediction remains symmetric and process-noise dr
 
     StationaryFilter::P_t phi{};
     StationaryFilter::P_t qd{};
-    REQUIRE(NoisyPropagation::covariance_step_from_increment<InsStateDef>(
+    REQUIRE(NoisyPropagation::covariance_step_from_increment<DefaultInsStateDef>(
         filter.state(), increment, phi, qd));
-    REQUIRE(NoisyPropagation::process_imu_increment<InsStateDef>(filter.state(), increment));
+    REQUIRE(NoisyPropagation::process_imu_increment<DefaultInsStateDef>(increment, filter.state()));
     filter.propagate_covariance(phi, qd);
 
     const auto& covariance = filter.covariance();
     CHECK(covariance.isApprox(covariance.transpose(), 1.0e-15));
-    CHECK(covariance(InsStateDef::Vel::i, InsStateDef::Vel::i) > 0.0);
-    CHECK(covariance(InsStateDef::Att::i, InsStateDef::Att::i) > 0.0);
-    CHECK(covariance(InsStateDef::GyroB::i, InsStateDef::GyroB::i) > 0.0);
-    CHECK(covariance(InsStateDef::AccB::i, InsStateDef::AccB::i) > 0.0);
+    CHECK(covariance(DefaultInsStateDef::Vel::i, DefaultInsStateDef::Vel::i) > 0.0);
+    CHECK(covariance(DefaultInsStateDef::Att::i, DefaultInsStateDef::Att::i) > 0.0);
+    CHECK(covariance(DefaultInsStateDef::GyroB::i, DefaultInsStateDef::GyroB::i) > 0.0);
+    CHECK(covariance(DefaultInsStateDef::AccB::i, DefaultInsStateDef::AccB::i) > 0.0);
 }
 
 TEST_CASE("ECEF INS propagation rejects invalid IMU intervals without throwing")
@@ -154,8 +180,8 @@ TEST_CASE("ECEF INS propagation rejects invalid IMU intervals without throwing")
     StationaryFilter filter;
     initialize_stationary_filter(filter);
 
-    CHECK_FALSE(
-        StationaryPropagation::process_imu_increment<InsStateDef>(filter.state(), ImuIncrement{}));
+    CHECK_FALSE(StationaryPropagation::process_imu_increment<DefaultInsStateDef>(ImuIncrement{},
+                                                                                 filter.state()));
 }
 
 } // namespace navkit::core::estimation::test

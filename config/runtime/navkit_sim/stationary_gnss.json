@@ -1,6 +1,20 @@
 {
   "run_name": "stationary_gnss_demo",
   "output_dir": "output/logs/stationary_gnss_demo",
+  "logging": {
+    "console": {
+      "rate_hz": 1.0
+    },
+    "truth": {
+      "rate_hz": 10.0
+    },
+    "nav": {
+      "rate_hz": 10.0
+    },
+    "measurement_statistics": {
+      "rate_hz": 1.0
+    }
+  },
   "trajectory": {
     "type": "stationary",
     "duration_s": 60.0,
