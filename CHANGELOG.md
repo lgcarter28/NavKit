@@ -34,6 +34,10 @@ This project follows
 - App-side navigation initialization and transfer-alignment provider seams, including typed PVA/TXA startup and alignment vocabulary, deterministic and random PVA initialization providers, transfer-alignment sample validity flags, and validation for the selected stationary GNSS app config.
 - Focused ECEF navigator v1 algorithm specification under `docs/algorithms/navigator_ecef_v1`, covering the first one-IMU quaternion mechanization, coning/sculling baseline, analytical covariance prediction contract, GNSS position/velocity antenna-lever-arm observations, runtime API contract, and validation gate.
 - Focused IMU emulator v1 algorithm specification and first working simulator implementation, including a product-core IMU increment sample, ECEF-truth-derived ideal increments, deterministic gyro/accelerometer error-model parameters, seeded noise, bias random walk, quantization, runtime config parsing helpers, and equation-shaped tests.
+- First ECEF INS propagation policy with rotation-vector/quaternion helpers, two-sample coning/sculling compensation, ECEF PVA nominal propagation, first-order `F_k`/`G_k` covariance prediction, symmetry-preserving covariance tests, and stationary truth/IMU closed-loop tests.
+- Navigator typed IMU ingestion through `push_imu(...)`, fixed-capacity IMU buffering, propagation success reporting, and explicit stage-method coverage.
+- Simulation app IMU runtime validation and app-configured IMU simulator selection for feeding generated IMU increments into the selected Navigator.
+- Shared runtime cadence parsing for `rate_hz` or `dt_s`, plus a small IMU runtime helper that keeps IMU simulator initialization/generation details out of the central simulation loop.
 
 ### Changed
 
@@ -109,6 +113,11 @@ This project follows
 - Split the Navigator propagation seam into explicit strapdown-integration and covariance-prediction hooks, added `Navigator::update()` as the normal orchestration call, and moved the simulation app loop to that API while preserving current GNSS-only `NoOpPropagation` behavior.
 - Corrected the truth-log metadata convention for `q_eb` so it matches the ECEF-to-body attitude used by trajectory truth and IMU derivation.
 - Tightened the IMU emulator API and truth schema: `TruthSample` now carries only trajectory truth, truth logs no longer include IMU-derived acceleration/angular-rate fields, reusable quaternion/skew helpers live under core math, and IMU generation uses explicit `bool`/out-parameter failure handling instead of exceptions or `std::optional`.
+- Selected stationary GNSS product configs now use the first ECEF INS propagation policy instead of `NoOpPropagation`, while `NoOpPropagation` remains available for measurement-only products.
+- Extended MSVC NavKit-owned compile options with `/bigobj` so template-heavy selected-config application translation units compile reliably on Windows.
+- Corrected the propagation/filter ownership boundary: propagation policies now operate on configured state definitions, build discrete covariance inputs, and leave `KalmanFilter` responsible for applying covariance propagation.
+- Reduced the v1 INS state definitions to bias-only PVA/IMU-error states by removing stale gyro and accelerometer scale-factor segments.
+- Moved reusable coning/sculling, planet-rate, gravity-gradient, quaternion/RPY, and simulation random-draw helpers toward their owning domains instead of keeping them inside the first ECEF INS and IMU simulator implementations.
 
 ### Removed
 

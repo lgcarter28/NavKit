@@ -7,7 +7,7 @@ make the emulator mode and every enabled error source explicit. A v1 shape is:
 \begin{verbatim}
 "imu": {
   "type": "ideal" | "error_model",
-  "sample_rate_hz": 200.0,
+  "rate_hz": 1000.0,
   "seed": 12345,
   "gyro": {
     "bias_radps": [0, 0, 0],
@@ -34,7 +34,9 @@ make the emulator mode and every enabled error source explicit. A v1 shape is:
 
 Runtime validation must reject:
 \begin{itemize}
-    \item nonpositive sample rates;
+    \item nonpositive sample rates or intervals;
+    \item ambiguous timing input where both \texttt{rate\_hz} and
+    \texttt{dt\_s} are provided;
     \item missing gyro or accelerometer sections when \texttt{type} is
     \texttt{error\_model};
     \item vectors with dimension other than three;

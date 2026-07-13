@@ -32,6 +32,7 @@ struct MissingFilterLifecycle
 
 struct MissingSensorProcessing
 {
+    using StateDef_t = NavigatorPolicyStateDef;
     using State_t = NavigatorPolicyFilter::State_t;
     using P_t = NavigatorPolicyFilter::P_t;
 
@@ -41,6 +42,7 @@ struct MissingSensorProcessing
     [[nodiscard]] const P_t& covariance() const;
     void set_state(const State_t&);
     void set_covariance(const P_t&);
+    void propagate_covariance(const P_t&, const P_t&);
     void inject();
     void reset();
 };
@@ -68,55 +70,176 @@ struct MissingStrapdownIntegration
 
 struct WrongStrapdownIntegrationReturn
 {
-    static int process_strapdown_integration(NavigatorPolicyFilter& filter,
-                                             NavigatorPolicySensors& sensors)
+    static constexpr std::size_t imu_buffer_capacity = 2U; // NOLINT(readability-identifier-naming)
+
+    template<typename StateDef>
+    static int process_imu_increment(State<StateDef>& state, const ImuIncrement& increment)
     {
-        static_cast<void>(filter);
-        static_cast<void>(sensors);
+        static_cast<void>(state);
+        static_cast<void>(increment);
         return 0;
     }
 
-    static void process_covariance(NavigatorPolicyFilter& filter, NavigatorPolicySensors& sensors)
+    template<typename StateDef>
+    static bool process_imu_increment_pair(State<StateDef>& state,
+                                           const ImuIncrement& first,
+                                           const ImuIncrement& second)
     {
-        static_cast<void>(filter);
-        static_cast<void>(sensors);
+        static_cast<void>(state);
+        static_cast<void>(first);
+        static_cast<void>(second);
+        return true;
+    }
+
+    template<typename StateDef>
+    static bool covariance_step_from_increment(const State<StateDef>& state,
+                                               const ImuIncrement& increment,
+                                               StateCov<StateDef>& phi,
+                                               StateCov<StateDef>& qd)
+    {
+        static_cast<void>(state);
+        static_cast<void>(increment);
+        phi.setIdentity();
+        qd.setZero();
+        return true;
+    }
+
+    template<typename StateDef>
+    static bool covariance_step_from_increment_pair(const State<StateDef>& state,
+                                                    const ImuIncrement& first,
+                                                    const ImuIncrement& second,
+                                                    StateCov<StateDef>& phi,
+                                                    StateCov<StateDef>& qd)
+    {
+        static_cast<void>(state);
+        static_cast<void>(first);
+        static_cast<void>(second);
+        phi.setIdentity();
+        qd.setZero();
+        return true;
     }
 };
 
 struct MissingCovariancePrediction
 {
-    static void process_strapdown_integration(NavigatorPolicyFilter& filter,
-                                              NavigatorPolicySensors& sensors)
+    static constexpr std::size_t imu_buffer_capacity = 2U; // NOLINT(readability-identifier-naming)
+
+    template<typename StateDef>
+    static bool process_imu_increment(State<StateDef>& state, const ImuIncrement& increment)
     {
-        static_cast<void>(filter);
-        static_cast<void>(sensors);
+        static_cast<void>(state);
+        static_cast<void>(increment);
+        return true;
+    }
+
+    template<typename StateDef>
+    static bool process_imu_increment_pair(State<StateDef>& state,
+                                           const ImuIncrement& first,
+                                           const ImuIncrement& second)
+    {
+        static_cast<void>(state);
+        static_cast<void>(first);
+        static_cast<void>(second);
+        return true;
+    }
+};
+
+struct MissingImuProcessing
+{
+    static constexpr std::size_t imu_buffer_capacity = 2U; // NOLINT(readability-identifier-naming)
+
+    template<typename StateDef>
+    static bool covariance_step_from_increment(const State<StateDef>& state,
+                                               const ImuIncrement& increment,
+                                               StateCov<StateDef>& phi,
+                                               StateCov<StateDef>& qd)
+    {
+        static_cast<void>(state);
+        static_cast<void>(increment);
+        phi.setIdentity();
+        qd.setZero();
+        return true;
+    }
+
+    template<typename StateDef>
+    static bool covariance_step_from_increment_pair(const State<StateDef>& state,
+                                                    const ImuIncrement& first,
+                                                    const ImuIncrement& second,
+                                                    StateCov<StateDef>& phi,
+                                                    StateCov<StateDef>& qd)
+    {
+        static_cast<void>(state);
+        static_cast<void>(first);
+        static_cast<void>(second);
+        phi.setIdentity();
+        qd.setZero();
+        return true;
     }
 };
 
 struct RecordingPropagation
 {
-    static inline int strapdown_call_count{0};
-    static inline int covariance_call_count{0};
+    static constexpr std::size_t imu_buffer_capacity = 4U; // NOLINT(readability-identifier-naming)
+    static inline int imu_increment_call_count{0};
+    static inline int imu_pair_call_count{0};
+    static inline int covariance_increment_call_count{0};
+    static inline int covariance_pair_call_count{0};
+    static inline double last_imu_time_s{0.0};
 
     static void reset()
     {
-        strapdown_call_count = 0;
-        covariance_call_count = 0;
+        imu_increment_call_count = 0;
+        imu_pair_call_count = 0;
+        covariance_increment_call_count = 0;
+        covariance_pair_call_count = 0;
+        last_imu_time_s = 0.0;
     }
 
-    static void process_strapdown_integration(NavigatorPolicyFilter& filter,
-                                              NavigatorPolicySensors& sensors)
+    template<typename StateDef>
+    static bool process_imu_increment(State<StateDef>& state, const ImuIncrement& increment)
     {
-        static_cast<void>(filter);
-        static_cast<void>(sensors);
-        ++strapdown_call_count;
+        static_cast<void>(state);
+        ++imu_increment_call_count;
+        last_imu_time_s = increment.time_s;
+        return increment.dt_s > 0.0;
     }
 
-    static void process_covariance(NavigatorPolicyFilter& filter, NavigatorPolicySensors& sensors)
+    template<typename StateDef>
+    static bool process_imu_increment_pair(State<StateDef>& state,
+                                           const ImuIncrement& first,
+                                           const ImuIncrement& second)
     {
-        static_cast<void>(filter);
-        static_cast<void>(sensors);
-        ++covariance_call_count;
+        static_cast<void>(state);
+        ++imu_pair_call_count;
+        last_imu_time_s = second.time_s;
+        return first.dt_s > 0.0 && second.dt_s > 0.0;
+    }
+
+    template<typename StateDef>
+    static bool covariance_step_from_increment(const State<StateDef>& state,
+                                               const ImuIncrement& increment,
+                                               StateCov<StateDef>& phi,
+                                               StateCov<StateDef>& qd)
+    {
+        static_cast<void>(state);
+        ++covariance_increment_call_count;
+        phi.setIdentity();
+        qd.setZero();
+        return increment.dt_s > 0.0;
+    }
+
+    template<typename StateDef>
+    static bool covariance_step_from_increment_pair(const State<StateDef>& state,
+                                                    const ImuIncrement& first,
+                                                    const ImuIncrement& second,
+                                                    StateCov<StateDef>& phi,
+                                                    StateCov<StateDef>& qd)
+    {
+        static_cast<void>(state);
+        ++covariance_pair_call_count;
+        phi.setIdentity();
+        qd.setZero();
+        return first.dt_s > 0.0 && second.dt_s > 0.0;
     }
 };
 
@@ -184,22 +307,14 @@ TEST_CASE("NavigatorUpdatePolicy captures tuple-wide Navigator update compatibil
     CHECK(true);
 }
 
-TEST_CASE("PropagationPolicy captures explicit Navigator propagation stages")
+TEST_CASE("PropagationPolicy captures state propagation and covariance-step construction")
 {
-    static_assert(PropagationPolicy<NavigatorPolicyPropagation,
-                                    NavigatorPolicyFilter,
-                                    NavigatorPolicySensors>);
-    static_assert(
-        PropagationPolicy<RecordingPropagation, NavigatorPolicyFilter, NavigatorPolicySensors>);
-    static_assert(!PropagationPolicy<MissingStrapdownIntegration,
-                                     NavigatorPolicyFilter,
-                                     NavigatorPolicySensors>);
-    static_assert(!PropagationPolicy<MissingCovariancePrediction,
-                                     NavigatorPolicyFilter,
-                                     NavigatorPolicySensors>);
-    static_assert(!PropagationPolicy<WrongStrapdownIntegrationReturn,
-                                     NavigatorPolicyFilter,
-                                     NavigatorPolicySensors>);
+    static_assert(PropagationPolicy<NavigatorPolicyPropagation, NavigatorPolicyStateDef>);
+    static_assert(PropagationPolicy<RecordingPropagation, NavigatorPolicyStateDef>);
+    static_assert(!PropagationPolicy<MissingStrapdownIntegration, NavigatorPolicyStateDef>);
+    static_assert(!PropagationPolicy<MissingCovariancePrediction, NavigatorPolicyStateDef>);
+    static_assert(!PropagationPolicy<MissingImuProcessing, NavigatorPolicyStateDef>);
+    static_assert(!PropagationPolicy<WrongStrapdownIntegrationReturn, NavigatorPolicyStateDef>);
 
     CHECK(true);
 }
@@ -221,31 +336,73 @@ TEST_CASE(
     CHECK(true);
 }
 
-TEST_CASE("Navigator explicit propagation stages dispatch through the propagation policy")
+TEST_CASE("Navigator covariance stage drains pending covariance steps")
 {
     using Nav = Navigator<NavigatorPolicyFilter, NavigatorPolicySensors, RecordingPropagation>;
 
     RecordingPropagation::reset();
     Nav navigator;
 
-    navigator.process_strapdown_integration();
-    navigator.process_covariance();
+    CHECK(navigator.push_imu(ImuIncrement{.time_s = 1.0, .dt_s = 1.0}));
+    CHECK(navigator.process_strapdown_integration());
+    CHECK(navigator.pending_covariance_step_count() == 1U);
+    CHECK(navigator.propagate_covariance());
 
-    CHECK(RecordingPropagation::strapdown_call_count == 1);
-    CHECK(RecordingPropagation::covariance_call_count == 1);
+    CHECK(navigator.pending_covariance_step_count() == 0U);
+    CHECK(RecordingPropagation::covariance_increment_call_count == 1);
 }
 
-TEST_CASE("Navigator update orchestrates propagation stages before measurement processing")
+TEST_CASE("Navigator consumes queued IMU increments through propagation policy")
 {
     using Nav = Navigator<NavigatorPolicyFilter, NavigatorPolicySensors, RecordingPropagation>;
 
     RecordingPropagation::reset();
     Nav navigator;
 
+    CHECK(navigator.push_imu(ImuIncrement{.time_s = 1.0, .dt_s = 1.0}));
+    CHECK(navigator.push_imu(ImuIncrement{.time_s = 2.0, .dt_s = 1.0}));
+    CHECK(navigator.push_imu(ImuIncrement{.time_s = 3.0, .dt_s = 1.0}));
+    CHECK(navigator.imu_buffer_size() == 3U);
+
+    CHECK(navigator.process_strapdown_integration());
+
+    CHECK(navigator.imu_buffer_size() == 0U);
+    CHECK(navigator.pending_covariance_step_count() == 1U);
+    CHECK(navigator.last_propagation_success());
+    CHECK(RecordingPropagation::imu_pair_call_count == 1);
+    CHECK(RecordingPropagation::imu_increment_call_count == 1);
+    CHECK(RecordingPropagation::covariance_pair_call_count == 1);
+    CHECK(RecordingPropagation::covariance_increment_call_count == 1);
+    CHECK(RecordingPropagation::last_imu_time_s == doctest::Approx(3.0));
+}
+
+TEST_CASE("Navigator reports IMU propagation failure")
+{
+    using Nav = Navigator<NavigatorPolicyFilter, NavigatorPolicySensors, RecordingPropagation>;
+
+    RecordingPropagation::reset();
+    Nav navigator;
+
+    CHECK(navigator.push_imu(ImuIncrement{.time_s = 1.0, .dt_s = 0.0}));
+
+    CHECK_FALSE(navigator.process_strapdown_integration());
+    CHECK_FALSE(navigator.last_propagation_success());
+    CHECK(navigator.imu_buffer_size() == 0U);
+}
+
+TEST_CASE("Navigator update orchestrates strapdown and covariance propagation before measurements")
+{
+    using Nav = Navigator<NavigatorPolicyFilter, NavigatorPolicySensors, RecordingPropagation>;
+
+    RecordingPropagation::reset();
+    Nav navigator;
+
+    CHECK(navigator.push_imu(ImuIncrement{.time_s = 1.0, .dt_s = 1.0}));
     navigator.update();
 
-    CHECK(RecordingPropagation::strapdown_call_count == 1);
-    CHECK(RecordingPropagation::covariance_call_count == 1);
+    CHECK(RecordingPropagation::imu_increment_call_count == 1);
+    CHECK(RecordingPropagation::covariance_increment_call_count == 1);
+    CHECK(navigator.pending_covariance_step_count() == 0U);
 }
 
 TEST_CASE("Navigator measurement processing does not invoke propagation stages")
@@ -257,8 +414,10 @@ TEST_CASE("Navigator measurement processing does not invoke propagation stages")
 
     navigator.process_measurements();
 
-    CHECK(RecordingPropagation::strapdown_call_count == 0);
-    CHECK(RecordingPropagation::covariance_call_count == 0);
+    CHECK(RecordingPropagation::imu_increment_call_count == 0);
+    CHECK(RecordingPropagation::imu_pair_call_count == 0);
+    CHECK(RecordingPropagation::covariance_increment_call_count == 0);
+    CHECK(RecordingPropagation::covariance_pair_call_count == 0);
 }
 
 } // namespace navkit::core::estimation::test

@@ -14,6 +14,7 @@
 #include "navkit/app_support/runtime/RuntimeConfigValidation.hpp"
 #include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
 #include "navkit/io/RunLogger.hpp"
+#include "navkit/sim/ImuSimulatorPolicy.hpp"
 #include "test_main.hpp"
 
 #include <nlohmann/json.hpp>
@@ -34,6 +35,7 @@ struct DuplicateSensorIdConfig
 {
     using NavKit = StationaryGnssAppConfig::NavKit;
     using Logger = StationaryGnssAppConfig::Logger;
+    using ImuSimulator = StationaryGnssAppConfig::ImuSimulator;
     using EmulatorBindings =
         std::tuple<navkit::app_support::EmulatorBinding<navkit::app_support::GnssEmulator<0U>,
                                                         NavKit::PrimaryGnssSensor>,
@@ -50,6 +52,7 @@ struct MissingTargetSensorConfig
 {
     using NavKit = StationaryGnssAppConfig::NavKit;
     using Logger = StationaryGnssAppConfig::Logger;
+    using ImuSimulator = StationaryGnssAppConfig::ImuSimulator;
     using EmulatorBindings =
         std::tuple<navkit::app_support::EmulatorBinding<navkit::app_support::GnssEmulator<99U>,
                                                         UnknownSensor>>;
@@ -68,8 +71,9 @@ struct NotABinding
             {"trajectory",
              {{"type", "stationary"},
               {"duration_s", 60.0},
-              {"dt_s", 1.0},
+              {"rate_hz", 1000.0},
               {"p_e_m", {6378137.0, 0.0, 0.0}}}},
+            {"imu", {{"type", "ideal"}, {"rate_hz", 1000.0}, {"seed", 42U}}},
             {"gnss", {{"dt_s", 1.0}, {"sigma_h_m", 3.0}, {"sigma_v_m", 5.0}, {"seed", 42U}}},
             {"initialization",
              {{"type", "pva_error"},
@@ -108,6 +112,7 @@ TEST_CASE("Stationary GNSS runtime validator accepts the documented input shape"
     const auto cfg = valid_stationary_gnss_runtime_config();
 
     static_assert(SimulationAppConfigPolicy<StationaryGnssAppConfig>);
+    static_assert(navkit::sim::ImuSimulatorPolicy<StationaryGnssAppConfig::ImuSimulator>);
     static_assert(!SimulationAppConfigPolicy<DuplicateSensorIdConfig>);
     static_assert(!SimulationAppConfigPolicy<MissingTargetSensorConfig>);
     static_assert(EmulatorPolicy<StationaryGnssAppConfig::PrimaryGnssEmulator,
@@ -193,7 +198,15 @@ TEST_CASE("Stationary GNSS runtime validator rejects disabled transfer alignment
 TEST_CASE("Stationary GNSS runtime validator rejects unsupported sensor sections")
 {
     auto cfg = valid_stationary_gnss_runtime_config();
-    cfg.emplace("imu", nlohmann::json::object());
+    cfg.emplace("baro", nlohmann::json::object());
+
+    CHECK_THROWS_AS(validate_runtime_config<StationaryGnssAppConfig>(cfg), std::runtime_error);
+}
+
+TEST_CASE("Stationary GNSS runtime validator rejects unsupported IMU configuration")
+{
+    auto cfg = valid_stationary_gnss_runtime_config();
+    cfg.at("imu").at("type") = "perfectish";
 
     CHECK_THROWS_AS(validate_runtime_config<StationaryGnssAppConfig>(cfg), std::runtime_error);
 }
@@ -202,6 +215,14 @@ TEST_CASE("Stationary GNSS runtime validator rejects invalid trajectory shape")
 {
     auto cfg = valid_stationary_gnss_runtime_config();
     cfg.at("trajectory").at("p_e_m") = {1.0, 2.0};
+
+    CHECK_THROWS_AS(validate_runtime_config<StationaryGnssAppConfig>(cfg), std::runtime_error);
+}
+
+TEST_CASE("Stationary GNSS runtime validator rejects ambiguous runtime rates")
+{
+    auto cfg = valid_stationary_gnss_runtime_config();
+    cfg.at("trajectory").emplace("dt_s", 0.001);
 
     CHECK_THROWS_AS(validate_runtime_config<StationaryGnssAppConfig>(cfg), std::runtime_error);
 }

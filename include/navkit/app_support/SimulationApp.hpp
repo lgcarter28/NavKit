@@ -7,6 +7,7 @@
 #include "navkit/app_support/config/LoggingConfigTraits.hpp"
 #include "navkit/app_support/config/SimulationAppConfigPolicy.hpp"
 #include "navkit/app_support/emulation/EmulatorRuntime.hpp"
+#include "navkit/app_support/emulation/concrete/ImuRuntime.hpp"
 #include "navkit/app_support/initialization/FilterInitialization.hpp"
 #include "navkit/app_support/logging/MeasurementStatisticsLogger.hpp"
 #include "navkit/app_support/profiling/ProfileExport.hpp"
@@ -34,8 +35,10 @@ public:
     using EmulatorBindings = typename Config::EmulatorBindings;
     using NavInitializationProvider = typename Config::NavInitializationProvider;
     using TransferAlignmentProvider = typename Config::TransferAlignmentProvider;
+    using ImuSimulator = typename Config::ImuSimulator;
     using Logger = LoggerConfig_t<Config>;
     using Emulators = EmulatorRuntime<NavKit, Logger, EmulatorBindings>;
+    using Imu = ImuRuntime<ImuSimulator>;
 
     static int run(const std::filesystem::path& config_path)
     {
@@ -45,6 +48,7 @@ public:
         const auto run_settings = run_settings_from_json(cfg);
         const auto trajectory = trajectory_run_from_json(cfg);
         auto emulator_runtimes = Emulators::make_runtimes(cfg);
+        Imu imu_runtime(cfg);
 
         reset_profile_sink_if_configured<NavKit>();
 
@@ -59,9 +63,18 @@ public:
 
         for (const auto& sample : trajectory.truth_samples) {
             logger.log(sample);
+            if (!imu_runtime.process(navigator, sample)) {
+                std::printf("IMU runtime failure at t=%f: %s\n",
+                            sample.time,
+                            imu_runtime.last_error().data());
+                return 2;
+            }
             Emulators::process(navigator, logger, emulator_runtimes, sample);
 
-            navigator.update();
+            if (!navigator.update()) {
+                std::printf("Navigator propagation failed at t=%f\n", sample.time);
+                return 4;
+            }
 
             log_measurement_statistics<typename NavKit::Sensors>(logger, filter);
             logger.log(io::NavEstimateLogPayload<StateDef, Filter>{

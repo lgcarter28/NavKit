@@ -92,6 +92,12 @@ public:
         m_P = P;
     }
 
+    void propagate_covariance(const P_t& phi, const P_t& qd)
+    {
+        m_P = (phi * m_P * phi.transpose()) + qd;
+        m_P = 0.5 * (m_P + m_P.transpose());
+    }
+
     template<SensorPolicy Sensor>
         requires MeasurementModelPolicy<typename Sensor::MeasurementModel_t, StateDef>
     [[nodiscard]] bool measurement_statistics_available() const

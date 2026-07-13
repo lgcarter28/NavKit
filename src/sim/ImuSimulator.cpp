@@ -3,6 +3,7 @@
 
 #include "navkit/sim/ImuSimulator.hpp"
 
+#include "navkit/core/environment/RotatingPlanetKinematics.hpp"
 #include "navkit/core/environment/gravity/J2.hpp"
 #include "navkit/core/environment/planet/Wgs84.hpp"
 #include "navkit/core/math/Quaternion.hpp"
@@ -19,11 +20,6 @@ namespace
 
 using navkit::core::environment::J2;
 using navkit::core::environment::Wgs84;
-
-[[nodiscard]] Vec3 earth_rate_e_radps()
-{
-    return Vec3{0.0, 0.0, Wgs84::omega_rad_s};
-}
 
 [[nodiscard]] Eigen::Matrix<Scalar_t, 3, 3> scale_matrix(const Vec3& scale_factor)
 {
@@ -71,14 +67,17 @@ bool ImuSimulator::ideal_interval_from_truth_ecef(const TruthSample& previous,
     const auto delta_theta_eb_b = core::math::rotation_vector_from_quaternion(q_body_relative);
 
     const auto q_mid = q_prev.slerp(0.5, q_current).normalized();
-    const auto omega_ie_b = q_mid * earth_rate_e_radps();
+    const auto omega_ie_b = q_mid * navkit::core::environment::planet_rate_fixed_radps<Wgs84>();
     const auto delta_theta_ib_b = delta_theta_eb_b + (omega_ie_b * dt_s);
 
     const auto a_bar_e = (current.v_e - previous.v_e) / dt_s;
     const auto v_bar_e = 0.5 * (previous.v_e + current.v_e);
     const auto p_bar_e = 0.5 * (previous.p_e + current.p_e);
     const auto gravity_e = J2<Wgs84>::acceleration(p_bar_e);
-    const auto specific_force_e = a_bar_e + (2.0 * earth_rate_e_radps().cross(v_bar_e)) - gravity_e;
+    const auto specific_force_e =
+        a_bar_e +
+        (2.0 * navkit::core::environment::planet_rate_fixed_radps<Wgs84>().cross(v_bar_e)) -
+        gravity_e;
     const auto specific_force_b = q_mid * specific_force_e;
 
     interval = {.time_s = current.time,
@@ -158,14 +157,7 @@ bool ImuSimulator::generate(const TruthSample& current, ImuIncrement& increment)
 
 Vec3 ImuSimulator::draw_normal_vector(const Vec3& covariance_diag)
 {
-    Vec3 draw = Vec3::Zero();
-    for (Eigen::Index axis = 0; axis < draw.size(); ++axis) {
-        const auto variance = std::max(covariance_diag(axis), 0.0);
-        if (variance > 0.0) {
-            draw(axis) = std::sqrt(variance) * m_unit_normal(m_rng);
-        }
-    }
-    return draw;
+    return draw_normal_diag_cov<3>(covariance_diag, m_rng);
 }
 
 void ImuSimulator::update_biases(Time_t dt_s)

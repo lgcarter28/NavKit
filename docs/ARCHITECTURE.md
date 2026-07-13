@@ -195,10 +195,14 @@ configuration facts.
 
 ## Current data flow
 
-The working demonstration is GNSS-position-only:
+The working demonstration is stationary ECEF INS propagation with GNSS-position
+aiding:
 
 ```text
 stationary truth
+    -> IMU simulator
+    -> Navigator IMU buffer
+    -> ECEF INS propagation policy
     -> GNSS simulator
     -> Sensor queue
     -> Navigator
@@ -208,21 +212,31 @@ stationary truth
     -> Python analysis
 ```
 
-The target flow will add propagation/mechanization, multi-rate sensors, richer
-truth generation, and repeatable validation metrics. Those are roadmap items,
-not current behavior.
+The target flow will add richer aiding, multi-rate sensors, richer truth
+generation, history/replay support, and repeatable validation metrics. Those are
+roadmap items, not current behavior.
 
 ## Current implementation boundaries
 
-- `KalmanFilter` performs measurement updates, stores optional per-model
-  statistics, and delegates injection/reset.
+- `KalmanFilter` performs measurement updates, propagates covariance from
+  discrete `Phi`/`Qd` inputs, stores optional per-model statistics, and
+  delegates injection/reset.
 - `Navigator` exposes `update()` as the normal orchestration call and explicit
-  stage methods for `process_strapdown_integration()`, `process_covariance()`,
-  and `process_measurements()`. The selected propagation policy owns the
-  strapdown-integration and covariance-prediction hooks, while the update policy
-  owns measurement update behavior. Current product configs use
-  `NoOpPropagation`, so behavior remains measurement-only until a real
-  mechanization/prediction policy is implemented.
+  stage methods for `process_strapdown_integration()`, `propagate_covariance()`,
+  and `process_measurements()`. It owns a fixed-capacity FIFO of timestamped IMU
+  increments fed through `push_imu(...)` and composes one pending discrete
+  covariance step while draining that buffer. The selected propagation policy
+  owns state propagation plus `F_k`/`G_k`/`Phi_k`/`Q_d` construction; the filter
+  owns applying the covariance propagation; and the update policy owns
+  measurement update behavior. `NoOpPropagation` remains available for
+  measurement-only products, while the selected stationary GNSS products now use
+  the first ECEF INS propagation policy.
+- `EcefInsPropagation` implements the first single-IMU ECEF propagation path. It
+  uses quaternion math internally for nominal attitude propagation, writes the
+  propagated ECEF-to-body attitude back to the current RPY `Att` segment, builds
+  first-order `F_k`/`G_k`/`Phi_k`/`Q_d` products, and applies the v1
+  PVA+gyro-bias+accelerometer-bias dynamics to the matching bias-only
+  `InsStateDef` segments.
 - Planet and gravity policies are the most complete examples of the intended
   concept -> optional CRTP base -> concrete policy layering.
 - Product-core profiling now provides the embedded-facing vocabulary for future
@@ -237,9 +251,9 @@ not current behavior.
   ECEF truth samples. It derives ideal body-frame inertial angular increments
   and specific-force increments, then applies deterministic gyro/accelerometer
   error-model parameters such as bias, bias random walk, white noise, scale
-  factor, misalignment, non-orthogonality, and quantization. It is tested as a
-  simulator component but is not yet wired into the selected app loop or
-  Navigator ingestion path.
+  factor, misalignment, non-orthogonality, and quantization. The selected
+  simulation app validates IMU runtime config, generates these increments, and
+  feeds them into the Navigator before GNSS measurement processing.
 - Simulation currently contains desktop-oriented support and may use runtime
   polymorphism where practical.
 - Python analysis is deliberately outside the embedded-facing C++ product core.
@@ -272,8 +286,12 @@ already exists and improves readability or diagnostics.
 
 ## Explicitly not implemented yet
 
-- INS propagation/mechanization beyond the current `NoOpPropagation` seam.
-- Navigator ingestion and buffering of IMU increments.
+- GNSS velocity aiding and configured non-IMU sensor lever-arm observations in
+  the selected simulation app.
+- Nominal quaternion state storage in the filter state. The first ECEF INS
+  propagation policy uses quaternion math internally but stores attitude in the
+  current RPY segment.
+- IMU history/replay, delayed-measurement handling, and latency compensation.
 - General coordinate conversions and local-vertical altitude modeling.
 - Barometer simulator behavior beyond current shells/placeholders.
 - Embedded target profiles, resource budgets, and hardware abstraction layers.

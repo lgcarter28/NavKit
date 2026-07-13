@@ -6,6 +6,7 @@
 #include "navkit/core/config/Types.hpp"
 #include "navkit/core/estimation/navigator/ImuIncrement.hpp"
 #include "navkit/core/math/Types.hpp"
+#include "navkit/sim/RandomDraw.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
 #include <random>
@@ -88,7 +89,6 @@ private:
     Vec3 m_gyro_bias_radps{Vec3::Zero()};
     Vec3 m_accel_bias_mps2{Vec3::Zero()};
     std::mt19937 m_rng;
-    std::normal_distribution<Scalar_t> m_unit_normal{0.0, 1.0};
     TruthSample m_previous{};
     bool m_initialized{false};
 };

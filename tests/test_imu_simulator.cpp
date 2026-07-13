@@ -182,7 +182,7 @@ TEST_CASE("IMU runtime config parser accepts ideal and error-model shapes")
     const nlohmann::json error_model = {{"imu",
                                          {{"type", "error_model"},
                                           {"seed", 12U},
-                                          {"sample_rate_hz", 200.0},
+                                          {"rate_hz", 200.0},
                                           {"gyro",
                                            {{"bias_radps", {1.0, 2.0, 3.0}},
                                             {"bias_rw_psd_rad2ps3", {0.0, 0.0, 0.0}},

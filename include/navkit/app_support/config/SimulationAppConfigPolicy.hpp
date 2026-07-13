@@ -9,6 +9,7 @@
 #include "navkit/app_support/initialization/NavInitializationProviderPolicy.hpp"
 #include "navkit/app_support/initialization/TransferAlignmentProviderPolicy.hpp"
 #include "navkit/io/LoggerPolicy.hpp"
+#include "navkit/sim/ImuSimulatorPolicy.hpp"
 
 namespace navkit::app_support
 {
@@ -18,10 +19,12 @@ concept SimulationAppConfigPolicy =
     requires {
         typename Config::NavKit;
         typename Config::EmulatorBindings;
+        typename Config::ImuSimulator;
         typename Config::NavInitializationProvider;
         typename Config::TransferAlignmentProvider;
         typename Config::Logger;
     } && navkit::api::config::NavKitProductConfigPolicy<typename Config::NavKit> &&
+    navkit::sim::ImuSimulatorPolicy<typename Config::ImuSimulator> &&
     navkit::io::LoggerPolicy<LoggerConfig_t<Config>> &&
     EmulatorBindingTuplePolicy<typename Config::EmulatorBindings,
                                typename Config::NavKit::Sensors,

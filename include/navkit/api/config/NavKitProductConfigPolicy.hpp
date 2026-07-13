@@ -36,8 +36,7 @@ concept NavKitProductConfigPolicy = requires {
     requires std::same_as<typename Candidate::Filter::Sensors_t, typename Candidate::Sensors>;
     requires navkit::core::profiling::ProfilerPolicy<typename Candidate::Profiler>;
     requires navkit::core::estimation::PropagationPolicy<typename Candidate::Propagation,
-                                                         typename Candidate::Filter,
-                                                         typename Candidate::Sensors>;
+                                                         typename Candidate::StateDef>;
     requires navkit::core::estimation::NavigatorUpdatePolicy<typename Candidate::NavigatorUpdate,
                                                              typename Candidate::Filter,
                                                              typename Candidate::Sensors>;

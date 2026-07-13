@@ -21,6 +21,7 @@ add_executable(navkit_tests
     test_state_def_policy.cpp
     test_units_frames.cpp
     test_csv_writer.cpp
+    test_ecef_ins_propagation.cpp
     test_environment_policies.cpp
     test_gnss_pos_update.cpp
     test_imu_simulator.cpp

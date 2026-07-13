@@ -15,6 +15,7 @@
 #include "navkit/io/log_products/NavEstimateLogProduct.hpp"
 #include "navkit/io/log_products/TruthLogProduct.hpp"
 #include "navkit/products/StationaryGnss.hpp"
+#include "navkit/sim/ImuSimulator.hpp"
 
 #include <tuple>
 
@@ -33,6 +34,7 @@ struct StationaryGnssConfig
         ::navkit::core::estimation::MeasurementStatistics<PrimaryGnssSensor>;
 
     using EmulatorBindings = std::tuple<PrimaryGnssBinding>;
+    using ImuSimulator = ::navkit::sim::ImuSimulator;
 
     using NavInitializationProvider = ::navkit::app_support::PvaExplicitInitializationProvider;
     using TransferAlignmentProvider = ::navkit::app_support::NoTransferAlignmentProvider;

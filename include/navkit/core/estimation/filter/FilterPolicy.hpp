@@ -4,6 +4,7 @@
 #pragma once
 
 #include "navkit/core/estimation/sensor/SensorPolicy.hpp"
+#include "navkit/core/estimation/state/StateDefPolicy.hpp"
 
 #include <concepts>
 
@@ -24,6 +25,9 @@ concept FilterPolicy =
                                                   const typename Candidate::P_t& covariance) {
         typename Candidate::State_t;
         typename Candidate::P_t;
+        typename Candidate::StateDef_t;
+
+        requires StateDefPolicy<typename Candidate::StateDef_t>;
 
         { filter.state() } -> std::same_as<typename Candidate::State_t&>;
         { const_filter.state() } -> std::same_as<const typename Candidate::State_t&>;
@@ -31,6 +35,7 @@ concept FilterPolicy =
         { const_filter.covariance() } -> std::same_as<const typename Candidate::P_t&>;
         { filter.set_state(state) } -> std::same_as<void>;
         { filter.set_covariance(covariance) } -> std::same_as<void>;
+        { filter.propagate_covariance(covariance, covariance) } -> std::same_as<void>;
     };
 
 template<typename Candidate, typename Sensor>

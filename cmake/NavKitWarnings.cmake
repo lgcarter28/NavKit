@@ -14,6 +14,7 @@ function(navkit_apply_warnings target_name)
         target_compile_options(${target_name}
             PRIVATE
                 /W4
+                /bigobj
                 /permissive-
                 /Zc:__cplusplus
                 $<$<BOOL:${NAVKIT_WARNINGS_AS_ERRORS}>:/WX>

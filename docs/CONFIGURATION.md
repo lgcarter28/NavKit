@@ -142,10 +142,12 @@ graph while still allowing filter-owned measurement statistics to remain keyed
 by the configured sensor type.
 
 `Propagation` is the selected propagation/mechanization behavior for the
-configured `Filter` and `Sensors`. Current stationary GNSS configs use
-`NoOpPropagation` so the Navigator can own the propagation seam without
-changing the existing measurement-only behavior. Real mechanization policies
-belong behind this alias once their equations and inputs are defined.
+configured `StateDef`. It owns nominal state propagation and construction of
+the discrete covariance inputs (`Phi` and `Qd`) from the selected dynamics, but
+it does not own the filter covariance update itself. `KalmanFilter` applies
+`P = Phi P Phi^T + Qd`, and `Navigator` orchestrates when the selected
+propagation policy and filter are called. Measurement-only products can still
+select `NoOpPropagation`.
 
 `NavigatorUpdate` is the selected concrete update behavior for the configured
 `Filter` and `Sensors`, such as `UpdatePostFilter<Filter>`. The lower-level
@@ -170,6 +172,7 @@ struct StationaryGnssAppConfig
         navkit::app_support::EmulatorBinding<PrimaryGnssEmulator, PrimaryGnssSensor>;
 
     using EmulatorBindings = std::tuple<PrimaryGnssBinding>;
+    using ImuSimulator = navkit::sim::ImuSimulator;
 
     using NavInitializationProvider =
         navkit::app_support::PvaExplicitInitializationProvider;
@@ -198,7 +201,9 @@ that this ID matches the selected sensor's configured `Sensor::Id`. This keeps
 duplicate sensors of the same model type, such as primary and backup GNSS
 receivers, unambiguous. App configs also select the logger adapter type at
 compile time; runtime JSON still owns run-specific choices such as run name and
-output directory. Logger adapters are composed from concrete log products with
+output directory. App configs also select the concrete IMU simulator type used by
+the selected simulation loop; runtime JSON configures that simulator's runtime
+mode and numeric error parameters. Logger adapters are composed from concrete log products with
 `navkit::io::RunLogger<...>`; the selected app config owns the product set.
 Startup navigation data is also an app boundary: `NavInitializationProvider`
 turns runtime input, simulated truth, saved state, or future embedded inputs
@@ -304,8 +309,8 @@ apps/navkit_sim/ProfiledStationaryGnss.hpp
 ```
 
 Runtime JSON is still checked against the compiled app composition. For example,
-the stationary GNSS sim config currently requires `trajectory`, `gnss`, and
-`initialization` sections, rejects unsupported `imu`, `baro`, and disabled
+the stationary GNSS sim config currently requires `trajectory`, `imu`, `gnss`,
+and `initialization` sections, rejects unsupported `baro` and disabled
 `transfer_alignment` sections, and validates common numeric/vector fields before
 the simulation loop starts. The current initialization provider uses
 `"type": "pva_error"` with nested `pva_error` and `pva_cov` sections so runtime

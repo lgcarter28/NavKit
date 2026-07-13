@@ -5,7 +5,9 @@
 
 #include "navkit/app_support/config/SimulationAppConfigPolicy.hpp"
 #include "navkit/app_support/emulation/EmulatorRuntimeKeys.hpp"
+#include "navkit/app_support/emulation/concrete/ImuRuntimeConfig.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
+#include "navkit/app_support/runtime/RuntimeRate.hpp"
 
 #include <nlohmann/json.hpp>
 #include <string>
@@ -41,6 +43,7 @@ void validate_runtime_config(const nlohmann::json& cfg)
     allowed_keys.push_back("run_name");
     allowed_keys.push_back("output_dir");
     allowed_keys.push_back("trajectory");
+    allowed_keys.push_back("imu");
     allowed_keys.push_back("initialization");
     allowed_keys.push_back("transfer_alignment");
     detail::reject_unknown_top_level_keys(cfg, allowed_keys);
@@ -56,11 +59,12 @@ void validate_runtime_config(const nlohmann::json& cfg)
             "trajectory.type must be 'stationary' for the current navkit_sim trajectory provider");
     }
     detail::require_optional_positive_number(trajectory, "duration_s");
-    detail::require_optional_positive_number(trajectory, "dt_s");
+    validate_runtime_rate(trajectory, "trajectory");
     detail::require_vec3(trajectory, "p_e_m");
 
     detail::validate_emulator_runtime_config<EmulatorBindings>(
         cfg, std::make_index_sequence<std::tuple_size_v<EmulatorBindings>>{});
+    validate_imu_runtime_config(cfg);
 
     NavInitializationProvider::validate_runtime_config(cfg);
     TransferAlignmentProvider::validate_runtime_config(cfg);

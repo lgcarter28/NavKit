@@ -28,6 +28,7 @@ class GnssSimulator
 public:
     explicit GnssSimulator(const GnssSimulatorConfig& cfg);
 
+    [[nodiscard]] bool should_generate(const TruthSample& truth) const;
     Measurement<3> generate(const TruthSample& truth);
     [[nodiscard]] Time_t dt_s() const
     {

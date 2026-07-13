@@ -62,8 +62,8 @@ TEST_CASE("StateDefPolicy accepts valid state definitions")
     static_assert(StateDefPolicy<GnssTcStateDef>);
 
     CHECK(ValidStateDef::N == 6);
-    CHECK(InsStateDef::N == 21);
-    CHECK(GnssTcStateDef::N == 23);
+    CHECK(InsStateDef::N == 15);
+    CHECK(GnssTcStateDef::N == 17);
 }
 
 TEST_CASE("StateDefPolicy rejects invalid state definitions")

@@ -4,6 +4,9 @@
 #pragma once
 
 #include "navkit/api/config/ConfigApi.hpp"
+#include "navkit/core/environment/gravity/J2.hpp"
+#include "navkit/core/environment/planet/Wgs84.hpp"
+#include "navkit/core/estimation/navigator/propagation/EcefInsPropagation.hpp"
 #include "navkit/core/models/GnssPosModel.hpp"
 #include "navkit/core/profiling/ProfileSinks.hpp"
 #include "navkit/core/profiling/ScopedProfiler.hpp"
@@ -60,6 +63,14 @@ struct ProductConfig
     using ProfileTick = typename ProfileClock::Tick;
     using ProfileSink = core::profiling::RingBufferProfileSink<ProfileTick, 4096U>;
     using Profiler = core::profiling::ScopedProfiler<ProfileClock, ProfileSink>;
+    using Planet = core::environment::Wgs84;
+    using Gravity = core::environment::J2<Planet>;
+    static constexpr std::size_t imu_buffer_capacity = 1024U;
+    using Propagation =
+        core::estimation::EcefInsPropagation<Planet,
+                                             Gravity,
+                                             core::estimation::EcefInsZeroProcessNoise,
+                                             imu_buffer_capacity>;
 
     using Filter =
         core::estimation::KalmanFilter<StateDef,
@@ -67,7 +78,6 @@ struct ProductConfig
                                        core::estimation::DefaultResetPolicy<StateDef>,
                                        Sensors,
                                        Profiler>;
-    using Propagation = core::estimation::NoOpPropagation;
     using NavigatorUpdate = core::estimation::UpdatePostFilter<Filter>;
     using Navigator =
         core::estimation::Navigator<Filter, Sensors, Propagation, NavigatorUpdate, Profiler>;

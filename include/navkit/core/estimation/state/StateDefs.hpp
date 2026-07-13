@@ -18,11 +18,9 @@ struct InsStateDef
     using Vel = Segment<3, 3>;
     using Att = Segment<6, 3>;
     using GyroB = Segment<9, 3>;
-    using GyroSf = Segment<12, 3>;
-    using AccB = Segment<15, 3>;
-    using AccSf = Segment<18, 3>;
+    using AccB = Segment<12, 3>;
 
-    static constexpr int N = 21;
+    static constexpr int N = 15;
 };
 
 struct GnssTcStateDef
@@ -33,13 +31,11 @@ struct GnssTcStateDef
     using Vel = Segment<3, 3>;
     using Att = Segment<6, 3>;
     using GyroB = Segment<9, 3>;
-    using GyroSf = Segment<12, 3>;
-    using AccB = Segment<15, 3>;
-    using AccSf = Segment<18, 3>;
-    using ClkB = Segment<21, 1>;
-    using ClkD = Segment<22, 1>;
+    using AccB = Segment<12, 3>;
+    using ClkB = Segment<15, 1>;
+    using ClkD = Segment<16, 1>;
 
-    static constexpr int N = 23;
+    static constexpr int N = 17;
 };
 
 static_assert(StateDefPolicy<InsStateDef>);

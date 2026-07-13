@@ -10,7 +10,7 @@
 
 NavKit is a C++ estimation and navigation framework aimed at embedded aerospace systems. It combines fixed-size estimation infrastructure with simulation, logging, and offline analysis so navigation algorithms can be developed and validated in one repository.
 
-The current working demonstration is a stationary GNSS-position estimator. The longer-term objective is a reusable, embedded-ready INS/GNSS platform with additional mechanizations, aiding sources, environments, and validation workflows.
+The current working demonstration is a stationary ECEF INS/GNSS-position estimator: ideal or configured IMU increments drive the first strapdown propagation policy, and GNSS position measurements provide aiding. The longer-term objective is a reusable, embedded-ready INS/GNSS platform with additional mechanizations, aiding sources, environments, and validation workflows.
 
 ## Current status
 
@@ -20,12 +20,13 @@ The current working demonstration is a stationary GNSS-position estimator. The l
 | Compile-time state definitions and segments | Implemented |
 | Measurement models, sensor queues, and update statistics | Implemented |
 | Planet, gravity, and frame policies | Implemented |
-| Stationary GNSS-position simulation and logging | Implemented |
+| Stationary ECEF INS/GNSS-position simulation and logging | Implemented |
 | Covariance, innovation, NIS, p-value, and histogram analysis | Implemented |
 | Fully constrained estimator policy architecture | In progress |
 | GNSS velocity and barometer integration | Planned; model classes exist |
-| Propagation policy and strapdown INS mechanization | Planned |
-| IMU and barometer simulation | Planned; shells exist |
+| Propagation policy and first strapdown INS mechanization | Implemented first pass |
+| IMU simulation | Implemented first pass |
+| Barometer simulation | Planned; shell exists |
 | Monte Carlo and automatic validation reports | Planned |
 
 NavKit requires C++23.
@@ -38,17 +39,18 @@ NavKit favors compile-time capability checks, policy-based composition, fixed-si
 concept -> optional CRTP base -> concrete policy -> runtime algorithm
 ```
 
-Today, the environment policies most fully realize this pattern. The estimator is partway through the same refactor, and Navigator does not yet have a propagation/mechanization policy.
+Today, the environment policies most fully realize this pattern. The estimator is partway through the same refactor, and Navigator has its first propagation/mechanization policy wired into the stationary app.
 
 Current data flow:
 
 ```text
-stationary truth -> GNSS simulator -> Sensor queue -> Navigator
+stationary truth -> IMU simulator -> Navigator IMU buffer
+    -> ECEF INS propagation -> GNSS simulator -> Sensor queue
     -> KalmanFilter measurement update -> measurement statistics
     -> CSV/JSON logs -> Python analysis
 ```
 
-Target data flow adds multi-rate sensor simulation, mechanization/prediction, and broader validation; it should not be mistaken for current functionality.
+Target data flow adds richer aiding, multi-rate sensor simulation, replay/latency handling, and broader validation; it should not be mistaken for current functionality.
 
 ## Repository layout
 

@@ -520,7 +520,7 @@ ctest --test-dir build/release/apps/navkit_sim/StationaryGnss --output-on-failur
 
 ## Run the First Simulation
 
-Run the first GNSS-only stationary simulation:
+Run the first stationary ECEF INS/GNSS-position simulation:
 
 ```bash
 python tools/run_first_sim.py --build-type Debug
@@ -574,12 +574,17 @@ timing artifacts. Runtime input bundles such as
 `config/runtime/navkit_sim/stationary_gnss.json` are executable inputs, not
 NavKit library compile-time configuration. The selected app validates the
 runtime JSON before running; for the stationary GNSS app, that means required
-`trajectory`, `gnss`, and `initialization` sections must exist, unsupported
-`imu`, `baro`, or disabled `transfer_alignment` sections are rejected, and common
-vector/numeric fields must have the expected shape. The current stationary GNSS
-initializer uses `"type": "pva_error"` with nested `pva_error` and `pva_cov`
+`trajectory`, `imu`, `gnss`, and `initialization` sections must exist,
+unsupported `baro` or disabled `transfer_alignment` sections are rejected, and
+common vector/numeric fields must have the expected shape. Runtime sections
+that describe update cadence may specify either `rate_hz` or `dt_s`, but not
+both. The current stationary GNSS initializer uses `"type": "pva_error"` with
+nested `pva_error` and `pva_cov`
 sections to keep startup PVA error/covariance input in app support while
-product-core code consumes only typed PVA navigation initialization data.
+product-core code consumes only typed PVA navigation initialization data. The
+`imu` section selects the simulator runtime mode, such as `"type": "ideal"` or a
+configured error model, while the app compile-time config selects which IMU
+simulator type is compiled in.
 
 ---
 

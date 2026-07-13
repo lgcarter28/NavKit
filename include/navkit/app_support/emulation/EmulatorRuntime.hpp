@@ -10,6 +10,7 @@
 #include "navkit/io/LoggerPolicy.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
+#include <concepts>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <tuple>
@@ -109,6 +110,16 @@ private:
                             Runtime& runtime,
                             const sim::TruthSample& sample)
     {
+        if constexpr (requires {
+                          {
+                              Binding::Emulator_t::should_generate(runtime, sample)
+                          } -> std::same_as<bool>;
+                      }) {
+            if (!Binding::Emulator_t::should_generate(runtime, sample)) {
+                return;
+            }
+        }
+
         auto& sensor = sensor_for_binding<Binding>(navigator);
         const auto measurement = Binding::Emulator_t::generate(runtime, sample);
         Binding::Emulator_t::log_measurement(logger, measurement);

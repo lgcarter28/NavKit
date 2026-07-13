@@ -5,6 +5,7 @@
 
 #include "navkit/app_support/runtime/JsonInput.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
+#include "navkit/app_support/runtime/RuntimeRate.hpp"
 #include "navkit/sim/ImuSimulator.hpp"
 
 #include <nlohmann/json.hpp>
@@ -95,7 +96,12 @@ inline void validate_imu_runtime_config(const nlohmann::json& cfg)
     const auto& imu = detail::require_object(cfg, "imu");
     detail::require_optional_string(imu, "type");
     detail::require_optional_unsigned_integer(imu, "seed");
+    validate_runtime_rate(imu, "imu");
     detail::require_optional_positive_number(imu, "sample_rate_hz");
+    if ((imu.contains("dt_s") || imu.contains("rate_hz")) && imu.contains("sample_rate_hz")) {
+        detail::throw_runtime_config_error(
+            "imu must specify only one of 'dt_s', 'rate_hz', or legacy 'sample_rate_hz'");
+    }
 
     const auto type = imu.value("type", std::string{"ideal"});
     if (type != "ideal" && type != "error_model") {
