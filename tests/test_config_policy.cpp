@@ -99,7 +99,7 @@ TEST_CASE("Narrow config concepts reject only their own missing capabilities")
 
 TEST_CASE("Concrete config composes at product-core sensor boundaries")
 {
-    using StateDef = navkit::core::estimation::InsStateDef;
+    using StateDef = navkit::core::estimation::DefaultInsStateDef;
     using Model = navkit::core::models::GnssPosModel<StateDef>;
     using SimConfig = navkit::app_support::NavKitConfig_t<navkit::selected_config::Config>;
     using Sensor = navkit::core::estimation::Sensor<0U, Model, SimConfig::primary_gnss_buffer_size>;

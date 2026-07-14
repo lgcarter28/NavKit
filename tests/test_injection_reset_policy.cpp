@@ -12,15 +12,27 @@
 namespace navkit::core::estimation::test
 {
 
-struct PolicyTestStateDef
+struct PolicyTestNominalStateDef
 {
     using Scalar_t = double;
     static constexpr int N = 3;
 };
 
+struct PolicyTestErrorStateDef
+{
+    using Scalar_t = double;
+    static constexpr int N = 3;
+};
+
+struct PolicyTestStateDef
+{
+    using Nominal = PolicyTestNominalStateDef;
+    using Error = PolicyTestErrorStateDef;
+};
+
 struct ValidInjection
 {
-    static void apply(State<PolicyTestStateDef>& x, const State<PolicyTestStateDef>& dx)
+    static void apply(NominalState<PolicyTestStateDef>& x, const ErrorState<PolicyTestStateDef>& dx)
     {
         x -= dx;
     }
@@ -31,7 +43,8 @@ struct MissingInjectionApply
 
 struct MutableErrorInjection
 {
-    static void apply(State<PolicyTestStateDef>& unused_state, State<PolicyTestStateDef>& unused_dx)
+    static void apply(NominalState<PolicyTestStateDef>& unused_state,
+                      ErrorState<PolicyTestStateDef>& unused_dx)
     {
         static_cast<void>(unused_state);
         static_cast<void>(unused_dx);
@@ -40,16 +53,16 @@ struct MutableErrorInjection
 
 struct ValidReset
 {
-    static void reset_covariance(State<PolicyTestStateDef>& unused_state,
-                                 const State<PolicyTestStateDef>& unused_dx,
-                                 StateCov<PolicyTestStateDef>& unused_covariance)
+    static void reset_covariance(NominalState<PolicyTestStateDef>& unused_state,
+                                 ErrorState<PolicyTestStateDef>& unused_dx,
+                                 ErrorStateCov<PolicyTestStateDef>& unused_covariance)
     {
         static_cast<void>(unused_state);
         static_cast<void>(unused_dx);
         static_cast<void>(unused_covariance);
     }
 
-    static void reset_dx(State<PolicyTestStateDef>& dx)
+    static void reset_dx(ErrorState<PolicyTestStateDef>& dx)
     {
         dx.setZero();
     }
@@ -57,7 +70,7 @@ struct ValidReset
 
 struct MissingCovarianceReset
 {
-    static void reset_dx(State<PolicyTestStateDef>& dx)
+    static void reset_dx(ErrorState<PolicyTestStateDef>& dx)
     {
         dx.setZero();
     }
@@ -65,9 +78,9 @@ struct MissingCovarianceReset
 
 struct MissingErrorStateReset
 {
-    static void reset_covariance(State<PolicyTestStateDef>& unused_state,
-                                 const State<PolicyTestStateDef>& unused_dx,
-                                 StateCov<PolicyTestStateDef>& unused_covariance)
+    static void reset_covariance(NominalState<PolicyTestStateDef>& unused_state,
+                                 ErrorState<PolicyTestStateDef>& unused_dx,
+                                 ErrorStateCov<PolicyTestStateDef>& unused_covariance)
     {
         static_cast<void>(unused_state);
         static_cast<void>(unused_dx);
@@ -78,7 +91,7 @@ struct MissingErrorStateReset
 TEST_CASE("InjectionPolicy accepts compatible policies")
 {
     static_assert(InjectionPolicy<ValidInjection, PolicyTestStateDef>);
-    static_assert(InjectionPolicy<DefaultInjectionPolicy<InsStateDef>, InsStateDef>);
+    static_assert(InjectionPolicy<DefaultInjectionPolicy<DefaultInsStateDef>, DefaultInsStateDef>);
 
     CHECK(true);
 }
@@ -94,7 +107,7 @@ TEST_CASE("InjectionPolicy rejects incompatible policies")
 TEST_CASE("ResetPolicy accepts compatible policies")
 {
     static_assert(ResetPolicy<ValidReset, PolicyTestStateDef>);
-    static_assert(ResetPolicy<DefaultResetPolicy<InsStateDef>, InsStateDef>);
+    static_assert(ResetPolicy<DefaultResetPolicy<DefaultInsStateDef>, DefaultInsStateDef>);
 
     CHECK(true);
 }

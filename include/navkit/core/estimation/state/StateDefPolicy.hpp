@@ -30,4 +30,15 @@ concept StateDefPolicy = requires {
     requires T::N > 0;
 };
 
+// A StateSpaceDefPolicy names the complete filter state-space layout selected
+// by a product config: one concrete nominal state vector definition and one
+// concrete error/covariance state vector definition.
+template<typename T>
+concept StateSpaceDefPolicy =
+    requires {
+        typename T::Nominal;
+        typename T::Error;
+    } && StateDefPolicy<typename T::Nominal> && StateDefPolicy<typename T::Error> &&
+    std::same_as<typename T::Nominal::Scalar_t, typename T::Error::Scalar_t>;
+
 } // namespace navkit::core::estimation

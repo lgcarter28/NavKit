@@ -15,20 +15,32 @@
 namespace navkit::core::estimation::test
 {
 
-struct MeasurementModelPolicyTestStateDef
+struct MeasurementModelPolicyTestNominalStateDef
 {
     using Scalar_t = double;
     static constexpr int N = 6;
 };
 
+struct MeasurementModelPolicyTestErrorStateDef
+{
+    using Scalar_t = double;
+    static constexpr int N = 6;
+};
+
+struct MeasurementModelPolicyTestStateDef
+{
+    using Nominal = MeasurementModelPolicyTestNominalStateDef;
+    using Error = MeasurementModelPolicyTestErrorStateDef;
+};
+
 struct ValidMeasurement
 {
     static constexpr int M = 2;
-    using State_t = State<MeasurementModelPolicyTestStateDef>;
+    using State_t = NominalState<MeasurementModelPolicyTestStateDef>;
     using O_t = Eigen::Matrix<Scalar_t, M, 1>;
     using R_t = Eigen::Matrix<Scalar_t, M, M>;
-    using H_t = Eigen::Matrix<Scalar_t, M, MeasurementModelPolicyTestStateDef::N>;
-    using K_t = Eigen::Matrix<Scalar_t, MeasurementModelPolicyTestStateDef::N, M>;
+    using H_t = Eigen::Matrix<Scalar_t, M, MeasurementModelPolicyTestErrorStateDef::N>;
+    using K_t = Eigen::Matrix<Scalar_t, MeasurementModelPolicyTestErrorStateDef::N, M>;
 
     struct NoiseContext
     {
@@ -55,8 +67,8 @@ struct ValidMeasurement
 
 struct LocalInjection
 {
-    static void apply(State<MeasurementModelPolicyTestStateDef>& x,
-                      const State<MeasurementModelPolicyTestStateDef>& dx)
+    static void apply(NominalState<MeasurementModelPolicyTestStateDef>& x,
+                      const ErrorState<MeasurementModelPolicyTestStateDef>& dx)
     {
         x -= dx;
     }
@@ -64,16 +76,17 @@ struct LocalInjection
 
 struct LocalReset
 {
-    static void reset_covariance(State<MeasurementModelPolicyTestStateDef>& unused_state,
-                                 const State<MeasurementModelPolicyTestStateDef>& unused_dx,
-                                 StateCov<MeasurementModelPolicyTestStateDef>& unused_covariance)
+    static void
+    reset_covariance(NominalState<MeasurementModelPolicyTestStateDef>& unused_state,
+                     ErrorState<MeasurementModelPolicyTestStateDef>& unused_dx,
+                     ErrorStateCov<MeasurementModelPolicyTestStateDef>& unused_covariance)
     {
         static_cast<void>(unused_state);
         static_cast<void>(unused_dx);
         static_cast<void>(unused_covariance);
     }
 
-    static void reset_dx(State<MeasurementModelPolicyTestStateDef>& dx)
+    static void reset_dx(ErrorState<MeasurementModelPolicyTestStateDef>& dx)
     {
         dx.setZero();
     }
@@ -82,20 +95,20 @@ struct LocalReset
 struct MissingNoiseContext
 {
     static constexpr int M = 2;
-    using State_t = State<MeasurementModelPolicyTestStateDef>;
+    using State_t = NominalState<MeasurementModelPolicyTestStateDef>;
     using O_t = Eigen::Matrix<Scalar_t, M, 1>;
     using R_t = Eigen::Matrix<Scalar_t, M, M>;
-    using H_t = Eigen::Matrix<Scalar_t, M, MeasurementModelPolicyTestStateDef::N>;
-    using K_t = Eigen::Matrix<Scalar_t, MeasurementModelPolicyTestStateDef::N, M>;
+    using H_t = Eigen::Matrix<Scalar_t, M, MeasurementModelPolicyTestErrorStateDef::N>;
+    using K_t = Eigen::Matrix<Scalar_t, MeasurementModelPolicyTestErrorStateDef::N, M>;
 };
 
 struct MissingGainType
 {
     static constexpr int M = 2;
-    using State_t = State<MeasurementModelPolicyTestStateDef>;
+    using State_t = NominalState<MeasurementModelPolicyTestStateDef>;
     using O_t = Eigen::Matrix<Scalar_t, M, 1>;
     using R_t = Eigen::Matrix<Scalar_t, M, M>;
-    using H_t = Eigen::Matrix<Scalar_t, M, MeasurementModelPolicyTestStateDef::N>;
+    using H_t = Eigen::Matrix<Scalar_t, M, MeasurementModelPolicyTestErrorStateDef::N>;
 
     struct NoiseContext
     {};
@@ -108,11 +121,11 @@ struct MissingGainType
 struct BadObservationReturn
 {
     static constexpr int M = 2;
-    using State_t = State<MeasurementModelPolicyTestStateDef>;
+    using State_t = NominalState<MeasurementModelPolicyTestStateDef>;
     using O_t = Eigen::Matrix<Scalar_t, M, 1>;
     using R_t = Eigen::Matrix<Scalar_t, M, M>;
-    using H_t = Eigen::Matrix<Scalar_t, M, MeasurementModelPolicyTestStateDef::N>;
-    using K_t = Eigen::Matrix<Scalar_t, MeasurementModelPolicyTestStateDef::N, M>;
+    using H_t = Eigen::Matrix<Scalar_t, M, MeasurementModelPolicyTestErrorStateDef::N>;
+    using K_t = Eigen::Matrix<Scalar_t, MeasurementModelPolicyTestErrorStateDef::N, M>;
 
     struct NoiseContext
     {};
@@ -125,11 +138,11 @@ struct BadObservationReturn
 struct WrongGainDimensions
 {
     static constexpr int M = 2;
-    using State_t = State<MeasurementModelPolicyTestStateDef>;
+    using State_t = NominalState<MeasurementModelPolicyTestStateDef>;
     using O_t = Eigen::Matrix<Scalar_t, M, 1>;
     using R_t = Eigen::Matrix<Scalar_t, M, M>;
-    using H_t = Eigen::Matrix<Scalar_t, M, MeasurementModelPolicyTestStateDef::N>;
-    using K_t = Eigen::Matrix<Scalar_t, M, MeasurementModelPolicyTestStateDef::N>;
+    using H_t = Eigen::Matrix<Scalar_t, M, MeasurementModelPolicyTestErrorStateDef::N>;
+    using K_t = Eigen::Matrix<Scalar_t, M, MeasurementModelPolicyTestErrorStateDef::N>;
 
     struct NoiseContext
     {};
@@ -142,12 +155,12 @@ struct WrongGainDimensions
 TEST_CASE("MeasurementModelPolicy accepts compatible measurement models")
 {
     static_assert(MeasurementModelPolicy<ValidMeasurement, MeasurementModelPolicyTestStateDef>);
-    static_assert(
-        MeasurementModelPolicy<navkit::core::models::GnssPosModel<InsStateDef>, InsStateDef>);
-    static_assert(
-        MeasurementModelPolicy<navkit::core::models::GnssVelModel<InsStateDef>, InsStateDef>);
-    static_assert(
-        MeasurementModelPolicy<navkit::core::models::BaroAltModel<InsStateDef>, InsStateDef>);
+    static_assert(MeasurementModelPolicy<navkit::core::models::GnssPosModel<DefaultInsStateDef>,
+                                         DefaultInsStateDef>);
+    static_assert(MeasurementModelPolicy<navkit::core::models::GnssVelModel<DefaultInsStateDef>,
+                                         DefaultInsStateDef>);
+    static_assert(MeasurementModelPolicy<navkit::core::models::BaroAltModel<DefaultInsStateDef>,
+                                         DefaultInsStateDef>);
 
     CHECK(true);
 }
@@ -159,7 +172,7 @@ TEST_CASE("MeasurementModelPolicy rejects incomplete or incompatible models")
     static_assert(
         !MeasurementModelPolicy<BadObservationReturn, MeasurementModelPolicyTestStateDef>);
     static_assert(!MeasurementModelPolicy<WrongGainDimensions, MeasurementModelPolicyTestStateDef>);
-    static_assert(!MeasurementModelPolicy<navkit::core::models::GnssPosModel<InsStateDef>,
+    static_assert(!MeasurementModelPolicy<navkit::core::models::GnssPosModel<DefaultInsStateDef>,
                                           MeasurementModelPolicyTestStateDef>);
 
     CHECK(true);

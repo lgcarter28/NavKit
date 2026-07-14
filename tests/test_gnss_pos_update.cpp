@@ -9,15 +9,16 @@
 TEST_CASE("GNSS position update moves state toward measurement")
 {
     using StateDef = navkit::core::estimation::DefaultInsStateDef;
+    using Nominal = typename StateDef::Nominal;
     using Model = navkit::core::models::GnssPosModel<StateDef>;
     navkit::core::estimation::KalmanFilter<StateDef> kf;
 
     decltype(kf)::State_t x = decltype(kf)::State_t::Zero();
-    x.template segment<3>(StateDef::Pos::i) << 10.0, 0.0, 0.0;
+    x.template segment<3>(Nominal::Pos::i) << 10.0, 0.0, 0.0;
     kf.set_state(x);
 
-    navkit::core::estimation::StateCov<StateDef> P =
-        navkit::core::estimation::StateCov<StateDef>::Identity();
+    navkit::core::estimation::ErrorStateCov<StateDef> P =
+        navkit::core::estimation::ErrorStateCov<StateDef>::Identity();
     P *= 100.0;
     kf.set_covariance(P);
 
@@ -31,5 +32,5 @@ TEST_CASE("GNSS position update moves state toward measurement")
     kf.inject();
     kf.reset();
 
-    CHECK(kf.state()(StateDef::Pos::i) < 10.0);
+    CHECK(kf.state()(Nominal::Pos::i) < 10.0);
 }

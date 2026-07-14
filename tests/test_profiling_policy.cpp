@@ -116,7 +116,7 @@ struct MissingProfileFunctionProfiler
 
 using FakeProfiler = ScopedProfiler<FakeClock, FixedSink>;
 using SteppingProfiler = ScopedProfiler<SteppingClock, FixedSink>;
-using ProfiledStateDef = navkit::core::estimation::InsStateDef;
+using ProfiledStateDef = navkit::core::estimation::DefaultInsStateDef;
 using ProfiledModel = navkit::core::models::GnssPosModel<ProfiledStateDef>;
 using ProfiledFilter = navkit::core::estimation::KalmanFilter<
     ProfiledStateDef,

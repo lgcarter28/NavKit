@@ -12,7 +12,7 @@ namespace navkit::core::estimation
 
 template<typename Candidate, typename StateDef>
 concept MeasurementModelPolicy =
-    StateDefPolicy<StateDef> &&
+    StateSpaceDefPolicy<StateDef> &&
     requires(const NominalState<StateDef>& x, const typename Candidate::NoiseContext& ctx) {
         { Candidate::M } -> std::convertible_to<int>;
         typename Candidate::O_t;
@@ -31,8 +31,8 @@ concept MeasurementModelPolicy =
         requires Candidate::R_t::RowsAtCompileTime == Candidate::M;
         requires Candidate::R_t::ColsAtCompileTime == Candidate::M;
         requires Candidate::H_t::RowsAtCompileTime == Candidate::M;
-        requires Candidate::H_t::ColsAtCompileTime == StateDef::N;
-        requires Candidate::K_t::RowsAtCompileTime == StateDef::N;
+        requires Candidate::H_t::ColsAtCompileTime == StateDef::Error::N;
+        requires Candidate::K_t::RowsAtCompileTime == StateDef::Error::N;
         requires Candidate::K_t::ColsAtCompileTime == Candidate::M;
     };
 

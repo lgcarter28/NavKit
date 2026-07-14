@@ -15,7 +15,7 @@ namespace navkit::core::models
 using navkit::core::estimation::MeasurementModelBase;
 using navkit::core::estimation::segment;
 
-template<navkit::core::estimation::StateDefPolicy StateDef>
+template<navkit::core::estimation::StateSpaceDefPolicy StateDef>
 class GnssVelModel : public MeasurementModelBase<GnssVelModel<StateDef>, StateDef, 3>
 {
 public:
@@ -26,6 +26,8 @@ public:
     using H_t = typename Base::H_t;
     using R_t = typename Base::R_t;
     using O_t = typename Base::O_t;
+    using Nominal = typename StateDef::Nominal;
+    using Error = typename StateDef::Error;
 
     struct NoiseContext
     {
@@ -35,7 +37,7 @@ public:
     static H_t compute_h_impl(const State_t&)
     {
         H_t H = H_t::Zero();
-        H.template block<3, 3>(0, StateDef::Vel::i) = -Eigen::Matrix<Scalar_t, 3, 3>::Identity();
+        H.template block<3, 3>(0, Error::Vel::i) = -Eigen::Matrix<Scalar_t, 3, 3>::Identity();
         return H;
     }
 
@@ -46,7 +48,7 @@ public:
 
     static O_t obs_impl(const State_t& x)
     {
-        return segment<typename StateDef::Vel>(x);
+        return segment<typename Nominal::Vel>(x);
     }
 };
 

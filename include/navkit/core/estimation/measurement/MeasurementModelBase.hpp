@@ -11,16 +11,17 @@
 namespace navkit::core::estimation
 {
 
-template<typename Derived, StateDefPolicy StateDef, int M_>
+template<typename Derived, StateSpaceDefPolicy StateDef, int M_>
 class MeasurementModelBase
 {
 public:
     static constexpr int M = M_;
+    using Error = typename StateDef::Error;
     using State_t = NominalState<StateDef>;
     using O_t = Eigen::Matrix<Scalar_t, M, 1>;
-    using H_t = Eigen::Matrix<Scalar_t, M, StateDef::N>;
+    using H_t = Eigen::Matrix<Scalar_t, M, Error::N>;
     using R_t = Eigen::Matrix<Scalar_t, M, M>;
-    using K_t = Eigen::Matrix<Scalar_t, StateDef::N, M>;
+    using K_t = Eigen::Matrix<Scalar_t, Error::N, M>;
 
     template<typename NoiseContext>
     static R_t compute_r(const NoiseContext& ctx)

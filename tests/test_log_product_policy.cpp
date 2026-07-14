@@ -29,7 +29,7 @@ namespace navkit::io::test
 namespace
 {
 
-using StateDef = navkit::core::estimation::InsStateDef;
+using StateDef = navkit::core::estimation::DefaultInsStateDef;
 using Model = navkit::core::models::GnssPosModel<StateDef>;
 using Sensor = navkit::core::estimation::Sensor<0U, Model, 4U>;
 using Sensors = std::tuple<Sensor>;

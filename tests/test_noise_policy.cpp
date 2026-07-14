@@ -14,7 +14,7 @@
 namespace navkit::core::estimation::test
 {
 
-using NoiseTestModel = navkit::core::models::GnssPosModel<InsStateDef>;
+using NoiseTestModel = navkit::core::models::GnssPosModel<DefaultInsStateDef>;
 using NoiseTestMeasurement = Measurement<NoiseTestModel::M>;
 
 struct ExactNoisePolicy

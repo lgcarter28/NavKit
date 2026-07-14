@@ -16,10 +16,10 @@ namespace navkit::core::estimation
 
 template<typename Candidate, typename StateDef>
 concept PropagationPolicy =
-    StateDefPolicy<StateDef> && requires(NominalState<StateDef>& state,
-                                         const NominalState<StateDef>& const_state,
-                                         StateCov<StateDef>& phi,
-                                         StateCov<StateDef>& qd) {
+    StateSpaceDefPolicy<StateDef> && requires(NominalState<StateDef>& state,
+                                              const NominalState<StateDef>& const_state,
+                                              ErrorStateCov<StateDef>& phi,
+                                              ErrorStateCov<StateDef>& qd) {
         { Candidate::imu_buffer_capacity } -> std::convertible_to<std::size_t>;
         { Candidate::covariance_history_capacity } -> std::convertible_to<std::size_t>;
         { Candidate::covariance_update_rate_hz } -> std::convertible_to<Time_t>;

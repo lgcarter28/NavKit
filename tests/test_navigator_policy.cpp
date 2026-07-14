@@ -19,7 +19,7 @@
 namespace navkit::core::estimation::test
 {
 
-using NavigatorPolicyStateDef = InsStateDef;
+using NavigatorPolicyStateDef = DefaultInsStateDef;
 using NavigatorPolicyModel = navkit::core::models::GnssPosModel<NavigatorPolicyStateDef>;
 using NavigatorPolicySensor = Sensor<0U, NavigatorPolicyModel, 4>;
 using NavigatorPolicyFilter = KalmanFilter<NavigatorPolicyStateDef>;
@@ -101,8 +101,8 @@ struct WrongStrapdownIntegrationReturn
     template<typename StateDef>
     static bool covariance_step_from_increment(const NominalState<StateDef>& state,
                                                const ImuIncrement& increment,
-                                               StateCov<StateDef>& phi,
-                                               StateCov<StateDef>& qd)
+                                               ErrorStateCov<StateDef>& phi,
+                                               ErrorStateCov<StateDef>& qd)
     {
         static_cast<void>(state);
         static_cast<void>(increment);
@@ -115,8 +115,8 @@ struct WrongStrapdownIntegrationReturn
     static bool covariance_step_from_increment_pair(const NominalState<StateDef>& state,
                                                     const ImuIncrement& first,
                                                     const ImuIncrement& second,
-                                                    StateCov<StateDef>& phi,
-                                                    StateCov<StateDef>& qd)
+                                                    ErrorStateCov<StateDef>& phi,
+                                                    ErrorStateCov<StateDef>& qd)
     {
         static_cast<void>(state);
         static_cast<void>(first);
@@ -170,8 +170,8 @@ struct MissingImuProcessing
     template<typename StateDef>
     static bool covariance_step_from_increment(const NominalState<StateDef>& state,
                                                const ImuIncrement& increment,
-                                               StateCov<StateDef>& phi,
-                                               StateCov<StateDef>& qd)
+                                               ErrorStateCov<StateDef>& phi,
+                                               ErrorStateCov<StateDef>& qd)
     {
         static_cast<void>(state);
         static_cast<void>(increment);
@@ -184,8 +184,8 @@ struct MissingImuProcessing
     static bool covariance_step_from_increment_pair(const NominalState<StateDef>& state,
                                                     const ImuIncrement& first,
                                                     const ImuIncrement& second,
-                                                    StateCov<StateDef>& phi,
-                                                    StateCov<StateDef>& qd)
+                                                    ErrorStateCov<StateDef>& phi,
+                                                    ErrorStateCov<StateDef>& qd)
     {
         static_cast<void>(state);
         static_cast<void>(first);
@@ -243,8 +243,8 @@ struct RecordingPropagation
     template<typename StateDef>
     static bool covariance_step_from_increment(const NominalState<StateDef>& state,
                                                const ImuIncrement& increment,
-                                               StateCov<StateDef>& phi,
-                                               StateCov<StateDef>& qd)
+                                               ErrorStateCov<StateDef>& phi,
+                                               ErrorStateCov<StateDef>& qd)
     {
         static_cast<void>(state);
         ++covariance_increment_call_count;
@@ -257,8 +257,8 @@ struct RecordingPropagation
     static bool covariance_step_from_increment_pair(const NominalState<StateDef>& state,
                                                     const ImuIncrement& first,
                                                     const ImuIncrement& second,
-                                                    StateCov<StateDef>& phi,
-                                                    StateCov<StateDef>& qd)
+                                                    ErrorStateCov<StateDef>& phi,
+                                                    ErrorStateCov<StateDef>& qd)
     {
         static_cast<void>(state);
         ++covariance_pair_call_count;

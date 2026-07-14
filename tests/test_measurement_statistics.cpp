@@ -16,6 +16,8 @@ namespace
 {
 
 using StateDef = DefaultInsStateDef;
+using Nominal = typename StateDef::Nominal;
+using Error = typename StateDef::Error;
 using Model = navkit::core::models::GnssPosModel<StateDef>;
 using Sensor = navkit::core::estimation::Sensor<0U, Model, 4U>;
 struct DisabledStatisticsDiagnostics
@@ -42,7 +44,7 @@ struct StatisticsFixture
 {
     Filter filter;
     Filter::ErrorState_t initial_error_state{Filter::ErrorState_t::Zero()};
-    StateCov<StateDef> initial_covariance{StateCov<StateDef>::Identity()};
+    ErrorStateCov<StateDef> initial_covariance{ErrorStateCov<StateDef>::Identity()};
     Model::O_t measurement{Model::O_t::Zero()};
     Model::NoiseContext noise{};
     Measurement<Model::M> sensor_measurement{};
@@ -50,7 +52,7 @@ struct StatisticsFixture
     StatisticsFixture()
     {
         Filter::State_t x = Filter::State_t::Zero();
-        x.template segment<3>(StateDef::Pos::i) << 10.0, -2.0, 5.0;
+        x.template segment<3>(Nominal::Pos::i) << 10.0, -2.0, 5.0;
         filter.set_state(x);
 
         initial_covariance *= 100.0;
@@ -84,14 +86,14 @@ Model::R_t expected_innovation_covariance()
 Model::H_t expected_jacobian()
 {
     Model::H_t H = Model::H_t::Zero();
-    H.template block<3, 3>(0, StateDef::Pos::i) = -Eigen::Matrix<Scalar_t, 3, 3>::Identity();
+    H.template block<3, 3>(0, Error::Pos::i) = -Eigen::Matrix<Scalar_t, 3, 3>::Identity();
     return H;
 }
 
 Model::K_t expected_gain()
 {
     Model::K_t K = Model::K_t::Zero();
-    K.template block<3, 3>(StateDef::Pos::i, 0) =
+    K.template block<3, 3>(Error::Pos::i, 0) =
         (-100.0 / 101.0) * Eigen::Matrix<Scalar_t, 3, 3>::Identity();
     return K;
 }
@@ -162,9 +164,9 @@ TEST_CASE("sensor diagnostics can disable measurement statistics storage")
     Model::NoiseContext noise{};
 
     DisabledStatisticsFilter::State_t x = DisabledStatisticsFilter::State_t::Zero();
-    x.template segment<3>(StateDef::Pos::i) << 10.0, -2.0, 5.0;
+    x.template segment<3>(Nominal::Pos::i) << 10.0, -2.0, 5.0;
     filter.set_state(x);
-    filter.set_covariance(StateCov<StateDef>::Identity() * 100.0);
+    filter.set_covariance(ErrorStateCov<StateDef>::Identity() * 100.0);
 
     noise.sigma_h = 1.0;
     noise.sigma_v = 1.0;

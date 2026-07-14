@@ -7,7 +7,7 @@
 #include "navkit/core/config/Types.hpp"
 #include "navkit/core/estimation/filter/FilterPolicy.hpp"
 #include "navkit/core/estimation/navigator/PvaStateDef.hpp"
-#include "navkit/core/estimation/state/StateDefPolicy.hpp"
+#include "navkit/core/estimation/state/State.hpp"
 #include "navkit/core/math/Quaternion.hpp"
 
 #include <Eigen/Dense>
@@ -26,54 +26,56 @@ void copy_pva_covariance_block(P& target_covariance,
         pva_covariance.template block<SourceRow::sz, SourceCol::sz>(SourceRow::i, SourceCol::i);
 }
 
-template<navkit::core::estimation::StateDefPolicy StateDef, typename P>
+template<navkit::core::estimation::StateSpaceDefPolicy StateDef, typename P>
 void copy_pva_covariance(P& target_covariance,
                          const core::estimation::PvaCovariance& pva_covariance)
 {
-    copy_pva_covariance_block<typename StateDef::Pos,
-                              typename StateDef::Pos,
+    using Error = typename StateDef::Error;
+
+    copy_pva_covariance_block<typename Error::Pos,
+                              typename Error::Pos,
                               core::estimation::PvaStateDef::Pos,
                               core::estimation::PvaStateDef::Pos>(target_covariance,
                                                                   pva_covariance);
-    copy_pva_covariance_block<typename StateDef::Pos,
-                              typename StateDef::Vel,
+    copy_pva_covariance_block<typename Error::Pos,
+                              typename Error::Vel,
                               core::estimation::PvaStateDef::Pos,
                               core::estimation::PvaStateDef::Vel>(target_covariance,
                                                                   pva_covariance);
-    copy_pva_covariance_block<typename StateDef::Pos,
-                              typename StateDef::Att,
+    copy_pva_covariance_block<typename Error::Pos,
+                              typename Error::AttRotVec,
                               core::estimation::PvaStateDef::Pos,
                               core::estimation::PvaStateDef::Rpy>(target_covariance,
                                                                   pva_covariance);
 
-    copy_pva_covariance_block<typename StateDef::Vel,
-                              typename StateDef::Pos,
+    copy_pva_covariance_block<typename Error::Vel,
+                              typename Error::Pos,
                               core::estimation::PvaStateDef::Vel,
                               core::estimation::PvaStateDef::Pos>(target_covariance,
                                                                   pva_covariance);
-    copy_pva_covariance_block<typename StateDef::Vel,
-                              typename StateDef::Vel,
+    copy_pva_covariance_block<typename Error::Vel,
+                              typename Error::Vel,
                               core::estimation::PvaStateDef::Vel,
                               core::estimation::PvaStateDef::Vel>(target_covariance,
                                                                   pva_covariance);
-    copy_pva_covariance_block<typename StateDef::Vel,
-                              typename StateDef::Att,
+    copy_pva_covariance_block<typename Error::Vel,
+                              typename Error::AttRotVec,
                               core::estimation::PvaStateDef::Vel,
                               core::estimation::PvaStateDef::Rpy>(target_covariance,
                                                                   pva_covariance);
 
-    copy_pva_covariance_block<typename StateDef::Att,
-                              typename StateDef::Pos,
+    copy_pva_covariance_block<typename Error::AttRotVec,
+                              typename Error::Pos,
                               core::estimation::PvaStateDef::Rpy,
                               core::estimation::PvaStateDef::Pos>(target_covariance,
                                                                   pva_covariance);
-    copy_pva_covariance_block<typename StateDef::Att,
-                              typename StateDef::Vel,
+    copy_pva_covariance_block<typename Error::AttRotVec,
+                              typename Error::Vel,
                               core::estimation::PvaStateDef::Rpy,
                               core::estimation::PvaStateDef::Vel>(target_covariance,
                                                                   pva_covariance);
-    copy_pva_covariance_block<typename StateDef::Att,
-                              typename StateDef::Att,
+    copy_pva_covariance_block<typename Error::AttRotVec,
+                              typename Error::AttRotVec,
                               core::estimation::PvaStateDef::Rpy,
                               core::estimation::PvaStateDef::Rpy>(target_covariance,
                                                                   pva_covariance);
@@ -81,23 +83,19 @@ void copy_pva_covariance(P& target_covariance,
 
 } // namespace detail
 
-template<navkit::core::estimation::StateDefPolicy StateDef,
+template<navkit::core::estimation::StateSpaceDefPolicy StateDef,
          navkit::core::estimation::FilterPolicy Filter>
 void initialize_filter_from_nav_initialization(Filter& filter, const NavInitialization& nav_init)
 {
+    using Nominal = typename StateDef::Nominal;
+
     typename Filter::State_t initial_state = Filter::State_t::Zero();
-    initial_state.template segment<3>(StateDef::Pos::i) = core::estimation::pos_e_m(nav_init.pva);
-    initial_state.template segment<3>(StateDef::Vel::i) = core::estimation::vel_e_mps(nav_init.pva);
-    if constexpr (requires { typename StateDef::Quat; }) {
-        const auto q_e2b =
-            core::math::quaternion_from_rpy_rad(core::estimation::rpy_e2b_rad(nav_init.pva));
-        initial_state.template segment<4>(StateDef::Quat::i) << q_e2b.w(), q_e2b.x(), q_e2b.y(),
-            q_e2b.z();
-    }
-    else {
-        initial_state.template segment<3>(StateDef::Att::i) =
-            core::estimation::rpy_e2b_rad(nav_init.pva);
-    }
+    initial_state.template segment<3>(Nominal::Pos::i) = core::estimation::pos_e_m(nav_init.pva);
+    initial_state.template segment<3>(Nominal::Vel::i) = core::estimation::vel_e_mps(nav_init.pva);
+    const auto q_e2b =
+        core::math::quaternion_from_rpy_rad(core::estimation::rpy_e2b_rad(nav_init.pva));
+    initial_state.template segment<4>(Nominal::AttQuat::i) << q_e2b.w(), q_e2b.x(), q_e2b.y(),
+        q_e2b.z();
 
     filter.set_state(initial_state);
 
@@ -107,7 +105,7 @@ void initialize_filter_from_nav_initialization(Filter& filter, const NavInitiali
     filter.set_covariance(initial_covariance);
 }
 
-template<navkit::core::estimation::StateDefPolicy StateDef, typename Navigator>
+template<navkit::core::estimation::StateSpaceDefPolicy StateDef, typename Navigator>
 void initialize_navigator(Navigator& navigator, const NavInitialization& nav_init)
 {
     initialize_filter_from_nav_initialization<StateDef>(navigator.filter(), nav_init);

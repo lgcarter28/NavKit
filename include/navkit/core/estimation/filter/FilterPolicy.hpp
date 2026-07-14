@@ -28,7 +28,7 @@ concept FilterPolicy =
         typename Candidate::P_t;
         typename Candidate::StateDef_t;
 
-        requires StateDefPolicy<typename Candidate::StateDef_t>;
+        requires StateSpaceDefPolicy<typename Candidate::StateDef_t>;
 
         { filter.state() } -> std::same_as<typename Candidate::State_t&>;
         { const_filter.state() } -> std::same_as<const typename Candidate::State_t&>;

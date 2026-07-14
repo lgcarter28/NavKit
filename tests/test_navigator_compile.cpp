@@ -12,6 +12,7 @@
 TEST_CASE("Navigator compiles and processes GNSS sensor")
 {
     using StateDef = navkit::core::estimation::DefaultInsStateDef;
+    using Nominal = typename StateDef::Nominal;
     using Model = navkit::core::models::GnssPosModel<StateDef>;
     using Sensor = navkit::core::estimation::Sensor<0U, Model, 4>;
     using Filter = navkit::core::estimation::KalmanFilter<StateDef>;
@@ -23,5 +24,5 @@ TEST_CASE("Navigator compiles and processes GNSS sensor")
     meas.z << 1.0, 2.0, 3.0;
     CHECK(nav.template sensor<0>().push(meas));
     nav.update();
-    CHECK(nav.filter().state()(StateDef::Pos::i) != doctest::Approx(0.0));
+    CHECK(nav.filter().state()(Nominal::Pos::i) != doctest::Approx(0.0));
 }

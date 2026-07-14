@@ -19,13 +19,13 @@ struct NoOpPropagation
     static constexpr std::size_t covariance_history_capacity =
         1U; // NOLINT(readability-identifier-naming)
 
-    template<StateDefPolicy StateDef>
+    template<StateSpaceDefPolicy StateDef>
     static bool process_imu_increment(const ImuIncrement& increment, NominalState<StateDef>&)
     {
         return increment.dt_s >= 0.0;
     }
 
-    template<StateDefPolicy StateDef>
+    template<StateSpaceDefPolicy StateDef>
     static bool process_imu_increment_pair(const ImuIncrement& first,
                                            const ImuIncrement& second,
                                            NominalState<StateDef>& state)
@@ -34,23 +34,23 @@ struct NoOpPropagation
                process_imu_increment<StateDef>(second, state);
     }
 
-    template<StateDefPolicy StateDef>
+    template<StateSpaceDefPolicy StateDef>
     static bool covariance_step_from_increment(const NominalState<StateDef>&,
                                                const ImuIncrement& increment,
-                                               StateCov<StateDef>& phi,
-                                               StateCov<StateDef>& qd)
+                                               ErrorStateCov<StateDef>& phi,
+                                               ErrorStateCov<StateDef>& qd)
     {
         phi.setIdentity();
         qd.setZero();
         return increment.dt_s >= 0.0;
     }
 
-    template<StateDefPolicy StateDef>
+    template<StateSpaceDefPolicy StateDef>
     static bool covariance_step_from_increment_pair(const NominalState<StateDef>& state,
                                                     const ImuIncrement& first,
                                                     const ImuIncrement& second,
-                                                    StateCov<StateDef>& phi,
-                                                    StateCov<StateDef>& qd)
+                                                    ErrorStateCov<StateDef>& phi,
+                                                    ErrorStateCov<StateDef>& qd)
     {
         return covariance_step_from_increment<StateDef>(state, first, phi, qd) &&
                covariance_step_from_increment<StateDef>(state, second, phi, qd);

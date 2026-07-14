@@ -127,15 +127,11 @@ private:
 
     static void print_console_status(const core::Time_t time_s, const Filter& filter)
     {
-        const auto p_e = filter.state().template segment<3>(StateDef::Pos::i);
-        const auto v_e = filter.state().template segment<3>(StateDef::Vel::i);
-        Eigen::Matrix<core::Scalar_t, 4, 1> q_e2b{};
-        if constexpr (requires { typename StateDef::Quat; }) {
-            q_e2b = filter.state().template segment<4>(StateDef::Quat::i);
-        }
-        else {
-            q_e2b << 1.0, 0.0, 0.0, 0.0;
-        }
+        using Nominal = typename StateDef::Nominal;
+
+        const auto p_e = filter.state().template segment<3>(Nominal::Pos::i);
+        const auto v_e = filter.state().template segment<3>(Nominal::Vel::i);
+        const auto q_e2b = filter.state().template segment<4>(Nominal::AttQuat::i);
         std::printf("t=%8.3f s | p_e=[%.3f %.3f %.3f] m | v_e=[%.6f %.6f %.6f] m/s | q_e2b=[%.6e "
                     "%.6e %.6e %.6e]\n",
                     time_s,

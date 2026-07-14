@@ -52,14 +52,14 @@ struct EcefInsPropagation
         CovarianceHistoryCapacity; // NOLINT(readability-identifier-naming)
     static constexpr Time_t covariance_update_rate_hz = CovarianceUpdateRateHz;
 
-    template<StateDefPolicy StateDef>
+    template<StateSpaceDefPolicy StateDef>
     static bool process_imu_increment(const ImuIncrement& increment, NominalState<StateDef>& state)
     {
         const auto interval = corrected_interval_from_single<StateDef>(state, increment);
         return propagate_nominal_state<StateDef>(interval, state);
     }
 
-    template<StateDefPolicy StateDef>
+    template<StateSpaceDefPolicy StateDef>
     static bool process_imu_increment_pair(const ImuIncrement& first,
                                            const ImuIncrement& second,
                                            NominalState<StateDef>& state)
@@ -68,22 +68,22 @@ struct EcefInsPropagation
         return propagate_nominal_state<StateDef>(interval, state);
     }
 
-    template<StateDefPolicy StateDef>
+    template<StateSpaceDefPolicy StateDef>
     static bool covariance_step_from_increment(const NominalState<StateDef>& state,
                                                const ImuIncrement& increment,
-                                               StateCov<StateDef>& phi,
-                                               StateCov<StateDef>& qd)
+                                               ErrorStateCov<StateDef>& phi,
+                                               ErrorStateCov<StateDef>& qd)
     {
         const auto interval = corrected_interval_from_single<StateDef>(state, increment);
         return covariance_step_from_interval<StateDef>(state, interval, phi, qd);
     }
 
-    template<StateDefPolicy StateDef>
+    template<StateSpaceDefPolicy StateDef>
     static bool covariance_step_from_increment_pair(const NominalState<StateDef>& state,
                                                     const ImuIncrement& first,
                                                     const ImuIncrement& second,
-                                                    StateCov<StateDef>& phi,
-                                                    StateCov<StateDef>& qd)
+                                                    ErrorStateCov<StateDef>& phi,
+                                                    ErrorStateCov<StateDef>& qd)
     {
         const auto interval = corrected_interval_from_pair<StateDef>(state, first, second);
         return covariance_step_from_interval<StateDef>(state, interval, phi, qd);
@@ -92,38 +92,36 @@ struct EcefInsPropagation
     template<typename StateDef, typename State_t>
     [[nodiscard]] static Vec3 position_e_m(const State_t& state)
     {
-        return segment<typename StateDef::Pos>(state);
+        using Nominal = typename StateDef::Nominal;
+        return segment<typename Nominal::Pos>(state);
     }
 
     template<typename StateDef, typename State_t>
     [[nodiscard]] static Vec3 velocity_e_mps(const State_t& state)
     {
-        return segment<typename StateDef::Vel>(state);
+        using Nominal = typename StateDef::Nominal;
+        return segment<typename Nominal::Vel>(state);
     }
 
     template<typename StateDef, typename State_t>
     [[nodiscard]] static Eigen::Quaternion<Scalar_t> quaternion_e2b(const State_t& state)
     {
-        if constexpr (requires { typename StateDef::Quat; }) {
-            const auto q_segment = segment<typename StateDef::Quat>(state);
-            return navkit::core::math::normalized_with_positive_scalar(Eigen::Quaternion<Scalar_t>{
-                q_segment(0), q_segment(1), q_segment(2), q_segment(3)});
-        }
-        else {
-            return navkit::core::math::quaternion_from_rpy_rad(
-                segment<typename StateDef::Att>(state));
-        }
+        using Nominal = typename StateDef::Nominal;
+        const auto q_segment = segment<typename Nominal::AttQuat>(state);
+        return navkit::core::math::normalized_with_positive_scalar(
+            Eigen::Quaternion<Scalar_t>{q_segment(0), q_segment(1), q_segment(2), q_segment(3)});
     }
 
     template<typename StateDef, typename State_t>
     [[nodiscard]] static Vec3 gyro_bias_radps(const State_t& state)
     {
-        if constexpr (requires { typename StateDef::GyroB; }) {
-            if constexpr (requires { typename StateDef::GyroBias; }) {
-                return segment<typename StateDef::GyroBias>(state);
+        using Nominal = typename StateDef::Nominal;
+        if constexpr (requires { typename Nominal::GyroB; }) {
+            if constexpr (requires { typename Nominal::GyroBias; }) {
+                return segment<typename Nominal::GyroBias>(state);
             }
             else {
-                return segment<typename StateDef::GyroB>(state);
+                return segment<typename Nominal::GyroB>(state);
             }
         }
         else {
@@ -134,12 +132,13 @@ struct EcefInsPropagation
     template<typename StateDef, typename State_t>
     [[nodiscard]] static Vec3 accel_bias_mps2(const State_t& state)
     {
-        if constexpr (requires { typename StateDef::AccB; }) {
-            if constexpr (requires { typename StateDef::AccelBias; }) {
-                return segment<typename StateDef::AccelBias>(state);
+        using Nominal = typename StateDef::Nominal;
+        if constexpr (requires { typename Nominal::AccB; }) {
+            if constexpr (requires { typename Nominal::AccelBias; }) {
+                return segment<typename Nominal::AccelBias>(state);
             }
             else {
-                return segment<typename StateDef::AccB>(state);
+                return segment<typename Nominal::AccB>(state);
             }
         }
         else {
@@ -150,33 +149,31 @@ struct EcefInsPropagation
     template<typename StateDef, typename State_t>
     static void set_position_e_m(State_t& state, const Vec3& value)
     {
-        segment<typename StateDef::Pos>(state) = value;
+        using Nominal = typename StateDef::Nominal;
+        segment<typename Nominal::Pos>(state) = value;
     }
 
     template<typename StateDef, typename State_t>
     static void set_velocity_e_mps(State_t& state, const Vec3& value)
     {
-        segment<typename StateDef::Vel>(state) = value;
+        using Nominal = typename StateDef::Nominal;
+        segment<typename Nominal::Vel>(state) = value;
     }
 
     template<typename StateDef, typename State_t>
     static void set_quaternion_e2b(State_t& state, const Eigen::Quaternion<Scalar_t>& value)
     {
         const auto q = navkit::core::math::normalized_with_positive_scalar(value);
-        if constexpr (requires { typename StateDef::Quat; }) {
-            segment<typename StateDef::Quat>(state) << q.w(), q.x(), q.y(), q.z();
-        }
-        else {
-            segment<typename StateDef::Att>(state) = navkit::core::math::rpy_rad_from_quaternion(q);
-        }
+        using Nominal = typename StateDef::Nominal;
+        segment<typename Nominal::AttQuat>(state) << q.w(), q.x(), q.y(), q.z();
     }
 
     template<typename StateDef>
-    [[nodiscard]] static Eigen::Matrix<Scalar_t, StateDef::N, StateDef::N>
+    [[nodiscard]] static ErrorStateCov<StateDef>
     build_f_matrix(const NominalState<StateDef>& state, const MechanizedImuInterval& interval)
     {
-        Eigen::Matrix<Scalar_t, StateDef::N, StateDef::N> F =
-            Eigen::Matrix<Scalar_t, StateDef::N, StateDef::N>::Zero();
+        using Error = typename StateDef::Error;
+        ErrorStateCov<StateDef> F = ErrorStateCov<StateDef>::Zero();
 
         const auto q_e2b = quaternion_e2b<StateDef>(state);
         const auto C_b_e = q_e2b.conjugate().toRotationMatrix();
@@ -184,39 +181,39 @@ struct EcefInsPropagation
         const auto Omega_ie_e = navkit::core::math::skew_symmetric(omega_ie_e);
         const auto f_ib_e = C_b_e * interval.specific_force_ib_b_mps2;
 
-        F.template block<3, 3>(StateDef::Pos::i, StateDef::Vel::i).setIdentity();
-        F.template block<3, 3>(StateDef::Vel::i, StateDef::Pos::i) =
+        F.template block<3, 3>(Error::Pos::i, Error::Vel::i).setIdentity();
+        F.template block<3, 3>(Error::Vel::i, Error::Pos::i) =
             environment::gravity_gradient_fixed_mps2_per_m<Gravity>(position_e_m<StateDef>(state));
-        F.template block<3, 3>(StateDef::Vel::i, StateDef::Vel::i) = -2.0 * Omega_ie_e;
-        F.template block<3, 3>(StateDef::Vel::i, StateDef::Att::i) =
+        F.template block<3, 3>(Error::Vel::i, Error::Vel::i) = -2.0 * Omega_ie_e;
+        F.template block<3, 3>(Error::Vel::i, Error::AttRotVec::i) =
             navkit::core::math::skew_symmetric(f_ib_e);
-        if constexpr (requires { typename StateDef::AccB; }) {
-            F.template block<3, 3>(StateDef::Vel::i, StateDef::AccB::i) = -C_b_e;
+        if constexpr (requires { typename Error::AccB; }) {
+            F.template block<3, 3>(Error::Vel::i, Error::AccB::i) = -C_b_e;
         }
-        F.template block<3, 3>(StateDef::Att::i, StateDef::Att::i) = -Omega_ie_e;
-        if constexpr (requires { typename StateDef::GyroB; }) {
-            F.template block<3, 3>(StateDef::Att::i, StateDef::GyroB::i) = C_b_e;
+        F.template block<3, 3>(Error::AttRotVec::i, Error::AttRotVec::i) = -Omega_ie_e;
+        if constexpr (requires { typename Error::GyroB; }) {
+            F.template block<3, 3>(Error::AttRotVec::i, Error::GyroB::i) = C_b_e;
         }
 
         return F;
     }
 
     template<typename StateDef>
-    [[nodiscard]] static Eigen::Matrix<Scalar_t, StateDef::N, 12>
+    [[nodiscard]] static Eigen::Matrix<Scalar_t, StateDef::Error::N, 12>
     build_g_matrix(const NominalState<StateDef>& state)
     {
-        Eigen::Matrix<Scalar_t, StateDef::N, 12> G =
-            Eigen::Matrix<Scalar_t, StateDef::N, 12>::Zero();
+        using Error = typename StateDef::Error;
+        Eigen::Matrix<Scalar_t, Error::N, 12> G = Eigen::Matrix<Scalar_t, Error::N, 12>::Zero();
         const auto q_e2b = quaternion_e2b<StateDef>(state);
         const auto C_b_e = q_e2b.conjugate().toRotationMatrix();
 
-        G.template block<3, 3>(StateDef::Vel::i, 3) = C_b_e;
-        G.template block<3, 3>(StateDef::Att::i, 0) = -C_b_e;
-        if constexpr (requires { typename StateDef::GyroB; }) {
-            G.template block<3, 3>(StateDef::GyroB::i, 6).setIdentity();
+        G.template block<3, 3>(Error::Vel::i, 3) = C_b_e;
+        G.template block<3, 3>(Error::AttRotVec::i, 0) = -C_b_e;
+        if constexpr (requires { typename Error::GyroB; }) {
+            G.template block<3, 3>(Error::GyroB::i, 6).setIdentity();
         }
-        if constexpr (requires { typename StateDef::AccB; }) {
-            G.template block<3, 3>(StateDef::AccB::i, 9).setIdentity();
+        if constexpr (requires { typename Error::AccB; }) {
+            G.template block<3, 3>(Error::AccB::i, 9).setIdentity();
         }
         return G;
     }
@@ -232,21 +229,21 @@ struct EcefInsPropagation
     }
 
     template<typename StateDef>
-    [[nodiscard]] static StateCov<StateDef> first_order_phi(const StateCov<StateDef>& F,
-                                                            const Time_t dt_s)
+    [[nodiscard]] static ErrorStateCov<StateDef> first_order_phi(const ErrorStateCov<StateDef>& F,
+                                                                 const Time_t dt_s)
     {
-        return StateCov<StateDef>::Identity() + (F * dt_s);
+        return ErrorStateCov<StateDef>::Identity() + (F * dt_s);
     }
 
     template<typename StateDef>
-    [[nodiscard]] static StateCov<StateDef>
-    first_order_qd(const Eigen::Matrix<Scalar_t, StateDef::N, 12>& G, const Time_t dt_s)
+    [[nodiscard]] static ErrorStateCov<StateDef>
+    first_order_qd(const Eigen::Matrix<Scalar_t, StateDef::Error::N, 12>& G, const Time_t dt_s)
     {
         return G * build_qc_matrix() * G.transpose() * dt_s;
     }
 
 private:
-    template<StateDefPolicy StateDef>
+    template<StateSpaceDefPolicy StateDef>
     [[nodiscard]] static MechanizedImuInterval
     corrected_interval_from_single(const NominalState<StateDef>& state,
                                    const ImuIncrement& increment)
@@ -260,7 +257,7 @@ private:
             state, increment.time_s, increment.dt_s, corrected);
     }
 
-    template<StateDefPolicy StateDef>
+    template<StateSpaceDefPolicy StateDef>
     [[nodiscard]] static MechanizedImuInterval corrected_interval_from_pair(
         const NominalState<StateDef>& state, const ImuIncrement& first, const ImuIncrement& second)
     {
@@ -280,11 +277,11 @@ private:
             state, second.time_s, first.dt_s + second.dt_s, corrected);
     }
 
-    template<StateDefPolicy StateDef>
+    template<StateSpaceDefPolicy StateDef>
     [[nodiscard]] static bool covariance_step_from_interval(const NominalState<StateDef>& state,
                                                             const MechanizedImuInterval& interval,
-                                                            StateCov<StateDef>& phi,
-                                                            StateCov<StateDef>& qd)
+                                                            ErrorStateCov<StateDef>& phi,
+                                                            ErrorStateCov<StateDef>& qd)
     {
         if (interval.dt_s <= 0.0) {
             phi.setIdentity();
@@ -299,7 +296,7 @@ private:
         return true;
     }
 
-    template<StateDefPolicy StateDef>
+    template<StateSpaceDefPolicy StateDef>
     [[nodiscard]] static bool propagate_nominal_state(const MechanizedImuInterval& interval,
                                                       NominalState<StateDef>& state)
     {
@@ -313,7 +310,7 @@ private:
         return true;
     }
 
-    template<StateDefPolicy StateDef>
+    template<StateSpaceDefPolicy StateDef>
     static void propagate_nominal(const NominalState<StateDef>& state_before,
                                   const MechanizedImuInterval& interval,
                                   NominalState<StateDef>& state_after)
@@ -340,7 +337,7 @@ private:
         set_quaternion_e2b<StateDef>(state_after, q_e2b_next);
     }
 
-    template<typename StateDef>
+    template<StateSpaceDefPolicy StateDef>
     [[nodiscard]] static MechanizedImuInterval
     mechanized_interval_from_corrected(const NominalState<StateDef>& state,
                                        const Time_t time_s,

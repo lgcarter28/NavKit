@@ -15,7 +15,7 @@ namespace navkit::core::models
 using navkit::core::estimation::MeasurementModelBase;
 using navkit::core::estimation::segment;
 
-template<navkit::core::estimation::StateDefPolicy StateDef>
+template<navkit::core::estimation::StateSpaceDefPolicy StateDef>
 class BaroAltModel : public MeasurementModelBase<BaroAltModel<StateDef>, StateDef, 1>
 {
 public:
@@ -26,6 +26,8 @@ public:
     using H_t = typename Base::H_t;
     using R_t = typename Base::R_t;
     using O_t = typename Base::O_t;
+    using Nominal = typename StateDef::Nominal;
+    using Error = typename StateDef::Error;
 
     struct NoiseContext
     {
@@ -35,7 +37,7 @@ public:
     static H_t compute_h_impl(const State_t&)
     {
         H_t H = H_t::Zero();
-        H(0, StateDef::Pos::i + 2) = -1.0;
+        H(0, Error::Pos::i + 2) = -1.0;
         return H;
     }
 
@@ -49,7 +51,7 @@ public:
     static O_t obs_impl(const State_t& x)
     {
         O_t out{};
-        out(0) = segment<typename StateDef::Pos>(x).z();
+        out(0) = segment<typename Nominal::Pos>(x).z();
         return out;
     }
 };

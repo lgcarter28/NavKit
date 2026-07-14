@@ -289,12 +289,11 @@ TEST_CASE("Explicit PVA initialization provider accepts full row-major covarianc
 
     using NavKit = StationaryGnssAppConfig::NavKit;
     using StateDef = NavKit::StateDef;
+    using Error = typename StateDef::Error;
     auto navigator = std::make_unique<NavKit::Navigator>();
     initialize_navigator<StateDef>(*navigator, nav_init);
-    CHECK(navigator->filter().covariance()(StateDef::Pos::i, StateDef::Vel::i) ==
-          doctest::Approx(0.25));
-    CHECK(navigator->filter().covariance()(StateDef::Vel::i, StateDef::Pos::i) ==
-          doctest::Approx(0.25));
+    CHECK(navigator->filter().covariance()(Error::Pos::i, Error::Vel::i) == doctest::Approx(0.25));
+    CHECK(navigator->filter().covariance()(Error::Vel::i, Error::Pos::i) == doctest::Approx(0.25));
 }
 
 TEST_CASE("Random PVA initialization provider produces deterministic colored draws")
@@ -320,6 +319,8 @@ TEST_CASE("NavInitialization maps into the configured Navigator filter state")
 {
     using NavKit = StationaryGnssAppConfig::NavKit;
     using StateDef = NavKit::StateDef;
+    using Nominal = typename StateDef::Nominal;
+    using Error = typename StateDef::Error;
 
     const auto cfg = valid_stationary_gnss_runtime_config();
     const auto trajectory = trajectory_run_from_json(cfg);
@@ -330,16 +331,16 @@ TEST_CASE("NavInitialization maps into the configured Navigator filter state")
     initialize_navigator<StateDef>(*navigator, nav_init);
 
     const auto& filter = navigator->filter();
-    CHECK(filter.state()(StateDef::Pos::i + 0) == doctest::Approx(6378137.0 + 25.0));
-    CHECK(filter.state()(StateDef::Pos::i + 1) == doctest::Approx(-15.0));
-    CHECK(filter.state()(StateDef::Pos::i + 2) == doctest::Approx(10.0));
-    CHECK(filter.state().template segment<3>(StateDef::Vel::i).isZero());
+    CHECK(filter.state()(Nominal::Pos::i + 0) == doctest::Approx(6378137.0 + 25.0));
+    CHECK(filter.state()(Nominal::Pos::i + 1) == doctest::Approx(-15.0));
+    CHECK(filter.state()(Nominal::Pos::i + 2) == doctest::Approx(10.0));
+    CHECK(filter.state().template segment<3>(Nominal::Vel::i).isZero());
     CHECK(filter.state()
-              .template segment<4>(StateDef::Quat::i)
+              .template segment<4>(Nominal::AttQuat::i)
               .isApprox(Eigen::Matrix<core::Scalar_t, 4, 1>{1.0, 0.0, 0.0, 0.0}));
-    CHECK(filter.covariance()(StateDef::Pos::i, StateDef::Pos::i) == doctest::Approx(10000.0));
-    CHECK(filter.covariance()(StateDef::Vel::i, StateDef::Vel::i) == doctest::Approx(1.0e-6));
-    CHECK(filter.covariance()(StateDef::Att::i, StateDef::Att::i) == doctest::Approx(1.0e-6));
+    CHECK(filter.covariance()(Error::Pos::i, Error::Pos::i) == doctest::Approx(10000.0));
+    CHECK(filter.covariance()(Error::Vel::i, Error::Vel::i) == doctest::Approx(1.0e-6));
+    CHECK(filter.covariance()(Error::AttRotVec::i, Error::AttRotVec::i) == doctest::Approx(1.0e-6));
 }
 
 } // namespace navkit::app_support::test

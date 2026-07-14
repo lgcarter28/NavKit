@@ -26,7 +26,7 @@
 namespace navkit::core::estimation
 {
 
-template<StateDefPolicy StateDef,
+template<StateSpaceDefPolicy StateDef,
          InjectionPolicy<StateDef> Injection = DefaultInjectionPolicy<StateDef>,
          ResetPolicy<StateDef> Reset = DefaultResetPolicy<StateDef>,
          SensorTuplePolicy Sensors = std::tuple<>,
@@ -35,10 +35,12 @@ class KalmanFilter
 {
 public:
     using StateDef_t = StateDef;
+    using Nominal = typename StateDef::Nominal;
+    using Error = typename StateDef::Error;
     using Sensors_t = Sensors;
     using State_t = NominalState<StateDef>;
-    using ErrorState_t = State<StateDef>;
-    using P_t = StateCov<StateDef>;
+    using ErrorState_t = ErrorState<StateDef>;
+    using P_t = ErrorStateCov<StateDef>;
     using MeasurementStatisticsTuple_t = MeasurementStatisticsStorage_t<Sensors>;
     using Profiler_t = Profiler;
 
@@ -199,8 +201,8 @@ public:
 private:
     static void normalize_nominal_attitude(State_t& x)
     {
-        if constexpr (requires { typename StateDef::Quat; }) {
-            auto q_segment = segment<typename StateDef::Quat>(x);
+        if constexpr (requires { typename Nominal::AttQuat; }) {
+            auto q_segment = segment<typename Nominal::AttQuat>(x);
             Eigen::Quaternion<Scalar_t> q{q_segment(0), q_segment(1), q_segment(2), q_segment(3)};
             if (q.norm() <= 0.0) {
                 q.setIdentity();

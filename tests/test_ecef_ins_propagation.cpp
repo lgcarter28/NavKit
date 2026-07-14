@@ -25,6 +25,8 @@ using navkit::core::environment::J2;
 using navkit::core::environment::Wgs84;
 using StationaryPropagation = EcefInsPropagation<Wgs84, J2<Wgs84>>;
 using StationaryFilter = KalmanFilter<DefaultInsStateDef>;
+using NominalStateDef = DefaultInsStateDef::Nominal;
+using ErrorStateDef = DefaultInsStateDef::Error;
 
 struct NonzeroProcessNoise
 {
@@ -64,9 +66,9 @@ using NoisyPropagation = EcefInsPropagation<Wgs84, J2<Wgs84>, NonzeroProcessNois
 void initialize_stationary_filter(StationaryFilter& filter)
 {
     StationaryFilter::State_t state = StationaryFilter::State_t::Zero();
-    segment<DefaultInsStateDef::Pos>(state) = Vec3{Wgs84::a_m, 0.0, 0.0};
-    segment<DefaultInsStateDef::Vel>(state).setZero();
-    segment<DefaultInsStateDef::Quat>(state) << 1.0, 0.0, 0.0, 0.0;
+    segment<NominalStateDef::Pos>(state) = Vec3{Wgs84::a_m, 0.0, 0.0};
+    segment<NominalStateDef::Vel>(state).setZero();
+    segment<NominalStateDef::AttQuat>(state) << 1.0, 0.0, 0.0, 0.0;
     filter.set_state(state);
 
     StationaryFilter::P_t covariance = StationaryFilter::P_t::Zero();
@@ -123,9 +125,9 @@ TEST_CASE("Ideal stationary ECEF IMU increment preserves nominal PVA")
                                                                              filter.state()));
 
     const auto& state = filter.state();
-    CHECK(segment<DefaultInsStateDef::Pos>(state).isApprox(Vec3{Wgs84::a_m, 0.0, 0.0}, 1.0e-8));
-    CHECK(segment<DefaultInsStateDef::Vel>(state).isZero(1.0e-10));
-    CHECK(segment<DefaultInsStateDef::Quat>(state).isApprox(
+    CHECK(segment<NominalStateDef::Pos>(state).isApprox(Vec3{Wgs84::a_m, 0.0, 0.0}, 1.0e-8));
+    CHECK(segment<NominalStateDef::Vel>(state).isZero(1.0e-10));
+    CHECK(segment<NominalStateDef::AttQuat>(state).isApprox(
         Eigen::Matrix<Scalar_t, 4, 1>{1.0, 0.0, 0.0, 0.0}, 1.0e-12));
 }
 
@@ -147,9 +149,9 @@ TEST_CASE("Ideal stationary ECEF IMU increments keep pure strapdown bounded at 1
     }
 
     const auto& state = filter.state();
-    CHECK(segment<DefaultInsStateDef::Pos>(state).isApprox(Vec3{Wgs84::a_m, 0.0, 0.0}, 1.0e-3));
-    CHECK(segment<DefaultInsStateDef::Vel>(state).isZero(1.0e-6));
-    CHECK(segment<DefaultInsStateDef::Quat>(state).isApprox(
+    CHECK(segment<NominalStateDef::Pos>(state).isApprox(Vec3{Wgs84::a_m, 0.0, 0.0}, 1.0e-3));
+    CHECK(segment<NominalStateDef::Vel>(state).isZero(1.0e-6));
+    CHECK(segment<NominalStateDef::AttQuat>(state).isApprox(
         Eigen::Matrix<Scalar_t, 4, 1>{1.0, 0.0, 0.0, 0.0}, 1.0e-10));
 }
 
@@ -169,10 +171,10 @@ TEST_CASE("ECEF INS covariance prediction remains symmetric and process-noise dr
 
     const auto& covariance = filter.covariance();
     CHECK(covariance.isApprox(covariance.transpose(), 1.0e-15));
-    CHECK(covariance(DefaultInsStateDef::Vel::i, DefaultInsStateDef::Vel::i) > 0.0);
-    CHECK(covariance(DefaultInsStateDef::Att::i, DefaultInsStateDef::Att::i) > 0.0);
-    CHECK(covariance(DefaultInsStateDef::GyroB::i, DefaultInsStateDef::GyroB::i) > 0.0);
-    CHECK(covariance(DefaultInsStateDef::AccB::i, DefaultInsStateDef::AccB::i) > 0.0);
+    CHECK(covariance(ErrorStateDef::Vel::i, ErrorStateDef::Vel::i) > 0.0);
+    CHECK(covariance(ErrorStateDef::AttRotVec::i, ErrorStateDef::AttRotVec::i) > 0.0);
+    CHECK(covariance(ErrorStateDef::GyroB::i, ErrorStateDef::GyroB::i) > 0.0);
+    CHECK(covariance(ErrorStateDef::AccB::i, ErrorStateDef::AccB::i) > 0.0);
 }
 
 TEST_CASE("ECEF INS propagation rejects invalid IMU intervals without throwing")

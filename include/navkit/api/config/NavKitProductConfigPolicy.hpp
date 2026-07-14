@@ -29,7 +29,7 @@ concept NavKitProductConfigPolicy = requires {
     typename Candidate::Navigator;
 
     requires navkit::core::config::ConfigPolicy<Candidate>;
-    requires navkit::core::estimation::StateDefPolicy<typename Candidate::StateDef>;
+    requires navkit::core::estimation::StateSpaceDefPolicy<typename Candidate::StateDef>;
     requires navkit::core::estimation::SensorCollectionPolicy<typename Candidate::Sensors>;
     requires navkit::core::estimation::sensor_ids_unique_v<typename Candidate::Sensors>;
     requires navkit::core::estimation::FilterPolicy<typename Candidate::Filter>;

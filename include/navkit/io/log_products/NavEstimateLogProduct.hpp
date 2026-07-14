@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "navkit/core/estimation/state/State.hpp"
 #include "navkit/io/CsvWriter.hpp"
 #include "navkit/io/log_payloads/NavEstimateLogPayload.hpp"
 
@@ -37,7 +38,10 @@ public:
     template<typename StateDef, typename Filter>
     void log(const NavEstimateLogPayload<StateDef, Filter>& payload)
     {
-        const auto p_est = payload.filter.state().template segment<3>(StateDef::Pos::i);
+        using Nominal = typename StateDef::Nominal;
+        using Error = typename StateDef::Error;
+
+        const auto p_est = payload.filter.state().template segment<3>(Nominal::Pos::i);
         const auto err = p_est - payload.truth.p_e;
         const auto& P = payload.filter.covariance();
 
@@ -48,9 +52,9 @@ public:
                         err.x(),
                         err.y(),
                         err.z(),
-                        std::sqrt(P(StateDef::Pos::i + 0, StateDef::Pos::i + 0)),
-                        std::sqrt(P(StateDef::Pos::i + 1, StateDef::Pos::i + 1)),
-                        std::sqrt(P(StateDef::Pos::i + 2, StateDef::Pos::i + 2)));
+                        std::sqrt(P(Error::Pos::i + 0, Error::Pos::i + 0)),
+                        std::sqrt(P(Error::Pos::i + 1, Error::Pos::i + 1)),
+                        std::sqrt(P(Error::Pos::i + 2, Error::Pos::i + 2)));
     }
 
     void flush()

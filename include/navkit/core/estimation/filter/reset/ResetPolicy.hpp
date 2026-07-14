@@ -12,8 +12,8 @@ namespace navkit::core::estimation
 
 template<typename Candidate, typename StateDef>
 concept ResetPolicy =
-    StateDefPolicy<StateDef> &&
-    requires(NominalState<StateDef>& x, State<StateDef>& dx, StateCov<StateDef>& P) {
+    StateSpaceDefPolicy<StateDef> &&
+    requires(NominalState<StateDef>& x, ErrorState<StateDef>& dx, ErrorStateCov<StateDef>& P) {
         { Candidate::reset_covariance(x, dx, P) } -> std::same_as<void>;
         { Candidate::reset_dx(dx) } -> std::same_as<void>;
     };
