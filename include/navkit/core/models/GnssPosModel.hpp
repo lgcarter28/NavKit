@@ -38,7 +38,7 @@ public:
     static H_t compute_h_impl(const State_t&)
     {
         H_t H = H_t::Zero();
-        H.template block<3, 3>(0, Error::Pos::i) = -Eigen::Matrix<Scalar_t, 3, 3>::Identity();
+        H.template block<3, 3>(0, Error::Pos::i) = Eigen::Matrix<Scalar_t, 3, 3>::Identity();
         return H;
     }
 

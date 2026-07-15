@@ -25,7 +25,7 @@ TEST_CASE("Stationary trajectory includes both endpoints at fixed sample spacing
         CHECK(sample.time == doctest::Approx(static_cast<double>(index) * config.dt_s));
         CHECK(sample.p_e.isApprox(config.p_e));
         CHECK(sample.v_e.isZero());
-        CHECK(sample.q_eb.isApprox(Eigen::Quaterniond::Identity()));
+        CHECK(sample.q_b2e.isApprox(Eigen::Quaterniond::Identity()));
     }
 }
 

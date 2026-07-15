@@ -3,13 +3,15 @@
 
 #pragma once
 
+#include "navkit/core/config/Types.hpp"
+
 namespace navkit::io
 {
 
 template<typename StateDef, typename Filter>
-struct NavEstimateLogPayload
+struct FilterCorrectionLogPayload
 {
-    double time_s{};
+    core::Time_t time_s{};
     const Filter& filter;
 };
 

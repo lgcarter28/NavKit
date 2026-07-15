@@ -16,8 +16,8 @@ namespace
 {
 
 using StateDef = DefaultInsStateDef;
-using Nominal = typename StateDef::Nominal;
-using Error = typename StateDef::Error;
+using Nominal = StateDef::Nominal;
+using Error = StateDef::Error;
 using Model = navkit::core::models::GnssPosModel<StateDef>;
 using Sensor = navkit::core::estimation::Sensor<0U, Model, 4U>;
 struct DisabledStatisticsDiagnostics
@@ -86,7 +86,7 @@ Model::R_t expected_innovation_covariance()
 Model::H_t expected_jacobian()
 {
     Model::H_t H = Model::H_t::Zero();
-    H.template block<3, 3>(0, Error::Pos::i) = -Eigen::Matrix<Scalar_t, 3, 3>::Identity();
+    H.template block<3, 3>(0, Error::Pos::i) = Eigen::Matrix<Scalar_t, 3, 3>::Identity();
     return H;
 }
 
@@ -94,7 +94,7 @@ Model::K_t expected_gain()
 {
     Model::K_t K = Model::K_t::Zero();
     K.template block<3, 3>(Error::Pos::i, 0) =
-        (-100.0 / 101.0) * Eigen::Matrix<Scalar_t, 3, 3>::Identity();
+        (100.0 / 101.0) * Eigen::Matrix<Scalar_t, 3, 3>::Identity();
     return K;
 }
 

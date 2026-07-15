@@ -8,6 +8,7 @@
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
 #include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
 #include "navkit/core/estimation/navigator/PvaStateDef.hpp"
+#include "navkit/core/math/Quaternion.hpp"
 
 #include <Eigen/Eigenvalues>
 #include <algorithm>
@@ -49,6 +50,7 @@ inline void require_initialization_type(const nlohmann::json& initialization,
     nav_init.time_s = truth.time;
     core::estimation::pos_e_m(nav_init.pva) = truth.p_e;
     core::estimation::vel_e_mps(nav_init.pva) = truth.v_e;
+    core::estimation::rpy_b2e_rad(nav_init.pva) = core::math::rpy_rad_from_quaternion(truth.q_b2e);
     return nav_init;
 }
 
@@ -67,7 +69,7 @@ pva_error_from_json(const nlohmann::json& initialization)
     core::estimation::PvaState error = core::estimation::PvaState::Zero();
     core::estimation::pos_e_m(error) = required_vec3_from_object(pva_error, "pos_m");
     core::estimation::vel_e_mps(error) = required_vec3_from_object(pva_error, "vel_mps");
-    core::estimation::rpy_e2b_rad(error) = required_vec3_from_object(pva_error, "rpy_e2b_rad");
+    core::estimation::rpy_b2e_rad(error) = required_vec3_from_object(pva_error, "rpy_b2e_rad");
     return error;
 }
 

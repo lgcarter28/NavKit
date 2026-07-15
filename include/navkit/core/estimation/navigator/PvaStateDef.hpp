@@ -18,7 +18,7 @@ struct PvaStateDef
     // Current PVA convention is ECEF-only:
     // - position resolved in ECEF, meters
     // - velocity resolved in ECEF, meters/second
-    // - roll/pitch/yaw parameterizing the ECEF-to-body transform, radians
+    // - roll/pitch/yaw parameterizing the body-to-ECEF transform, radians
     using Pos = Segment<0, 3>;
     using Vel = Segment<3, 3>;
     using Rpy = Segment<6, 3>;
@@ -49,12 +49,12 @@ inline auto vel_e_mps(const PvaState& pva)
     return segment<PvaStateDef::Vel>(pva);
 }
 
-inline auto rpy_e2b_rad(PvaState& pva)
+inline auto rpy_b2e_rad(PvaState& pva)
 {
     return segment<PvaStateDef::Rpy>(pva);
 }
 
-inline auto rpy_e2b_rad(const PvaState& pva)
+inline auto rpy_b2e_rad(const PvaState& pva)
 {
     return segment<PvaStateDef::Rpy>(pva);
 }

@@ -7,6 +7,8 @@
 #include "navkit/core/estimation/state/State.hpp"
 #include "navkit/core/math/Quaternion.hpp"
 
+#include <Eigen/Dense>
+
 namespace navkit::core::estimation
 {
 
@@ -16,7 +18,7 @@ struct AdditiveInjection
     template<typename State_t>
     static void apply(State_t& x, const State_t& dx)
     {
-        segment<Seg>(x) -= segment<Seg>(dx);
+        segment<Seg>(x) += segment<Seg>(dx);
     }
 };
 
@@ -77,7 +79,7 @@ private:
              typename ErrorState_t>
     static void apply_additive_pair(NominalState_t& x, const ErrorState_t& dx)
     {
-        segment<NominalSegment>(x) -= segment<ErrorSegment>(dx);
+        segment<NominalSegment>(x) += segment<ErrorSegment>(dx);
     }
 
     template<typename NominalState_t, typename ErrorState_t>
@@ -87,13 +89,14 @@ private:
                           typename Nominal::AttQuat;
                           typename Error::AttRotVec;
                       }) {
-            const auto q_segment = segment<typename Nominal::AttQuat>(x);
-            const Eigen::Quaternion<Scalar_t> q_e2b{
+            const Eigen::Matrix<Scalar_t, 4, 1> q_segment = segment<typename Nominal::AttQuat>(x);
+            const Eigen::Quaternion<Scalar_t> q_b2e{
                 q_segment(0), q_segment(1), q_segment(2), q_segment(3)};
-            const auto delta_q = navkit::core::math::quaternion_from_rotvec_rad(
-                -segment<typename Error::AttRotVec>(dx));
-            const auto q_next =
-                navkit::core::math::normalized_with_positive_scalar(delta_q * q_e2b);
+            const Eigen::Quaternion<Scalar_t> delta_q =
+                navkit::core::math::quaternion_from_rotvec_rad(
+                    segment<typename Error::AttRotVec>(dx));
+            const Eigen::Quaternion<Scalar_t> q_next =
+                navkit::core::math::normalized_with_positive_scalar(delta_q * q_b2e);
             segment<typename Nominal::AttQuat>(x) << q_next.w(), q_next.x(), q_next.y(), q_next.z();
         }
         else {

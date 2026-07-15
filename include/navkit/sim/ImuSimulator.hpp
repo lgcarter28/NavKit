@@ -36,6 +36,7 @@ struct ImuTriadErrorConfig
 struct ImuSimulatorConfig
 {
     unsigned int seed{42U};
+    bool output_coning_sculling_compensated{false};
     ImuTriadErrorConfig gyro{};
     ImuTriadErrorConfig accel{};
 };
@@ -44,8 +45,14 @@ struct IdealImuInterval
 {
     Time_t time_s{0.0};
     Time_t dt_s{0.0};
+    Vec3 p_bar_e_m{Vec3::Zero()};
+    Vec3 v_bar_e_mps{Vec3::Zero()};
+    Vec3 a_bar_e_mps2{Vec3::Zero()};
+    Vec3 gravity_e_mps2{Vec3::Zero()};
+    Vec3 specific_force_e_mps2{Vec3::Zero()};
     Vec3 omega_ib_b_radps{Vec3::Zero()};
     Vec3 specific_force_ib_b_mps2{Vec3::Zero()};
+    Vec3 delta_theta_eb_b_rad{Vec3::Zero()};
     Vec3 delta_theta_ib_b_rad{Vec3::Zero()};
     Vec3 delta_v_ib_b_mps{Vec3::Zero()};
 };
@@ -67,9 +74,17 @@ public:
     [[nodiscard]] bool
     generate(const TruthSample& previous, const TruthSample& current, ImuIncrement& increment);
 
+    [[nodiscard]] bool generate(const TruthSample& previous,
+                                const TruthSample& current,
+                                ImuIncrement& increment,
+                                IdealImuInterval& ideal);
+
     void initialize(const TruthSample& initial);
 
     [[nodiscard]] bool generate(const TruthSample& current, ImuIncrement& increment);
+
+    [[nodiscard]] bool
+    generate(const TruthSample& current, ImuIncrement& increment, IdealImuInterval& ideal);
 
     [[nodiscard]] const Vec3& gyro_bias_radps() const
     {
@@ -79,6 +94,11 @@ public:
     [[nodiscard]] const Vec3& accel_bias_mps2() const
     {
         return m_accel_bias_mps2;
+    }
+
+    [[nodiscard]] bool output_coning_sculling_compensated() const
+    {
+        return m_cfg.output_coning_sculling_compensated;
     }
 
 private:

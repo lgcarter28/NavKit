@@ -28,7 +28,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - App composition configs intentionally live in a separate tree from reusable NavKit library configs, so the same descriptive file name can exist in both places without ambiguity. A selected app config owns the link between `using NavKit = ...` and `using App = ...`; runtime JSON is then validated by the app-support layer against that compiled composition before the executable runs.
 - Debug and Release build flags are now treated as explicit engineering products for NavKit-owned targets. CI enables warnings-as-errors, Release uses an embedded-oriented optimization profile, Linux Debug CI runs clang-tidy against the compilation database, and local agentic workflows intentionally do not run clang-tidy unless diagnosing that CI lane. Target-specific embedded toolchain flags remain future work until a target profile is selected.
 - `GnssPosModel`, `GnssVelModel`, and `BaroAltModel` exist, but only GNSS position is integrated into the current simulation. The barometer model currently selects the third position component; it is not yet a general ECEF-to-local-vertical altitude model.
-- The current trajectory generator supports only a simplistic stationary ECEF trajectory with timestamp, ECEF position, ECEF velocity, and ECEF-to-body attitude truth. Derived IMU quantities are produced by the IMU simulator rather than stored in `TruthSample`.
+- The current trajectory generator supports only a simplistic stationary ECEF trajectory with timestamp, ECEF position, ECEF velocity, and body-to-ECEF attitude truth. Derived IMU quantities are produced by the IMU simulator rather than stored in `TruthSample`.
 - `ImuSimulator` can generate deterministic raw IMU increments from consecutive ECEF truth samples, including Earth-rate gyro truth, specific force, bias, bias random walk, white noise, scale factor, misalignment, non-orthogonality, and quantization. The selected stationary GNSS simulation app now validates IMU runtime config, generates IMU increments, and feeds them into `Navigator::push_imu(...)`. `BaroSimulator` remains an empty shell.
 - Analysis already provides position error/covariance, innovation, NIS, p-value, mean p-value, and innovation histogram plots. More formal statistics and consistency tests remain future work.
 - Desktop timing and coarse binary-size artifacts now exist for the stationary simulation/analysis workflow and CI artifact upload. Product-core embedded profiling vocabulary now exists under `include/navkit/core/profiling`, and the first coarse `Navigator` and `KalmanFilter` integration points are instrumented. Profile export/visualization and memory/resource budgets remain future work.
@@ -394,11 +394,11 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 - [x] Add a reusable `Vec3` alias as `using Vec3 = Eigen::Matrix<core::Scalar_t, 3, 1>;` under `include/navkit/core/math/Types.hpp`. Keep it as a convenience alias for common 3D vectors without forcing every API to use it.
 - [x] Add `PvaStateDef` with `Pos`, `Vel`, and `Rpy` segments and `N = 9`, and represent PVA covariance as `StateCov<PvaStateDef>` so initialization covariance preserves position/velocity/attitude cross-correlation terms and uses existing segment/block utilities.
-- [x] Store `NavInitialization` PVA content as a packed `PvaState` plus `PvaCovariance`, mirroring transfer-alignment `TxaState`/`TxaCovariance` storage. Centralize physical interpretation through accessors such as `pos_e_m`, `vel_e_mps`, and `rpy_e2b_rad` instead of repeating segmented vectors directly on initialization messages.
+- [x] Store `NavInitialization` PVA content as a packed `PvaState` plus `PvaCovariance`, mirroring transfer-alignment `TxaState`/`TxaCovariance` storage. Centralize physical interpretation through accessors such as `pos_e_m`, `vel_e_mps`, and `rpy_b2e_rad` instead of repeating segmented vectors directly on initialization messages.
 - [x] Move stable PVA/TXA state vocabulary under `include/navkit/core/estimation/navigator`, while keeping app-side provider files under `include/navkit/app_support/initialization`.
-- [x] Rename PVA fields for clarity and unit consistency, including staged `attitude_rad`/`att_rad` vocabulary to `rpy_e2b_rad`. Align covariance field names with the PVA state vocabulary and units while avoiding one-off 3x3 covariance block members that lose cross-correlation terms.
+- [x] Rename PVA fields for clarity and unit consistency, including staged `attitude_rad`/`att_rad` vocabulary to `rpy_b2e_rad`. Align covariance field names with the PVA state vocabulary and units while avoiding one-off 3x3 covariance block members that lose cross-correlation terms.
 - [x] Replace the staged `truth_perturbed_pva` runtime/provider naming with clearer initializer choices: `PvaExplicitInitializationProvider` for explicit deterministic PVA error input and `PvaRandomInitializationProvider` for random PVA error draws from configured covariance.
-- [x] Restructure runtime initialization JSON around explicit PVA sections. Use `pva_error` with fields such as `pos_m`, `vel_mps`, and `rpy_e2b_rad`, and use `pva_cov` with either `diag` containing 9 diagonal covariance values or `full` containing 81 row-major covariance values. Drop sigma-based initialization inputs from this path.
+- [x] Restructure runtime initialization JSON around explicit PVA sections. Use `pva_error` with fields such as `pos_m`, `vel_mps`, and `rpy_b2e_rad`, and use `pva_cov` with either `diag` containing 9 diagonal covariance values or `full` containing 81 row-major covariance values. Drop sigma-based initialization inputs from this path.
 - [x] Add runtime validation that rejects missing/ambiguous `pva_cov` shapes, wrong `diag`/`full` lengths, unsupported initializer types, and malformed PVA vectors with clear messages.
 - [x] Clean provider control flow so it does not use raw pointers, `nullptr`, or repeated null comparisons to branch on optional truth samples; use explicit empty/non-empty trajectory logic instead.
 - [x] Add `PvaRandomInitializationProvider` using the configured full PVA covariance to generate colored random PVA error draws with an explicit runtime seed, while keeping randomness in app/sim support and outside product-core code.
@@ -549,7 +549,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 ## Pass 5c — IMU increment contract and emulator implementation
 
 - [x] Define the product-core IMU increment sample type consumed by `navigator_ecef_v1`, including timestamp, sample interval, incremental angle `delta_theta_ib_b_rad`, incremental velocity `delta_v_ib_b_mps`, and explicit pre/post-correction semantics.
-- [x] Update truth generation enough to support ideal stationary ECEF IMU truth: trajectory providers should emit ECEF truth states only (`t`, `p_eb_e`, `v_eb_e`, and ECEF-to-body attitude), while the IMU emulator derives body-frame inertial angular increments and specific-force increments from successive truth samples with explicit Earth-rotation compensation.
+- [x] Update truth generation enough to support ideal stationary ECEF IMU truth: trajectory providers should emit ECEF truth states only (`t`, `p_eb_e`, `v_eb_e`, and body-to-ECEF attitude), while the IMU emulator derives body-frame inertial angular increments and specific-force increments from successive truth samples with explicit Earth-rotation compensation.
 - [x] Implement an ideal IMU emulator first: deterministic timestamped increments from truth with no bias, noise, scale factor, misalignment, non-orthogonality, or quantization.
 - [x] Define an IMU triad error-model vocabulary for gyro and accelerometer independently. The model should preserve the substance of `docs/navigation_reference` section 2.2 without inheriting its notation:
   - [x] bias and optional bias random walk;
@@ -571,21 +571,21 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Move the selected simulation app loop to `Navigator::update()` so executable orchestration no longer couples itself to the temporary measurements-only path.
 - [x] Add focused reusable implementation primitives before broad app wiring: rotation-vector/quaternion conversion helpers, two-sample coning/sculling helpers, ECEF PVA strapdown helpers, interval `F_k`/`G_k` builders, first-order `Phi_k`/`Q_d`, and symmetry-preserving covariance prediction tests.
 - [x] Add typed IMU ingestion to `Navigator` with fixed-capacity internal buffering. The normal client contract is `push_imu(...)` followed by `update()`, with `process_strapdown_integration()`, `propagate_covariance()`, and `process_measurements()` available as explicit stage methods for tests and advanced users.
-- [x] Implement the first ECEF v1 propagation policy against the current split-state reality: propagate nominal ECEF-to-body attitude as a unit quaternion while retaining the 3D `Att` segment as the small-angle attitude error state used by covariance, Jacobians, and injection.
+- [x] Implement the first ECEF v1 propagation policy against the current split-state reality: propagate nominal body-to-ECEF attitude as a unit quaternion while retaining the 3D `Att` segment as the small-angle attitude error state used by covariance, Jacobians, and injection.
 - [x] Keep the v1 selected configs aligned with the algorithm document by using `DefaultInsStateDef`: a 15D PVA+gyro-bias+accelerometer-bias error/covariance layout with quaternion nominal attitude storage. Leave online scale-factor/misalignment estimation for a deliberately designed future pass.
 - [x] Wire the selected stationary simulation loop to generate IMU increments from the new IMU emulator and feed the Navigator through the new typed ingestion path, while preserving existing GNSS-position logging and analysis behavior.
 - [x] Implement the first real INS path from the `navigator_ecef_v1` equation-to-code map, using the Pass 5c IMU emulator as the primary data source:
   - [x] Mechanization primitives: rotation-vector/quaternion conversion, quaternion propagation sign tests, two-sample coning/sculling, ECEF PVA nominal propagation, and gravity/gravity-gradient policy calls.
   - [x] Covariance prediction primitives: build `F_k`, build `G_k`, first-order `Phi_k`, first-order `Q_d`, filter-owned covariance propagation, symmetry checks, and equation-block sanity tests.
   - [x] Navigator integration: typed IMU ingestion, fixed-capacity internal buffers, `update()` orchestration, and explicit stage-method tests.
-  - [x] Aiding integration beyond the existing GNSS position path is deliberately moved to Pass 5e.3 after IMU-only propagation diagnosis is stable.
+  - [x] Aiding integration beyond the existing GNSS position path is deliberately moved to Pass 5e.4 after IMU-only propagation diagnosis is stable.
 - [x] Define typed IMU data ingestion using the real IMU sample contract. Clients push timestamped IMU increments through `push_imu(...)`, then call `Navigator::update()`.
 - [x] Correct the propagation/filter ownership boundary after the first working navigator pass: remove filter/sensor knowledge from propagation policies, move `P = Phi P Phi^T + Q_d` into `KalmanFilter::propagate_covariance(...)`, and keep `Navigator` as the owner of orchestration and stage sequencing.
 - [x] Tighten the first IMU/runtime cleanup: expose 1024-sample IMU buffer capacity in product configs, support `rate_hz` or `dt_s` runtime rate input with exactly-one validation where applicable, default truth and IMU to 1000 Hz for simple v1 timing, and move IMU-specific simulator setup out of the central simulation loop.
 - [x] Move reusable implementation pieces toward their owning domains: quaternion/RPY conversion helpers under math, coning/sculling helpers under Navigator IMU support, diagonal random draws under simulation utilities, and zero process-noise policy into its own propagation header.
 - [ ] Define buffer ownership and timing rules for v1 beyond the current FIFO IMU buffer. Simple history buffers for inspection and future replay support are acceptable, but full latency handling, measurement replay, and delayed-measurement correction are explicitly out of scope.
-- [ ] Add the next logging/analysis pass for the new INS path: queryable/interpolated truth sampling, separate runtime-configurable truth logging rate, IMU increment truth/measured logs, cumulative-sum plots, optional compile-time IMU debug interval logs, and runtime manifests for simulator configuration.
-- [x] Move runtime scenario JSON splitting to Pass 5e.3 so this implementation pass can focus on stabilizing the single-IMU ECEF v1 path.
+- [x] Move INS observability/logging/analysis expansion to the dedicated Pass 5e.3 so this implementation pass can focus on stabilizing the single-IMU ECEF v1 path.
+- [x] Move runtime scenario JSON splitting to Pass 5e.4 so this implementation pass can focus on stabilizing the single-IMU ECEF v1 path.
 - [ ] Defer full delayed-measurement replay, multi-IMU support, IMU lever arms, estimated scale-factor/misalignment states, and richer timing/latency handling until the single-IMU ECEF v1 path is numerically stable.
 
 ## Pass 5e.1/5e.2 — Navigator stabilization, timing, and diagnosis cleanup
@@ -594,14 +594,75 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Add a bounded covariance-step history buffer owned by `Navigator`, defaulting to 256 entries for the first implementation. Keep the current accumulated pending covariance step for the normal no-latency path, but retain enough recent `Phi`/`Q_d` history for inspection and future latent-measurement replay.
 - [x] Add `Navigator::StateDef_t = typename Filter_t::StateDef_t` and use it to consolidate repeated state-definition spelling inside Navigator.
 - [x] Normalize math helper names: use `quaternion_from_rpy_rad()` / `rpy_rad_from_quaternion()` for roll-pitch-yaw Euler conversions, and add `quaternion_from_rotvec_rad()` / `rotvec_rad_from_quaternion()` for small-angle or Rodrigues rotation-vector use cases. Keep nominal-state attitude and error-state perturbation vocabulary separate in names and tests.
-- [x] Migrate from transitional RPY nominal attitude storage to the `navigator_ecef_v1` split-state design by making `DefaultInsStateDef` an aggregate selected state-space definition: `DefaultInsNominalStateDef` stores ECEF-to-body attitude in `AttQuat`, while `DefaultInsErrorStateDef` keeps the covariance/error attitude as the 3D small-angle `AttRotVec` perturbation.
+- [x] Migrate from transitional RPY nominal attitude storage to the `navigator_ecef_v1` split-state design by making `DefaultInsStateDef` an aggregate selected state-space definition: `DefaultInsNominalStateDef` stores body-to-ECEF attitude in `AttQuat`, while `DefaultInsErrorStateDef` keeps the covariance/error attitude as the 3D small-angle `AttRotVec` perturbation.
 - [x] Leave PVA sub-selection alone for now. Do not introduce PVA state views or copies unless a zero-runtime-cost view abstraction becomes clearly worthwhile.
 - [x] Standardize function signatures in Navigator/propagation code: input parameters first as `const&`, in/out parameters second as non-const references, and output-only parameters last. Add this rule to the agent/design guidance before applying broad cleanup.
 - [x] Add a tight INS diagnosis pass before expanding aiding: create an IMU-only stationary validation configuration or test harness, run ideal stationary truth with ideal IMU and no GNSS, and verify that pure strapdown propagation holds ECEF position/velocity/attitude within tight tolerances over a short run.
 - [x] Add focused logging or assertions for the diagnosis pass around one or a few IMU intervals: `delta_theta_ib_b`, `delta_v_ib_b`, gravity, specific force, and resulting velocity/position increments. Use this to isolate ECEF/inertial rotation sign, quaternion/DCM direction, gravity/sign, and GNSS Jacobian/update sign issues before masking them with additional aiding.
 - [x] Add runtime-configurable console/log output rates. Default the console heartbeat to 1 Hz and include time, position, velocity, and attitude; keep file logging rates separate from truth/IMU system rates so 1000 Hz simulation does not force 1000 Hz logs.
 
-## Pass 5e.3 — GNSS velocity aiding and runtime scenario modularization
+## Pass 5e.3 — INS observability, IMU debug logs, and full-state plotting
+
+- [ ] Add queryable/interpolated truth sampling so consumers can request truth at arbitrary times without forcing all downstream processing to run at the trajectory generation rate. Keep truth generation/system rate separate from truth logging rate.
+- [x] Keep runtime-configurable log rates independent for truth, navigation, measurement statistics, IMU logs, IMU debug logs, and console heartbeat. Default high-rate simulation to numerically simple rates such as 1000 Hz while allowing logs to default to lower inspection-friendly rates.
+- [x] Add or extend truth trajectory logs for the complete v1 truth contract: time, ECEF position, ECEF velocity, and body-to-ECEF attitude. Preserve frame/unit suffix naming and schema metadata.
+- [x] Add IMU increment log products for both truth/ideal increments and measured emulator increments:
+  - [x] Log `delta_theta_ib_b_rad`, `delta_v_ib_b_mps`, timestamp, and interval `dt_s`.
+  - [x] Include cumulative sums of truth/ideal and measured increments so bias, drift, quantization, and sign errors are visible without staring at noisy high-rate samples.
+  - [x] Add Python plots for raw increment time histories and cumulative-sum comparisons, grouped by gyro/incremental-angle and accelerometer/incremental-velocity channels.
+- [x] Add explicit compile-time-selected IMU simulator debug logging for implementation-internal interval quantities needed to debug the truth-to-IMU conversion:
+  - [x] Include ECEF terms such as `p_bar_e_m`, `v_bar_e_mps`, `a_bar_e_mps2`, `gravity_e_mps2`, and `specific_force_e_mps2`.
+  - [x] Include body/inertial terms such as `delta_theta_eb_b_rad`, `delta_theta_ib_b_rad`, `specific_force_ib_b_mps2`, and `delta_v_ib_b_mps`.
+  - [x] Include time-varying emulator error states such as gyro and accelerometer biases when enabled.
+  - [x] Keep this as an explicit debug log product or compile-time diagnostics path rather than leaking IMU internals into `SimulationApp`.
+- [ ] Add dedicated IMU simulator runtime/config manifests beside the run logs so analysis can verify seed, rate, noise PSD/covariance, bias, scale factor, misalignment, non-orthogonality, quantization, and enabled debug-log settings. The current run manifest already stores the selected runtime config; this item tracks richer per-IMU manifest/schema detail.
+- [x] Generalize Kalman filter/navigation error logging beyond ECEF position:
+  - [x] Add a filter covariance logging mode that can record either covariance diagonal only or the full upper/lower triangular covariance matrix. Keep diagonal logging as the lightweight default, and enable triangular logging when downstream transforms require cross-correlation terms.
+  - [x] Generate one log/schema path that records the full configured error-state correction vector and matching covariance data for every state in `StateDef::Error`.
+  - [x] Keep the existing ECEF position error/covariance plot behavior as the first specialization/view, but make the same 1-sigma and 3-sigma bound plots available for every configured error-state component.
+  - [x] Add correction-within-covariance plots that show filter error-state corrections against covariance bounds. These plots must not require truth, so they are valid for both real runs and simulations.
+  - [x] Add simulation-only truth-error-within-covariance plots that interpolate truth to nav/log timestamps, calculate actual navigation errors, and plot those errors against covariance bounds.
+  - [x] Include attitude-error, gyro-bias, and accelerometer-bias plots for `DefaultInsErrorStateDef`, with frame/unit labels taken from schema helpers or explicit state-def metadata where available.
+  - [x] For IMU bias truth-error plots, expose/log the simulator's truth bias state as turn-on bias plus in-run bias/random-walk state, compare it against the estimated gyro/accelerometer bias states, and plot the resulting bias errors inside the corresponding covariance bounds.
+  - [x] Add ECEF-to-local-level plots for position, velocity, and attitude errors/covariance. Use a clearly named sensitivity/rotation matrix from ECEF to NED, apply `P_ned = G P_ecef G^T` where the full covariance is available, and keep diagonal-only logging explicitly limited to component-wise ECEF plots.
+  - [x] Add analysis plots for full-state correction histories, truth-error histories, covariance bounds, and transformed NED bounds where truth is available.
+  - [ ] Add optional normalized error-ratio plots where truth is available.
+  - [x] Preserve existing GNSS innovation, NIS, p-value, and histogram outputs while making the state-error plotting path independent of GNSS-specific assumptions.
+- [ ] Add tests for the new log-product schemas and plotting input contracts. Favor small deterministic CSV/log fixtures where possible so plotting failures are caught without requiring long stochastic simulation runs.
+
+## Pass 5e.4 — Logging contract cleanup, trajectory initialization, and `auto` audit
+
+- [x] Update `AGENTS.md` with the stronger repository rule for `auto`: prohibit `auto` by default, except for narrow obvious cases such as iteration variables, lambda/closure types, unavoidable template abstraction, or immediately consumed expressions where the concrete type is irrelevant. Explicit concrete types are required for stored/reused Eigen expressions, math temporaries, domain values, dimensions, state vectors, matrices, units, and frame-bearing quantities.
+- [ ] Continue the dedicated `auto` deep-dive audit across the codebase. The first pass replaced high-risk nontrivial `auto` usages in touched simulation, propagation, logging, and analysis-facing math code; a broader repository-wide audit remains.
+- [x] Rename default log products/files to include `ecef` where the frame is part of the contract, now that local-level/NED products also exist.
+- [x] Split runtime logs into fact logs and derived analysis artifacts:
+  - [x] Keep a dedicated truth trajectory log with only timestamp, ECEF position, ECEF velocity, and body-to-ECEF attitude.
+  - [x] Keep a dedicated nominal navigation/filter estimate log with timestamp, nominal state estimate, attitude representation, and covariance data. Support diagonal-only covariance as the default and full triangular covariance when downstream transforms need cross-correlation terms.
+  - [x] Keep `filter_correction` as an event log that writes only when corrections actually occur; do not fill the file with zero rows on propagation-only timesteps.
+  - [x] Move truth-error calculation out of primary C++ logging and into Python post-processing: load truth and estimate logs, interpolate truth to estimate timestamps, compute simulation-only errors, and optionally write derived truth-error CSV artifacts.
+- [x] Redesign the monolithic truth-error/covariance dashboard while keeping the detailed broken-out plots available:
+  - [x] Use one subplot per kinematic/error-state family with all axes on the same subplot.
+  - [x] Use a two-column layout: left column position, velocity, attitude; right column gyro bias and accelerometer bias.
+  - [x] Use consistent axis colors, such as x/roll red, y/pitch blue, and z/yaw green.
+  - [x] Plot errors and matched 3-sigma bounds only; omit 1-sigma bounds from the dashboard to reduce clutter.
+  - [x] Label attitude plots as roll, pitch, and yaw rather than north/east/down.
+- [x] Add dedicated IMU error/bias plots outside the mega-dashboard. Compare simulator truth gyro/accelerometer bias states against estimated bias states, plot bias errors inside covariance bounds, and label axes using the configured body-axis convention.
+- [ ] Split IMU logs by responsibility:
+  - [x] nominal IMU simulator log for truth/ideal and measured increments plus cumulative sums;
+  - [x] optional IMU debug log for implementation-internal interval quantities;
+  - [ ] richer IMU runtime/config manifest that records enabled error sources, seed, rates, covariance/PSD settings, quantization, coning/sculling setting, and debug-log setting.
+- [x] Extend trajectory initial-condition parsing for the current stationary/runtime trajectory path without introducing full 6-DOF dynamics yet:
+  - [x] Support ECEF initial values such as `p_e_m`, `v_e_mps`, and one attitude form among `q_b2e`, `rpy_b2e_rad`, or `dcm_b2e`.
+  - [x] Support local-level initial values such as `p_lla_deg_m`, `v_n_mps`, and one attitude form among `q_b2n`, `rpy_b2n_rad`, or `dcm_b2n`, converting internally to canonical ECEF truth state.
+  - [x] Add initial angular-rate parsing for `w_ib_b_radps`, `w_eb_b_radps`, and `w_nb_b_radps`, with explicit validation that only one angular-rate convention is selected.
+  - [x] Default stationary body axes to the aircraft convention x-forward/nose, y-right-wing, z-down by deriving the initial body frame from local-level/NED attitude when provided.
+- [x] Add coning/sculling compensation configurability on both sides of the IMU contract:
+  - [x] IMU simulator can emit raw/uncompensated or compensated increments.
+  - [x] ECEF INS propagation can apply compensation or assume increments are already compensated.
+  - [x] Add validation or clear manifest metadata to make double compensation or missing compensation obvious.
+- [x] Keep full rigid-body 6-DOF trajectory dynamics out of this pass. Record the future direction separately: mass, CG, inertia, force/moment models, aerodynamic effects, and closed-loop guidance should become a dedicated trajectory-dynamics pass after the initial-condition and truth-provider contract is stable.
+
+## Pass 5e.5 — GNSS velocity aiding and runtime scenario modularization
 
 - [ ] Add GNSS velocity aiding after the IMU-only propagation diagnosis is stable. Wire the existing GNSS velocity model into the selected simulation/app config, include antenna lever-arm handling, and add finite-difference Jacobian tests.
 - [ ] Split runtime scenario JSON into reusable blocks only after the current app/runtime contracts stabilize. Keep trajectory profile selection runtime-configurable; avoid compile-time product names that imply a fixed trajectory.
@@ -615,7 +676,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Truth generation
 
-- [x] Keep `TruthSample` trajectory-only for v1: timestamp, ECEF position, ECEF velocity, and ECEF-to-body attitude. Acceleration, angular-rate, and specific-force truth are derived by simulator/emulator components rather than stored as primary trajectory fields.
+- [x] Keep `TruthSample` trajectory-only for v1: timestamp, ECEF position, ECEF velocity, and body-to-ECEF attitude. Acceleration, angular-rate, and specific-force truth are derived by simulator/emulator components rather than stored as primary trajectory fields.
 - [ ] Add a trajectory-source abstraction so generated trajectories and CSV/playback trajectories feed the same downstream hooks. Do not create a separate playback driver unless the shared trajectory-provider path cannot express the required replay behavior.
 - [x] Priority 1: flesh out stationary ECEF trajectory/emulator validation with proper Earth rotation, nonzero stationary IMU gyro increments, and physically meaningful derived specific-force increments. This scenario supports future gyrocompassing, coarse alignment, and ZUPT validation work.
 - [ ] Priority 2: add a simple ballistic trajectory: stationary launch-pad initialization, optional transfer-alignment window, initial heading/pitch definition, and a simple axial body-x boost profile before ballistic/coast behavior. Keep this intentionally simple before adding aero or guidance complexity.

@@ -27,7 +27,7 @@ using navkit::core::environment::Wgs84;
     sample.time = time_s;
     sample.p_e = Vec3{Wgs84::a_m, 0.0, 0.0};
     sample.v_e.setZero();
-    sample.q_eb.setIdentity();
+    sample.q_b2e.setIdentity();
     return sample;
 }
 
@@ -70,7 +70,7 @@ TEST_CASE("Ideal gyro truth combines ECEF attitude delta with Earth rotation")
 {
     auto previous = stationary_sample(0.0);
     auto current = stationary_sample(2.0);
-    current.q_eb = Eigen::AngleAxisd(0.1, Vec3::UnitZ());
+    current.q_b2e = Eigen::AngleAxisd(0.1, Vec3::UnitZ());
 
     IdealImuInterval ideal;
     REQUIRE(ImuSimulator::ideal_interval_from_truth_ecef(previous, current, ideal));
@@ -141,9 +141,18 @@ TEST_CASE("IMU simulator stateful generation consumes consecutive samples")
     simulator.initialize(stationary_sample(0.0));
     REQUIRE(simulator.generate(stationary_sample(0.25), increment));
 
+    IdealImuInterval ideal;
+    REQUIRE(ImuSimulator::ideal_interval_from_truth_ecef(
+        stationary_sample(0.0), stationary_sample(0.25), ideal));
+
     CHECK(increment.time_s == doctest::Approx(0.25));
     CHECK(increment.dt_s == doctest::Approx(0.25));
+    CHECK(increment.delta_theta_ib_b_rad.x() == doctest::Approx(0.0));
+    CHECK(increment.delta_theta_ib_b_rad.y() == doctest::Approx(0.0));
     CHECK(increment.delta_theta_ib_b_rad.z() == doctest::Approx(0.25 * Wgs84::omega_rad_s));
+    CHECK(increment.delta_v_ib_b_mps.x() == doctest::Approx(ideal.delta_v_ib_b_mps.x()));
+    CHECK(increment.delta_v_ib_b_mps.y() == doctest::Approx(0.0));
+    CHECK(increment.delta_v_ib_b_mps.z() == doctest::Approx(0.0));
 
     CHECK_FALSE(simulator.generate(stationary_sample(0.25), increment));
 }

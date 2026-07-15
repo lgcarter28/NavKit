@@ -15,6 +15,10 @@
 #include "navkit/app_support/runtime/RunSettings.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigValidation.hpp"
 #include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
+#include "navkit/core/math/Types.hpp"
+#include "navkit/io/log_payloads/FilterCorrectionLogPayload.hpp"
+#include "navkit/io/log_payloads/ImuDebugLogPayload.hpp"
+#include "navkit/io/log_payloads/ImuIncrementLogPayload.hpp"
 #include "navkit/io/log_payloads/NavEstimateLogPayload.hpp"
 
 #include <Eigen/Dense>
@@ -47,17 +51,18 @@ public:
         const nlohmann::json cfg = load_json_file(config_path);
         validate_runtime_config<Config>(cfg);
 
-        const auto run_settings = run_settings_from_json(cfg);
-        const auto trajectory = trajectory_run_from_json(cfg);
+        const RunSettings run_settings = run_settings_from_json(cfg);
+        const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
         auto emulator_runtimes = Emulators::make_runtimes(cfg);
         Imu imu_runtime(cfg);
 
         reset_profile_sink_if_configured<NavKit>();
 
-        auto navigator_storage = std::make_unique<Navigator>();
-        auto& navigator = *navigator_storage;
-        auto& filter = navigator.filter();
-        const auto nav_initialization = NavInitializationProvider::initialize(cfg, trajectory);
+        std::unique_ptr<Navigator> navigator_storage = std::make_unique<Navigator>();
+        Navigator& navigator = *navigator_storage;
+        Filter& filter = navigator.filter();
+        const NavInitialization nav_initialization =
+            NavInitializationProvider::initialize(cfg, trajectory);
         initialize_navigator<StateDef>(navigator, nav_initialization);
         TransferAlignmentProvider::template transfer_align<Navigator>(navigator, cfg, trajectory);
 
@@ -68,16 +73,39 @@ public:
         core::Time_t next_truth_log_s{0.0};
         core::Time_t next_nav_log_s{0.0};
         core::Time_t next_measurement_statistics_log_s{0.0};
+        core::Time_t next_imu_log_s{0.0};
+        core::Time_t next_imu_debug_log_s{0.0};
+        core::Time_t next_filter_correction_log_s{0.0};
 
         for (const auto& sample : trajectory.truth_samples) {
             if (should_log_at(sample.time, run_settings.logging.truth_dt_s, next_truth_log_s)) {
                 logger.log(sample);
             }
-            if (!imu_runtime.process(navigator, sample)) {
+            ImuRuntimeSample imu_sample{};
+            if (!imu_runtime.process(sample, navigator, imu_sample)) {
                 std::printf("IMU runtime failure at t=%f: %s\n",
                             sample.time,
                             imu_runtime.last_error().data());
                 return 2;
+            }
+            if (imu_sample.generated &&
+                should_log_at(sample.time, run_settings.logging.imu_dt_s, next_imu_log_s)) {
+                log_if_supported(logger,
+                                 io::ImuIncrementLogPayload{
+                                     .ideal = imu_sample.ideal,
+                                     .measured = imu_sample.measured,
+                                     .gyro_bias_truth_radps = imu_sample.gyro_bias_truth_radps,
+                                     .accel_bias_truth_mps2 = imu_sample.accel_bias_truth_mps2});
+            }
+            if (imu_sample.generated && should_log_at(sample.time,
+                                                      run_settings.logging.imu_debug_dt_s,
+                                                      next_imu_debug_log_s)) {
+                log_if_supported(logger,
+                                 io::ImuDebugLogPayload{
+                                     .ideal = imu_sample.ideal,
+                                     .measured = imu_sample.measured,
+                                     .gyro_bias_truth_radps = imu_sample.gyro_bias_truth_radps,
+                                     .accel_bias_truth_mps2 = imu_sample.accel_bias_truth_mps2});
             }
             Emulators::process(navigator, logger, emulator_runtimes, sample);
 
@@ -95,8 +123,17 @@ public:
                 logger.log(io::NavEstimateLogPayload<StateDef, Filter>{
                     .time_s = sample.time,
                     .filter = filter,
-                    .truth = sample,
                 });
+            }
+            if (filter.last_correction_valid() &&
+                should_log_at(sample.time,
+                              run_settings.logging.filter_correction_dt_s,
+                              next_filter_correction_log_s)) {
+                log_if_supported(logger,
+                                 io::FilterCorrectionLogPayload<StateDef, Filter>{
+                                     .time_s = sample.time,
+                                     .filter = filter,
+                                 });
             }
             if (should_log_at(sample.time, run_settings.logging.console_dt_s, next_console_log_s)) {
                 print_console_status(sample.time, filter);
@@ -112,6 +149,16 @@ public:
     }
 
 private:
+    template<typename Payload>
+    static void log_if_supported(Logger& logger, const Payload& payload)
+    {
+        if constexpr (requires { Logger::template matching_product_count_v<Payload>; }) {
+            if constexpr (Logger::template matching_product_count_v<Payload> == 1U) {
+                logger.log(payload);
+            }
+        }
+    }
+
     [[nodiscard]] static bool
     should_log_at(const core::Time_t time_s, const core::Time_t dt_s, core::Time_t& next_time_s)
     {
@@ -129,10 +176,11 @@ private:
     {
         using Nominal = typename StateDef::Nominal;
 
-        const auto p_e = filter.state().template segment<3>(Nominal::Pos::i);
-        const auto v_e = filter.state().template segment<3>(Nominal::Vel::i);
-        const auto q_e2b = filter.state().template segment<4>(Nominal::AttQuat::i);
-        std::printf("t=%8.3f s | p_e=[%.3f %.3f %.3f] m | v_e=[%.6f %.6f %.6f] m/s | q_e2b=[%.6e "
+        const core::Vec3 p_e = filter.state().template segment<3>(Nominal::Pos::i);
+        const core::Vec3 v_e = filter.state().template segment<3>(Nominal::Vel::i);
+        const Eigen::Matrix<core::Scalar_t, 4, 1> q_b2e =
+            filter.state().template segment<4>(Nominal::AttQuat::i);
+        std::printf("t=%8.3f s | p_e=[%.3f %.3f %.3f] m | v_e=[%.6f %.6f %.6f] m/s | q_b2e=[%.6e "
                     "%.6e %.6e %.6e]\n",
                     time_s,
                     p_e.x(),
@@ -141,10 +189,10 @@ private:
                     v_e.x(),
                     v_e.y(),
                     v_e.z(),
-                    q_e2b(0),
-                    q_e2b(1),
-                    q_e2b(2),
-                    q_e2b(3));
+                    q_b2e(0),
+                    q_b2e(1),
+                    q_b2e(2),
+                    q_b2e(3));
     }
 };
 

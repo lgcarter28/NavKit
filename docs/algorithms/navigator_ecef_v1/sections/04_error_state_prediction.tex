@@ -47,7 +47,7 @@ equations are grouped separately from the IMU bias equations:
 G_p^e\delta\pb^{e}
 -
 2\Omega_{ie}^{e}\delta\vb^{e}
-+
+-
 \crossmat{\hat{\fb}_{ib}^{e}}\delta\boldsymbol{\theta}
 -
 \hat{C}_b^e\delta\bb_a
@@ -57,9 +57,9 @@ G_p^e\delta\pb^{e}
 &=
 -
 \Omega_{ie}^{e}\delta\boldsymbol{\theta}
-+
-\hat{C}_b^e\delta\bb_g
 -
+\hat{C}_b^e\delta\bb_g
++
 \hat{C}_b^e\mathbf{w}_g.
 \end{align}
 
@@ -110,8 +110,8 @@ the reduced v1 continuous-time matrices are
 F =
 \begin{bmatrix}
 \zero & \I & \zero & \zero & \zero\\
-G_p^e & -2\Omega_{ie}^{e} & \crossmat{\hat{\fb}_{ib}^{e}} & \zero & -\hat{C}_b^e\\
-\zero & \zero & -\Omega_{ie}^{e} & \hat{C}_b^e & \zero\\
+G_p^e & -2\Omega_{ie}^{e} & -\crossmat{\hat{\fb}_{ib}^{e}} & \zero & -\hat{C}_b^e\\
+\zero & \zero & -\Omega_{ie}^{e} & -\hat{C}_b^e & \zero\\
 \zero & \zero & \zero & \zero & \zero\\
 \zero & \zero & \zero & \zero & \zero
 \end{bmatrix},
@@ -123,7 +123,7 @@ G =
 \begin{bmatrix}
 \zero & \zero & \zero & \zero\\
 \zero & \hat{C}_b^e & \zero & \zero\\
--\hat{C}_b^e & \zero & \zero & \zero\\
+\hat{C}_b^e & \zero & \zero & \zero\\
 \zero & \zero & \I & \zero\\
 \zero & \zero & \zero & \I
 \end{bmatrix}.
@@ -194,8 +194,8 @@ the v1 interval-specific continuous-time dynamics matrix is
 F_k =
 \begin{bmatrix}
 \zero & \I & \zero & \zero & \zero\\
-G_{p,k}^{e} & -2\Omega_{ie}^{e} & \crossmat{\hat{\fb}_{ib,k}^{e}} & \zero & -\hat{C}_{b,k}^{e}\\
-\zero & \zero & -\Omega_{ie}^{e} & \hat{C}_{b,k}^{e} & \zero\\
+G_{p,k}^{e} & -2\Omega_{ie}^{e} & -\crossmat{\hat{\fb}_{ib,k}^{e}} & \zero & -\hat{C}_{b,k}^{e}\\
+\zero & \zero & -\Omega_{ie}^{e} & -\hat{C}_{b,k}^{e} & \zero\\
 \zero & \zero & \zero & \zero & \zero\\
 \zero & \zero & \zero & \zero & \zero
 \end{bmatrix}.
@@ -219,7 +219,7 @@ G_k =
 \begin{bmatrix}
 \zero & \zero & \zero & \zero\\
 \zero & \hat{C}_{b,k}^{e} & \zero & \zero\\
--\hat{C}_{b,k}^{e} & \zero & \zero & \zero\\
+\hat{C}_{b,k}^{e} & \zero & \zero & \zero\\
 \zero & \zero & \I & \zero\\
 \zero & \zero & \zero & \I
 \end{bmatrix}.
@@ -328,8 +328,8 @@ Q_{\theta g}
 \approx
 \begin{bmatrix}
 \Delta t\,S_g^e+\frac{\Delta t^3}{3}S_{bg}^e &
-\frac{\Delta t^2}{2}\hat{C}_b^eS_{bg}\\
-\frac{\Delta t^2}{2}S_{bg}\hat{C}_e^b &
+-\frac{\Delta t^2}{2}\hat{C}_b^eS_{bg}\\
+-\frac{\Delta t^2}{2}S_{bg}\hat{C}_e^b &
 \Delta t\,S_{bg}
 \end{bmatrix},
 \end{equation}

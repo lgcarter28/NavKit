@@ -18,7 +18,7 @@ struct TxaStateDef
     // Current TXA convention is ECEF/body:
     // - position resolved in ECEF, meters
     // - velocity resolved in ECEF, meters/second
-    // - roll/pitch/yaw parameterizing the ECEF-to-body transform, radians
+    // - roll/pitch/yaw parameterizing the body-to-ECEF transform, radians
     // - angular rate of body with respect to inertial, resolved in body, radians/second
     // - specific force of body with respect to inertial, resolved in body, meters/second^2
     using Pos = Segment<0, 3>;
@@ -53,12 +53,12 @@ inline auto vel_e_mps(const TxaState& txa)
     return segment<TxaStateDef::Vel>(txa);
 }
 
-inline auto rpy_e2b_rad(TxaState& txa)
+inline auto rpy_b2e_rad(TxaState& txa)
 {
     return segment<TxaStateDef::Rpy>(txa);
 }
 
-inline auto rpy_e2b_rad(const TxaState& txa)
+inline auto rpy_b2e_rad(const TxaState& txa)
 {
     return segment<TxaStateDef::Rpy>(txa);
 }

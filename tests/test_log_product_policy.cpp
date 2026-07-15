@@ -9,12 +9,19 @@
 #include "navkit/io/LogProductPolicy.hpp"
 #include "navkit/io/LoggerPolicy.hpp"
 #include "navkit/io/RunLogger.hpp"
+#include "navkit/io/log_payloads/FilterCorrectionLogPayload.hpp"
+#include "navkit/io/log_payloads/ImuDebugLogPayload.hpp"
+#include "navkit/io/log_payloads/ImuIncrementLogPayload.hpp"
 #include "navkit/io/log_payloads/MeasurementStatisticsLogPayload.hpp"
 #include "navkit/io/log_payloads/NavEstimateLogPayload.hpp"
+#include "navkit/io/log_products/FilterCorrectionLogProduct.hpp"
 #include "navkit/io/log_products/GnssPositionLogProduct.hpp"
 #include "navkit/io/log_products/GnssPositionUpdateLogProduct.hpp"
+#include "navkit/io/log_products/ImuDebugLogProduct.hpp"
+#include "navkit/io/log_products/ImuIncrementLogProduct.hpp"
 #include "navkit/io/log_products/NavEstimateLogProduct.hpp"
 #include "navkit/io/log_products/TruthLogProduct.hpp"
+#include "navkit/sim/ImuSimulator.hpp"
 #include "navkit/sim/TruthSample.hpp"
 #include "test_main.hpp"
 
@@ -41,8 +48,14 @@ using Filter = navkit::core::estimation::KalmanFilter<
 using GnssMeasurement = navkit::core::estimation::Measurement<3>;
 using Statistics = navkit::core::estimation::MeasurementStatistics<Sensor>;
 using GnssUpdateLogProduct = GnssPositionUpdateLogProduct<Statistics>;
-using StationaryGnssTestRunLogger =
-    RunLogger<TruthLogProduct, GnssPositionLogProduct, NavEstimateLogProduct, GnssUpdateLogProduct>;
+using FilterCorrectionProduct = FilterCorrectionLogProduct<StateDef, Filter>;
+using StationaryGnssTestRunLogger = RunLogger<TruthLogProduct,
+                                              GnssPositionLogProduct,
+                                              NavEstimateLogProduct<StateDef, Filter>,
+                                              ImuIncrementLogProduct,
+                                              ImuDebugLogProduct,
+                                              FilterCorrectionProduct,
+                                              GnssUpdateLogProduct>;
 
 struct MissingOpen
 {
@@ -181,7 +194,12 @@ TEST_CASE("log product policies describe concrete payload boundaries")
 {
     static_assert(LogProductPolicy<TruthLogProduct, navkit::sim::TruthSample>);
     static_assert(LogProductPolicy<GnssPositionLogProduct, GnssMeasurement>);
-    static_assert(LogProductPolicy<NavEstimateLogProduct, NavEstimateLogPayload<StateDef, Filter>>);
+    static_assert(LogProductPolicy<NavEstimateLogProduct<StateDef, Filter>,
+                                   NavEstimateLogPayload<StateDef, Filter>>);
+    static_assert(LogProductPolicy<ImuIncrementLogProduct, ImuIncrementLogPayload>);
+    static_assert(LogProductPolicy<ImuDebugLogProduct, ImuDebugLogPayload>);
+    static_assert(
+        LogProductPolicy<FilterCorrectionProduct, FilterCorrectionLogPayload<StateDef, Filter>>);
     static_assert(
         LogProductPolicy<GnssUpdateLogProduct, MeasurementStatisticsLogPayload<Statistics>>);
 
@@ -194,12 +212,21 @@ TEST_CASE("log product policies describe concrete payload boundaries")
     static_assert(StationaryGnssTestRunLogger::matching_product_count_v<GnssMeasurement> == 1U);
     static_assert(StationaryGnssTestRunLogger::matching_product_count_v<
                       NavEstimateLogPayload<StateDef, Filter>> == 1U);
+    static_assert(StationaryGnssTestRunLogger::matching_product_count_v<ImuIncrementLogPayload> ==
+                  1U);
+    static_assert(StationaryGnssTestRunLogger::matching_product_count_v<ImuDebugLogPayload> == 1U);
+    static_assert(StationaryGnssTestRunLogger::matching_product_count_v<
+                      FilterCorrectionLogPayload<StateDef, Filter>> == 1U);
     static_assert(StationaryGnssTestRunLogger::matching_product_count_v<
                       MeasurementStatisticsLogPayload<Statistics>> == 1U);
     static_assert(StationaryGnssTestRunLogger::matching_product_count_v<nlohmann::json> == 0U);
 
     static_assert(LoggerPolicy<StationaryGnssTestRunLogger>);
     static_assert(LoggerPayloadPolicy<StationaryGnssTestRunLogger, GnssMeasurement>);
+    static_assert(LoggerPayloadPolicy<StationaryGnssTestRunLogger, ImuIncrementLogPayload>);
+    static_assert(LoggerPayloadPolicy<StationaryGnssTestRunLogger, ImuDebugLogPayload>);
+    static_assert(LoggerPayloadPolicy<StationaryGnssTestRunLogger,
+                                      FilterCorrectionLogPayload<StateDef, Filter>>);
     static_assert(LoggerProductAccessPolicy<StationaryGnssTestRunLogger, GnssPositionLogProduct>);
     static_assert(LoggerProductAccessPolicy<StationaryGnssTestRunLogger, GnssUpdateLogProduct>);
 

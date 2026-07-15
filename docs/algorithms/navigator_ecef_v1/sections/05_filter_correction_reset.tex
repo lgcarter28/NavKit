@@ -71,7 +71,7 @@ bias corrections additively:
 For attitude, convert the small-angle correction into a scalar-first quaternion
 correction:
 \begin{equation}
-\delta\hat{\quat}
+\delta\hat{\quat}_{\theta}
 \approx
 \begin{bmatrix}
 1\\
@@ -79,13 +79,14 @@ correction:
 \end{bmatrix}.
 \end{equation}
 
-The NavKit v1 convention is left-multiplicative correction of the whole nominal
-body-to-ECEF quaternion:
+The NavKit v1 attitude-error convention in
+\cref{eq:v1_attitude_error_dcm_relation} implies a left-multiplicative
+correction for the whole nominal body-to-ECEF quaternion:
 \begin{equation}
 \boxed{
 \hat{\quat}_{b}^{e,+}
 \leftarrow
-\delta\hat{\quat}
+\delta\hat{\quat}_{\theta}
 \otimes
 \hat{\quat}_{b}^{e,-}.
 }
@@ -93,17 +94,18 @@ body-to-ECEF quaternion:
 \end{equation}
 Then normalize:
 \begin{equation}
-\hat{\quat}_{b}^{e,+}
+\hat{\quat}^{+}
 \leftarrow
-\frac{\hat{\quat}_{b}^{e,+}}{\norm{\hat{\quat}_{b}^{e,+}}}.
+\frac{\hat{\quat}^{+}}{\norm{\hat{\quat}^{+}}}.
 \end{equation}
 
 \begin{warningbox}
-The left-multiplication convention in \cref{eq:v1_quat_injection} fixes the
-meaning of $\delta\boldsymbol{\theta}$ and matches
-\cref{eq:v1_attitude_error_dcm_relation}. If implementation chooses right
-multiplication instead, the prediction, measurement Jacobians, injection, reset
-Jacobian, and tests must be updated together.
+The correction side and sign in
+\cref{eq:v1_quat_injection} fix the meaning of
+$\delta\boldsymbol{\theta}$ and match
+\cref{eq:v1_attitude_error_dcm_relation}. If implementation changes quaternion
+storage direction or perturbation side, the prediction, measurement Jacobians,
+injection, reset Jacobian, and tests must be updated together.
 \end{warningbox}
 
 \section{Reset}

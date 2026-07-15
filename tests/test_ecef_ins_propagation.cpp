@@ -59,7 +59,7 @@ using NoisyPropagation = EcefInsPropagation<Wgs84, J2<Wgs84>, NonzeroProcessNois
     sample.time = time_s;
     sample.p_e = Vec3{Wgs84::a_m, 0.0, 0.0};
     sample.v_e.setZero();
-    sample.q_eb.setIdentity();
+    sample.q_b2e.setIdentity();
     return sample;
 }
 

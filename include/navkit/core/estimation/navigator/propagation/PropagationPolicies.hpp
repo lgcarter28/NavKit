@@ -18,6 +18,8 @@ struct NoOpPropagation
     static constexpr Time_t covariance_update_rate_hz = 100.0;
     static constexpr std::size_t covariance_history_capacity =
         1U; // NOLINT(readability-identifier-naming)
+    static constexpr bool apply_coning_sculling_compensation =
+        false; // NOLINT(readability-identifier-naming)
 
     template<StateSpaceDefPolicy StateDef>
     static bool process_imu_increment(const ImuIncrement& increment, NominalState<StateDef>&)

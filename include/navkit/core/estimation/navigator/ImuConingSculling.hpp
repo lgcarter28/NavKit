@@ -25,9 +25,9 @@ struct ConingSculling
                                                                const Vec3& delta_theta_2_ib_b_rad,
                                                                const Vec3& delta_v_2_ib_b_mps)
 {
-    const auto delta_theta = delta_theta_1_ib_b_rad + delta_theta_2_ib_b_rad +
+    const Vec3 delta_theta = delta_theta_1_ib_b_rad + delta_theta_2_ib_b_rad +
                              ((2.0 / 3.0) * delta_theta_1_ib_b_rad.cross(delta_theta_2_ib_b_rad));
-    const auto delta_v = delta_v_1_ib_b_mps + delta_v_2_ib_b_mps +
+    const Vec3 delta_v = delta_v_1_ib_b_mps + delta_v_2_ib_b_mps +
                          (0.5 * (delta_theta_1_ib_b_rad + delta_theta_2_ib_b_rad)
                                     .cross(delta_v_1_ib_b_mps + delta_v_2_ib_b_mps)) +
                          ((2.0 / 3.0) * ((delta_theta_1_ib_b_rad.cross(delta_v_2_ib_b_mps)) +

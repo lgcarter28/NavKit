@@ -16,9 +16,13 @@ template<typename Candidate>
 concept ImuSimulatorPolicy = std::constructible_from<Candidate, ImuSimulatorConfig> &&
                              requires(Candidate& simulator,
                                       const TruthSample& truth,
-                                      navkit::core::estimation::ImuIncrement& increment) {
+                                      navkit::core::estimation::ImuIncrement& increment,
+                                      IdealImuInterval& ideal) {
                                  { simulator.initialize(truth) } -> std::same_as<void>;
                                  { simulator.generate(truth, increment) } -> std::same_as<bool>;
+                                 {
+                                     simulator.generate(truth, increment, ideal)
+                                 } -> std::same_as<bool>;
                              };
 
 } // namespace navkit::sim

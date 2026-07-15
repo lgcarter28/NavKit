@@ -55,37 +55,45 @@ bool ImuSimulator::ideal_interval_from_truth_ecef(const TruthSample& previous,
                                                   const TruthSample& current,
                                                   IdealImuInterval& interval)
 {
-    const auto dt_s = current.time - previous.time;
+    const Time_t dt_s = current.time - previous.time;
     if (dt_s <= 0.0) {
         interval = {};
         return false;
     }
 
-    const auto q_prev = previous.q_eb.normalized();
-    const auto q_current = current.q_eb.normalized();
-    const auto q_body_relative = q_current * q_prev.conjugate();
-    const auto delta_theta_eb_b = core::math::rotvec_rad_from_quaternion(q_body_relative);
+    const Eigen::Quaternion<Scalar_t> q_prev = previous.q_b2e.normalized();
+    const Eigen::Quaternion<Scalar_t> q_current = current.q_b2e.normalized();
+    const Eigen::Quaternion<Scalar_t> q_body_relative = q_prev.conjugate() * q_current;
+    const Vec3 delta_theta_eb_b = core::math::rotvec_rad_from_quaternion(q_body_relative);
 
-    const auto q_mid = q_prev.slerp(0.5, q_current).normalized();
-    const auto omega_ie_b = q_mid * navkit::core::environment::planet_rate_fixed_radps<Wgs84>();
-    const auto delta_theta_ib_b = delta_theta_eb_b + (omega_ie_b * dt_s);
+    const Eigen::Quaternion<Scalar_t> q_mid = q_prev.slerp(0.5, q_current).normalized();
+    const Vec3 omega_ie_b =
+        q_mid.conjugate() * navkit::core::environment::planet_rate_fixed_radps<Wgs84>();
+    const Vec3 delta_theta_ib_b = delta_theta_eb_b + (omega_ie_b * dt_s);
 
-    const auto a_bar_e = (current.v_e - previous.v_e) / dt_s;
-    const auto v_bar_e = 0.5 * (previous.v_e + current.v_e);
-    const auto p_bar_e = 0.5 * (previous.p_e + current.p_e);
-    const auto gravity_e = J2<Wgs84>::acceleration(p_bar_e);
-    const auto specific_force_e =
+    const Vec3 a_bar_e = (current.v_e - previous.v_e) / dt_s;
+    const Vec3 v_bar_e = 0.5 * (previous.v_e + current.v_e);
+    const Vec3 p_bar_e = 0.5 * (previous.p_e + current.p_e);
+    const Vec3 gravity_e = J2<Wgs84>::acceleration(p_bar_e);
+    const Vec3 specific_force_e =
         a_bar_e +
         (2.0 * navkit::core::environment::planet_rate_fixed_radps<Wgs84>().cross(v_bar_e)) -
         gravity_e;
-    const auto specific_force_b = q_mid * specific_force_e;
+    const Vec3 specific_force_b = q_mid.conjugate() * specific_force_e;
 
-    interval = {.time_s = current.time,
-                .dt_s = dt_s,
-                .omega_ib_b_radps = delta_theta_ib_b / dt_s,
-                .specific_force_ib_b_mps2 = specific_force_b,
-                .delta_theta_ib_b_rad = delta_theta_ib_b,
-                .delta_v_ib_b_mps = specific_force_b * dt_s};
+    interval = {};
+    interval.time_s = current.time;
+    interval.dt_s = dt_s;
+    interval.p_bar_e_m = p_bar_e;
+    interval.v_bar_e_mps = v_bar_e;
+    interval.a_bar_e_mps2 = a_bar_e;
+    interval.gravity_e_mps2 = gravity_e;
+    interval.specific_force_e_mps2 = specific_force_e;
+    interval.omega_ib_b_radps = delta_theta_ib_b / dt_s;
+    interval.specific_force_ib_b_mps2 = specific_force_b;
+    interval.delta_theta_eb_b_rad = delta_theta_eb_b;
+    interval.delta_theta_ib_b_rad = delta_theta_ib_b;
+    interval.delta_v_ib_b_mps = specific_force_b * dt_s;
     return true;
 }
 
@@ -111,6 +119,14 @@ bool ImuSimulator::generate(const TruthSample& previous,
                             ImuIncrement& increment)
 {
     IdealImuInterval ideal;
+    return generate(previous, current, increment, ideal);
+}
+
+bool ImuSimulator::generate(const TruthSample& previous,
+                            const TruthSample& current,
+                            ImuIncrement& increment,
+                            IdealImuInterval& ideal)
+{
     if (!ideal_interval_from_truth_ecef(previous, current, ideal)) {
         increment = {};
         return false;
@@ -118,20 +134,20 @@ bool ImuSimulator::generate(const TruthSample& previous,
 
     update_biases(ideal.dt_s);
 
-    const auto gyro_noise = draw_normal_vector(m_cfg.gyro.white_noise_psd / ideal.dt_s);
-    const auto accel_noise = draw_normal_vector(m_cfg.accel.white_noise_psd / ideal.dt_s);
+    const Vec3 gyro_noise = draw_normal_vector(m_cfg.gyro.white_noise_psd / ideal.dt_s);
+    const Vec3 accel_noise = draw_normal_vector(m_cfg.accel.white_noise_psd / ideal.dt_s);
 
-    const auto raw_gyro_radps = calibration_matrix_apply(ideal.omega_ib_b_radps, m_cfg.gyro) +
+    const Vec3 raw_gyro_radps = calibration_matrix_apply(ideal.omega_ib_b_radps, m_cfg.gyro) +
                                 m_gyro_bias_radps + gyro_noise;
-    const auto raw_accel_mps2 =
+    const Vec3 raw_accel_mps2 =
         calibration_matrix_apply(ideal.specific_force_ib_b_mps2, m_cfg.accel) + m_accel_bias_mps2 +
         accel_noise;
 
-    increment = {
-        .time_s = ideal.time_s,
-        .dt_s = ideal.dt_s,
-        .delta_theta_ib_b_rad = quantize(raw_gyro_radps * ideal.dt_s, m_cfg.gyro.quantization),
-        .delta_v_ib_b_mps = quantize(raw_accel_mps2 * ideal.dt_s, m_cfg.accel.quantization)};
+    increment = {};
+    increment.time_s = ideal.time_s;
+    increment.dt_s = ideal.dt_s;
+    increment.delta_theta_ib_b_rad = quantize(raw_gyro_radps * ideal.dt_s, m_cfg.gyro.quantization);
+    increment.delta_v_ib_b_mps = quantize(raw_accel_mps2 * ideal.dt_s, m_cfg.accel.quantization);
     return true;
 }
 
@@ -143,12 +159,21 @@ void ImuSimulator::initialize(const TruthSample& initial)
 
 bool ImuSimulator::generate(const TruthSample& current, ImuIncrement& increment)
 {
+    IdealImuInterval ideal;
+    return generate(current, increment, ideal);
+}
+
+bool ImuSimulator::generate(const TruthSample& current,
+                            ImuIncrement& increment,
+                            IdealImuInterval& ideal)
+{
     if (!m_initialized) {
         increment = {};
+        ideal = {};
         return false;
     }
 
-    if (!generate(m_previous, current, increment)) {
+    if (!generate(m_previous, current, increment, ideal)) {
         return false;
     }
     m_previous = current;

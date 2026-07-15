@@ -23,6 +23,7 @@ concept PropagationPolicy =
         { Candidate::imu_buffer_capacity } -> std::convertible_to<std::size_t>;
         { Candidate::covariance_history_capacity } -> std::convertible_to<std::size_t>;
         { Candidate::covariance_update_rate_hz } -> std::convertible_to<Time_t>;
+        { Candidate::apply_coning_sculling_compensation } -> std::convertible_to<bool>;
         {
             Candidate::template process_imu_increment<StateDef>(ImuIncrement{}, state)
         } -> std::same_as<bool>;

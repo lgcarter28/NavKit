@@ -17,15 +17,18 @@ from navkit_analysis.style import (
 
 
 def _position_columns(axis_name: str) -> tuple[str, str]:
-    err_col = f"err_p_e_{axis_name}_m"
+    err_col = f"error_p_e_{axis_name}_m"
     sigma_col = f"sigma_p_e_{axis_name}_m"
     return err_col, sigma_col
 
 
-def plot_position_error_covariance(run: RunData, save: bool = True) -> plt.Figure:
+def plot_position_error_covariance(run: RunData, save: bool = True) -> plt.Figure | None:
     """Plot ECEF position error with 1-sigma and 3-sigma covariance bounds."""
-    nav = run.nav
-    time_s = nav["time_s"]
+    truth_error = run.truth_error
+    if truth_error is None:
+        print("Skipping position error covariance plot; missing truth/nav estimate logs")
+        return None
+    time_s = truth_error["time_s"]
 
     fig, axes = plt.subplots(
         nrows=3,
@@ -39,8 +42,8 @@ def plot_position_error_covariance(run: RunData, save: bool = True) -> plt.Figur
 
     for ax, axis_name in zip(axes, AXES):
         err_col, sigma_col = _position_columns(axis_name)
-        err = nav[err_col]
-        sigma = nav[sigma_col]
+        err = truth_error[err_col]
+        sigma = truth_error[sigma_col]
 
         ax.plot(
             time_s,

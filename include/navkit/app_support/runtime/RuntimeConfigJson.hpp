@@ -45,6 +45,14 @@ inline void require_optional_string(const nlohmann::json& cfg, std::string_view 
     }
 }
 
+inline void require_optional_bool(const nlohmann::json& cfg, std::string_view path)
+{
+    const auto iter = cfg.find(std::string(path));
+    if (iter != cfg.end() && !iter->is_boolean()) {
+        throw_runtime_config_error("expected " + quoted_path(path) + " to be a boolean");
+    }
+}
+
 inline void require_optional_positive_number(const nlohmann::json& cfg, std::string_view path)
 {
     const auto iter = cfg.find(std::string(path));

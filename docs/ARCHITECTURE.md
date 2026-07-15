@@ -235,7 +235,7 @@ roadmap items, not current behavior.
   measurement-only products, while the selected stationary GNSS products now use
   the first ECEF INS propagation policy.
 - `EcefInsPropagation` implements the first single-IMU ECEF propagation path. It
-  propagates nominal ECEF-to-body attitude as a unit quaternion, keeps the
+  propagates nominal body-to-ECEF attitude as a unit quaternion, keeps the
   covariance attitude state as a 3D small-angle `Att` perturbation, builds
   first-order `F_k`/`G_k`/`Phi_k`/`Q_d` products, and applies the v1
   PVA+gyro-bias+accelerometer-bias dynamics to the selected

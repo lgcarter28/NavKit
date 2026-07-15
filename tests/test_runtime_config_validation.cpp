@@ -13,6 +13,7 @@
 #include "navkit/app_support/initialization/TransferAlignmentProviderPolicy.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigValidation.hpp"
 #include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
+#include "navkit/core/math/Quaternion.hpp"
 #include "navkit/io/RunLogger.hpp"
 #include "navkit/sim/ImuSimulatorPolicy.hpp"
 #include "test_main.hpp"
@@ -72,21 +73,31 @@ struct NotABinding
             {"logging",
              {{"console", {{"rate_hz", 1.0}}},
               {"truth", {{"rate_hz", 10.0}}},
-              {"nav", {{"rate_hz", 10.0}}},
-              {"measurement_statistics", {{"rate_hz", 1.0}}}}},
+              {"nav_estimate", {{"rate_hz", 10.0}, {"covariance", "triangular"}}},
+              {"measurement_statistics", {{"rate_hz", 1.0}}},
+              {"imu", {{"rate_hz", 100.0}}},
+              {"imu_debug", {{"rate_hz", 10.0}}},
+              {"filter_correction", {{"rate_hz", 10.0}, {"covariance", "diagonal"}}}}},
             {"trajectory",
              {{"type", "stationary"},
               {"duration_s", 60.0},
               {"rate_hz", 1000.0},
-              {"p_e_m", {6378137.0, 0.0, 0.0}}}},
-            {"imu", {{"type", "ideal"}, {"rate_hz", 1000.0}, {"seed", 42U}}},
+              {"p_lla_deg_m", {0.0, 0.0, 0.0}},
+              {"v_n_mps", {0.0, 0.0, 0.0}},
+              {"rpy_b2n_rad", {0.0, 0.0, 0.0}},
+              {"w_nb_b_radps", {0.0, 0.0, 0.0}}}},
+            {"imu",
+             {{"type", "ideal"},
+              {"rate_hz", 1000.0},
+              {"seed", 42U},
+              {"output_coning_sculling_compensated", false}}},
             {"gnss", {{"dt_s", 1.0}, {"sigma_h_m", 3.0}, {"sigma_v_m", 5.0}, {"seed", 42U}}},
             {"initialization",
              {{"type", "pva_error"},
               {"pva_error",
                {{"pos_m", {25.0, -15.0, 10.0}},
                 {"vel_mps", {0.0, 0.0, 0.0}},
-                {"rpy_e2b_rad", {0.0, 0.0, 0.0}}}},
+                {"rpy_b2e_rad", {0.0, 0.0, 0.0}}}},
               {"pva_cov",
                {{"diag",
                  {10000.0, 10000.0, 10000.0, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6}}}}}}};
@@ -220,7 +231,7 @@ TEST_CASE("Stationary GNSS runtime validator rejects unsupported IMU configurati
 TEST_CASE("Stationary GNSS runtime validator rejects invalid trajectory shape")
 {
     auto cfg = valid_stationary_gnss_runtime_config();
-    cfg.at("trajectory").at("p_e_m") = {1.0, 2.0};
+    cfg.at("trajectory").at("p_lla_deg_m") = {1.0, 2.0};
 
     CHECK_THROWS_AS(validate_runtime_config<StationaryGnssAppConfig>(cfg), std::runtime_error);
 }
@@ -236,7 +247,15 @@ TEST_CASE("Stationary GNSS runtime validator rejects ambiguous runtime rates")
 TEST_CASE("Stationary GNSS runtime validator rejects ambiguous logging rates")
 {
     auto cfg = valid_stationary_gnss_runtime_config();
-    cfg.at("logging").at("nav").emplace("dt_s", 0.1);
+    cfg.at("logging").at("nav_estimate").emplace("dt_s", 0.1);
+
+    CHECK_THROWS_AS(validate_runtime_config<StationaryGnssAppConfig>(cfg), std::runtime_error);
+}
+
+TEST_CASE("Stationary GNSS runtime validator rejects unsupported covariance log modes")
+{
+    auto cfg = valid_stationary_gnss_runtime_config();
+    cfg.at("logging").at("nav_estimate").at("covariance") = "full";
 
     CHECK_THROWS_AS(validate_runtime_config<StationaryGnssAppConfig>(cfg), std::runtime_error);
 }
@@ -265,7 +284,9 @@ TEST_CASE("Explicit PVA initialization provider preserves stationary demo behavi
     CHECK(core::estimation::pos_e_m(nav_init.pva)(1) == doctest::Approx(-15.0));
     CHECK(core::estimation::pos_e_m(nav_init.pva)(2) == doctest::Approx(10.0));
     CHECK(core::estimation::vel_e_mps(nav_init.pva).isZero());
-    CHECK(core::estimation::rpy_e2b_rad(nav_init.pva).isZero());
+    CHECK(
+        core::estimation::rpy_b2e_rad(nav_init.pva)
+            .isApprox(core::math::rpy_rad_from_quaternion(trajectory.truth_samples.front().q_b2e)));
     CHECK(nav_init.pva_cov(0, 0) == doctest::Approx(10000.0));
     CHECK(nav_init.pva_cov(3, 3) == doctest::Approx(1.0e-6));
     CHECK(nav_init.pva_cov(6, 6) == doctest::Approx(1.0e-6));
@@ -289,7 +310,7 @@ TEST_CASE("Explicit PVA initialization provider accepts full row-major covarianc
 
     using NavKit = StationaryGnssAppConfig::NavKit;
     using StateDef = NavKit::StateDef;
-    using Error = typename StateDef::Error;
+    using Error = StateDef::Error;
     auto navigator = std::make_unique<NavKit::Navigator>();
     initialize_navigator<StateDef>(*navigator, nav_init);
     CHECK(navigator->filter().covariance()(Error::Pos::i, Error::Vel::i) == doctest::Approx(0.25));
@@ -309,8 +330,8 @@ TEST_CASE("Random PVA initialization provider produces deterministic colored dra
 
     CHECK(core::estimation::pos_e_m(first.pva).isApprox(core::estimation::pos_e_m(second.pva)));
     CHECK(core::estimation::vel_e_mps(first.pva).isApprox(core::estimation::vel_e_mps(second.pva)));
-    CHECK(core::estimation::rpy_e2b_rad(first.pva).isApprox(
-        core::estimation::rpy_e2b_rad(second.pva)));
+    CHECK(core::estimation::rpy_b2e_rad(first.pva).isApprox(
+        core::estimation::rpy_b2e_rad(second.pva)));
     CHECK_FALSE((core::estimation::pos_e_m(first.pva) - trajectory.initial_position_e_m).isZero());
     CHECK(first.pva_cov(0, 0) == doctest::Approx(1.0));
 }
@@ -319,13 +340,15 @@ TEST_CASE("NavInitialization maps into the configured Navigator filter state")
 {
     using NavKit = StationaryGnssAppConfig::NavKit;
     using StateDef = NavKit::StateDef;
-    using Nominal = typename StateDef::Nominal;
-    using Error = typename StateDef::Error;
+    using Nominal = StateDef::Nominal;
+    using Error = StateDef::Error;
 
     const auto cfg = valid_stationary_gnss_runtime_config();
     const auto trajectory = trajectory_run_from_json(cfg);
     const auto nav_init =
         StationaryGnssAppConfig::NavInitializationProvider::initialize(cfg, trajectory);
+    const Eigen::Quaternion<core::Scalar_t> expected_q_b2e =
+        trajectory.truth_samples.front().q_b2e.normalized();
 
     auto navigator = std::make_unique<NavKit::Navigator>();
     initialize_navigator<StateDef>(*navigator, nav_init);
@@ -337,7 +360,8 @@ TEST_CASE("NavInitialization maps into the configured Navigator filter state")
     CHECK(filter.state().template segment<3>(Nominal::Vel::i).isZero());
     CHECK(filter.state()
               .template segment<4>(Nominal::AttQuat::i)
-              .isApprox(Eigen::Matrix<core::Scalar_t, 4, 1>{1.0, 0.0, 0.0, 0.0}));
+              .isApprox(Eigen::Matrix<core::Scalar_t, 4, 1>{
+                  expected_q_b2e.w(), expected_q_b2e.x(), expected_q_b2e.y(), expected_q_b2e.z()}));
     CHECK(filter.covariance()(Error::Pos::i, Error::Pos::i) == doctest::Approx(10000.0));
     CHECK(filter.covariance()(Error::Vel::i, Error::Vel::i) == doctest::Approx(1.0e-6));
     CHECK(filter.covariance()(Error::AttRotVec::i, Error::AttRotVec::i) == doctest::Approx(1.0e-6));

@@ -10,8 +10,11 @@
 #include "navkit/app_support/initialization/TransferAlignmentProviders.hpp"
 #include "navkit/core/estimation/filter/MeasurementStatistics.hpp"
 #include "navkit/io/RunLogger.hpp"
+#include "navkit/io/log_products/FilterCorrectionLogProduct.hpp"
 #include "navkit/io/log_products/GnssPositionLogProduct.hpp"
 #include "navkit/io/log_products/GnssPositionUpdateLogProduct.hpp"
+#include "navkit/io/log_products/ImuDebugLogProduct.hpp"
+#include "navkit/io/log_products/ImuIncrementLogProduct.hpp"
 #include "navkit/io/log_products/NavEstimateLogProduct.hpp"
 #include "navkit/io/log_products/TruthLogProduct.hpp"
 #include "navkit/products/StationaryGnss.hpp"
@@ -32,6 +35,8 @@ struct StationaryGnssConfig
         ::navkit::app_support::EmulatorBinding<PrimaryGnssEmulator, PrimaryGnssSensor>;
     using PrimaryGnssStatistics =
         ::navkit::core::estimation::MeasurementStatistics<PrimaryGnssSensor>;
+    using Filter = typename NavKit::Filter;
+    using StateDef = typename NavKit::StateDef;
 
     using EmulatorBindings = std::tuple<PrimaryGnssBinding>;
     using ImuSimulator = ::navkit::sim::ImuSimulator;
@@ -42,7 +47,10 @@ struct StationaryGnssConfig
     using Logger =
         ::navkit::io::RunLogger<::navkit::io::TruthLogProduct,
                                 ::navkit::io::GnssPositionLogProduct,
-                                ::navkit::io::NavEstimateLogProduct,
+                                ::navkit::io::NavEstimateLogProduct<StateDef, Filter>,
+                                ::navkit::io::ImuIncrementLogProduct,
+                                ::navkit::io::ImuDebugLogProduct,
+                                ::navkit::io::FilterCorrectionLogProduct<StateDef, Filter>,
                                 ::navkit::io::GnssPositionUpdateLogProduct<PrimaryGnssStatistics>>;
     using App = ::navkit::app_support::SimulationApp<StationaryGnssConfig>;
 };

@@ -78,6 +78,9 @@ struct WrongStrapdownIntegrationReturn
     // NOLINTNEXTLINE(readability-identifier-naming)
     static constexpr Time_t covariance_update_rate_hz =
         1.0; // NOLINT(readability-identifier-naming)
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr bool apply_coning_sculling_compensation =
+        false; // NOLINT(readability-identifier-naming)
 
     template<typename StateDef>
     static int process_imu_increment(const ImuIncrement& increment, NominalState<StateDef>& state)
@@ -136,6 +139,9 @@ struct MissingCovariancePrediction
     // NOLINTNEXTLINE(readability-identifier-naming)
     static constexpr Time_t covariance_update_rate_hz =
         1.0; // NOLINT(readability-identifier-naming)
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr bool apply_coning_sculling_compensation =
+        false; // NOLINT(readability-identifier-naming)
 
     template<typename StateDef>
     static bool process_imu_increment(const ImuIncrement& increment, NominalState<StateDef>& state)
@@ -166,6 +172,9 @@ struct MissingImuProcessing
     // NOLINTNEXTLINE(readability-identifier-naming)
     static constexpr Time_t covariance_update_rate_hz =
         1.0; // NOLINT(readability-identifier-naming)
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr bool apply_coning_sculling_compensation =
+        false; // NOLINT(readability-identifier-naming)
 
     template<typename StateDef>
     static bool covariance_step_from_increment(const NominalState<StateDef>& state,
@@ -205,6 +214,9 @@ struct RecordingPropagation
     // NOLINTNEXTLINE(readability-identifier-naming)
     static constexpr Time_t covariance_update_rate_hz =
         1.0; // NOLINT(readability-identifier-naming)
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr bool apply_coning_sculling_compensation =
+        false; // NOLINT(readability-identifier-naming)
     static inline int imu_increment_call_count{0};
     static inline int imu_pair_call_count{0};
     static inline int covariance_increment_call_count{0};

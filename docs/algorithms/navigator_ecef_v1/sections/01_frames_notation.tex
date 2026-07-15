@@ -44,7 +44,7 @@ C_e^b=\left(C_b^e\right)^{T}.
 
 \begin{warningbox}
 Code identifiers sometimes use explicit \texttt{from2to} names such as
-\texttt{q\_e2b} or \texttt{rpy\_e2b\_rad} when transform direction is the
+\texttt{q\_b2e} or \texttt{rpy\_b2e\_rad} when transform direction is the
 primary meaning. This document's mathematical notation follows the compact
 Groves-style convention: $C_b^e$ maps from $b$ to $e$.
 \end{warningbox}
@@ -74,7 +74,7 @@ reference, the true body-to-ECEF DCM is related to the nominal DCM by
 \begin{equation}
 C_b^{e,true}
 \approx
-\left(\I-\crossmat{\delta\boldsymbol\theta}\right)
+\left(\I+\crossmat{\delta\boldsymbol\theta}\right)
 \hat{C}_b^e.
 \label{eq:v1_attitude_error_dcm_relation}
 \end{equation}

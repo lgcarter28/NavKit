@@ -33,6 +33,7 @@ public:
         , m_config(std::move(config))
     {
         std::filesystem::create_directories(m_output_dir);
+        configure_products(std::make_index_sequence<sizeof...(LogProducts)>{});
         open_products(std::make_index_sequence<sizeof...(LogProducts)>{});
     }
 
@@ -68,6 +69,20 @@ public:
     }
 
 private:
+    template<std::size_t... Is>
+    void configure_products(std::index_sequence<Is...>)
+    {
+        (configure_product_if_supported(std::get<Is>(m_products)), ...);
+    }
+
+    template<typename Product>
+    void configure_product_if_supported(Product& product)
+    {
+        if constexpr (requires { product.configure(m_config); }) {
+            product.configure(m_config);
+        }
+    }
+
     template<std::size_t... Is>
     void open_products(std::index_sequence<Is...>)
     {

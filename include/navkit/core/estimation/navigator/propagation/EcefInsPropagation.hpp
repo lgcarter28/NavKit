@@ -40,7 +40,8 @@ template<environment::RotatingPlanetPolicy Planet,
          typename ProcessNoise = EcefInsZeroProcessNoise,
          std::size_t ImuBufferCapacity = 512U,
          std::size_t CovarianceHistoryCapacity = 256U,
-         Time_t CovarianceUpdateRateHz = 100.0>
+         Time_t CovarianceUpdateRateHz = 100.0,
+         bool ApplyConingScullingCompensation = true>
 struct EcefInsPropagation
 {
     static_assert(std::is_same_v<typename Gravity::Planet_t, Planet>,
@@ -51,11 +52,14 @@ struct EcefInsPropagation
     static constexpr std::size_t covariance_history_capacity =
         CovarianceHistoryCapacity; // NOLINT(readability-identifier-naming)
     static constexpr Time_t covariance_update_rate_hz = CovarianceUpdateRateHz;
+    static constexpr bool apply_coning_sculling_compensation =
+        ApplyConingScullingCompensation; // NOLINT(readability-identifier-naming)
 
     template<StateSpaceDefPolicy StateDef>
     static bool process_imu_increment(const ImuIncrement& increment, NominalState<StateDef>& state)
     {
-        const auto interval = corrected_interval_from_single<StateDef>(state, increment);
+        const MechanizedImuInterval interval =
+            corrected_interval_from_single<StateDef>(state, increment);
         return propagate_nominal_state<StateDef>(interval, state);
     }
 
@@ -64,7 +68,8 @@ struct EcefInsPropagation
                                            const ImuIncrement& second,
                                            NominalState<StateDef>& state)
     {
-        const auto interval = corrected_interval_from_pair<StateDef>(state, first, second);
+        const MechanizedImuInterval interval =
+            corrected_interval_from_pair<StateDef>(state, first, second);
         return propagate_nominal_state<StateDef>(interval, state);
     }
 
@@ -74,7 +79,8 @@ struct EcefInsPropagation
                                                ErrorStateCov<StateDef>& phi,
                                                ErrorStateCov<StateDef>& qd)
     {
-        const auto interval = corrected_interval_from_single<StateDef>(state, increment);
+        const MechanizedImuInterval interval =
+            corrected_interval_from_single<StateDef>(state, increment);
         return covariance_step_from_interval<StateDef>(state, interval, phi, qd);
     }
 
@@ -85,7 +91,8 @@ struct EcefInsPropagation
                                                     ErrorStateCov<StateDef>& phi,
                                                     ErrorStateCov<StateDef>& qd)
     {
-        const auto interval = corrected_interval_from_pair<StateDef>(state, first, second);
+        const MechanizedImuInterval interval =
+            corrected_interval_from_pair<StateDef>(state, first, second);
         return covariance_step_from_interval<StateDef>(state, interval, phi, qd);
     }
 
@@ -104,10 +111,10 @@ struct EcefInsPropagation
     }
 
     template<typename StateDef, typename State_t>
-    [[nodiscard]] static Eigen::Quaternion<Scalar_t> quaternion_e2b(const State_t& state)
+    [[nodiscard]] static Eigen::Quaternion<Scalar_t> quaternion_b2e(const State_t& state)
     {
         using Nominal = typename StateDef::Nominal;
-        const auto q_segment = segment<typename Nominal::AttQuat>(state);
+        const Eigen::Matrix<Scalar_t, 4, 1> q_segment = segment<typename Nominal::AttQuat>(state);
         return navkit::core::math::normalized_with_positive_scalar(
             Eigen::Quaternion<Scalar_t>{q_segment(0), q_segment(1), q_segment(2), q_segment(3)});
     }
@@ -161,9 +168,10 @@ struct EcefInsPropagation
     }
 
     template<typename StateDef, typename State_t>
-    static void set_quaternion_e2b(State_t& state, const Eigen::Quaternion<Scalar_t>& value)
+    static void set_quaternion_b2e(State_t& state, const Eigen::Quaternion<Scalar_t>& value)
     {
-        const auto q = navkit::core::math::normalized_with_positive_scalar(value);
+        const Eigen::Quaternion<Scalar_t> q =
+            navkit::core::math::normalized_with_positive_scalar(value);
         using Nominal = typename StateDef::Nominal;
         segment<typename Nominal::AttQuat>(state) << q.w(), q.x(), q.y(), q.z();
     }
@@ -175,24 +183,25 @@ struct EcefInsPropagation
         using Error = typename StateDef::Error;
         ErrorStateCov<StateDef> F = ErrorStateCov<StateDef>::Zero();
 
-        const auto q_e2b = quaternion_e2b<StateDef>(state);
-        const auto C_b_e = q_e2b.conjugate().toRotationMatrix();
-        const auto omega_ie_e = environment::planet_rate_fixed_radps<Planet>();
-        const auto Omega_ie_e = navkit::core::math::skew_symmetric(omega_ie_e);
-        const auto f_ib_e = C_b_e * interval.specific_force_ib_b_mps2;
+        const Eigen::Quaternion<Scalar_t> q_b2e = quaternion_b2e<StateDef>(state);
+        const Eigen::Matrix<Scalar_t, 3, 3> C_b_e = q_b2e.toRotationMatrix();
+        const Vec3 omega_ie_e = environment::planet_rate_fixed_radps<Planet>();
+        const Eigen::Matrix<Scalar_t, 3, 3> Omega_ie_e =
+            navkit::core::math::skew_symmetric(omega_ie_e);
+        const Vec3 f_ib_e = C_b_e * interval.specific_force_ib_b_mps2;
 
         F.template block<3, 3>(Error::Pos::i, Error::Vel::i).setIdentity();
         F.template block<3, 3>(Error::Vel::i, Error::Pos::i) =
             environment::gravity_gradient_fixed_mps2_per_m<Gravity>(position_e_m<StateDef>(state));
         F.template block<3, 3>(Error::Vel::i, Error::Vel::i) = -2.0 * Omega_ie_e;
         F.template block<3, 3>(Error::Vel::i, Error::AttRotVec::i) =
-            navkit::core::math::skew_symmetric(f_ib_e);
+            -navkit::core::math::skew_symmetric(f_ib_e);
         if constexpr (requires { typename Error::AccB; }) {
             F.template block<3, 3>(Error::Vel::i, Error::AccB::i) = -C_b_e;
         }
         F.template block<3, 3>(Error::AttRotVec::i, Error::AttRotVec::i) = -Omega_ie_e;
         if constexpr (requires { typename Error::GyroB; }) {
-            F.template block<3, 3>(Error::AttRotVec::i, Error::GyroB::i) = C_b_e;
+            F.template block<3, 3>(Error::AttRotVec::i, Error::GyroB::i) = -C_b_e;
         }
 
         return F;
@@ -204,11 +213,11 @@ struct EcefInsPropagation
     {
         using Error = typename StateDef::Error;
         Eigen::Matrix<Scalar_t, Error::N, 12> G = Eigen::Matrix<Scalar_t, Error::N, 12>::Zero();
-        const auto q_e2b = quaternion_e2b<StateDef>(state);
-        const auto C_b_e = q_e2b.conjugate().toRotationMatrix();
+        const Eigen::Quaternion<Scalar_t> q_b2e = quaternion_b2e<StateDef>(state);
+        const Eigen::Matrix<Scalar_t, 3, 3> C_b_e = q_b2e.toRotationMatrix();
 
         G.template block<3, 3>(Error::Vel::i, 3) = C_b_e;
-        G.template block<3, 3>(Error::AttRotVec::i, 0) = -C_b_e;
+        G.template block<3, 3>(Error::AttRotVec::i, 0) = C_b_e;
         if constexpr (requires { typename Error::GyroB; }) {
             G.template block<3, 3>(Error::GyroB::i, 6).setIdentity();
         }
@@ -248,11 +257,11 @@ private:
     corrected_interval_from_single(const NominalState<StateDef>& state,
                                    const ImuIncrement& increment)
     {
-        const auto delta_theta =
+        const Vec3 delta_theta =
             increment.delta_theta_ib_b_rad - (gyro_bias_radps<StateDef>(state) * increment.dt_s);
-        const auto delta_v =
+        const Vec3 delta_v =
             increment.delta_v_ib_b_mps - (accel_bias_mps2<StateDef>(state) * increment.dt_s);
-        const auto corrected = coning_sculling_single(delta_theta, delta_v);
+        const ConingSculling corrected = coning_sculling_single(delta_theta, delta_v);
         return mechanized_interval_from_corrected<StateDef>(
             state, increment.time_s, increment.dt_s, corrected);
     }
@@ -265,14 +274,21 @@ private:
             return {};
         }
 
-        const auto gyro_bias = gyro_bias_radps<StateDef>(state);
-        const auto accel_bias = accel_bias_mps2<StateDef>(state);
-        const auto delta_theta_1 = first.delta_theta_ib_b_rad - (gyro_bias * first.dt_s);
-        const auto delta_theta_2 = second.delta_theta_ib_b_rad - (gyro_bias * second.dt_s);
-        const auto delta_v_1 = first.delta_v_ib_b_mps - (accel_bias * first.dt_s);
-        const auto delta_v_2 = second.delta_v_ib_b_mps - (accel_bias * second.dt_s);
-        const auto corrected =
-            coning_sculling_two_sample(delta_theta_1, delta_v_1, delta_theta_2, delta_v_2);
+        const Vec3 gyro_bias = gyro_bias_radps<StateDef>(state);
+        const Vec3 accel_bias = accel_bias_mps2<StateDef>(state);
+        const Vec3 delta_theta_1 = first.delta_theta_ib_b_rad - (gyro_bias * first.dt_s);
+        const Vec3 delta_theta_2 = second.delta_theta_ib_b_rad - (gyro_bias * second.dt_s);
+        const Vec3 delta_v_1 = first.delta_v_ib_b_mps - (accel_bias * first.dt_s);
+        const Vec3 delta_v_2 = second.delta_v_ib_b_mps - (accel_bias * second.dt_s);
+        ConingSculling corrected{};
+        if constexpr (apply_coning_sculling_compensation) {
+            corrected =
+                coning_sculling_two_sample(delta_theta_1, delta_v_1, delta_theta_2, delta_v_2);
+        }
+        else {
+            corrected = {.delta_theta_ib_b_rad = delta_theta_1 + delta_theta_2,
+                         .delta_v_ib_b_mps = delta_v_1 + delta_v_2};
+        }
         return mechanized_interval_from_corrected<StateDef>(
             state, second.time_s, first.dt_s + second.dt_s, corrected);
     }
@@ -289,8 +305,8 @@ private:
             return false;
         }
 
-        const auto F = build_f_matrix<StateDef>(state, interval);
-        const auto G = build_g_matrix<StateDef>(state);
+        const ErrorStateCov<StateDef> F = build_f_matrix<StateDef>(state, interval);
+        const Eigen::Matrix<Scalar_t, StateDef::Error::N, 12> G = build_g_matrix<StateDef>(state);
         phi = first_order_phi<StateDef>(F, interval.dt_s);
         qd = first_order_qd<StateDef>(G, interval.dt_s);
         return true;
@@ -304,7 +320,7 @@ private:
             return false;
         }
 
-        auto state_after = state;
+        NominalState<StateDef> state_after = state;
         propagate_nominal<StateDef>(state, interval, state_after);
         state = state_after;
         return true;
@@ -315,26 +331,26 @@ private:
                                   const MechanizedImuInterval& interval,
                                   NominalState<StateDef>& state_after)
     {
-        const auto p_k = position_e_m<StateDef>(state_before);
-        const auto v_k = velocity_e_mps<StateDef>(state_before);
-        const auto q_e2b_k = quaternion_e2b<StateDef>(state_before);
-        const auto q_b2e_k = q_e2b_k.conjugate();
-        const auto C_b2e_k = q_b2e_k.toRotationMatrix();
+        const Vec3 p_k = position_e_m<StateDef>(state_before);
+        const Vec3 v_k = velocity_e_mps<StateDef>(state_before);
+        const Eigen::Quaternion<Scalar_t> q_b2e_k = quaternion_b2e<StateDef>(state_before);
+        const Eigen::Matrix<Scalar_t, 3, 3> C_b2e_k = q_b2e_k.toRotationMatrix();
 
-        const auto gravity_e = Gravity::acceleration(p_k);
-        const auto omega_ie_e = environment::planet_rate_fixed_radps<Planet>();
-        const auto v_next = v_k + (C_b2e_k * interval.delta_v_ib_b_mps) +
-                            ((gravity_e - (2.0 * omega_ie_e.cross(v_k))) * interval.dt_s);
-        const auto p_next = p_k + (0.5 * (v_k + v_next) * interval.dt_s);
+        const Vec3 gravity_e = Gravity::acceleration(p_k);
+        const Vec3 omega_ie_e = environment::planet_rate_fixed_radps<Planet>();
+        const Vec3 delta_v_e = C_b2e_k * interval.delta_v_ib_b_mps;
+        const Vec3 coriolis_e = 2.0 * omega_ie_e.cross(v_k);
+        const Vec3 v_next = v_k + delta_v_e + ((gravity_e - coriolis_e) * interval.dt_s);
+        const Vec3 p_next = p_k + (0.5 * (v_k + v_next) * interval.dt_s);
 
-        const auto delta_q_e2b =
+        const Eigen::Quaternion<Scalar_t> delta_q_eb_b =
             navkit::core::math::quaternion_from_rotvec_rad(interval.delta_theta_eb_b_rad);
-        const auto q_e2b_next =
-            navkit::core::math::normalized_with_positive_scalar(delta_q_e2b * q_e2b_k);
+        const Eigen::Quaternion<Scalar_t> q_b2e_next =
+            navkit::core::math::normalized_with_positive_scalar(q_b2e_k * delta_q_eb_b);
 
         set_position_e_m<StateDef>(state_after, p_next);
         set_velocity_e_mps<StateDef>(state_after, v_next);
-        set_quaternion_e2b<StateDef>(state_after, q_e2b_next);
+        set_quaternion_b2e<StateDef>(state_after, q_b2e_next);
     }
 
     template<StateSpaceDefPolicy StateDef>
@@ -348,10 +364,10 @@ private:
             return {};
         }
 
-        const auto q_e2b = quaternion_e2b<StateDef>(state);
-        const auto delta_theta_eb_b =
-            corrected.delta_theta_ib_b_rad -
-            ((q_e2b * environment::planet_rate_fixed_radps<Planet>()) * dt_s);
+        const Eigen::Quaternion<Scalar_t> q_b2e = quaternion_b2e<StateDef>(state);
+        const Vec3 earth_rate_b =
+            q_b2e.conjugate() * environment::planet_rate_fixed_radps<Planet>();
+        const Vec3 delta_theta_eb_b = corrected.delta_theta_ib_b_rad - (earth_rate_b * dt_s);
         return {.time_s = time_s,
                 .dt_s = dt_s,
                 .delta_theta_ib_b_rad = corrected.delta_theta_ib_b_rad,

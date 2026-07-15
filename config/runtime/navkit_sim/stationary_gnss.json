@@ -8,8 +8,19 @@
     "truth": {
       "rate_hz": 10.0
     },
-    "nav": {
+    "nav_estimate": {
+      "rate_hz": 10.0,
+      "covariance": "triangular"
+    },
+    "imu": {
+      "rate_hz": 100.0
+    },
+    "imu_debug": {
       "rate_hz": 10.0
+    },
+    "filter_correction": {
+      "rate_hz": 10.0,
+      "covariance": "diagonal"
     },
     "measurement_statistics": {
       "rate_hz": 1.0
@@ -19,12 +30,16 @@
     "type": "stationary",
     "duration_s": 60.0,
     "rate_hz": 1000.0,
-    "p_e_m": [6378137.0, 0.0, 0.0]
+    "p_lla_deg_m": [0.0, 0.0, 0.0],
+    "v_n_mps": [0.0, 0.0, 0.0],
+    "rpy_b2n_rad": [0.0, 0.0, 0.0],
+    "w_nb_b_radps": [0.0, 0.0, 0.0]
   },
   "imu": {
     "type": "ideal",
     "rate_hz": 1000.0,
-    "seed": 42
+    "seed": 42,
+    "output_coning_sculling_compensated": false
   },
   "gnss": {
     "dt_s": 1.0,
@@ -37,7 +52,7 @@
     "pva_error": {
       "pos_m": [25.0, -15.0, 10.0],
       "vel_mps": [0.0, 0.0, 0.0],
-      "rpy_e2b_rad": [0.0, 0.0, 0.0]
+      "rpy_b2e_rad": [0.0, 0.0, 0.0]
     },
     "pva_cov": {
       "diag": [10000.0, 10000.0, 10000.0, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001]

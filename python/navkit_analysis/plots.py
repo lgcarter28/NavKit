@@ -24,10 +24,17 @@ import matplotlib.pyplot as plt
 
 from navkit_analysis.data import load_run
 from navkit_analysis.figures import (
+    plot_filter_corrections,
     plot_gnss_position_histograms,
     plot_gnss_position_innovation,
     plot_gnss_position_nis,
+    plot_imu_bias_truth_errors,
+    plot_imu_debug_terms,
+    plot_imu_increment_cumsums,
+    plot_imu_increment_time_histories,
     plot_position_error_covariance,
+    plot_truth_errors,
+    plot_truth_errors_ned,
 )
 from navkit_analysis.style import apply_style
 
@@ -46,9 +53,18 @@ def plot_run(run_dir: Path, save: bool = True) -> list[plt.Figure]:
         plot_gnss_position_innovation(run_data, save=save),
         plot_gnss_position_nis(run_data, save=save),
         plot_gnss_position_histograms(run_data, save=save),
+        plot_filter_corrections(run_data, save=save),
+        plot_truth_errors(run_data, save=save),
     ]
 
-    return [fig for fig in maybe_figures if fig is not None]
+    figures = [fig for fig in maybe_figures if fig is not None]
+    figures.extend(plot_imu_increment_time_histories(run_data, save=save))
+    figures.extend(plot_imu_increment_cumsums(run_data, save=save))
+    figures.extend(plot_imu_debug_terms(run_data, save=save))
+    figures.extend(plot_imu_bias_truth_errors(run_data, save=save))
+    figures.extend(plot_truth_errors_ned(run_data, save=save))
+
+    return figures
 
 
 def close_figures(figures: list[plt.Figure]) -> None:

@@ -46,13 +46,15 @@ struct ProductConfig
     static constexpr std::size_t imu_buffer_capacity = 1024U;
     static constexpr std::size_t covariance_history_capacity = 256U;
     static constexpr core::Time_t covariance_update_rate_hz = 100.0;
+    static constexpr bool apply_coning_sculling_compensation = true;
     using Propagation =
         core::estimation::EcefInsPropagation<Planet,
                                              Gravity,
                                              core::estimation::EcefInsZeroProcessNoise,
                                              imu_buffer_capacity,
                                              covariance_history_capacity,
-                                             covariance_update_rate_hz>;
+                                             covariance_update_rate_hz,
+                                             apply_coning_sculling_compensation>;
 
     using Filter =
         core::estimation::KalmanFilter<StateDef,

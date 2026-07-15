@@ -78,6 +78,16 @@ public:
         return m_dx;
     }
 
+    [[nodiscard]] const ErrorState_t& last_correction() const
+    {
+        return m_last_correction;
+    }
+
+    [[nodiscard]] bool last_correction_valid() const
+    {
+        return m_last_correction_valid;
+    }
+
     P_t& covariance()
     {
         return m_P;
@@ -189,6 +199,8 @@ public:
 
     void inject()
     {
+        m_last_correction = m_dx;
+        m_last_correction_valid = m_pending_correction_valid;
         Injection::apply(m_x, m_dx);
     }
 
@@ -196,6 +208,7 @@ public:
     {
         Reset::reset_covariance(m_x, m_dx, m_P);
         Reset::reset_dx(m_dx);
+        m_pending_correction_valid = false;
     }
 
 private:
@@ -244,6 +257,7 @@ private:
         if (accepted) {
             m_dx += dx;
             m_P = P_f;
+            m_pending_correction_valid = true;
         }
     }
 
@@ -275,8 +289,11 @@ private:
 
     State_t m_x{};
     ErrorState_t m_dx{};
+    ErrorState_t m_last_correction{};
     P_t m_P{};
     MeasurementStatisticsTuple_t m_measurement_stats{};
+    bool m_pending_correction_valid{false};
+    bool m_last_correction_valid{false};
 };
 
 } // namespace navkit::core::estimation
