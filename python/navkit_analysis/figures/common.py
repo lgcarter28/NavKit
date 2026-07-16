@@ -12,6 +12,7 @@ AXES = ("x", "y", "z")
 
 
 def save_figure(fig: plt.Figure, out: Path) -> Path:
+    out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out)
     print(f"Wrote {out}")
     return out

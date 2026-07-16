@@ -56,7 +56,7 @@ def _plot_imu_family(
     axes[-1].set_xlabel("Time [s]")
 
     if save:
-        save_figure(fig, run.run_dir / output_name)
+        save_figure(fig, run.figures_dir / output_name)
 
     return fig
 
@@ -72,7 +72,7 @@ def plot_imu_increment_time_histories(run: RunData, save: bool = True) -> list[p
             suffix="rad",
             ylabel=r"$\Delta\theta$ [rad]",
             title="IMU Incremental Angle: Truth/Ideal vs Measured",
-            output_name="imu_delta_theta.png",
+            output_name="imu_delta_theta_body.png",
             save=save,
         ),
         _plot_imu_family(
@@ -82,7 +82,7 @@ def plot_imu_increment_time_histories(run: RunData, save: bool = True) -> list[p
             suffix="mps",
             ylabel=r"$\Delta v$ [m/s]",
             title="IMU Incremental Velocity: Truth/Ideal vs Measured",
-            output_name="imu_delta_v.png",
+            output_name="imu_delta_v_body.png",
             save=save,
         ),
     ]:
@@ -102,7 +102,7 @@ def plot_imu_increment_cumsums(run: RunData, save: bool = True) -> list[plt.Figu
             suffix="rad",
             ylabel=r"$\sum\Delta\theta$ [rad]",
             title="IMU Cumulative Incremental Angle: Truth/Ideal vs Measured",
-            output_name="imu_cumsum_delta_theta.png",
+            output_name="imu_cumsum_delta_theta_body.png",
             save=save,
         ),
         _plot_imu_family(
@@ -112,7 +112,7 @@ def plot_imu_increment_cumsums(run: RunData, save: bool = True) -> list[plt.Figu
             suffix="mps",
             ylabel=r"$\sum\Delta v$ [m/s]",
             title="IMU Cumulative Incremental Velocity: Truth/Ideal vs Measured",
-            output_name="imu_cumsum_delta_v.png",
+            output_name="imu_cumsum_delta_v_body.png",
             save=save,
         ),
     ]:
@@ -132,7 +132,7 @@ def _plot_imu_debug_family(
 ) -> plt.Figure | None:
     imu_debug = run.imu_debug
     if imu_debug is None:
-        print(f"Skipping {title}; missing imu_debug_ecef.csv")
+        print(f"Skipping {title}; missing imu_debug_body.csv")
         return None
 
     time_s = imu_debug["time_s"]
@@ -157,7 +157,7 @@ def _plot_imu_debug_family(
     axes[-1].set_xlabel("Time [s]")
 
     if save:
-        save_figure(fig, run.run_dir / output_name)
+        save_figure(fig, run.figures_dir / output_name)
 
     return fig
 
@@ -169,36 +169,33 @@ def plot_imu_debug_terms(run: RunData, save: bool = True) -> list[plt.Figure]:
         _plot_imu_debug_family(
             run,
             column_groups=[
-                ("a_bar_e", "a_bar_e", RESIDUAL_COLOR),
-                ("gravity_e", "gravity_e", TRUTH_COLOR),
-                ("specific_force_e", "specific_force_e", ERROR_COLOR),
+                ("specific_force_ib_b", "truth specific force", TRUTH_COLOR),
             ],
             ylabel="mps2",
-            title="IMU Debug ECEF Acceleration and Specific-Force Terms",
-            output_name="imu_debug_ecef_specific_force.png",
+            title="IMU Debug Body-Frame Specific-Force Terms",
+            output_name="imu_debug_specific_force_body.png",
             save=save,
         ),
         _plot_imu_debug_family(
             run,
             column_groups=[
-                ("delta_theta_eb_b", "delta theta e2b", TRUTH_COLOR),
-                ("delta_theta_ib_b", "delta theta i2b", ERROR_COLOR),
+                ("truth_delta_theta_ib_b", "truth/ideal", TRUTH_COLOR),
                 ("meas_delta_theta_ib_b", "measured", MEASUREMENT_COLOR),
             ],
             ylabel="rad",
             title="IMU Debug Body-Frame Incremental Angle Terms",
-            output_name="imu_debug_delta_theta.png",
+            output_name="imu_debug_delta_theta_body.png",
             save=save,
         ),
         _plot_imu_debug_family(
             run,
             column_groups=[
-                ("delta_v_ib_b", "truth/ideal", TRUTH_COLOR),
+                ("truth_delta_v_ib_b", "truth/ideal", TRUTH_COLOR),
                 ("meas_delta_v_ib_b", "measured", MEASUREMENT_COLOR),
             ],
             ylabel="mps",
             title="IMU Debug Body-Frame Incremental Velocity Terms",
-            output_name="imu_debug_delta_v.png",
+            output_name="imu_debug_delta_v_body.png",
             save=save,
         ),
     ]:

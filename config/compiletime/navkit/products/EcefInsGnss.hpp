@@ -8,37 +8,18 @@
 #include "navkit/core/environment/planet/Wgs84.hpp"
 #include "navkit/core/estimation/navigator/propagation/EcefInsPropagation.hpp"
 #include "navkit/core/models/GnssPosModel.hpp"
-#include "navkit/core/profiling/ProfileSinks.hpp"
-#include "navkit/core/profiling/ScopedProfiler.hpp"
+#include "navkit/core/profiling/NullProfiler.hpp"
 
-#include <chrono>
 #include <cstddef>
-#include <cstdint>
-#include <string_view>
 #include <tuple>
 
-namespace navkit::config::navkit::products::profiled_stationary_gnss
+namespace navkit::config::navkit::products::ecef_ins_gnss
 {
 
 struct NumericConfig
 {
     using Scalar_t = core::Scalar_t;
     using Time_t = core::Time_t;
-};
-
-struct HostSteadyMicrosecondClock
-{
-    using Tick = std::uint64_t;
-
-    static constexpr std::string_view source = "std::chrono::steady_clock";
-    static constexpr double tick_period_us = 1.0;
-
-    static Tick now()
-    {
-        const auto now = std::chrono::steady_clock::now().time_since_epoch();
-        return static_cast<Tick>(
-            std::chrono::duration_cast<std::chrono::microseconds>(now).count());
-    }
 };
 
 struct ProductConfig
@@ -59,10 +40,7 @@ struct ProductConfig
 
     using Sensors = std::tuple<PrimaryGnssSensor>;
 
-    using ProfileClock = HostSteadyMicrosecondClock;
-    using ProfileTick = typename ProfileClock::Tick;
-    using ProfileSink = core::profiling::RingBufferProfileSink<ProfileTick, 4096U>;
-    using Profiler = core::profiling::ScopedProfiler<ProfileClock, ProfileSink>;
+    using Profiler = core::profiling::NullProfiler;
     using Planet = core::environment::Wgs84;
     using Gravity = core::environment::J2<Planet>;
     static constexpr std::size_t imu_buffer_capacity = 1024U;
@@ -91,11 +69,11 @@ struct ProductConfig
 
 static_assert(api::config::NavKitProductConfigPolicy<ProductConfig>);
 
-} // namespace navkit::config::navkit::products::profiled_stationary_gnss
+} // namespace navkit::config::navkit::products::ecef_ins_gnss
 
 namespace navkit::config::navkit
 {
 
-using ProfiledStationaryGnssConfig = products::profiled_stationary_gnss::ProductConfig;
+using EcefInsGnssConfig = products::ecef_ins_gnss::ProductConfig;
 
 } // namespace navkit::config::navkit

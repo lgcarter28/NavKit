@@ -89,6 +89,6 @@ def plot_gnss_position_nis(run: RunData, save: bool = True) -> plt.Figure | None
     apply_nav_axes_style(ax_p)
 
     if save:
-        save_figure(fig, run.run_dir / "gnss_position_nis.png")
+        save_figure(fig, run.figures_dir / "gnss_position_nis_ecef.png")
 
     return fig

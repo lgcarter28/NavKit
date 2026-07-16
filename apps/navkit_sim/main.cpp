@@ -22,9 +22,9 @@ int main(int argc, char** argv)
             return navkit::app_support::describe_compiletime_config<AppConfig>(std::cout);
         }
 
-        const fs::path config_path =
-            (argc > 1) ? fs::path(argv[1])
-                       : fs::path("config/runtime/navkit_sim/stationary_gnss.json");
+        const fs::path config_path = (argc > 1)
+                                         ? fs::path(argv[1])
+                                         : fs::path("config/runtime/navkit_sim/ecef_ins_gnss.json");
         return navkit::app_support::run_selected_app<AppConfig>(config_path);
     }
     catch (const std::exception& e) {

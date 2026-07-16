@@ -16,40 +16,25 @@ namespace navkit::io
 class ImuDebugLogProduct
 {
 public:
-    static constexpr std::string_view LogKey = "imu_debug_ecef";
+    static constexpr std::string_view LogKey = "imu_debug_body";
 
     void open(const std::filesystem::path& output_dir)
     {
-        m_csv.open(output_dir / "imu_debug_ecef.csv",
+        m_csv.open(output_dir / "imu_debug_body.csv",
                    {"time_s",
                     "dt_s",
-                    "p_bar_e_x_m",
-                    "p_bar_e_y_m",
-                    "p_bar_e_z_m",
-                    "v_bar_e_x_mps",
-                    "v_bar_e_y_mps",
-                    "v_bar_e_z_mps",
-                    "a_bar_e_x_mps2",
-                    "a_bar_e_y_mps2",
-                    "a_bar_e_z_mps2",
-                    "gravity_e_x_mps2",
-                    "gravity_e_y_mps2",
-                    "gravity_e_z_mps2",
-                    "specific_force_e_x_mps2",
-                    "specific_force_e_y_mps2",
-                    "specific_force_e_z_mps2",
+                    "omega_ib_b_x_radps",
+                    "omega_ib_b_y_radps",
+                    "omega_ib_b_z_radps",
                     "specific_force_ib_b_x_mps2",
                     "specific_force_ib_b_y_mps2",
                     "specific_force_ib_b_z_mps2",
-                    "delta_theta_eb_b_x_rad",
-                    "delta_theta_eb_b_y_rad",
-                    "delta_theta_eb_b_z_rad",
-                    "delta_theta_ib_b_x_rad",
-                    "delta_theta_ib_b_y_rad",
-                    "delta_theta_ib_b_z_rad",
-                    "delta_v_ib_b_x_mps",
-                    "delta_v_ib_b_y_mps",
-                    "delta_v_ib_b_z_mps",
+                    "truth_delta_theta_ib_b_x_rad",
+                    "truth_delta_theta_ib_b_y_rad",
+                    "truth_delta_theta_ib_b_z_rad",
+                    "truth_delta_v_ib_b_x_mps",
+                    "truth_delta_v_ib_b_y_mps",
+                    "truth_delta_v_ib_b_z_mps",
                     "meas_delta_theta_ib_b_x_rad",
                     "meas_delta_theta_ib_b_y_rad",
                     "meas_delta_theta_ib_b_z_rad",
@@ -66,37 +51,23 @@ public:
 
     void log(const ImuDebugLogPayload& payload)
     {
-        const auto& ideal = payload.ideal;
-        const auto& measured = payload.measured;
-        m_csv.write_row(ideal.time_s,
-                        ideal.dt_s,
-                        ideal.p_bar_e_m.x(),
-                        ideal.p_bar_e_m.y(),
-                        ideal.p_bar_e_m.z(),
-                        ideal.v_bar_e_mps.x(),
-                        ideal.v_bar_e_mps.y(),
-                        ideal.v_bar_e_mps.z(),
-                        ideal.a_bar_e_mps2.x(),
-                        ideal.a_bar_e_mps2.y(),
-                        ideal.a_bar_e_mps2.z(),
-                        ideal.gravity_e_mps2.x(),
-                        ideal.gravity_e_mps2.y(),
-                        ideal.gravity_e_mps2.z(),
-                        ideal.specific_force_e_mps2.x(),
-                        ideal.specific_force_e_mps2.y(),
-                        ideal.specific_force_e_mps2.z(),
-                        ideal.specific_force_ib_b_mps2.x(),
-                        ideal.specific_force_ib_b_mps2.y(),
-                        ideal.specific_force_ib_b_mps2.z(),
-                        ideal.delta_theta_eb_b_rad.x(),
-                        ideal.delta_theta_eb_b_rad.y(),
-                        ideal.delta_theta_eb_b_rad.z(),
-                        ideal.delta_theta_ib_b_rad.x(),
-                        ideal.delta_theta_ib_b_rad.y(),
-                        ideal.delta_theta_ib_b_rad.z(),
-                        ideal.delta_v_ib_b_mps.x(),
-                        ideal.delta_v_ib_b_mps.y(),
-                        ideal.delta_v_ib_b_mps.z(),
+        const navkit::sim::ImuInterval& interval = payload.debug.interval;
+        const navkit::core::estimation::ImuIncrement& truth = payload.truth;
+        const navkit::core::estimation::ImuIncrement& measured = payload.measured;
+        m_csv.write_row(interval.time_s,
+                        interval.dt_s,
+                        interval.omega_ib_b_radps.x(),
+                        interval.omega_ib_b_radps.y(),
+                        interval.omega_ib_b_radps.z(),
+                        interval.specific_force_ib_b_mps2.x(),
+                        interval.specific_force_ib_b_mps2.y(),
+                        interval.specific_force_ib_b_mps2.z(),
+                        truth.delta_theta_ib_b_rad.x(),
+                        truth.delta_theta_ib_b_rad.y(),
+                        truth.delta_theta_ib_b_rad.z(),
+                        truth.delta_v_ib_b_mps.x(),
+                        truth.delta_v_ib_b_mps.y(),
+                        truth.delta_v_ib_b_mps.z(),
                         measured.delta_theta_ib_b_rad.x(),
                         measured.delta_theta_ib_b_rad.y(),
                         measured.delta_theta_ib_b_rad.z(),
@@ -118,16 +89,16 @@ public:
 
     static nlohmann::json metadata()
     {
-        return {{"schema", "imu_debug_ecef_interval_v1"},
-                {"file", "imu_debug_ecef.csv"},
+        return {{"schema", "imu_debug_body_interval_v1"},
+                {"file", "imu_debug_body.csv"},
                 {"description",
-                 "Intermediate truth-to-IMU conversion terms for debugging frame, sign, and "
-                 "gravity/specific-force behavior."}};
+                 "Body-resolved truth-to-IMU conversion terms for debugging frame, sign, and "
+                 "specific-force behavior."}};
     }
 
     static nlohmann::json manifest_entry()
     {
-        return {{"csv", "imu_debug_ecef.csv"}, {"manifest", "imu_debug_ecef.meta.json"}};
+        return {{"csv", "imu_debug_body.csv"}, {"manifest", "imu_debug_body.meta.json"}};
     }
 
 private:

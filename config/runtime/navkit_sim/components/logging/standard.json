@@ -1,0 +1,32 @@
+{
+  "logging": {
+    "console": {
+      "enabled": true,
+      "rate_hz": 1.0
+    },
+    "truth": {
+      "enabled": true,
+      "rate_hz": 10.0
+    },
+    "nav_estimate": {
+      "enabled": true,
+      "rate_hz": 10.0,
+      "covariance": "triangular"
+    },
+    "imu": {
+      "enabled": true,
+      "rate_hz": 100.0
+    },
+    "imu_debug": {
+      "enabled": false
+    },
+    "filter_correction": {
+      "enabled": true,
+      "rate_hz": 10.0
+    },
+    "measurement_statistics": {
+      "enabled": true,
+      "rate_hz": 1.0
+    }
+  }
+}

@@ -78,6 +78,6 @@ def plot_position_error_covariance(run: RunData, save: bool = True) -> plt.Figur
     axes[-1].set_xlabel("Time [s]")
 
     if save:
-        save_figure(fig, run.run_dir / "position_error_covariance.png")
+        save_figure(fig, run.figures_dir / "error_covariance_position_ecef.png")
 
     return fig

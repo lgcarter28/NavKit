@@ -11,12 +11,14 @@
 #include "navkit/core/math/Quaternion.hpp"
 
 #include <Eigen/Eigenvalues>
+#include <Eigen/Geometry>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <nlohmann/json.hpp>
 #include <random>
 #include <string>
+#include <vector>
 
 namespace navkit::app_support::detail
 {
@@ -61,16 +63,73 @@ inline void require_initialization_type(const nlohmann::json& initialization,
     return vec3_from_json<core::Vec3>(cfg.at(key));
 }
 
-[[nodiscard]] inline core::estimation::PvaState
-pva_error_from_json(const nlohmann::json& initialization)
+inline void require_exactly_one_pva_error_key(const nlohmann::json& pva_error,
+                                              const std::vector<std::string>& keys,
+                                              const std::string& group_name)
+{
+    const int count = count_present(pva_error, keys);
+    if (count != 1) {
+        throw_runtime_config_error("initialization.pva_error must specify exactly one " +
+                                   group_name + " convention");
+    }
+}
+
+inline void validate_pva_error_shape(const nlohmann::json& initialization)
 {
     const auto& pva_error = require_object(initialization, "pva_error");
+    require_exactly_one_pva_error_key(pva_error, {"p_e_m", "p_n_m"}, "position-error");
+    require_exactly_one_pva_error_key(pva_error, {"v_e_mps", "v_n_mps"}, "velocity-error");
+    require_exactly_one_pva_error_key(
+        pva_error, {"rotvec_b2e_rad", "rotvec_b2n_rad"}, "attitude-error");
+    require_optional_vec3(pva_error, "p_e_m");
+    require_optional_vec3(pva_error, "p_n_m");
+    require_optional_vec3(pva_error, "v_e_mps");
+    require_optional_vec3(pva_error, "v_n_mps");
+    require_optional_vec3(pva_error, "rotvec_b2e_rad");
+    require_optional_vec3(pva_error, "rotvec_b2n_rad");
+}
 
-    core::estimation::PvaState error = core::estimation::PvaState::Zero();
-    core::estimation::pos_e_m(error) = required_vec3_from_object(pva_error, "pos_m");
-    core::estimation::vel_e_mps(error) = required_vec3_from_object(pva_error, "vel_mps");
-    core::estimation::rpy_b2e_rad(error) = required_vec3_from_object(pva_error, "rpy_b2e_rad");
+[[nodiscard]] inline Eigen::Matrix<core::Scalar_t, 3, 3>
+n2e_matrix_at_position(const core::Vec3& p_e_m)
+{
+    return ecef_to_ned_matrix(p_e_m).transpose();
+}
+
+[[nodiscard]] inline core::Vec3 pva_error_vec3_e_from_json(const nlohmann::json& pva_error,
+                                                           const char* ecef_key,
+                                                           const char* ned_key,
+                                                           const core::Vec3& reference_p_e_m)
+{
+    if (pva_error.contains(ecef_key)) {
+        return required_vec3_from_object(pva_error, ecef_key);
+    }
+    return n2e_matrix_at_position(reference_p_e_m) * required_vec3_from_object(pva_error, ned_key);
+}
+
+[[nodiscard]] inline core::estimation::PvaErrorState
+pva_error_from_json(const nlohmann::json& initialization, const core::Vec3& reference_p_e_m)
+{
+    validate_pva_error_shape(initialization);
+    const auto& pva_error = require_object(initialization, "pva_error");
+
+    core::estimation::PvaErrorState error = core::estimation::PvaErrorState::Zero();
+    core::estimation::pos_error_e_m(error) =
+        pva_error_vec3_e_from_json(pva_error, "p_e_m", "p_n_m", reference_p_e_m);
+    core::estimation::vel_error_e_mps(error) =
+        pva_error_vec3_e_from_json(pva_error, "v_e_mps", "v_n_mps", reference_p_e_m);
+    core::estimation::att_rotvec_e_rad(error) =
+        pva_error_vec3_e_from_json(pva_error, "rotvec_b2e_rad", "rotvec_b2n_rad", reference_p_e_m);
     return error;
+}
+
+[[nodiscard]] inline std::string pva_error_frame_from_json(const nlohmann::json& initialization)
+{
+    require_optional_string(initialization, "pva_error_frame");
+    const std::string frame = initialization.value("pva_error_frame", std::string{"ecef"});
+    if (frame != "ecef" && frame != "ned") {
+        throw_runtime_config_error("initialization.pva_error_frame must be 'ecef' or 'ned'");
+    }
+    return frame;
 }
 
 inline void validate_pva_covariance_shape(const nlohmann::json& initialization)
@@ -93,7 +152,7 @@ inline void validate_pva_covariance_shape(const nlohmann::json& initialization)
 }
 
 [[nodiscard]] inline core::estimation::PvaCovariance
-pva_covariance_from_json(const nlohmann::json& initialization)
+pva_covariance_from_json(const nlohmann::json& initialization, const core::Vec3& reference_p_e_m)
 {
     validate_pva_covariance_shape(initialization);
     const auto& pva_cov = initialization.at("pva_cov");
@@ -101,29 +160,71 @@ pva_covariance_from_json(const nlohmann::json& initialization)
     core::estimation::PvaCovariance covariance = core::estimation::PvaCovariance::Zero();
     if (pva_cov.contains("diag")) {
         const auto& diag = pva_cov.at("diag");
-        for (int i = 0; i < core::estimation::PvaStateDef::N; ++i) {
+        for (int i = 0; i < core::estimation::PvaErrorStateDef::N; ++i) {
             covariance(i, i) = diag.at(static_cast<std::size_t>(i)).get<core::Scalar_t>();
         }
-        return covariance;
     }
-
-    const auto& full = pva_cov.at("full");
-    for (int row = 0; row < core::estimation::PvaStateDef::N; ++row) {
-        for (int col = 0; col < core::estimation::PvaStateDef::N; ++col) {
-            const auto index =
-                static_cast<std::size_t>((row * core::estimation::PvaStateDef::N) + col);
-            covariance(row, col) = full.at(index).get<core::Scalar_t>();
+    else {
+        const auto& full = pva_cov.at("full");
+        for (int row = 0; row < core::estimation::PvaErrorStateDef::N; ++row) {
+            for (int col = 0; col < core::estimation::PvaErrorStateDef::N; ++col) {
+                const auto index =
+                    static_cast<std::size_t>((row * core::estimation::PvaErrorStateDef::N) + col);
+                covariance(row, col) = full.at(index).get<core::Scalar_t>();
+            }
         }
     }
-    return covariance;
+
+    if (!initialization.contains("pva_error")) {
+        if (pva_error_frame_from_json(initialization) == "ecef") {
+            return covariance;
+        }
+
+        core::estimation::PvaCovariance T = core::estimation::PvaCovariance::Identity();
+        const Eigen::Matrix<core::Scalar_t, 3, 3> C_n2e = n2e_matrix_at_position(reference_p_e_m);
+        T.template block<3, 3>(core::estimation::PvaErrorStateDef::Pos::i,
+                               core::estimation::PvaErrorStateDef::Pos::i) = C_n2e;
+        T.template block<3, 3>(core::estimation::PvaErrorStateDef::Vel::i,
+                               core::estimation::PvaErrorStateDef::Vel::i) = C_n2e;
+        T.template block<3, 3>(core::estimation::PvaErrorStateDef::AttRotVec::i,
+                               core::estimation::PvaErrorStateDef::AttRotVec::i) = C_n2e;
+        return T * covariance * T.transpose();
+    }
+
+    validate_pva_error_shape(initialization);
+    const auto& pva_error = initialization.at("pva_error");
+    core::estimation::PvaCovariance T = core::estimation::PvaCovariance::Identity();
+    const Eigen::Matrix<core::Scalar_t, 3, 3> C_n2e = n2e_matrix_at_position(reference_p_e_m);
+    if (pva_error.contains("p_n_m")) {
+        T.template block<3, 3>(core::estimation::PvaErrorStateDef::Pos::i,
+                               core::estimation::PvaErrorStateDef::Pos::i) = C_n2e;
+    }
+    if (pva_error.contains("v_n_mps")) {
+        T.template block<3, 3>(core::estimation::PvaErrorStateDef::Vel::i,
+                               core::estimation::PvaErrorStateDef::Vel::i) = C_n2e;
+    }
+    if (pva_error.contains("rotvec_b2n_rad")) {
+        T.template block<3, 3>(core::estimation::PvaErrorStateDef::AttRotVec::i,
+                               core::estimation::PvaErrorStateDef::AttRotVec::i) = C_n2e;
+    }
+    return T * covariance * T.transpose();
 }
 
-inline void apply_pva_error(NavInitialization& nav_init, const core::estimation::PvaState& error)
+inline void apply_pva_error(NavInitialization& nav_init,
+                            const core::estimation::PvaErrorState& error)
 {
-    nav_init.pva += error;
+    core::estimation::pos_e_m(nav_init.pva) += core::estimation::pos_error_e_m(error);
+    core::estimation::vel_e_mps(nav_init.pva) += core::estimation::vel_error_e_mps(error);
+
+    const Eigen::Quaternion<core::Scalar_t> q_b2e =
+        core::math::quaternion_from_rpy_rad(core::estimation::rpy_b2e_rad(nav_init.pva));
+    const Eigen::Quaternion<core::Scalar_t> delta_q =
+        core::math::quaternion_from_rotvec_rad(core::estimation::att_rotvec_e_rad(error));
+    core::estimation::rpy_b2e_rad(nav_init.pva) =
+        core::math::rpy_rad_from_quaternion(delta_q * q_b2e);
 }
 
-[[nodiscard]] inline core::estimation::PvaState
+[[nodiscard]] inline core::estimation::PvaErrorState
 sample_pva_error(const core::estimation::PvaCovariance& covariance, const std::uint64_t seed)
 {
     Eigen::SelfAdjointEigenSolver<core::estimation::PvaCovariance> solver(covariance);
@@ -136,15 +237,15 @@ sample_pva_error(const core::estimation::PvaCovariance& covariance, const std::u
         throw_runtime_config_error("initialization.pva_cov must be positive semidefinite");
     }
 
-    core::estimation::PvaState normal = core::estimation::PvaState::Zero();
+    core::estimation::PvaErrorState normal = core::estimation::PvaErrorState::Zero();
     std::mt19937_64 rng(seed);
     std::normal_distribution<core::Scalar_t> distribution{0.0, 1.0};
-    for (int i = 0; i < core::estimation::PvaStateDef::N; ++i) {
+    for (int i = 0; i < core::estimation::PvaErrorStateDef::N; ++i) {
         normal(i) = distribution(rng);
     }
 
-    core::estimation::PvaState sqrt_eigenvalues = core::estimation::PvaState::Zero();
-    for (int i = 0; i < core::estimation::PvaStateDef::N; ++i) {
+    core::estimation::PvaErrorState sqrt_eigenvalues = core::estimation::PvaErrorState::Zero();
+    for (int i = 0; i < core::estimation::PvaErrorStateDef::N; ++i) {
         sqrt_eigenvalues(i) = std::sqrt(std::max<core::Scalar_t>(0.0, solver.eigenvalues()(i)));
     }
 

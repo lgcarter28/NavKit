@@ -41,6 +41,6 @@ def plot_gnss_position_histograms(
         apply_nav_axes_style(ax)
 
     if save:
-        save_figure(fig, run.run_dir / "gnss_position_innovation_histograms.png")
+        save_figure(fig, run.figures_dir / "gnss_position_innovation_histograms_ecef.png")
 
     return fig

@@ -12,7 +12,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--exe", type=Path, required=True)
     parser.add_argument(
-        "--config", type=Path, default=Path("config/runtime/navkit_sim/stationary_gnss.json")
+        "--config", type=Path, default=Path("config/runtime/navkit_sim/ecef_ins_gnss.json")
     )
     args = parser.parse_args()
     return subprocess.call([str(args.exe), str(args.config)])

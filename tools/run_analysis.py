@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -28,11 +29,13 @@ def run_dir_from_argv(argv: list[str]) -> Path:
         if not item.startswith("-"):
             return Path(item)
 
-    return Path("output/logs/stationary_gnss_demo")
+    return Path("output/logs/ecef_ins_gnss_demo")
 
 
 def run_name_from_dir(run_dir: Path) -> str:
-    manifest = run_dir / "run_manifest.json"
+    manifest = run_dir / "data" / "run_manifest.json"
+    if not manifest.exists():
+        manifest = run_dir / "run_manifest.json"
     if manifest.exists():
         data = json.loads(manifest.read_text(encoding="utf-8"))
         if isinstance(data.get("run_name"), str):
@@ -47,6 +50,8 @@ def main(argv: list[str] | None = None) -> int:
     forwarded_argv = [item for item in forwarded_argv if item != "--no-timing-report"]
     root = repo_root()
     python_root = root / "python"
+    if "--show" not in forwarded_argv:
+        os.environ.setdefault("MPLBACKEND", "Agg")
 
     if str(python_root) not in sys.path:
         sys.path.insert(0, str(python_root))
@@ -57,7 +62,8 @@ def main(argv: list[str] | None = None) -> int:
     command = [str(Path(__file__).name), *forwarded_argv]
 
     return_code, result = measure_call(plots_main, forwarded_argv)
-    timing_path = run_dir / "timing.json"
+    timing_path = run_dir / "data" / "timing.json"
+    timing_path.parent.mkdir(parents=True, exist_ok=True)
     command_name = "analysis"
     record = update_timing_artifact(
         timing_path,

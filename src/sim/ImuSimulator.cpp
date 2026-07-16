@@ -7,7 +7,7 @@
 #include "navkit/core/environment/gravity/J2.hpp"
 #include "navkit/core/environment/planet/Wgs84.hpp"
 #include "navkit/core/math/Quaternion.hpp"
-#include "navkit/core/math/Skew.hpp"
+#include "navkit/core/math/TriadCalibration.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -15,49 +15,48 @@
 namespace navkit::sim
 {
 
-namespace
-{
-
 using navkit::core::environment::J2;
 using navkit::core::environment::Wgs84;
 
-[[nodiscard]] Eigen::Matrix<Scalar_t, 3, 3> scale_matrix(const Vec3& scale_factor)
-{
-    Eigen::Matrix<Scalar_t, 3, 3> scale = Eigen::Matrix<Scalar_t, 3, 3>::Identity();
-    scale.diagonal() += scale_factor;
-    return scale;
-}
-
-[[nodiscard]] Eigen::Matrix<Scalar_t, 3, 3> nonorthogonality_matrix(const Vec3& nonorthogonality)
-{
-    Eigen::Matrix<Scalar_t, 3, 3> matrix = Eigen::Matrix<Scalar_t, 3, 3>::Identity();
-    matrix(1, 0) = nonorthogonality.x();
-    matrix(2, 0) = nonorthogonality.y();
-    matrix(2, 1) = nonorthogonality.z();
-    return matrix;
-}
-
-[[nodiscard]] Eigen::Matrix<Scalar_t, 3, 3> misalignment_matrix(const Vec3& misalignment_rad)
-{
-    return Eigen::Matrix<Scalar_t, 3, 3>::Identity() - core::math::skew_symmetric(misalignment_rad);
-}
-
-} // namespace
-
-ImuSimulator::ImuSimulator(const ImuSimulatorConfig& cfg)
+template<bool OutputConingScullingCompensated>
+ImuSimulator<OutputConingScullingCompensated>::ImuSimulator(const ImuSimulatorConfig& cfg)
     : m_cfg(cfg)
     , m_gyro_bias_radps(cfg.gyro.bias)
     , m_accel_bias_mps2(cfg.accel.bias)
     , m_rng(cfg.seed)
 {}
 
-bool ImuSimulator::ideal_interval_from_truth_ecef(const TruthSample& previous,
-                                                  const TruthSample& current,
-                                                  IdealImuInterval& interval)
+template<bool OutputConingScullingCompensated>
+ImuIncrement
+ImuSimulator<OutputConingScullingCompensated>::increment_from_interval(const ImuInterval& interval)
+{
+    ImuIncrement increment{};
+    increment.time_s = interval.time_s;
+    increment.dt_s = interval.dt_s;
+    increment.delta_theta_ib_b_rad = interval.omega_ib_b_radps * interval.dt_s;
+    increment.delta_v_ib_b_mps = interval.specific_force_ib_b_mps2 * interval.dt_s;
+    return increment;
+}
+
+template<bool OutputConingScullingCompensated>
+bool ImuSimulator<OutputConingScullingCompensated>::interval_from_truth_ecef(
+    const TruthSample& previous, const TruthSample& current, ImuInterval& interval)
+{
+    ImuIntervalDebug debug{};
+    return interval_from_truth_ecef(previous, current, interval, debug);
+}
+
+template<bool OutputConingScullingCompensated>
+bool ImuSimulator<OutputConingScullingCompensated>::interval_from_truth_ecef(
+    const TruthSample& previous,
+    const TruthSample& current,
+    ImuInterval& interval,
+    ImuIntervalDebug& debug)
 {
     const Time_t dt_s = current.time - previous.time;
     if (dt_s <= 0.0) {
         interval = {};
+        debug = {};
         return false;
     }
 
@@ -84,26 +83,30 @@ bool ImuSimulator::ideal_interval_from_truth_ecef(const TruthSample& previous,
     interval = {};
     interval.time_s = current.time;
     interval.dt_s = dt_s;
-    interval.p_bar_e_m = p_bar_e;
-    interval.v_bar_e_mps = v_bar_e;
-    interval.a_bar_e_mps2 = a_bar_e;
-    interval.gravity_e_mps2 = gravity_e;
-    interval.specific_force_e_mps2 = specific_force_e;
     interval.omega_ib_b_radps = delta_theta_ib_b / dt_s;
     interval.specific_force_ib_b_mps2 = specific_force_b;
-    interval.delta_theta_eb_b_rad = delta_theta_eb_b;
-    interval.delta_theta_ib_b_rad = delta_theta_ib_b;
-    interval.delta_v_ib_b_mps = specific_force_b * dt_s;
+
+    debug = {};
+    debug.interval = interval;
+    debug.p_bar_e_m = p_bar_e;
+    debug.v_bar_e_mps = v_bar_e;
+    debug.a_bar_e_mps2 = a_bar_e;
+    debug.gravity_e_mps2 = gravity_e;
+    debug.specific_force_e_mps2 = specific_force_e;
+    debug.delta_theta_eb_b_rad = delta_theta_eb_b;
     return true;
 }
 
-Vec3 ImuSimulator::calibration_matrix_apply(const Vec3& input, const ImuTriadErrorConfig& config)
+template<bool OutputConingScullingCompensated>
+Vec3 ImuSimulator<OutputConingScullingCompensated>::calibration_matrix_apply(
+    const Vec3& input, const ImuTriadErrorConfig& config)
 {
-    return scale_matrix(config.scale_factor) * nonorthogonality_matrix(config.nonorthogonality) *
-           misalignment_matrix(config.misalignment_rad) * input;
+    return core::math::apply_triad_calibration(
+        input, config.scale_factor, config.misalignment_rad, config.nonorthogonality);
 }
 
-Vec3 ImuSimulator::quantize(const Vec3& value, const Vec3& quantum)
+template<bool OutputConingScullingCompensated>
+Vec3 ImuSimulator<OutputConingScullingCompensated>::quantize(const Vec3& value, const Vec3& quantum)
 {
     Vec3 result = value;
     for (Eigen::Index axis = 0; axis < result.size(); ++axis) {
@@ -114,81 +117,115 @@ Vec3 ImuSimulator::quantize(const Vec3& value, const Vec3& quantum)
     return result;
 }
 
-bool ImuSimulator::generate(const TruthSample& previous,
-                            const TruthSample& current,
-                            ImuIncrement& increment)
+template<bool OutputConingScullingCompensated>
+bool ImuSimulator<OutputConingScullingCompensated>::generate(const TruthSample& previous,
+                                                             const TruthSample& current,
+                                                             ImuIncrement& increment)
 {
-    IdealImuInterval ideal;
-    return generate(previous, current, increment, ideal);
+    ImuInterval interval;
+    return generate(previous, current, increment, interval);
 }
 
-bool ImuSimulator::generate(const TruthSample& previous,
-                            const TruthSample& current,
-                            ImuIncrement& increment,
-                            IdealImuInterval& ideal)
+template<bool OutputConingScullingCompensated>
+bool ImuSimulator<OutputConingScullingCompensated>::generate(const TruthSample& previous,
+                                                             const TruthSample& current,
+                                                             ImuIncrement& increment,
+                                                             ImuInterval& interval)
 {
-    if (!ideal_interval_from_truth_ecef(previous, current, ideal)) {
+    ImuIntervalDebug debug{};
+    return generate(previous, current, increment, interval, debug);
+}
+
+template<bool OutputConingScullingCompensated>
+bool ImuSimulator<OutputConingScullingCompensated>::generate(const TruthSample& previous,
+                                                             const TruthSample& current,
+                                                             ImuIncrement& increment,
+                                                             ImuInterval& interval,
+                                                             ImuIntervalDebug& debug)
+{
+    if (!interval_from_truth_ecef(previous, current, interval, debug)) {
         increment = {};
         return false;
     }
 
-    update_biases(ideal.dt_s);
+    update_biases(interval.dt_s);
 
-    const Vec3 gyro_noise = draw_normal_vector(m_cfg.gyro.white_noise_psd / ideal.dt_s);
-    const Vec3 accel_noise = draw_normal_vector(m_cfg.accel.white_noise_psd / ideal.dt_s);
+    const Vec3 gyro_noise = draw_normal_vector(m_cfg.gyro.white_noise_psd / interval.dt_s);
+    const Vec3 accel_noise = draw_normal_vector(m_cfg.accel.white_noise_psd / interval.dt_s);
 
-    const Vec3 raw_gyro_radps = calibration_matrix_apply(ideal.omega_ib_b_radps, m_cfg.gyro) +
+    const Vec3 raw_gyro_radps = calibration_matrix_apply(interval.omega_ib_b_radps, m_cfg.gyro) +
                                 m_gyro_bias_radps + gyro_noise;
     const Vec3 raw_accel_mps2 =
-        calibration_matrix_apply(ideal.specific_force_ib_b_mps2, m_cfg.accel) + m_accel_bias_mps2 +
-        accel_noise;
+        calibration_matrix_apply(interval.specific_force_ib_b_mps2, m_cfg.accel) +
+        m_accel_bias_mps2 + accel_noise;
 
     increment = {};
-    increment.time_s = ideal.time_s;
-    increment.dt_s = ideal.dt_s;
-    increment.delta_theta_ib_b_rad = quantize(raw_gyro_radps * ideal.dt_s, m_cfg.gyro.quantization);
-    increment.delta_v_ib_b_mps = quantize(raw_accel_mps2 * ideal.dt_s, m_cfg.accel.quantization);
+    increment.time_s = interval.time_s;
+    increment.dt_s = interval.dt_s;
+    increment.delta_theta_ib_b_rad =
+        quantize(raw_gyro_radps * interval.dt_s, m_cfg.gyro.quantization);
+    increment.delta_v_ib_b_mps = quantize(raw_accel_mps2 * interval.dt_s, m_cfg.accel.quantization);
     return true;
 }
 
-void ImuSimulator::initialize(const TruthSample& initial)
+template<bool OutputConingScullingCompensated>
+void ImuSimulator<OutputConingScullingCompensated>::initialize(const TruthSample& initial)
 {
     m_previous = initial;
     m_initialized = true;
 }
 
-bool ImuSimulator::generate(const TruthSample& current, ImuIncrement& increment)
+template<bool OutputConingScullingCompensated>
+bool ImuSimulator<OutputConingScullingCompensated>::generate(const TruthSample& current,
+                                                             ImuIncrement& increment)
 {
-    IdealImuInterval ideal;
-    return generate(current, increment, ideal);
+    ImuInterval interval;
+    return generate(current, increment, interval);
 }
 
-bool ImuSimulator::generate(const TruthSample& current,
-                            ImuIncrement& increment,
-                            IdealImuInterval& ideal)
+template<bool OutputConingScullingCompensated>
+bool ImuSimulator<OutputConingScullingCompensated>::generate(const TruthSample& current,
+                                                             ImuIncrement& increment,
+                                                             ImuInterval& interval)
+{
+    ImuIntervalDebug debug{};
+    return generate(current, increment, interval, debug);
+}
+
+template<bool OutputConingScullingCompensated>
+bool ImuSimulator<OutputConingScullingCompensated>::generate(const TruthSample& current,
+                                                             ImuIncrement& increment,
+                                                             ImuInterval& interval,
+                                                             ImuIntervalDebug& debug)
 {
     if (!m_initialized) {
         increment = {};
-        ideal = {};
+        interval = {};
+        debug = {};
         return false;
     }
 
-    if (!generate(m_previous, current, increment, ideal)) {
+    if (!generate(m_previous, current, increment, interval, debug)) {
         return false;
     }
     m_previous = current;
     return true;
 }
 
-Vec3 ImuSimulator::draw_normal_vector(const Vec3& covariance_diag)
+template<bool OutputConingScullingCompensated>
+Vec3 ImuSimulator<OutputConingScullingCompensated>::draw_normal_vector(const Vec3& covariance_diag)
 {
     return draw_normal_diag_cov<3>(covariance_diag, m_rng);
 }
 
-void ImuSimulator::update_biases(Time_t dt_s)
+template<bool OutputConingScullingCompensated>
+void ImuSimulator<OutputConingScullingCompensated>::update_biases(Time_t dt_s)
 {
     m_gyro_bias_radps += draw_normal_vector(m_cfg.gyro.bias_random_walk_psd * dt_s);
     m_accel_bias_mps2 += draw_normal_vector(m_cfg.accel.bias_random_walk_psd * dt_s);
 }
+
+template class ImuSimulator<false>;
+template class ImuSimulator<true>;
 
 } // namespace navkit::sim

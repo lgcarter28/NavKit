@@ -45,6 +45,32 @@ def load_build_manifest(build_dir: Path) -> dict[str, object]:
     return json.loads(manifest_path.read_text(encoding="utf-8"))
 
 
+def merge_json_object(source: dict[str, object], target: dict[str, object]) -> None:
+    for key, value in source.items():
+        if key == "components":
+            continue
+        existing = target.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            merge_json_object(value, existing)
+        else:
+            target[key] = value
+
+
+def load_runtime_config(path: Path) -> dict[str, object]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    merged: dict[str, object] = {}
+    components = raw.get("components", [])
+    if components:
+        if not isinstance(components, list):
+            raise ValueError("runtime config 'components' must be a list")
+        for component in components:
+            if not isinstance(component, str):
+                raise ValueError("runtime config component entries must be strings")
+            merge_json_object(load_runtime_config(path.parent / component), merged)
+    merge_json_object(raw, merged)
+    return merged
+
+
 def build_manifest_path(build_dir: Path) -> Path:
     return build_dir / "navkit_build_manifest.json"
 
@@ -88,7 +114,7 @@ def main() -> int:
         help="Compile-time config header relative to config/compiletime.",
     )
     parser.add_argument(
-        "--config", type=Path, default=Path("config/runtime/navkit_sim/stationary_gnss.json")
+        "--config", type=Path, default=Path("config/runtime/navkit_sim/ecef_ins_gnss.json")
     )
     parser.add_argument(
         "--no-timing-report",
@@ -114,12 +140,14 @@ def main() -> int:
     build_manifest = load_build_manifest(build_dir)
     navkit_config = str(build_manifest.get("navkit_config", "unknown"))
 
-    runtime_config = json.loads(args.config.read_text(encoding="utf-8"))
-    run_name = runtime_config.get("run_name", "stationary_gnss_demo")
+    runtime_config = load_runtime_config(args.config)
+    run_name = runtime_config.get("run_name", "ecef_ins_gnss_demo")
     output_dir = Path(runtime_config.get("output_dir", f"output/logs/{run_name}"))
-    timing_path = output_dir / "timing.json"
+    data_dir = output_dir / "data"
+    timing_path = data_dir / "timing.json"
+    data_dir.mkdir(parents=True, exist_ok=True)
 
-    if not remove_stale_profile_artifacts(output_dir):
+    if not remove_stale_profile_artifacts(data_dir):
         return 1
 
     exe = default_exe(build_dir, args.build_type)
@@ -143,7 +171,7 @@ def main() -> int:
         print()
         print_command_timing(command_name, record)
 
-    profile_path = output_dir / "profile.csv"
+    profile_path = data_dir / "profile.csv"
     if return_code == 0 and profile_path.exists():
         records = load_profile_csv(profile_path)
         run_manifest = load_profile_run_manifest(default_profile_run_manifest_path(profile_path))

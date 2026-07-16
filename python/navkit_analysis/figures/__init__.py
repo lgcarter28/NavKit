@@ -22,7 +22,9 @@ from navkit_analysis.figures.state_errors import (
     plot_filter_corrections,
     plot_imu_bias_truth_errors,
     plot_truth_errors,
+    plot_truth_errors_ecef,
     plot_truth_errors_ned,
+    plot_truth_errors_ned_dashboard,
 )
 
 __all__ = [
@@ -36,5 +38,7 @@ __all__ = [
     "plot_imu_increment_time_histories",
     "plot_position_error_covariance",
     "plot_truth_errors",
+    "plot_truth_errors_ecef",
     "plot_truth_errors_ned",
+    "plot_truth_errors_ned_dashboard",
 ]

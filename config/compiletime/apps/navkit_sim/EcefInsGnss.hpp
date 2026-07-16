@@ -17,7 +17,7 @@
 #include "navkit/io/log_products/ImuIncrementLogProduct.hpp"
 #include "navkit/io/log_products/NavEstimateLogProduct.hpp"
 #include "navkit/io/log_products/TruthLogProduct.hpp"
-#include "navkit/products/StationaryGnss.hpp"
+#include "navkit/products/EcefInsGnss.hpp"
 #include "navkit/sim/ImuSimulator.hpp"
 
 #include <tuple>
@@ -25,9 +25,9 @@
 namespace navkit::config::apps::navkit_sim
 {
 
-struct StationaryGnssConfig
+struct EcefInsGnssConfig
 {
-    using NavKit = ::navkit::config::navkit::StationaryGnssConfig;
+    using NavKit = ::navkit::config::navkit::EcefInsGnssConfig;
 
     using PrimaryGnssSensor = typename NavKit::PrimaryGnssSensor;
     using PrimaryGnssEmulator = ::navkit::app_support::GnssEmulator<PrimaryGnssSensor::Id>;
@@ -39,7 +39,8 @@ struct StationaryGnssConfig
     using StateDef = typename NavKit::StateDef;
 
     using EmulatorBindings = std::tuple<PrimaryGnssBinding>;
-    using ImuSimulator = ::navkit::sim::ImuSimulator;
+    using ImuSimulator =
+        ::navkit::sim::ImuSimulator<!NavKit::Propagation::apply_coning_sculling_compensation>;
 
     using NavInitializationProvider = ::navkit::app_support::PvaExplicitInitializationProvider;
     using TransferAlignmentProvider = ::navkit::app_support::NoTransferAlignmentProvider;
@@ -52,7 +53,7 @@ struct StationaryGnssConfig
                                 ::navkit::io::ImuDebugLogProduct,
                                 ::navkit::io::FilterCorrectionLogProduct<StateDef, Filter>,
                                 ::navkit::io::GnssPositionUpdateLogProduct<PrimaryGnssStatistics>>;
-    using App = ::navkit::app_support::SimulationApp<StationaryGnssConfig>;
+    using App = ::navkit::app_support::SimulationApp<EcefInsGnssConfig>;
 };
 
 } // namespace navkit::config::apps::navkit_sim
@@ -60,6 +61,6 @@ struct StationaryGnssConfig
 namespace navkit::config
 {
 
-using SelectedConfig = apps::navkit_sim::StationaryGnssConfig;
+using SelectedConfig = apps::navkit_sim::EcefInsGnssConfig;
 
 } // namespace navkit::config

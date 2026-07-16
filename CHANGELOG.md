@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to NavKit will be documented in this file.
 
@@ -85,7 +85,7 @@ This project follows
 - Clarified that same-named NavKit and app compile-time config files are expected when separated by ownership directories, and documented how runtime JSON links to the selected app/NavKit composition.
 - Replaced the bespoke stationary GNSS app runner with the generic simulation app loop while preserving stationary GNSS log/profile behavior.
 - Moved runnable NavKit product graph aliases into reusable NavKit configs and collapsed app configs to `NavKit` plus explicit `EmulatorBindings`.
-- Renamed the profiled reusable NavKit GNSS config to `ProfiledStationaryGnss.hpp` to match the app-level selected config name.
+- Renamed the profiled reusable NavKit GNSS config to `ProfiledEcefInsGnss.hpp` to match the app-level selected config name.
 - Replaced app-facing sensor-index wiring with configured `Sensor::Id` values, emulator-owned stream IDs, explicit `(Emulator, Sensor)` bindings, and tuple helpers for ID-based lookup.
 - Replaced derived `MeasurementModels` config aliases with explicit `MeasurementStatisticsTuple` aliases keyed by configured sensor types.
 - Split app-support policy concepts into standalone headers and constrained simulation app configs, emulator bindings, emulator runtime plumbing, runtime validation, measurement models, and Navigator sensor processing on their real concept boundaries.
@@ -104,8 +104,8 @@ This project follows
 - Renamed compile-time config constants such as GNSS sensor IDs and buffer sizes to snake_case while keeping type aliases in PascalCase.
 - Refactored stationary simulation logging so `RunLogger` coordinates composable log-product adapters while app compile-time configs explicitly select the logger type.
 - Added payload-specific log-product concepts and CSV schema helpers so logging adapters expose explicit serialization boundaries.
-- Reworked `RunLogger` into a compile-time log-product tuple façade with typed payload dispatch, selected-product metadata emission, and generic app-support measurement-statistics logging.
-- Moved logger composition into app compile-time configs, added logger lifecycle/payload/product-access concepts, and made `RunLogger<...>` the generic log-product tuple façade.
+- Reworked `RunLogger` into a compile-time log-product tuple faÃ§ade with typed payload dispatch, selected-product metadata emission, and generic app-support measurement-statistics logging.
+- Moved logger composition into app compile-time configs, added logger lifecycle/payload/product-access concepts, and made `RunLogger<...>` the generic log-product tuple faÃ§ade.
 - Removed public `MeasurementStatisticsTuple` aliases from reusable product configs; `KalmanFilter` now derives filter-owned diagnostics storage from the configured `Sensors` tuple and exposes `measurement_statistics_available<Sensor>()`.
 - Added sensor diagnostics configuration and disabled-statistics coverage while keeping measurement statistics keyed by configured sensor type.
 - Installed Ninja through bootstrap as a local compile-database convenience for optional Windows clang-tidy diagnostics.
@@ -211,3 +211,4 @@ developed software platform.
 - Template metaprogramming issues
 - Logging architecture
 - Plotting infrastructure
+

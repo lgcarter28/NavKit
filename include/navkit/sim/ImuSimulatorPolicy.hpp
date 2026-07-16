@@ -17,11 +17,18 @@ concept ImuSimulatorPolicy = std::constructible_from<Candidate, ImuSimulatorConf
                              requires(Candidate& simulator,
                                       const TruthSample& truth,
                                       navkit::core::estimation::ImuIncrement& increment,
-                                      IdealImuInterval& ideal) {
+                                      ImuInterval& interval,
+                                      ImuIntervalDebug& debug) {
+                                 {
+                                     Candidate::output_coning_sculling_compensated_v
+                                 } -> std::convertible_to<bool>;
                                  { simulator.initialize(truth) } -> std::same_as<void>;
                                  { simulator.generate(truth, increment) } -> std::same_as<bool>;
                                  {
-                                     simulator.generate(truth, increment, ideal)
+                                     simulator.generate(truth, increment, interval)
+                                 } -> std::same_as<bool>;
+                                 {
+                                     simulator.generate(truth, increment, interval, debug)
                                  } -> std::same_as<bool>;
                              };
 

@@ -2,60 +2,60 @@
   "version": 4,
   "configurePresets": [
     {
-      "name": "debug-stationary-gnss",
-      "displayName": "Debug - navkit_sim StationaryGnss",
-      "binaryDir": "${sourceDir}/build/debug/apps/navkit_sim/StationaryGnss",
+      "name": "debug-ecef-ins-gnss",
+      "displayName": "Debug - navkit_sim EcefInsGnss",
+      "binaryDir": "${sourceDir}/build/debug/apps/navkit_sim/EcefInsGnss",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/debug/apps/navkit_sim/StationaryGnss/build/Debug/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "apps/navkit_sim/StationaryGnss.hpp"
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/debug/apps/navkit_sim/EcefInsGnss/build/Debug/generators/conan_toolchain.cmake",
+        "NAVKIT_CONFIG": "apps/navkit_sim/EcefInsGnss.hpp"
       }
     },
     {
-      "name": "debug-profiled-stationary-gnss",
-      "displayName": "Debug - navkit_sim ProfiledStationaryGnss",
-      "binaryDir": "${sourceDir}/build/debug/apps/navkit_sim/ProfiledStationaryGnss",
+      "name": "debug-profiled-ecef-ins-gnss",
+      "displayName": "Debug - navkit_sim ProfiledEcefInsGnss",
+      "binaryDir": "${sourceDir}/build/debug/apps/navkit_sim/ProfiledEcefInsGnss",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/debug/apps/navkit_sim/ProfiledStationaryGnss/build/Debug/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "apps/navkit_sim/ProfiledStationaryGnss.hpp"
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/debug/apps/navkit_sim/ProfiledEcefInsGnss/build/Debug/generators/conan_toolchain.cmake",
+        "NAVKIT_CONFIG": "apps/navkit_sim/ProfiledEcefInsGnss.hpp"
       }
     },
     {
-      "name": "release-stationary-gnss",
-      "displayName": "Release - navkit_sim StationaryGnss",
-      "binaryDir": "${sourceDir}/build/release/apps/navkit_sim/StationaryGnss",
+      "name": "release-ecef-ins-gnss",
+      "displayName": "Release - navkit_sim EcefInsGnss",
+      "binaryDir": "${sourceDir}/build/release/apps/navkit_sim/EcefInsGnss",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/release/apps/navkit_sim/StationaryGnss/build/Release/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "apps/navkit_sim/StationaryGnss.hpp"
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/release/apps/navkit_sim/EcefInsGnss/build/Release/generators/conan_toolchain.cmake",
+        "NAVKIT_CONFIG": "apps/navkit_sim/EcefInsGnss.hpp"
       }
     },
     {
-      "name": "release-profiled-stationary-gnss",
-      "displayName": "Release - navkit_sim ProfiledStationaryGnss",
-      "binaryDir": "${sourceDir}/build/release/apps/navkit_sim/ProfiledStationaryGnss",
+      "name": "release-profiled-ecef-ins-gnss",
+      "displayName": "Release - navkit_sim ProfiledEcefInsGnss",
+      "binaryDir": "${sourceDir}/build/release/apps/navkit_sim/ProfiledEcefInsGnss",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/release/apps/navkit_sim/ProfiledStationaryGnss/build/Release/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "apps/navkit_sim/ProfiledStationaryGnss.hpp"
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/release/apps/navkit_sim/ProfiledEcefInsGnss/build/Release/generators/conan_toolchain.cmake",
+        "NAVKIT_CONFIG": "apps/navkit_sim/ProfiledEcefInsGnss.hpp"
       }
     }
   ],
   "buildPresets": [
-    { "name": "debug-stationary-gnss", "configurePreset": "debug-stationary-gnss" },
-    { "name": "debug-profiled-stationary-gnss", "configurePreset": "debug-profiled-stationary-gnss" },
-    { "name": "release-stationary-gnss", "configurePreset": "release-stationary-gnss" },
-    { "name": "release-profiled-stationary-gnss", "configurePreset": "release-profiled-stationary-gnss" }
+    { "name": "debug-ecef-ins-gnss", "configurePreset": "debug-ecef-ins-gnss" },
+    { "name": "debug-profiled-ecef-ins-gnss", "configurePreset": "debug-profiled-ecef-ins-gnss" },
+    { "name": "release-ecef-ins-gnss", "configurePreset": "release-ecef-ins-gnss" },
+    { "name": "release-profiled-ecef-ins-gnss", "configurePreset": "release-profiled-ecef-ins-gnss" }
   ],
   "testPresets": [
-    { "name": "debug-stationary-gnss", "configurePreset": "debug-stationary-gnss" },
-    { "name": "debug-profiled-stationary-gnss", "configurePreset": "debug-profiled-stationary-gnss" },
-    { "name": "release-stationary-gnss", "configurePreset": "release-stationary-gnss" },
-    { "name": "release-profiled-stationary-gnss", "configurePreset": "release-profiled-stationary-gnss" }
+    { "name": "debug-ecef-ins-gnss", "configurePreset": "debug-ecef-ins-gnss" },
+    { "name": "debug-profiled-ecef-ins-gnss", "configurePreset": "debug-profiled-ecef-ins-gnss" },
+    { "name": "release-ecef-ins-gnss", "configurePreset": "release-ecef-ins-gnss" },
+    { "name": "release-profiled-ecef-ins-gnss", "configurePreset": "release-profiled-ecef-ins-gnss" }
   ]
 }

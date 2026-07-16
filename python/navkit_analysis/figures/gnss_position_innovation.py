@@ -80,6 +80,6 @@ def plot_gnss_position_innovation(run: RunData, save: bool = True) -> plt.Figure
     axes[-1].set_xlabel("Time [s]")
 
     if save:
-        save_figure(fig, run.run_dir / "gnss_position_innovation.png")
+        save_figure(fig, run.figures_dir / "gnss_position_innovation_ecef.png")
 
     return fig

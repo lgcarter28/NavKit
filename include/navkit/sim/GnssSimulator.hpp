@@ -21,6 +21,7 @@ struct GnssSimulatorConfig
     Scalar_t sigma_h_m{3.0};
     Scalar_t sigma_v_m{5.0};
     unsigned int seed{42U};
+    bool noise_enabled{true};
 };
 
 class GnssSimulator

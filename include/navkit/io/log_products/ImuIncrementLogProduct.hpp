@@ -58,19 +58,19 @@ public:
 
     void log(const ImuIncrementLogPayload& payload)
     {
-        m_truth_delta_theta_sum += payload.ideal.delta_theta_ib_b_rad;
-        m_truth_delta_v_sum += payload.ideal.delta_v_ib_b_mps;
+        m_truth_delta_theta_sum += payload.truth.delta_theta_ib_b_rad;
+        m_truth_delta_v_sum += payload.truth.delta_v_ib_b_mps;
         m_measured_delta_theta_sum += payload.measured.delta_theta_ib_b_rad;
         m_measured_delta_v_sum += payload.measured.delta_v_ib_b_mps;
 
         m_csv.write_row(payload.measured.time_s,
                         payload.measured.dt_s,
-                        payload.ideal.delta_theta_ib_b_rad.x(),
-                        payload.ideal.delta_theta_ib_b_rad.y(),
-                        payload.ideal.delta_theta_ib_b_rad.z(),
-                        payload.ideal.delta_v_ib_b_mps.x(),
-                        payload.ideal.delta_v_ib_b_mps.y(),
-                        payload.ideal.delta_v_ib_b_mps.z(),
+                        payload.truth.delta_theta_ib_b_rad.x(),
+                        payload.truth.delta_theta_ib_b_rad.y(),
+                        payload.truth.delta_theta_ib_b_rad.z(),
+                        payload.truth.delta_v_ib_b_mps.x(),
+                        payload.truth.delta_v_ib_b_mps.y(),
+                        payload.truth.delta_v_ib_b_mps.z(),
                         payload.measured.delta_theta_ib_b_rad.x(),
                         payload.measured.delta_theta_ib_b_rad.y(),
                         payload.measured.delta_theta_ib_b_rad.z(),

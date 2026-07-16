@@ -34,6 +34,7 @@ struct GnssEmulator
         detail::require_optional_nonnegative_number(gnss, "sigma_h_m");
         detail::require_optional_nonnegative_number(gnss, "sigma_v_m");
         detail::require_optional_unsigned_integer(gnss, "seed");
+        detail::require_optional_bool(gnss, "noise_enabled");
     }
 
     static RuntimeConfig runtime_config_from_json(const nlohmann::json& cfg)
@@ -44,6 +45,7 @@ struct GnssEmulator
         gnss_cfg.sigma_h_m = gnss_config.value("sigma_h_m", 3.0);
         gnss_cfg.sigma_v_m = gnss_config.value("sigma_v_m", 5.0);
         gnss_cfg.seed = gnss_config.value("seed", 42U);
+        gnss_cfg.noise_enabled = gnss_config.value("noise_enabled", true);
         return gnss_cfg;
     }
 

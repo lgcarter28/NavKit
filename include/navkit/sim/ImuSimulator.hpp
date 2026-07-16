@@ -36,35 +36,47 @@ struct ImuTriadErrorConfig
 struct ImuSimulatorConfig
 {
     unsigned int seed{42U};
-    bool output_coning_sculling_compensated{false};
     ImuTriadErrorConfig gyro{};
     ImuTriadErrorConfig accel{};
 };
 
-struct IdealImuInterval
+struct ImuInterval
 {
     Time_t time_s{0.0};
     Time_t dt_s{0.0};
+    Vec3 omega_ib_b_radps{Vec3::Zero()};
+    Vec3 specific_force_ib_b_mps2{Vec3::Zero()};
+};
+
+struct ImuIntervalDebug
+{
+    ImuInterval interval{};
     Vec3 p_bar_e_m{Vec3::Zero()};
     Vec3 v_bar_e_mps{Vec3::Zero()};
     Vec3 a_bar_e_mps2{Vec3::Zero()};
     Vec3 gravity_e_mps2{Vec3::Zero()};
     Vec3 specific_force_e_mps2{Vec3::Zero()};
-    Vec3 omega_ib_b_radps{Vec3::Zero()};
-    Vec3 specific_force_ib_b_mps2{Vec3::Zero()};
     Vec3 delta_theta_eb_b_rad{Vec3::Zero()};
-    Vec3 delta_theta_ib_b_rad{Vec3::Zero()};
-    Vec3 delta_v_ib_b_mps{Vec3::Zero()};
 };
 
+template<bool OutputConingScullingCompensated = false>
 class ImuSimulator
 {
 public:
+    static constexpr bool output_coning_sculling_compensated_v = OutputConingScullingCompensated;
+
     explicit ImuSimulator(const ImuSimulatorConfig& cfg = {});
 
-    [[nodiscard]] static bool ideal_interval_from_truth_ecef(const TruthSample& previous,
-                                                             const TruthSample& current,
-                                                             IdealImuInterval& interval);
+    [[nodiscard]] static ImuIncrement increment_from_interval(const ImuInterval& interval);
+
+    [[nodiscard]] static bool interval_from_truth_ecef(const TruthSample& previous,
+                                                       const TruthSample& current,
+                                                       ImuInterval& interval);
+
+    [[nodiscard]] static bool interval_from_truth_ecef(const TruthSample& previous,
+                                                       const TruthSample& current,
+                                                       ImuInterval& interval,
+                                                       ImuIntervalDebug& debug);
 
     [[nodiscard]] static Vec3 calibration_matrix_apply(const Vec3& input,
                                                        const ImuTriadErrorConfig& config);
@@ -77,14 +89,25 @@ public:
     [[nodiscard]] bool generate(const TruthSample& previous,
                                 const TruthSample& current,
                                 ImuIncrement& increment,
-                                IdealImuInterval& ideal);
+                                ImuInterval& interval);
+
+    [[nodiscard]] bool generate(const TruthSample& previous,
+                                const TruthSample& current,
+                                ImuIncrement& increment,
+                                ImuInterval& interval,
+                                ImuIntervalDebug& debug);
 
     void initialize(const TruthSample& initial);
 
     [[nodiscard]] bool generate(const TruthSample& current, ImuIncrement& increment);
 
     [[nodiscard]] bool
-    generate(const TruthSample& current, ImuIncrement& increment, IdealImuInterval& ideal);
+    generate(const TruthSample& current, ImuIncrement& increment, ImuInterval& interval);
+
+    [[nodiscard]] bool generate(const TruthSample& current,
+                                ImuIncrement& increment,
+                                ImuInterval& interval,
+                                ImuIntervalDebug& debug);
 
     [[nodiscard]] const Vec3& gyro_bias_radps() const
     {
@@ -98,7 +121,7 @@ public:
 
     [[nodiscard]] bool output_coning_sculling_compensated() const
     {
-        return m_cfg.output_coning_sculling_compensated;
+        return output_coning_sculling_compensated_v;
     }
 
 private:

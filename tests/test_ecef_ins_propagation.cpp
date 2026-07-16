@@ -77,7 +77,7 @@ void initialize_stationary_filter(StationaryFilter& filter)
 
 [[nodiscard]] bool ideal_stationary_increment(ImuIncrement& increment)
 {
-    sim::ImuSimulator simulator;
+    sim::ImuSimulator<> simulator;
     simulator.initialize(stationary_sample(0.0));
     return simulator.generate(stationary_sample(1.0), increment);
 }
@@ -136,7 +136,7 @@ TEST_CASE("Ideal stationary ECEF IMU increments keep pure strapdown bounded at 1
     StationaryFilter filter;
     initialize_stationary_filter(filter);
 
-    sim::ImuSimulator simulator;
+    sim::ImuSimulator<> simulator;
     simulator.initialize(stationary_sample(0.0));
 
     constexpr Time_t dt_s = 0.001;

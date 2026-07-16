@@ -32,8 +32,6 @@ void validate_emulator_runtime_config(const nlohmann::json& cfg, std::index_sequ
 template<SimulationAppConfigPolicy Config>
 void validate_runtime_config(const nlohmann::json& cfg)
 {
-    using NavKit = typename Config::NavKit;
-    using Propagation = typename NavKit::Propagation;
     using EmulatorBindings = typename Config::EmulatorBindings;
     using NavInitializationProvider = typename Config::NavInitializationProvider;
     using TransferAlignmentProvider = typename Config::TransferAlignmentProvider;
@@ -107,14 +105,6 @@ void validate_runtime_config(const nlohmann::json& cfg)
     detail::validate_emulator_runtime_config<EmulatorBindings>(
         cfg, std::make_index_sequence<std::tuple_size_v<EmulatorBindings>>{});
     validate_imu_runtime_config(cfg);
-    if constexpr (requires { Propagation::apply_coning_sculling_compensation; }) {
-        if (imu_outputs_coning_sculling_compensated(cfg) &&
-            Propagation::apply_coning_sculling_compensation) {
-            detail::throw_runtime_config_error(
-                "imu.output_coning_sculling_compensated cannot be true when the selected "
-                "propagation policy also applies coning/sculling compensation");
-        }
-    }
 
     NavInitializationProvider::validate_runtime_config(cfg);
     TransferAlignmentProvider::validate_runtime_config(cfg);

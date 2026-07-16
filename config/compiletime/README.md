@@ -9,15 +9,15 @@ This directory contains repository-provided C++ configuration headers.
 
 The `navkit/` and `apps/` trees are intentionally separate. It is normal for
 both trees to contain the same descriptive file name, such as
-`StationaryGnss.hpp`: the NavKit product file owns reusable library
+`EcefInsGnss.hpp`: the NavKit product file owns reusable library
 configuration, while the app file owns the executable composition that links a
 NavKit config to an app runner.
 
 Provided `NAVKIT_CONFIG` selections:
 
-- `apps/navkit_sim/StationaryGnss.hpp`: default stationary GNSS demo app using
+- `apps/navkit_sim/EcefInsGnss.hpp`: default stationary GNSS demo app using
   the unprofiled NavKit GNSS library config.
-- `apps/navkit_sim/ProfiledStationaryGnss.hpp`: same app shape, but consumes a
+- `apps/navkit_sim/ProfiledEcefInsGnss.hpp`: same app shape, but consumes a
   profiled NavKit GNSS library config with a host microsecond clock,
   fixed-capacity profiling ring-buffer sink, and scoped profiler so the app
   emits `profile.csv`.

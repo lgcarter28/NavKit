@@ -31,7 +31,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--navkit-config",
-        default="apps/navkit_sim/StationaryGnss.hpp",
+        default="apps/navkit_sim/EcefInsGnss.hpp",
         help="Compile-time config header relative to config/compiletime.",
     )
     parser.add_argument(

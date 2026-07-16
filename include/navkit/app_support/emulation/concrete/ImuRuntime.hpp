@@ -17,7 +17,9 @@ namespace navkit::app_support
 struct ImuRuntimeSample
 {
     bool generated{false};
-    navkit::sim::IdealImuInterval ideal{};
+    navkit::sim::ImuInterval interval{};
+    navkit::sim::ImuIntervalDebug debug{};
+    core::estimation::ImuIncrement truth{};
     core::estimation::ImuIncrement measured{};
     core::Vec3 gyro_bias_truth_radps{core::Vec3::Zero()};
     core::Vec3 accel_bias_truth_mps2{core::Vec3::Zero()};
@@ -50,8 +52,9 @@ public:
         }
 
         core::estimation::ImuIncrement increment;
-        navkit::sim::IdealImuInterval ideal;
-        if (!m_simulator.generate(sample, increment, ideal)) {
+        navkit::sim::ImuInterval interval;
+        navkit::sim::ImuIntervalDebug debug;
+        if (!m_simulator.generate(sample, increment, interval, debug)) {
             m_last_error = "failed to generate IMU increment";
             output = {};
             return false;
@@ -63,7 +66,9 @@ public:
         }
         output = {};
         output.generated = true;
-        output.ideal = ideal;
+        output.interval = interval;
+        output.debug = debug;
+        output.truth = ImuSimulator::increment_from_interval(interval);
         output.measured = increment;
         output.gyro_bias_truth_radps = m_simulator.gyro_bias_radps();
         output.accel_bias_truth_mps2 = m_simulator.accel_bias_mps2();

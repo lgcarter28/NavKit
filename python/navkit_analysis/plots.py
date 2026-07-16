@@ -34,7 +34,9 @@ from navkit_analysis.figures import (
     plot_imu_increment_time_histories,
     plot_position_error_covariance,
     plot_truth_errors,
+    plot_truth_errors_ecef,
     plot_truth_errors_ned,
+    plot_truth_errors_ned_dashboard,
 )
 from navkit_analysis.style import apply_style
 
@@ -55,6 +57,7 @@ def plot_run(run_dir: Path, save: bool = True) -> list[plt.Figure]:
         plot_gnss_position_histograms(run_data, save=save),
         plot_filter_corrections(run_data, save=save),
         plot_truth_errors(run_data, save=save),
+        plot_truth_errors_ned_dashboard(run_data, save=save),
     ]
 
     figures = [fig for fig in maybe_figures if fig is not None]
@@ -62,6 +65,7 @@ def plot_run(run_dir: Path, save: bool = True) -> list[plt.Figure]:
     figures.extend(plot_imu_increment_cumsums(run_data, save=save))
     figures.extend(plot_imu_debug_terms(run_data, save=save))
     figures.extend(plot_imu_bias_truth_errors(run_data, save=save))
+    figures.extend(plot_truth_errors_ecef(run_data, save=save))
     figures.extend(plot_truth_errors_ned(run_data, save=save))
 
     return figures
@@ -88,6 +92,9 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     args = parser.parse_args(argv)
+
+    if not args.show:
+        plt.rcParams["figure.max_open_warning"] = 0
 
     figures = plot_run(args.run_dir, save=not args.no_save)
 

@@ -17,7 +17,7 @@
 #include "navkit/io/log_products/ImuIncrementLogProduct.hpp"
 #include "navkit/io/log_products/NavEstimateLogProduct.hpp"
 #include "navkit/io/log_products/TruthLogProduct.hpp"
-#include "navkit/products/ProfiledStationaryGnss.hpp"
+#include "navkit/products/ProfiledEcefInsGnss.hpp"
 #include "navkit/sim/ImuSimulator.hpp"
 
 #include <tuple>
@@ -25,9 +25,9 @@
 namespace navkit::config::apps::navkit_sim
 {
 
-struct ProfiledStationaryGnssConfig
+struct ProfiledEcefInsGnssConfig
 {
-    using NavKit = ::navkit::config::navkit::ProfiledStationaryGnssConfig;
+    using NavKit = ::navkit::config::navkit::ProfiledEcefInsGnssConfig;
 
     using PrimaryGnssSensor = typename NavKit::PrimaryGnssSensor;
     using PrimaryGnssEmulator = ::navkit::app_support::GnssEmulator<PrimaryGnssSensor::Id>;
@@ -39,7 +39,8 @@ struct ProfiledStationaryGnssConfig
     using StateDef = typename NavKit::StateDef;
 
     using EmulatorBindings = std::tuple<PrimaryGnssBinding>;
-    using ImuSimulator = ::navkit::sim::ImuSimulator;
+    using ImuSimulator =
+        ::navkit::sim::ImuSimulator<!NavKit::Propagation::apply_coning_sculling_compensation>;
 
     using NavInitializationProvider = ::navkit::app_support::PvaExplicitInitializationProvider;
     using TransferAlignmentProvider = ::navkit::app_support::NoTransferAlignmentProvider;
@@ -52,7 +53,7 @@ struct ProfiledStationaryGnssConfig
                                 ::navkit::io::ImuDebugLogProduct,
                                 ::navkit::io::FilterCorrectionLogProduct<StateDef, Filter>,
                                 ::navkit::io::GnssPositionUpdateLogProduct<PrimaryGnssStatistics>>;
-    using App = ::navkit::app_support::SimulationApp<ProfiledStationaryGnssConfig>;
+    using App = ::navkit::app_support::SimulationApp<ProfiledEcefInsGnssConfig>;
 };
 
 } // namespace navkit::config::apps::navkit_sim
@@ -60,6 +61,6 @@ struct ProfiledStationaryGnssConfig
 namespace navkit::config
 {
 
-using SelectedConfig = apps::navkit_sim::ProfiledStationaryGnssConfig;
+using SelectedConfig = apps::navkit_sim::ProfiledEcefInsGnssConfig;
 
 } // namespace navkit::config

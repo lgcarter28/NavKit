@@ -107,7 +107,7 @@ Runnable/product NavKit configs also expose the product graph that downstream
 apps consume:
 
 ```cpp
-struct StationaryGnssConfig
+struct EcefInsGnssConfig
 {
     using StateDef = navkit::core::estimation::DefaultInsStateDef;
     using PrimaryGnssMeasurementModel = navkit::core::models::GnssPosModel<StateDef>;
@@ -130,7 +130,7 @@ struct StationaryGnssConfig
     using Navigator = /* concrete navigator type */;
 };
 
-static_assert(navkit::api::config::NavKitProductConfigPolicy<StationaryGnssConfig>);
+static_assert(navkit::api::config::NavKitProductConfigPolicy<EcefInsGnssConfig>);
 ```
 
 `SensorId` gives each configured sensor a stable product-graph identity even
@@ -165,9 +165,9 @@ executables. It consumes a reusable NavKit config and names the app composition
 being built:
 
 ```cpp
-struct StationaryGnssAppConfig
+struct EcefInsGnssAppConfig
 {
-    using NavKit = navkit::config::navkit::StationaryGnssConfig;
+    using NavKit = navkit::config::navkit::EcefInsGnssConfig;
 
     using PrimaryGnssSensor = typename NavKit::PrimaryGnssSensor;
     using PrimaryGnssEmulator = navkit::app_support::GnssEmulator<PrimaryGnssSensor::Id>;
@@ -188,7 +188,7 @@ struct StationaryGnssAppConfig
                               navkit::io::GnssPositionLogProduct,
                               navkit::io::NavEstimateLogProduct,
                               navkit::io::GnssPositionUpdateLogProduct<PrimaryGnssStatistics>>;
-    using App = navkit::app_support::SimulationApp<StationaryGnssAppConfig>;
+    using App = navkit::app_support::SimulationApp<EcefInsGnssAppConfig>;
 };
 ```
 
@@ -218,13 +218,24 @@ silently ignored.
 The built-in PVA initialization providers currently support deterministic
 `"type": "pva_error"` inputs and seeded random `"type": "pva_random"` draws
 from a configured `pva_cov`; selecting which provider is valid is a compile-time
-app-config decision.
+app-config decision. For deterministic PVA errors, vector keys encode the frame
+and units. ECEF-resolved errors use `p_e_m`, `v_e_mps`, and `rotvec_b2e_rad`.
+Local-level errors use `p_n_m`, `v_n_mps`, and `rotvec_b2n_rad`; app support
+converts those relative NED vectors to the internal ECEF-resolved
+initialization convention using the initial truth/reference position. The
+`pva_cov` `diag` or `full` matrix follows the same field ordering and frame
+conventions implied by the selected `pva_error` keys, then is rotated into the
+filter's ECEF-resolved small-angle attitude-error covariance before
+initialization. Random PVA initialization uses the same covariance ordering but
+has no deterministic `pva_error` keys, so `"type": "pva_random"` may provide
+`"pva_error_frame": "ecef"` or `"pva_error_frame": "ned"` to state how the
+configured covariance should be interpreted before sampling.
 
 The app and NavKit config trees are deliberately separate:
 
 ```text
-config/compiletime/navkit/products/StationaryGnss.hpp
-config/compiletime/apps/navkit_sim/StationaryGnss.hpp
+config/compiletime/navkit/products/EcefInsGnss.hpp
+config/compiletime/apps/navkit_sim/EcefInsGnss.hpp
 ```
 
 Using the same descriptive file name in both places is fine because the
@@ -282,14 +293,14 @@ using AppConfig = navkit::selected_config::Config;
 The CMake model is one compile-time configuration per build tree:
 
 ```text
-cmake -S . -B build/debug/apps/navkit_sim/StationaryGnss -G Ninja -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
+cmake -S . -B build/debug/apps/navkit_sim/EcefInsGnss -G Ninja -DNAVKIT_CONFIG=apps/navkit_sim/EcefInsGnss.hpp
 ```
 
 `NAVKIT_CONFIG` is a CMake cache variable relative to `config/compiletime`. It
 has a useful default:
 
 ```text
-apps/navkit_sim/StationaryGnss.hpp
+apps/navkit_sim/EcefInsGnss.hpp
 ```
 
 Debug/Release and `NAVKIT_CONFIG` are separate axes:
@@ -304,11 +315,11 @@ default, repository Python tools derive the build directory from the selected
 config header:
 
 ```text
-apps/navkit_sim/StationaryGnss.hpp
-    -> build/debug/apps/navkit_sim/StationaryGnss
+apps/navkit_sim/EcefInsGnss.hpp
+    -> build/debug/apps/navkit_sim/EcefInsGnss
 
-apps/navkit_sim/ProfiledStationaryGnss.hpp
-    -> build/debug/apps/navkit_sim/ProfiledStationaryGnss
+apps/navkit_sim/ProfiledEcefInsGnss.hpp
+    -> build/debug/apps/navkit_sim/ProfiledEcefInsGnss
 ```
 
 Runtime JSON is still checked against the compiled app composition. For example,
@@ -318,28 +329,33 @@ and `initialization` sections, rejects unsupported `baro` and disabled
 the simulation loop starts. The current initialization provider uses
 `"type": "pva_error"` with nested `pva_error` and `pva_cov` sections so runtime
 inputs describe startup PVA error and covariance explicitly while still passing
-only typed PVA navigation data into the configured Navigator. This validation
-lives in `navkit::app_support` because it is app/runtime-input glue, not
-reusable product-core NavKit configuration.
+only typed PVA navigation data into the configured Navigator. `pva_error` keys
+name the authored convention, for example `p_n_m`, `v_n_mps`, and
+`rotvec_b2n_rad` for intuitive local-level position, velocity, and
+roll/pitch/yaw-like small-angle attitude errors. The covariance section uses the
+same implied order and frame before app support converts it into the internal
+ECEF-resolved state covariance. This validation lives in `navkit::app_support`
+because it is app/runtime-input glue, not reusable product-core NavKit
+configuration.
 
 The Python build wrapper forwards the same selection:
 
 ```text
-python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/StationaryGnss.hpp
+python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/EcefInsGnss.hpp
 ```
 
 The default build directory is already config-rooted. Use `--build-dir` only
 when an explicit custom location is needed:
 
 ```text
-python tools/build.py --build-type Debug --build-dir build/custom/stationary --navkit-config apps/navkit_sim/StationaryGnss.hpp
+python tools/build.py --build-type Debug --build-dir build/custom/stationary --navkit-config apps/navkit_sim/EcefInsGnss.hpp
 ```
 
 Each build directory has its own generated `navkit/SelectedConfig.hpp`, so two
 different selected configs do not fight over the same generated header.
 
 CMake presets can capture common build-type/config pairings. Repository presets
-such as `debug-stationary-gnss` and `release-stationary-gnss` are examples of
+such as `debug-ecef-ins-gnss` and `release-ecef-ins-gnss` are examples of
 that pattern; they do not make Debug/Release part of the config itself.
 
 ## Adding a new compile-time config

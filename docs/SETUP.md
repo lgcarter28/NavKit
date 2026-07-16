@@ -315,17 +315,17 @@ In day-to-day development, `--build-only` is typically sufficient unless CMake c
 
 Select a compile-time configuration with `--navkit-config`. The value is
 relative to `config/compiletime`, and defaults to
-`apps/navkit_sim/StationaryGnss.hpp`:
+`apps/navkit_sim/EcefInsGnss.hpp`:
 
 ```bash
-python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/StationaryGnss.hpp
+python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/EcefInsGnss.hpp
 ```
 
 That app-level selection composes:
 
 ```text
-config/compiletime/apps/navkit_sim/StationaryGnss.hpp
-    -> config/compiletime/navkit/products/StationaryGnss.hpp
+config/compiletime/apps/navkit_sim/EcefInsGnss.hpp
+    -> config/compiletime/navkit/products/EcefInsGnss.hpp
 ```
 
 The app config is the executable composition selected by CMake. The NavKit
@@ -337,12 +337,12 @@ To run the same stationary GNSS scenario with the embedded-style profiling
 configuration:
 
 ```bash
-python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/ProfiledStationaryGnss.hpp
+python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/ProfiledEcefInsGnss.hpp
 python tools/run_first_sim.py --build-type Debug
 ```
 
 That writes `profile.csv` and `profile.trace.json` under
-`output/logs/stationary_gnss_demo/`. The run wrapper reads the selected
+`output/logs/ecef_ins_gnss_demo/`. The run wrapper reads the selected
 compile-time config from the build manifest written by `build.py`; it does not
 reselect compile-time configuration at run time. Use `--no-profile-trace` when
 you want only the compact CSV profile export.
@@ -350,15 +350,15 @@ you want only the compact CSV profile export.
 Use a separate build directory for each selected compile-time configuration:
 
 ```bash
-python tools/build.py --build-type Debug --build-dir build/custom/stationary-gnss --navkit-config apps/navkit_sim/StationaryGnss.hpp
+python tools/build.py --build-type Debug --build-dir build/custom/ecef-ins-gnss --navkit-config apps/navkit_sim/EcefInsGnss.hpp
 ```
 
 The wrapper requires Ninja for its official default layout and derives build
 directories from build type and selected config, for example:
 
 ```text
-build/debug/apps/navkit_sim/StationaryGnss
-build/debug/apps/navkit_sim/ProfiledStationaryGnss
+build/debug/apps/navkit_sim/EcefInsGnss
+build/debug/apps/navkit_sim/ProfiledEcefInsGnss
 ```
 
 This keeps each generated `navkit/SelectedConfig.hpp` isolated. Debug/Release
@@ -377,8 +377,8 @@ the default build tree. When you intentionally keep multiple build trees for
 different selected configs, pass the matching `--build-dir` to the run wrapper.
 
 `CMakePresets.json` also contains example selected-config presets such as
-`debug-stationary-gnss`, `debug-profiled-stationary-gnss`,
-`release-stationary-gnss`, and `release-profiled-stationary-gnss`. As with any
+`debug-ecef-ins-gnss`, `debug-profiled-ecef-ins-gnss`,
+`release-ecef-ins-gnss`, and `release-profiled-ecef-ins-gnss`. As with any
 Conan-backed CMake preset, install dependencies into the preset binary directory
 before configuring if the toolchain file does not exist yet.
 
@@ -424,13 +424,13 @@ The Python wrapper is preferred, but the raw commands are useful for debugging.
 From the repository root, install dependencies with Conan:
 
 ```bash
-conan install . --output-folder build/debug/apps/navkit_sim/StationaryGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Debug
+conan install . --output-folder build/debug/apps/navkit_sim/EcefInsGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Debug
 ```
 
 Conan 2 usually writes the generated CMake toolchain file to:
 
 ```text
-build/debug/apps/navkit_sim/StationaryGnss/build/Debug/generators/conan_toolchain.cmake
+build/debug/apps/navkit_sim/EcefInsGnss/build/Debug/generators/conan_toolchain.cmake
 ```
 
 On Windows with Ninja/MSVC, run the manual CMake configure and build commands
@@ -438,27 +438,27 @@ from a Visual Studio Developer Prompt or first activate Conan's generated build
 environment:
 
 ```powershell
-build\debug\apps\navkit_sim\StationaryGnss\build\Debug\generators\conanbuild.bat
+build\\debug\\apps\\navkit_sim\\EcefInsGnss\build\Debug\generators\conanbuild.bat
 ```
 
 Configure CMake manually:
 
 ```bash
-cmake -S . -B build/debug/apps/navkit_sim/StationaryGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/debug/apps/navkit_sim/StationaryGnss/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
+cmake -S . -B build/debug/apps/navkit_sim/EcefInsGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/debug/apps/navkit_sim/EcefInsGnss/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/EcefInsGnss.hpp
 ```
 
 To select a different compile-time config manually, use a matching build
 directory and `-DNAVKIT_CONFIG=...`:
 
 ```bash
-conan install . --output-folder build/debug/apps/navkit_sim/ProfiledStationaryGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Debug
-cmake -S . -B build/debug/apps/navkit_sim/ProfiledStationaryGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/debug/apps/navkit_sim/ProfiledStationaryGnss/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/ProfiledStationaryGnss.hpp
+conan install . --output-folder build/debug/apps/navkit_sim/ProfiledEcefInsGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Debug
+cmake -S . -B build/debug/apps/navkit_sim/ProfiledEcefInsGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/debug/apps/navkit_sim/ProfiledEcefInsGnss/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/ProfiledEcefInsGnss.hpp
 ```
 
 Build manually:
 
 ```bash
-cmake --build build/debug/apps/navkit_sim/StationaryGnss --config Debug
+cmake --build build/debug/apps/navkit_sim/EcefInsGnss --config Debug
 ```
 
 Install a staged local build when validating the deployable layout:
@@ -470,7 +470,7 @@ python tools/build.py --build-type Debug --build-only --install
 The default install prefix mirrors the selected build:
 
 ```text
-install/debug/apps/navkit_sim/StationaryGnss
+install/debug/apps/navkit_sim/EcefInsGnss
 ```
 
 The install tree contains public headers, exported CMake package files,
@@ -481,9 +481,9 @@ default.
 For Release, replace `Debug` with `Release`:
 
 ```bash
-conan install . --output-folder build/release/apps/navkit_sim/StationaryGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Release
-cmake -S . -B build/release/apps/navkit_sim/StationaryGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/release/apps/navkit_sim/StationaryGnss/build/Release/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DNAVKIT_CONFIG=apps/navkit_sim/StationaryGnss.hpp
-cmake --build build/release/apps/navkit_sim/StationaryGnss --config Release
+conan install . --output-folder build/release/apps/navkit_sim/EcefInsGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Release
+cmake -S . -B build/release/apps/navkit_sim/EcefInsGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/release/apps/navkit_sim/EcefInsGnss/build/Release/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DNAVKIT_CONFIG=apps/navkit_sim/EcefInsGnss.hpp
+cmake --build build/release/apps/navkit_sim/EcefInsGnss --config Release
 ```
 
 Notes:
@@ -507,13 +507,13 @@ If the project has already been built, this runs CTest against the selected buil
 Equivalent raw CTest command:
 
 ```bash
-ctest --test-dir build/debug/apps/navkit_sim/StationaryGnss --output-on-failure -C Debug
+ctest --test-dir build/debug/apps/navkit_sim/EcefInsGnss --output-on-failure -C Debug
 ```
 
 For Release:
 
 ```bash
-ctest --test-dir build/release/apps/navkit_sim/StationaryGnss --output-on-failure -C Release
+ctest --test-dir build/release/apps/navkit_sim/EcefInsGnss --output-on-failure -C Release
 ```
 
 ---
@@ -531,19 +531,19 @@ Or manually, after building:
 Windows Debug:
 
 ```powershell
-build\debug\apps\navkit_sim\StationaryGnss\apps\navkit_sim\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
+build\\debug\\apps\\navkit_sim\\EcefInsGnss\apps\navkit_sim\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
 ```
 
 Windows Release:
 
 ```powershell
-build\release\apps\navkit_sim\StationaryGnss\apps\navkit_sim\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
+build\\release\\apps\\navkit_sim\\EcefInsGnss\apps\navkit_sim\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
 ```
 
 Linux Debug:
 
 ```bash
-build/debug/apps/navkit_sim/StationaryGnss/apps/navkit_sim/navkit_sim config/runtime/navkit_sim/stationary_gnss.json
+build/debug/apps/navkit_sim/EcefInsGnss/apps/navkit_sim/navkit_sim config/runtime/navkit_sim/stationary_gnss.json
 ```
 
 The simulation generates logs under:
@@ -583,7 +583,13 @@ console, truth, nav, and measurement-statistics output rates, so simulation
 system rates do not force file or console logging rates. The current stationary
 GNSS initializer uses `"type": "pva_error"` with nested `pva_error` and `pva_cov`
 sections to keep startup PVA error/covariance input in app support while
-product-core code consumes only typed PVA navigation initialization data. The
+product-core code consumes only typed PVA navigation initialization data.
+Initialization error keys encode the authored frame and units. For example,
+`p_n_m`, `v_n_mps`, and `rotvec_b2n_rad` author relative errors in the local
+NED frame, while `p_e_m`, `v_e_mps`, and `rotvec_b2e_rad` author them directly
+in ECEF. The covariance `diag` or row-major `full` matrix follows the same
+position/velocity/attitude-error order and frame implied by those keys before
+app support converts it into the internal ECEF-resolved filter covariance. The
 `imu` section selects the simulator runtime mode, such as `"type": "ideal"` or a
 configured error model, while the app compile-time config selects which IMU
 simulator type is compiled in.
@@ -595,12 +601,12 @@ simulator type is compiled in.
 Example:
 
 ```bash
-python python/navkit_analysis/plots.py output/logs/stationary_gnss_demo
+python python/navkit_analysis/plots.py output/logs/ecef_ins_gnss_demo
 ```
 
 Or, to display an interactive browser of the figures:
 ```bash
-python python/navkit_analysis/plots.py output/logs/stationary_gnss_demo --show
+python python/navkit_analysis/plots.py output/logs/ecef_ins_gnss_demo --show
 ```
 
 Future plotting utilities will include:
@@ -629,7 +635,7 @@ For the default stationary GNSS workflow:
 
 ```bash
 python tools/run_first_sim.py --build-type Debug
-python tools/run_analysis.py output/logs/stationary_gnss_demo
+python tools/run_analysis.py output/logs/ecef_ins_gnss_demo
 ```
 
 Both commands update `timing.json` and print a compact timing summary for the
@@ -639,7 +645,7 @@ output needs to stay quiet.
 To view the timing artifact as a compact terminal report:
 
 ```bash
-python tools/timing_report.py output/logs/stationary_gnss_demo/timing.json
+python tools/timing_report.py output/logs/ecef_ins_gnss_demo/timing.json
 ```
 
 Build, test, simulation, and analysis wrappers update the default timing
@@ -649,7 +655,7 @@ artifact during normal use:
 python tools/build.py --build-type Debug --skip-conan
 python tools/run_tests.py --build-type Debug
 python tools/run_first_sim.py --build-type Debug
-python tools/run_analysis.py output/logs/stationary_gnss_demo
+python tools/run_analysis.py output/logs/ecef_ins_gnss_demo
 ```
 
 Use `--timing-output <path>` on `build.py` or `run_tests.py` to write to a
@@ -663,7 +669,7 @@ terminal output should stay quiet.
 To write a coarse executable/library size report for a build tree:
 
 ```bash
-python tools/resource_report.py --build-type Debug --output output/logs/stationary_gnss_demo/resources-debug-local.json
+python tools/resource_report.py --build-type Debug --output output/logs/ecef_ins_gnss_demo/resources-debug-local.json
 ```
 
 `build.py` writes and displays the same coarse artifact-size report by default
@@ -674,7 +680,7 @@ For a Release size snapshot:
 
 ```bash
 python tools/build.py --build-type Release --clean --without-tests
-python tools/resource_report.py --build-type Release --output output/logs/stationary_gnss_demo/resources-release-local.json
+python tools/resource_report.py --build-type Release --output output/logs/ecef_ins_gnss_demo/resources-release-local.json
 ```
 
 These files are intended for trend review and future Monte Carlo summaries.
@@ -873,7 +879,7 @@ python tools/run_tests.py --build-type Debug
 
 python tools/run_first_sim.py --build-type Debug
 
-python tools/run_analysis.py output/logs/stationary_gnss_demo --show
+python tools/run_analysis.py output/logs/ecef_ins_gnss_demo --show
 
 update CHANGELOG.md for changes worth tracking
 

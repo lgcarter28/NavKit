@@ -1,0 +1,9 @@
+{
+  "gnss": {
+    "rate_hz": 1.0,
+    "sigma_h_m": 3.0,
+    "sigma_v_m": 5.0,
+    "seed": 42,
+    "noise_enabled": true
+  }
+}

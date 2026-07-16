@@ -12,7 +12,7 @@ namespace navkit::io
 
 struct ImuIncrementLogPayload
 {
-    sim::IdealImuInterval ideal;
+    core::estimation::ImuIncrement truth;
     core::estimation::ImuIncrement measured;
     core::Vec3 gyro_bias_truth_radps{core::Vec3::Zero()};
     core::Vec3 accel_bias_truth_mps2{core::Vec3::Zero()};

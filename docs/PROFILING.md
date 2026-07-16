@@ -114,16 +114,16 @@ The easiest end-to-end profiling demo is the profiled stationary GNSS config:
 
 ```bash
 python tools/build.py --build-type Debug --skip-conan \
-  --navkit-config apps/navkit_sim/ProfiledStationaryGnss.hpp
+  --navkit-config apps/navkit_sim/ProfiledEcefInsGnss.hpp
 
 python tools/run_first_sim.py --build-type Debug
 ```
 
 That writes:
 
-- `output/logs/stationary_gnss_demo/profile.csv`
-- `output/logs/stationary_gnss_demo/profile_run_manifest.json`
-- `output/logs/stationary_gnss_demo/profile.trace.json`
+- `output/logs/ecef_ins_gnss_demo/profile.csv`
+- `output/logs/ecef_ins_gnss_demo/profile_run_manifest.json`
+- `output/logs/ecef_ins_gnss_demo/profile.trace.json`
 
 `run_first_sim.py` reads the selected compile-time config from the build
 manifest written by `tools/build.py`; the compile-time config does not need to
@@ -145,7 +145,7 @@ To generate Chrome Trace / Perfetto-compatible JSON from an existing profile:
 
 ```bash
 python tools/profile_report.py output/logs/<run_name>/profile.csv \
-  --build-manifest build/debug/apps/navkit_sim/ProfiledStationaryGnss/navkit_build_manifest.json \
+  --build-manifest build/debug/apps/navkit_sim/ProfiledEcefInsGnss/navkit_build_manifest.json \
   --chrome-trace output/logs/<run_name>/profile.trace.json
 ```
 
@@ -155,7 +155,7 @@ manifest so compile-time and runtime facts remain separate:
 ```bash
 python tools/profile_report.py output/logs/<run_name>/profile.csv \
   --profile-run-manifest output/logs/<run_name>/profile_run_manifest.json \
-  --build-manifest build/debug/apps/navkit_sim/ProfiledStationaryGnss/navkit_build_manifest.json \
+  --build-manifest build/debug/apps/navkit_sim/ProfiledEcefInsGnss/navkit_build_manifest.json \
   --chrome-trace output/logs/<run_name>/profile.trace.json
 ```
 

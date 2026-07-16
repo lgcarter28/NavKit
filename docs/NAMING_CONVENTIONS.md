@@ -33,6 +33,8 @@ direction is the primary meaning, prefer explicit `from2to` naming in code:
 dcm_b2e        DCM that transforms body-frame components into ECEF-frame components
 rpy_b2e_rad    roll/pitch/yaw parameterization of the body-to-ECEF transform
 q_b2e          quaternion with the same body-to-ECEF transform convention
+rotvec_b2e_rad small-angle attitude-error vector for the body-to-ECEF transform, resolved in ECEF
+rotvec_b2n_rad small-angle attitude-error vector for the body-to-NED transform, resolved in NED
 ```
 
 This avoids ambiguity around superscript/subscript conventions in code. Vector

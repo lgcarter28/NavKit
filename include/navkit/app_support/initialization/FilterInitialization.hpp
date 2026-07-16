@@ -34,51 +34,51 @@ void copy_pva_covariance(P& target_covariance,
 
     copy_pva_covariance_block<typename Error::Pos,
                               typename Error::Pos,
-                              core::estimation::PvaStateDef::Pos,
-                              core::estimation::PvaStateDef::Pos>(target_covariance,
-                                                                  pva_covariance);
+                              core::estimation::PvaErrorStateDef::Pos,
+                              core::estimation::PvaErrorStateDef::Pos>(target_covariance,
+                                                                       pva_covariance);
     copy_pva_covariance_block<typename Error::Pos,
                               typename Error::Vel,
-                              core::estimation::PvaStateDef::Pos,
-                              core::estimation::PvaStateDef::Vel>(target_covariance,
-                                                                  pva_covariance);
+                              core::estimation::PvaErrorStateDef::Pos,
+                              core::estimation::PvaErrorStateDef::Vel>(target_covariance,
+                                                                       pva_covariance);
     copy_pva_covariance_block<typename Error::Pos,
                               typename Error::AttRotVec,
-                              core::estimation::PvaStateDef::Pos,
-                              core::estimation::PvaStateDef::Rpy>(target_covariance,
-                                                                  pva_covariance);
+                              core::estimation::PvaErrorStateDef::Pos,
+                              core::estimation::PvaErrorStateDef::AttRotVec>(target_covariance,
+                                                                             pva_covariance);
 
     copy_pva_covariance_block<typename Error::Vel,
                               typename Error::Pos,
-                              core::estimation::PvaStateDef::Vel,
-                              core::estimation::PvaStateDef::Pos>(target_covariance,
-                                                                  pva_covariance);
+                              core::estimation::PvaErrorStateDef::Vel,
+                              core::estimation::PvaErrorStateDef::Pos>(target_covariance,
+                                                                       pva_covariance);
     copy_pva_covariance_block<typename Error::Vel,
                               typename Error::Vel,
-                              core::estimation::PvaStateDef::Vel,
-                              core::estimation::PvaStateDef::Vel>(target_covariance,
-                                                                  pva_covariance);
+                              core::estimation::PvaErrorStateDef::Vel,
+                              core::estimation::PvaErrorStateDef::Vel>(target_covariance,
+                                                                       pva_covariance);
     copy_pva_covariance_block<typename Error::Vel,
                               typename Error::AttRotVec,
-                              core::estimation::PvaStateDef::Vel,
-                              core::estimation::PvaStateDef::Rpy>(target_covariance,
-                                                                  pva_covariance);
+                              core::estimation::PvaErrorStateDef::Vel,
+                              core::estimation::PvaErrorStateDef::AttRotVec>(target_covariance,
+                                                                             pva_covariance);
 
     copy_pva_covariance_block<typename Error::AttRotVec,
                               typename Error::Pos,
-                              core::estimation::PvaStateDef::Rpy,
-                              core::estimation::PvaStateDef::Pos>(target_covariance,
-                                                                  pva_covariance);
+                              core::estimation::PvaErrorStateDef::AttRotVec,
+                              core::estimation::PvaErrorStateDef::Pos>(target_covariance,
+                                                                       pva_covariance);
     copy_pva_covariance_block<typename Error::AttRotVec,
                               typename Error::Vel,
-                              core::estimation::PvaStateDef::Rpy,
-                              core::estimation::PvaStateDef::Vel>(target_covariance,
-                                                                  pva_covariance);
+                              core::estimation::PvaErrorStateDef::AttRotVec,
+                              core::estimation::PvaErrorStateDef::Vel>(target_covariance,
+                                                                       pva_covariance);
     copy_pva_covariance_block<typename Error::AttRotVec,
                               typename Error::AttRotVec,
-                              core::estimation::PvaStateDef::Rpy,
-                              core::estimation::PvaStateDef::Rpy>(target_covariance,
-                                                                  pva_covariance);
+                              core::estimation::PvaErrorStateDef::AttRotVec,
+                              core::estimation::PvaErrorStateDef::AttRotVec>(target_covariance,
+                                                                             pva_covariance);
 }
 
 } // namespace detail
@@ -102,6 +102,13 @@ void initialize_filter_from_nav_initialization(Filter& filter, const NavInitiali
     typename Filter::P_t initial_covariance = Filter::P_t::Identity();
     initial_covariance *= 1.0e-6;
     detail::copy_pva_covariance<StateDef>(initial_covariance, nav_init.pva_cov);
+    if constexpr (requires { typename StateDef::Error::GyroB; }) {
+        constexpr core::Scalar_t gyro_bias_sigma_radps = 8.726646259971648e-4;
+        constexpr core::Scalar_t gyro_bias_variance = gyro_bias_sigma_radps * gyro_bias_sigma_radps;
+        initial_covariance.template block<3, 3>(StateDef::Error::GyroB::i,
+                                                StateDef::Error::GyroB::i) =
+            Eigen::Matrix<core::Scalar_t, 3, 3>::Identity() * gyro_bias_variance;
+    }
     filter.set_covariance(initial_covariance);
 }
 

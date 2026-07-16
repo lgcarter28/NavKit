@@ -1,4 +1,4 @@
-# NavKit Master Roadmap
+﻿# NavKit Master Roadmap
 
 This document is the canonical current-state handoff and working roadmap. It was reconciled from earlier planning notes and verified against the repository as it exists today.
 
@@ -54,7 +54,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ---
 
-# Phase 0 — Provenance and owner-controlled safeguards
+# Phase 0 â€” Provenance and owner-controlled safeguards
 
 **Goal:** Preserve clear independent provenance and recovery points. These actions are owner-managed and are not prerequisites for ordinary local refactoring unless timing or legal advice makes them so.
 
@@ -71,7 +71,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ---
 
-# Phase 1 — Baseline integrity and documentation alignment
+# Phase 1 â€” Baseline integrity and documentation alignment
 
 **Goal:** Make the existing baseline trustworthy before expanding the architecture.
 
@@ -100,7 +100,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ---
 
-# Phase 2 — Estimator policy boundaries
+# Phase 2 â€” Estimator policy boundaries
 
 **Goal:** Complete the next estimator policy refactor pass without changing GNSS-only runtime behavior.
 
@@ -140,13 +140,13 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ---
 
-# Phase 3 — Configuration, compiler flags, tests, and runtime profiling
+# Phase 3 â€” Configuration, compiler flags, tests, and runtime profiling
 
 **Goal:** Make the product-core configuration model, compiler/tooling posture, coverage strategy, and performance evidence explicit before adding more navigation physics and orchestration complexity.
 
 ## Compile-time configuration architecture
 
-### Pass 3.1a — Initial core configuration vocabulary
+### Pass 3.1a â€” Initial core configuration vocabulary
 
 - [x] Rename `include/navkit/core/common` to the explicit `include/navkit/core/config` product-core configuration domain.
 - [x] Introduce foundational scalar/time aliases separately from named configuration policies.
@@ -154,14 +154,14 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Relocate `navkit_sim` runtime JSON files into an explicit app-input location, separate from product-core configuration.
 - [x] Add compile-time tests that valid configuration slices satisfy the intended concepts and intentionally invalid slices fail those concepts.
 
-### Pass 3.1b — Configuration ownership cleanup
+### Pass 3.1b â€” Configuration ownership cleanup
 
 - [x] Keep `include/navkit/core/config` focused on configuration vocabulary shared broadly by product-core code, such as scalar/time types and any future truly cross-cutting core options.
 - [x] Move domain-specific configuration concepts beside the domains that consume them once the domain boundary is clear, following the general pattern `include/navkit/<product-or-domain>/.../*ConfigPolicy.hpp`; current examples include sensor buffer configuration near `core/estimation/sensor` and measurement-statistics configuration near `core/estimation/filter`.
 - [x] Remove or demote library-owned concrete `DefaultConfig` as the universal product configuration once repository-provided app/product configurations exist outside public NavKit headers.
 - [x] Document that concept policies distributed in domain folders define required capabilities, while concrete compile-time configurations are selected by applications or product builds.
 
-### Pass 3.1c — Configuration guide and example-contract documentation
+### Pass 3.1c â€” Configuration guide and example-contract documentation
 
 - [x] Add `docs/CONFIGURATION.md` as the human-facing map for the concept/policy configuration architecture.
 - [x] Explain the core mental model: domain config concepts define local requirements; concrete compile-time configs compose named slices; aggregate product checks validate runnable graphs; CMake selects one config per build tree; runtime inputs remain separate.
@@ -172,38 +172,38 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Point readers to `tests/test_config_policy.cpp` for rigorous positive and negative examples, including invalid cases expressed as `static_assert(!Concept<Bad>)`.
 - [x] Link `docs/CONFIGURATION.md` from `README.md`, `docs/SETUP.md`, `docs/ARCHITECTURE.md`, `docs/README.md`, and `AGENTS.md`.
 
-### Pass 3.1d — Root configuration tree
+### Pass 3.1d â€” Root configuration tree
 
 - [x] Create a root `config/` tree as the obvious place for repository-provided selectable configuration.
 - [x] Add `config/compiletime/...` for C++ compile-time configuration headers, split into reusable NavKit library configs and app composition configs.
 - [x] Add `config/runtime/...` for JSON or other runtime inputs consumed by desktop applications, simulators, and demos.
 - [x] Move `navkit_sim` runtime JSON files to `config/runtime/navkit_sim/...` and update tools, apps, docs, and tests.
-- [x] Add at least one plug-and-play app compile-time configuration for `navkit_sim`, such as `config/compiletime/apps/navkit_sim/StationaryGnss.hpp`, so a fresh clone can build and run without user-authored configuration.
+- [x] Add at least one plug-and-play app compile-time configuration for `navkit_sim`, such as `config/compiletime/apps/navkit_sim/EcefInsGnss.hpp`, so a fresh clone can build and run without user-authored configuration.
 - [x] Add README files or examples that show where new desktop, embedded-target, simulation, and test-fixture configurations should live.
 
-### Pass 3.1e — CMake selected-config path
+### Pass 3.1e â€” CMake selected-config path
 
 - [x] Add a CMake cache variable named `NAVKIT_CONFIG` for selecting exactly one compile-time configuration header per build tree.
-- [x] Provide a good default `-DNAVKIT_CONFIG` value, for example `apps/navkit_sim/StationaryGnss.hpp` relative to `config/compiletime`, so ordinary clone/build/test workflows work without extra flags.
+- [x] Provide a good default `-DNAVKIT_CONFIG` value, for example `apps/navkit_sim/EcefInsGnss.hpp` relative to `config/compiletime`, so ordinary clone/build/test workflows work without extra flags.
 - [x] Keep `NAVKIT_CONFIG` orthogonal to `CMAKE_BUILD_TYPE`; Debug/Release chooses compiler mode, while `NAVKIT_CONFIG` chooses the top-level compile-time build configuration.
 - [x] Generate a build-local selected-config header, for example `build/generated/navkit/SelectedConfig.hpp`, from a CMake template so generic applications can include one stable header.
 - [x] Expose the selected compile-time configuration through a stable alias such as `navkit::selected_config::Config` or an equivalent clearly documented name.
 - [x] Ensure selected-config include paths are applied to app or product targets that need them, not forced into `navkit::core` as a dependency on repository app configuration.
 - [x] Update `navkit_sim` to remain config-agnostic in source and consume only the generated selected-config alias.
 
-### Pass 3.1f — Multiple configurations and developer UX
+### Pass 3.1f â€” Multiple configurations and developer UX
 
 - [x] Document the primary rule: one build tree selects one `NAVKIT_CONFIG`.
 - [x] Support multiple configurations by using multiple build directories or CMake presets, not by making one executable dynamically switch among compile-time configurations.
 - [x] Add CMake presets or documented wrapper examples that pair common build types and selected configs for convenience while keeping those axes independent.
-- [x] Add a `tools/build.py` option such as `--navkit-config apps/navkit_sim/StationaryGnss.hpp` that forwards to `-DNAVKIT_CONFIG=...`.
-- [x] Make the default build directory derive from the selected compile-time config header, for example `apps/navkit_sim/StationaryGnss.hpp` maps to `build/debug/apps/navkit_sim/StationaryGnss`, so switching configs does not overwrite another build tree's generated selected-config header.
+- [x] Add a `tools/build.py` option such as `--navkit-config apps/navkit_sim/EcefInsGnss.hpp` that forwards to `-DNAVKIT_CONFIG=...`.
+- [x] Make the default build directory derive from the selected compile-time config header, for example `apps/navkit_sim/EcefInsGnss.hpp` maps to `build/debug/apps/navkit_sim/EcefInsGnss`, so switching configs does not overwrite another build tree's generated selected-config header.
 - [x] Document how to add a new compile-time config header, how to select it with CMake or the build wrapper, and how to pair it with a runtime JSON input when an application needs one.
 - [x] Reconcile `README.md`, `docs/SETUP.md`, `docs/ARCHITECTURE.md`, and `AGENTS.md` so the default selected config, root config tree, and one-config-per-build-tree rule stay discoverable.
 - [x] Keep reusable NavKit library configs and app composition configs in dedicated directories so app and library configs can share descriptive names without coupling their ownership.
 - [x] Add runtime-input validation at the app-support boundary so missing scenario sections, unsupported sensor/emulator sections, and malformed JSON inputs fail early with clear diagnostics against the selected compile-time composition.
 
-### Pass 3.1g — Generic simulation-app composition
+### Pass 3.1g â€” Generic simulation-app composition
 
 - [x] Replace the bespoke `StationaryGnssApp::run()` shape with a generic `SimulationApp<Config>::run()` that owns the common application loop: load runtime input, validate it against the selected compile-time app/NavKit composition, create the runtime trajectory, construct configured emulators, push generated measurements into the matching NavKit sensors, process the Navigator, log outputs, and export profiling artifacts.
 - [x] Move app sensor/emulator capability selection into app compile-time config tuples, now represented as `EmulatorBindings`, while keeping numeric values such as noise, covariance, seeds, rates, output paths, and run names in runtime JSON.
@@ -213,7 +213,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Remove stale placeholder runtime configs, including placeholder future-scenario JSON files, during this refactor unless they are converted into real validated examples.
 - [x] Add compile-time tests for valid/invalid app composition concepts and runtime tests for missing emulator sections, extra unsupported sections, and app/NavKit capability mismatches.
 
-### Pass 3.1h — Public config API surface and product graph aliases
+### Pass 3.1h â€” Public config API surface and product graph aliases
 
 - [x] Add an explicit public config API directory, for example `include/navkit/api/config`, as the front door for compile-time configuration contracts intended for end users.
 - [x] Define `NavKitProductConfigPolicy` in the public config API. It should explicitly state the required aliases for a runnable/product NavKit configuration, including at least `StateDef`, `Sensors`, `Profiler`, `Filter`, `NavigatorUpdate`, and `Navigator`.
@@ -225,7 +225,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Simplify emulator binding machinery so the ID is the app/runtime key and the sensor target is an explicit NavKit sensor alias. `SimulationApp` derives the tuple index from `NavKit::Sensors` by `Sensor::Id`, so app configs avoid raw indices and do not search sensor bindings by potentially duplicated model type.
 - [x] Update configuration docs and tests so users can find the public config concepts, see which aliases are required, and understand which aliases are local helper wiring rather than the public config contract.
 
-### Pass 3.1i — Simplify diagnostics ownership and config graph policy boundaries
+### Pass 3.1i â€” Simplify diagnostics ownership and config graph policy boundaries
 
 - [x] Remove the current public `SensorGraphConfigPolicy` shape. The public config API should not force derived aliases such as `MeasurementModelsFromSensors_t<Sensors>` or expose tuple-search/count machinery as user-facing architecture. Keep only public contracts that config authors are expected to satisfy directly.
 - [x] Replace `MeasurementModels` with an explicit `MeasurementStatisticsTuple` alias in concrete NavKit configs. The tuple must be manually authored, for example `using MeasurementStatisticsTuple = std::tuple<MeasurementStatistics<PrimaryGnssSensor>>;`, so config readers can see exactly which configured sensor streams produce stored diagnostics.
@@ -237,7 +237,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Define a real `SensorPolicy` concept that proves a type is a NavKit sensor: configured ID, model alias, measurement alias, noise context, and queue operations. Then strengthen `SensorCollectionPolicy` so it means "tuple of sensors", not merely "tuple-like type".
 - [x] Make the `Sensor` -> `SensorPolicy` -> `SensorCollectionPolicy` -> `Navigator` chain obvious in headers and tests. A reader should not need to reverse-engineer why `std::tuple<int, double>` is not a valid sensor collection.
 
-### Pass 3.1j — Finish app orchestration cleanup and naming polish
+### Pass 3.1j â€” Finish app orchestration cleanup and naming polish
 
 - [x] Introduce a trajectory-provider seam so `SimulationApp` is not hard-coded to `StationaryTrajectoryConfig` or `TrajectoryGenerator::stationary`. Runtime trajectory selection should remain easy for stationary, straight-line, turning, scripted, and future Monte Carlo scenarios.
 - [x] Move measurement-statistics logging out of `SimulationApp`. The app loop should not iterate `NavKit::MeasurementStatisticsTuple` or probe logger methods such as `log_gnss_pos_statistics`; logging adapters should own model-specific CSV/schema details.
@@ -249,9 +249,9 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Simplify `KalmanFilter` statistics type aliases. Rename the public config alias from `MeasurementStatisticsConfigs` to `MeasurementStatisticsTuple` for plain-language clarity, expose `MeasurementStatisticsTuple_t` at the class level to match the other aliases, then remove unnecessary internal layers such as `MeasurementStatisticsConfigs_t` when they only restate the template parameter.
 - [x] Rename `include/navkit/app_support/SensorId.hpp` to an emulator-binding-focused header, such as `EmulatorBinding.hpp`, because the file now owns app-side emulator/sensor binding vocabulary rather than the core sensor ID definition.
 - [x] Trim concrete NavKit config static assertions to the reusable aggregate product-config check. The final alias names, such as `StateDef`, `PrimaryGnssSensor`, `Sensors`, `MeasurementStatisticsTuple`, `Profiler`, `Filter`, `NavigatorUpdate`, and `Navigator`, should stay clear enough that the config reads as the product graph rather than as a concept-test file.
-- [x] Move reusable NavKit product configs under `config/compiletime/navkit/products`, including `MinimalConfig.hpp`, `StationaryGnss.hpp`, and `ProfiledStationaryGnss.hpp`. Product configs should use product-local namespaces so scenario identity comes from the file path and namespace, while local types use role-based names such as `NumericConfig` and `ProductConfig`. Export stable scenario-specific aliases from `navkit::config::navkit`, such as `StationaryGnssConfig` and `ProfiledStationaryGnssConfig`. Future reusable component configs, such as profilers, sensor bundles, filters, or navigator update choices, should live in their own component folders only after multiple real options exist, and their exported names should be descriptive because users select them directly.
+- [x] Move reusable NavKit product configs under `config/compiletime/navkit/products`, including `MinimalConfig.hpp`, `EcefInsGnss.hpp`, and `ProfiledEcefInsGnss.hpp`. Product configs should use product-local namespaces so scenario identity comes from the file path and namespace, while local types use role-based names such as `NumericConfig` and `ProductConfig`. Export stable scenario-specific aliases from `navkit::config::navkit`, such as `EcefInsGnssConfig` and `ProfiledEcefInsGnssConfig`. Future reusable component configs, such as profilers, sensor bundles, filters, or navigator update choices, should live in their own component folders only after multiple real options exist, and their exported names should be descriptive because users select them directly.
 
-### Pass 3.1k — Header boundary and helper split cleanup
+### Pass 3.1k â€” Header boundary and helper split cleanup
 
 - [x] Add durable config API inclusion guidelines to `AGENTS.md` and, if the rule is architecture-level enough, `docs/ARCHITECTURE.md`. `ConfigApi.hpp` should include shared public configuration vocabulary and defaults exposed by primary core template boundaries; concrete product configs should include `ConfigApi.hpp` plus the specific selected model, profiler, target, or component headers they use. Do not turn `ConfigApi.hpp` into a grab bag of every possible concrete component choice.
 - [x] Split profiling policy vocabulary so the primary concepts and public types are easy to find. Separate clock, sink, scope, profiler, and sink-record trait/helper concerns, then retire the unused `ProfilePolicy.hpp` umbrella include.
@@ -261,7 +261,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Split `NavKitProductConfigPolicy.hpp` so the public product-config concept stays readable as the API contract, while supporting detail checks live in a small detail/traits header.
 - [x] Decompose `RuntimeConfigValidation.hpp` into smaller app-support headers for runtime key/schema definitions, JSON value parsing helpers, emulator runtime-key derivation, and validation orchestration. Keep the top-level validation entry point obvious.
 
-### Pass 3.1l — Follow-on app/config simplification
+### Pass 3.1l â€” Follow-on app/config simplification
 
 - [x] Reduce `SimulationApp<Config>` back to orchestration only: load validated runtime input, obtain truth samples from a trajectory provider, run configured emulators, process the configured Navigator, and delegate logging/export details.
 - [x] Replace dummy-object type dispatch such as `typename NavKit::MeasurementStatisticsTuple{}` with explicit type-level helper APIs, for example `log_measurement_statistics<typename NavKit::MeasurementStatisticsTuple>(logger, filter)`, so `SimulationApp` does not appear to pass empty runtime statistics state.
@@ -272,14 +272,14 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Preserve existing stationary GNSS runtime behavior, file names, manifest contents, profile export behavior, and analysis compatibility while simplifying the app loop and logging boundary.
 - [x] At the end of the pass, run the normal format/copyright/build/test workflow, then run local clang-tidy explicitly with `python tools/format.py --check --tidy --tidy-warnings-as-errors` and let it run long enough to collect full findings before deciding whether to fix or defer issues.
 
-### Pass 3.1m — App config type-aggregation cleanup
+### Pass 3.1m â€” App config type-aggregation cleanup
 
 - [x] Refactor app compile-time configs to use the same readable type-aggregation style as NavKit product configs: local role aliases, configured emulator aliases, explicit binding aliases, aggregate `EmulatorBindings`, selected `Logger`, and final `App`. App configs may reference exported NavKit product aliases but must not reconstruct product-core internals.
 - [x] Treat `EmulatorBindings` as the owned app graph. Do not add a separate `Emulators` tuple unless a real app consumer needs emulator-only iteration; each binding already carries the emulator, target sensor, and runtime stream relationship.
 - [x] Embed the runtime stream `Id` into configured emulator types, mirroring `Sensor::Id`. `EmulatorBinding<Emulator, Sensor>` should derive `Binding::Id` from `Emulator::Id` and `static_assert(Emulator::Id == Sensor::Id)`, instead of duplicating the same ID as a third binding template parameter.
 - [x] Preserve current selected-config behavior, stationary GNSS runtime behavior, file names, profiling export, and analysis compatibility.
 
-### Pass 3.1n — App-support concept-policy boundary cleanup
+### Pass 3.1n â€” App-support concept-policy boundary cleanup
 
 - [x] Move `SimulationAppConfigPolicy` out of `SimulationApp.hpp` into a focused standalone policy header. Keep `SimulationApp.hpp` focused on the application orchestration loop.
 - [x] Establish the hard default rule that policy concepts live in clear standalone `*Policy.hpp` headers. Exceptions should be rare and deliberate: tiny private implementation concepts may stay local only when moving them would make ownership less clear.
@@ -294,7 +294,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Hold off on additional `RunLogger`/`RunLogProducts` concept work until the dedicated generic logger-composition pass. Note that logger constraints should be revisited there, after the product/payload split is stable.
 - [x] Add focused compile-time tests for the new policy concepts and negative cases. Keep helper machinery minimal and local; the concepts should clarify ownership boundaries, not add another abstraction layer.
 
-### Pass 3.1o — App-support directory organization
+### Pass 3.1o â€” App-support directory organization
 
 - [x] Reorganize `include/navkit/app_support` into ownership-oriented subdirectories while preserving behavior: top-level app entry/orchestration headers, `config/` for app compile-time config concepts and traits, `emulation/` for generic emulator/binding/runtime machinery, `runtime/` for JSON/runtime-input parsing and validation, `initialization/` for current startup initialization helpers, `logging/` for app-side logging adapters, `profiling/` for profile export adapters, and `trajectory/` for trajectory-provider helpers.
 - [x] Keep generic emulation infrastructure directly under `app_support/emulation`, but move concrete emulators into a clearly named concrete location such as `app_support/emulation/concrete` unless a domain-specific subfolder like `gnss/` becomes immediately useful.
@@ -303,7 +303,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Add or update documentation in `docs/ARCHITECTURE.md` or `docs/CONFIGURATION.md` if the new layout changes how end users discover app compile-time config, runtime JSON validation, or simulator emulators.
 - [x] Run format/copyright checks, Debug build/tests, and the stationary GNSS sim/analysis pipeline after the move to catch include-path and selected-config regressions.
 
-### Pass 3.1p — Core policy-concept contract cleanup
+### Pass 3.1p â€” Core policy-concept contract cleanup
 
 - [x] Flesh out `FilterPolicy` so it names the stable standalone filter lifecycle contract consumed by Navigator, initialization, and app-support code. Do not include implementation-specific diagnostics or every `KalmanFilter` helper merely because they exist.
 - [x] Add a separate sensor-dependent filter compatibility concept, `SensorFilterPolicy<Filter, Sensor>`, so tuple compatibility can say "this filter can consume this configured sensor" without forcing every filter consumer to know about sensors.
@@ -318,17 +318,17 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Rename concrete config aliases such as `PrimaryGnssModel` to `PrimaryGnssMeasurementModel` where they are user-facing product graph nodes. Tiny local implementation aliases named `Model` remain acceptable where the surrounding function scope makes the meaning obvious.
 - [x] Add positive and negative compile-time tests for the new and renamed concepts. Keep raw `typename` in private tuple expansion helpers where a concept would only add ceremony.
 
-### Pass 3.2 — Log product concepts and payload boundaries
+### Pass 3.2 â€” Log product concepts and payload boundaries
 
 - [x] Add a narrow `LogProductPolicy<Candidate, Payload>` concept under `include/navkit/io` that validates the shared log-product lifecycle and the concrete payload-specific `log(payload)` operation. Do not force every log product into one fake common `log(...)` signature.
 - [x] Introduce explicit log payload wrapper types for products whose natural inputs are more than one argument, such as nav-estimate logging and measurement-statistics logging. Payload wrappers should name the serialized boundary clearly instead of leaking helper argument lists through `RunLogger`.
 - [x] Update existing concrete log products to satisfy `LogProductPolicy` with their actual payloads: truth samples, GNSS position measurements, nav-estimate payloads, and GNSS position update-statistics payloads.
 - [x] Move generic CSV schema helpers such as matrix-header and matrix-value flattening out of `RunLogProducts.hpp` into a focused helper header such as `include/navkit/io/CsvSchemaUtils.hpp`.
 - [x] Add compile-time tests proving each current concrete log product satisfies its intended `LogProductPolicy<Candidate, Payload>` instance, plus negative concept tests for missing lifecycle/schema/log operations.
-- [x] Keep `RunLogger` as the coordinating façade and manifest owner for now. It should compose log products through typed payloads, preserve current stationary GNSS filenames/schemas/manifests, and avoid becoming a second logging framework.
+- [x] Keep `RunLogger` as the coordinating faÃ§ade and manifest owner for now. It should compose log products through typed payloads, preserve current stationary GNSS filenames/schemas/manifests, and avoid becoming a second logging framework.
 - [x] Keep richer runtime optional log-product enable/disable, verbosity, schema migration, and model/state-derived generic logging in the later Phase 8 logging scope unless this pass uncovers a tiny prerequisite.
 
-#### Pass 3.2a — Log product header organization
+#### Pass 3.2a â€” Log product header organization
 
 - [x] Split concrete log products out of `RunLogProducts.hpp` into focused headers under `include/navkit/io/log_products/`: `TruthLogProduct.hpp`, `GnssPositionLogProduct.hpp`, `NavEstimateLogProduct.hpp`, and `GnssPositionUpdateLogProduct.hpp`.
 - [x] Split reusable payload wrappers into `include/navkit/io/log_payloads/`: `NavEstimateLogPayload.hpp` and `MeasurementStatisticsLogPayload.hpp`. Keep payloads beside concrete products only if they are truly private to one product; otherwise keep the dedicated payload folder so callers can name payload boundaries clearly.
@@ -336,7 +336,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Preserve the existing namespaces and public include compatibility where practical, but prefer narrow includes in production code and tests so dependencies stay obvious.
 - [x] Add or update compile-time tests if needed so the split headers still expose all current concrete log-product policy checks.
 
-#### Pass 3.2b — Generic compile-time RunLogger composition
+#### Pass 3.2b â€” Generic compile-time RunLogger composition
 
 - [x] Replace the current hard-coded `RunLogger` member list with a generic `RunLogger<LogProducts...>` or equivalent tuple-based composition selected by app compile-time config. The default stationary GNSS logger should remain available through a clear alias so existing app configs stay readable.
 - [x] Keep the implementation simple and explicit: avoid broad tuple metaprogramming machinery, type-erasure, virtual dispatch, or a runtime registry. Use small local helpers only where they directly dispatch a typed payload to the matching product.
@@ -349,9 +349,9 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Add compile-time tests for generic logger composition and at least one negative case where a selected product cannot consume the requested payload.
 - [x] Add runtime or integration evidence by running the stationary GNSS sim and analysis pipeline after the generic logger refactor.
 
-#### Pass 3.2c — RunLogger API and measurement-statistics ownership cleanup
+#### Pass 3.2c â€” RunLogger API and measurement-statistics ownership cleanup
 
-- [x] Keep `include/navkit/io/RunLogger.hpp` focused on the generic compile-time logger façade. Rename `BasicRunLogger` to `RunLogger<LogProducts...>` and move local helper machinery such as product matching counts and metadata-path derivation into `include/navkit/io/RunLoggerTraits.hpp`.
+- [x] Keep `include/navkit/io/RunLogger.hpp` focused on the generic compile-time logger faÃ§ade. Rename `BasicRunLogger` to `RunLogger<LogProducts...>` and move local helper machinery such as product matching counts and metadata-path derivation into `include/navkit/io/RunLoggerTraits.hpp`.
 - [x] Move concrete stationary GNSS logger composition out of `RunLogger.hpp` and into app compile-time config. App configs should explicitly alias their selected logger product set, e.g. `using Logger = navkit::io::RunLogger<TruthLogProduct, ...>;`.
 - [x] Use value-style naming for value helpers such as `matching_product_count_v`; reserve PascalCase for types and concepts.
 - [x] Add focused `RunLogger` tests with small fake log products and a temporary output directory to prove product open/flush/metadata/manifest ownership, positive payload dispatch, zero-matching-product failure, and ambiguous multi-product payload failure.
@@ -366,7 +366,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Update `MeasurementStatisticsLogger` to iterate `NavKit::Sensors`, construct `MeasurementStatisticsLogPayload<MeasurementStatistics<Sensor>>` explicitly, and constrain call sites with `FilterSensorPolicy` and `LoggerPayloadPolicy` where that improves diagnostics.
 - [x] Document Windows clang-tidy expectations: Linux CI remains canonical; local Windows clang-tidy requires a compile-database-capable generator such as Ninja. Add Ninja to the Python/bootstrap or setup guidance as a local-tidy prerequisite without making local tidy part of the normal agentic loop.
 
-#### Pass 3.2d — Log schema generalization and remaining product-specific assumptions
+#### Pass 3.2d â€” Log schema generalization and remaining product-specific assumptions
 
 - [x] Make Ninja the default generator for repository Python build wrappers while keeping a deliberate generator override behind explicit `--build-dir`. Pass Ninja through Conan/CMake configuration, keep selected-config build directories isolated by build type/config, document the one-time clean rebuild expectation when replacing existing MSBuild trees, and preserve CMake presets as Ninja-based examples. Treat faster incremental builds as a bonus; the main goal is consistent compile-database generation for optional local clang-tidy and CI-like diagnostics.
 - [x] Begin removing hard-coded logging assumptions such as GNSS-only update-statistics plumbing, `StateDef::Pos` position extraction, and fixed `H`/`K` matrix dimensions where the selected product/log payload can own the schema more clearly. Current scope keeps the GNSS position-update product GNSS-specific, but templates it on the selected statistics stream so state and matrix dimensions come from the configured payload.
@@ -374,7 +374,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Revisit whether measurement-statistics logging should become product/model-specific log products beyond the current GNSS position update product once multiple measurement models are active. Current decision: keep the explicit GNSS update product for now and add additional typed products when additional measurement models are actually logged.
 - [x] Preserve stationary GNSS filenames, metadata schemas, run-manifest shape, profile export behavior, and downstream Python analysis compatibility while generalizing schemas.
 
-### Pass 3.3 — Navigation initialization and transfer-alignment boundary
+### Pass 3.3 â€” Navigation initialization and transfer-alignment boundary
 
 - [x] Replace direct truth/error-style filter initialization in app support with an explicit initialization boundary. Product-core navigation code must not know about truth, injected errors, or simulator-only perturbations.
 - [x] Introduce a core-facing `NavInitialization`-style message that represents only the initial navigation solution, not the full Kalman/filter state. It should carry PVA content such as position, velocity, attitude, timestamp, and PVA covariance; the filter/product maps that message into its internal state layout.
@@ -390,15 +390,15 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Add focused tests for runtime JSON validation, required initialization presence, unsupported initializer/transfer-alignment types, and the happy-path stationary GNSS initialization provider.
 - [x] Document the lifecycle rule: construction is compile-time product wiring, initialization is required runtime nav-data input, transfer alignment is optional timestamped aiding input, and simulator truth/error/noise models stay outside product-core embedded algorithms.
 
-### Pass 3.3a — PVA initialization and transfer-alignment polish
+### Pass 3.3a â€” PVA initialization and transfer-alignment polish
 
 - [x] Add a reusable `Vec3` alias as `using Vec3 = Eigen::Matrix<core::Scalar_t, 3, 1>;` under `include/navkit/core/math/Types.hpp`. Keep it as a convenience alias for common 3D vectors without forcing every API to use it.
-- [x] Add `PvaStateDef` with `Pos`, `Vel`, and `Rpy` segments and `N = 9`, and represent PVA covariance as `StateCov<PvaStateDef>` so initialization covariance preserves position/velocity/attitude cross-correlation terms and uses existing segment/block utilities.
+- [x] Add `PvaStateDef` with `Pos`, `Vel`, and attitude-error-vector segments and `N = 9`, and represent PVA covariance as `StateCov<PvaStateDef>` so initialization covariance preserves position/velocity/attitude cross-correlation terms and uses existing segment/block utilities.
 - [x] Store `NavInitialization` PVA content as a packed `PvaState` plus `PvaCovariance`, mirroring transfer-alignment `TxaState`/`TxaCovariance` storage. Centralize physical interpretation through accessors such as `pos_e_m`, `vel_e_mps`, and `rpy_b2e_rad` instead of repeating segmented vectors directly on initialization messages.
 - [x] Move stable PVA/TXA state vocabulary under `include/navkit/core/estimation/navigator`, while keeping app-side provider files under `include/navkit/app_support/initialization`.
 - [x] Rename PVA fields for clarity and unit consistency, including staged `attitude_rad`/`att_rad` vocabulary to `rpy_b2e_rad`. Align covariance field names with the PVA state vocabulary and units while avoiding one-off 3x3 covariance block members that lose cross-correlation terms.
 - [x] Replace the staged `truth_perturbed_pva` runtime/provider naming with clearer initializer choices: `PvaExplicitInitializationProvider` for explicit deterministic PVA error input and `PvaRandomInitializationProvider` for random PVA error draws from configured covariance.
-- [x] Restructure runtime initialization JSON around explicit PVA sections. Use `pva_error` with fields such as `pos_m`, `vel_mps`, and `rpy_b2e_rad`, and use `pva_cov` with either `diag` containing 9 diagonal covariance values or `full` containing 81 row-major covariance values. Drop sigma-based initialization inputs from this path.
+- [x] Restructure runtime initialization JSON around explicit PVA sections. Use `pva_error` with frame/unit-bearing fields such as `p_e_m`, `v_e_mps`, and `rotvec_b2e_rad`, or local-level equivalents such as `p_n_m`, `v_n_mps`, and `rotvec_b2n_rad`; use `pva_cov` with either `diag` containing 9 diagonal covariance values or `full` containing 81 row-major covariance values in the same implied convention. Drop sigma-based initialization inputs from this path.
 - [x] Add runtime validation that rejects missing/ambiguous `pva_cov` shapes, wrong `diag`/`full` lengths, unsupported initializer types, and malformed PVA vectors with clear messages.
 - [x] Clean provider control flow so it does not use raw pointers, `nullptr`, or repeated null comparisons to branch on optional truth samples; use explicit empty/non-empty trajectory logic instead.
 - [x] Add `PvaRandomInitializationProvider` using the configured full PVA covariance to generate colored random PVA error draws with an explicit runtime seed, while keeping randomness in app/sim support and outside product-core code.
@@ -406,10 +406,10 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Split concrete initialization providers into `include/navkit/app_support/initialization/concrete` and keep shared PVA JSON parsing/sampling helpers separate from provider classes.
 - [x] Update tests and docs for the new JSON shape, full/diagonal covariance handling, deterministic explicit initializer, random covariance-sampled initializer, and transfer-alignment validity flags.
 
-### Pass 3.3b — Build, install, and generated-output layout cleanup
+### Pass 3.3b â€” Build, install, and generated-output layout cleanup
 
 - [x] Make Ninja the required generator for repository Python wrappers and CI. Keep raw CMake generator overrides possible only through explicit user-selected build directories; do not optimize the official wrapper layout around Visual Studio/Ninja generator swapping.
-- [x] Remove the generator segment from default wrapper build directories. Use the simpler convention `build/<build-type-lower>/apps/navkit_sim/<ConfigStem>`, for example `build/debug/apps/navkit_sim/StationaryGnss`, while preserving `--build-dir` for advanced/manual layouts.
+- [x] Remove the generator segment from default wrapper build directories. Use the simpler convention `build/<build-type-lower>/apps/navkit_sim/<ConfigStem>`, for example `build/debug/apps/navkit_sim/EcefInsGnss`, while preserving `--build-dir` for advanced/manual layouts.
 - [x] Update Python build helpers, CMake presets, VS Code launch/docs, CI paths, timing/resource helpers, and setup/configuration documentation away from `build/Ninja/<BuildType>/...` toward the new `build/debug/...` and `build/release/...` convention.
 - [x] Add a deliberate CMake install/staging path rooted at `install/<build-type-lower>/apps/navkit_sim/<ConfigStem>` for local package validation. Install public headers, exported CMake targets, compiled libraries, and runnable app executables; do not install source-tree runtime JSON examples by default.
 - [x] Keep unit tests primarily build-tree based for local development speed. Add install-tree smoke validation separately, such as running the installed `navkit_sim` executable against the source-tree runtime JSON and/or compiling a tiny downstream `find_package(NavKit CONFIG REQUIRED)` consumer against the staged install.
@@ -437,7 +437,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Runtime profiling and resource evidence
 
-### Pass 3.4a — Desktop workflow timing artifacts
+### Pass 3.4a â€” Desktop workflow timing artifacts
 
 - [x] Add simple script-level timing around build/test/demo/analysis commands without forcing desktop-only dependencies into `navkit::core`.
 - [x] Record stationary simulation wall time and analysis wall time in a machine-readable artifact, such as `output/logs/<run_name>/timing.json`.
@@ -446,7 +446,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Add CI or tool-wrapper hooks that preserve timing/resource artifacts as uploaded artifacts without making stochastic or machine-dependent values brittle pass/fail gates.
 - [x] Keep these desktop timing artifacts useful for future Monte Carlo runtime summaries and batch trade studies.
 
-### Pass 3.4b — Embedded-ready profiling policy architecture
+### Pass 3.4b â€” Embedded-ready profiling policy architecture
 
 - [x] Add a zero-overhead-by-default profiling vocabulary under the reusable product-core boundary, likely `include/navkit/core/profiling`.
 - [x] Define stable enum-based profile points instead of string-owned scope names for embedded-facing instrumentation, for example `ProfilePoint::NavigatorProcessMeasurements`, `ProfilePoint::KalmanObservationUpdate`, and future propagation/mechanization points.
@@ -459,7 +459,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Add unit tests with a deterministic fake clock and fake sink to prove scope entry/exit records elapsed ticks correctly.
 - [x] Add compile-time tests that valid profiler/clock/sink policies satisfy their concepts and invalid policies fail them.
 
-### Pass 3.4c — First algorithm integration points
+### Pass 3.4c â€” First algorithm integration points
 
 - [x] Introduce profiler policy parameters only at coarse, stable hot-path seams first: `Navigator::process_measurements`, `KalmanFilter::observation_update`, and future propagation/mechanization update.
 - [x] Keep the default selected configuration on `NullProfiler`; profiling must not affect default runtime behavior, allocation behavior, or public numerical results.
@@ -492,7 +492,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ---
 
-# Phase 4 — Navigator and propagation seam
+# Phase 4 â€” Navigator and propagation seam
 
 **Goal:** Introduce propagation as an orchestration capability without implementing full INS mechanization yet.
 
@@ -511,11 +511,11 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ---
 
-# Phase 5 — Navigation physics and simulation contracts
+# Phase 5 â€” Navigation physics and simulation contracts
 
 **Goal:** Establish correct truth and sensor contracts before trusting an INS implementation.
 
-## Pass 5a — Focused ECEF navigator algorithm document
+## Pass 5a â€” Focused ECEF navigator algorithm document
 
 - [x] Create a dedicated LaTeX algorithm-spec folder, `docs/algorithms/navigator_ecef_v1/`, with a `main.tex` entry point and separate section/chapter `.tex` files.
 - [x] Scope the first mechanization narrowly: one IMU, body frame collocated with the IMU and navigation center, no IMU lever arm, no multiple-IMU fusion, no arbitrary center of navigation, and no runtime-polymorphic algorithm selection. Non-IMU aiding sensor lever arms, beginning with GNSS antenna position/velocity, are in scope.
@@ -524,7 +524,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Link the spec back to the implementation passes that will consume it so real propagation policy work is driven by written math rather than aspirational generic APIs.
 - [x] Treat this pass as a documentation/design gate. Do not implement the real ECEF mechanization, IMU buffering, covariance propagation, or public INS Navigator API until this algorithm document exists.
 
-## Pass 5a.1 — Code-ready ECEF/GNSS math refinement
+## Pass 5a.1 â€” Code-ready ECEF/GNSS math refinement
 
 - [x] Refine the `navigator_ecef_v1` notation so formal LaTeX uses conventional DCM/quaternion frame notation such as `C_b^e` and `q_b^e`, while code remains free to use explicit `b2e`/`e2b` variable names where clearer.
 - [x] Define truth, estimate, measured, and error-state notation explicitly, including the Groves-style ECEF-resolved small-angle attitude error convention and left-multiplicative quaternion correction.
@@ -533,7 +533,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Replace the Van Loan implementation direction with an analytical discrete-transition/process-noise formulation suitable for code implementation.
 - [x] Add loosely coupled GNSS position and velocity observation equations with configured antenna lever arm and explicit `H` matrix blocks.
 
-## Pass 5b — IMU emulator/error-model algorithm document
+## Pass 5b â€” IMU emulator/error-model algorithm document
 
 - [x] Create a standalone LaTeX IMU emulator/error-model algorithm document under `docs/algorithms/`, similar in structure to `docs/algorithms/navigator_ecef_v1/`.
 - [x] Use `docs/navigation_reference` section 2.2 as source material, but clean up the notation into a narrow code-ready implementation reference rather than copying the broader reference notation.
@@ -546,7 +546,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Define required tests tied to equations: ideal output, constant bias, scale-factor response, cross-axis response from misalignment/non-orthogonality, seeded noise reproducibility, bias random walk statistics, quantization behavior, increment units, and sample timing.
 - [x] Include all equations needed for software implementation; defer full appendix-style line-by-line derivations until later.
 
-## Pass 5c — IMU increment contract and emulator implementation
+## Pass 5c â€” IMU increment contract and emulator implementation
 
 - [x] Define the product-core IMU increment sample type consumed by `navigator_ecef_v1`, including timestamp, sample interval, incremental angle `delta_theta_ib_b_rad`, incremental velocity `delta_v_ib_b_mps`, and explicit pre/post-correction semantics.
 - [x] Update truth generation enough to support ideal stationary ECEF IMU truth: trajectory providers should emit ECEF truth states only (`t`, `p_eb_e`, `v_eb_e`, and body-to-ECEF attitude), while the IMU emulator derives body-frame inertial angular increments and specific-force increments from successive truth samples with explicit Earth-rotation compensation.
@@ -564,7 +564,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Tighten the embedded-facing simulator contract: keep `TruthSample` trajectory-only, move reusable quaternion/skew helpers out of the IMU implementation, prefer `bool`/out-parameter runtime failure handling over exceptions and `std::optional`, and rename `ideal_interval_from_truth_ecef()` with frame suffix ordering.
 - [x] Keep IMU lever arms, multiple IMUs, online scale-factor/misalignment estimation, and latency/replay handling out of v1 unless a later pass deliberately expands scope.
 
-## Pass 5d — Strapdown aided navigator implementation
+## Pass 5d â€” Strapdown aided navigator implementation
 
 - [x] Add the initial Navigator API seam from the completed `navigator_ecef_v1` algorithm document: `Navigator::update()` is the normal orchestration call, and the explicit stage methods are `process_strapdown_integration()`, `propagate_covariance()`, and `process_measurements()`.
 - [x] Add the first propagation-policy seam while keeping `NoOpPropagation` behavior-preserving for measurement-only products. The first implementation proved the ECEF INS path, then the follow-up cleanup moved covariance ownership back to the filter: propagation policies own strapdown math plus `F_k`/`G_k`/`Phi_k`/`Q_d` construction, while `KalmanFilter` owns covariance propagation.
@@ -588,7 +588,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Move runtime scenario JSON splitting to Pass 5e.4 so this implementation pass can focus on stabilizing the single-IMU ECEF v1 path.
 - [ ] Defer full delayed-measurement replay, multi-IMU support, IMU lever arms, estimated scale-factor/misalignment states, and richer timing/latency handling until the single-IMU ECEF v1 path is numerically stable.
 
-## Pass 5e.1/5e.2 — Navigator stabilization, timing, and diagnosis cleanup
+## Pass 5e.1/5e.2 â€” Navigator stabilization, timing, and diagnosis cleanup
 
 - [x] Add explicit medium-rate covariance propagation configuration to the selected NavKit product configs. Start with a compile-time default of 100 Hz because this rate informs fixed-size STM/process-noise history capacity and future delayed-measurement support.
 - [x] Add a bounded covariance-step history buffer owned by `Navigator`, defaulting to 256 entries for the first implementation. Keep the current accumulated pending covariance step for the normal no-latency path, but retain enough recent `Phi`/`Q_d` history for inspection and future latent-measurement replay.
@@ -600,8 +600,9 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [x] Add a tight INS diagnosis pass before expanding aiding: create an IMU-only stationary validation configuration or test harness, run ideal stationary truth with ideal IMU and no GNSS, and verify that pure strapdown propagation holds ECEF position/velocity/attitude within tight tolerances over a short run.
 - [x] Add focused logging or assertions for the diagnosis pass around one or a few IMU intervals: `delta_theta_ib_b`, `delta_v_ib_b`, gravity, specific force, and resulting velocity/position increments. Use this to isolate ECEF/inertial rotation sign, quaternion/DCM direction, gravity/sign, and GNSS Jacobian/update sign issues before masking them with additional aiding.
 - [x] Add runtime-configurable console/log output rates. Default the console heartbeat to 1 Hz and include time, position, velocity, and attitude; keep file logging rates separate from truth/IMU system rates so 1000 Hz simulation does not force 1000 Hz logs.
+- [x] Close the roll/pitch attitude-drift regression after the quaternion convention debugging pass. The active v1 convention is body-to-ECEF nominal quaternion storage, vector transform `v_e = q_b2e * v_b`, left-multiplicative small-angle injection `C_true ~= (I + [delta theta]x) C_hat`, and `q_b2e+ = delta_q(delta theta) * q_b2e-`.
 
-## Pass 5e.3 — INS observability, IMU debug logs, and full-state plotting
+## Pass 5e.3 â€” INS observability, IMU debug logs, and full-state plotting
 
 - [ ] Add queryable/interpolated truth sampling so consumers can request truth at arbitrary times without forcing all downstream processing to run at the trajectory generation rate. Keep truth generation/system rate separate from truth logging rate.
 - [x] Keep runtime-configurable log rates independent for truth, navigation, measurement statistics, IMU logs, IMU debug logs, and console heartbeat. Default high-rate simulation to numerically simple rates such as 1000 Hz while allowing logs to default to lower inspection-friendly rates.
@@ -630,7 +631,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
   - [x] Preserve existing GNSS innovation, NIS, p-value, and histogram outputs while making the state-error plotting path independent of GNSS-specific assumptions.
 - [ ] Add tests for the new log-product schemas and plotting input contracts. Favor small deterministic CSV/log fixtures where possible so plotting failures are caught without requiring long stochastic simulation runs.
 
-## Pass 5e.4 — Logging contract cleanup, trajectory initialization, and `auto` audit
+## Pass 5e.4 â€” Logging contract cleanup, trajectory initialization, and `auto` audit
 
 - [x] Update `AGENTS.md` with the stronger repository rule for `auto`: prohibit `auto` by default, except for narrow obvious cases such as iteration variables, lambda/closure types, unavoidable template abstraction, or immediately consumed expressions where the concrete type is irrelevant. Explicit concrete types are required for stored/reused Eigen expressions, math temporaries, domain values, dimensions, state vectors, matrices, units, and frame-bearing quantities.
 - [ ] Continue the dedicated `auto` deep-dive audit across the codebase. The first pass replaced high-risk nontrivial `auto` usages in touched simulation, propagation, logging, and analysis-facing math code; a broader repository-wide audit remains.
@@ -662,10 +663,81 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
   - [x] Add validation or clear manifest metadata to make double compensation or missing compensation obvious.
 - [x] Keep full rigid-body 6-DOF trajectory dynamics out of this pass. Record the future direction separately: mass, CG, inertia, force/moment models, aerodynamic effects, and closed-loop guidance should become a dedicated trajectory-dynamics pass after the initial-condition and truth-provider contract is stable.
 
-## Pass 5e.5 — GNSS velocity aiding and runtime scenario modularization
+## Pass 5e.5 â€” Combined logging, config, IMU contract, and plotting cleanup
 
-- [ ] Add GNSS velocity aiding after the IMU-only propagation diagnosis is stable. Wire the existing GNSS velocity model into the selected simulation/app config, include antenna lever-arm handling, and add finite-difference Jacobian tests.
-- [ ] Split runtime scenario JSON into reusable blocks only after the current app/runtime contracts stabilize. Keep trajectory profile selection runtime-configurable; avoid compile-time product names that imply a fixed trajectory.
+- [x] Keep the existing `ImuRuntime::process(...)` overload shape unless implementation work reveals a concrete ownership bug. Do not churn the API just because one call currently ignores a returned diagnostic sample.
+- [x] Replace `IdealImuInterval` with clearer interval vocabulary:
+  - [x] `ImuInterval` is the canonical simulation/math interval data: `time_s`, `dt_s`, `omega_ib_b_radps`, and `specific_force_ib_b_mps2`.
+  - [x] `ImuIntervalDebug` is optional debug-only data: average position/velocity/acceleration, gravity, ECEF specific force, and intermediate ECI/body-frame terms needed for diagnosis.
+  - [x] `ImuIncrement` remains the sampled IMU output contract: `time_s`, `dt_s`, `delta_theta_ib_b_rad`, and `delta_v_ib_b_mps`.
+- [x] Remove IMU ECEF debug logging/plotting that is unused or hard-coded to zero. Keep a body/inertial IMU debug product, for example `imu_debug_body`, with ECI/body quantities resolved in the body frame.
+- [x] Move reusable IMU calibration helpers out of simulator implementation code:
+  - [x] Put scale-factor, misalignment, and non-orthogonality triad calibration helpers in `include/navkit/core/math/TriadCalibration.hpp`.
+  - [ ] Move reusable Earth-rate, frame-transform, and trajectory-provider conversion helpers into their owning core math/frames/environment locations instead of leaving them buried in trajectory or simulator code.
+- [x] Make coning/sculling compensation compile-time configured on both sides of the contract:
+  - [x] IMU simulator emits either raw/uncompensated or compensated increments according to its selected compile-time config.
+  - [x] ECEF INS propagation either applies coning/sculling compensation or assumes increments are already compensated.
+  - [x] Let the app config set the simulator-side compensation flag from the NavKit propagation choice when appropriate, for example the logical opposite of the selected Navigator compensation setting, and record the choice in manifests.
+- [x] Split runtime output under `output/logs/<run>/` into `data/` and `figures/`, and update Python analysis to read/write through that structure. Keep runtime-configurable log rates for each file family; high-rate truth/IMU generation must not imply high-rate logging.
+- [x] Split logs by responsibility:
+  - [x] dedicated truth trajectory log only: time, position, velocity, and attitude;
+  - [x] dedicated nominal navigation/filter estimate log with estimate and covariance data;
+  - [x] dedicated filter-correction event log that records corrections only and does not duplicate covariance owned by the estimate log;
+  - [x] remove `nav.csv` unless it is deliberately replaced by a clearer product such as a PVA-specific estimate log.
+- [x] Rename default frame-bearing log and figure products so the frame suffix is at the end, for example `error_covariance_position_ecef.png`, `error_covariance_position_ned.png`, and matching ECEF/NED CSV names.
+- [x] Add ECEF plots for all position, velocity, and attitude states in addition to the existing NED views. Keep NED plots for local-level interpretability.
+- [x] Update plot units and labels:
+  - [x] attitude error plots in degrees, labeled roll/pitch/yaw rather than NED axes;
+  - [x] accelerometer bias/error plots in micro-g;
+  - [x] gyro bias/error plots in milli-degrees per second or another clearly documented small-angle-rate unit;
+  - [x] individual IMU error covariance plots use black covariance bounds and red error series.
+- [x] Redesign the roll-up dashboards:
+  - [x] keep detailed broken-out plots in the existing per-state format;
+  - [x] specialize `error_covariance_dashboard_*` with one subplot per state family and all axes overlaid;
+  - [x] use a two-column layout: position/velocity/attitude on the left, gyro bias/accelerometer bias on the right;
+  - [x] color-match x/roll, y/pitch, z/yaw errors and 3-sigma bounds; omit 1-sigma bounds from dashboards;
+  - [x] consolidate the legend into a single vertical legend in the available blank panel area;
+  - [x] update `filter_correction_covariance_*` to match the same dashboard layout, but only for actual correction events.
+- [x] Increase default initial covariance examples to realistic first-cut values: 100 m position, 10 m/s velocity, 5 deg roll/pitch tilt, and 10 deg yaw. Prefer deriving these as scaled-up versions of initialization-error-generation covariance when that relationship is explicit.
+- [x] Split PVA startup types by meaning: `PvaStateDef` stores position, velocity, and RPY startup state, while `PvaErrorStateDef` stores position, velocity, and small-angle attitude error. Keep `PvaState = State<PvaStateDef>` and `PvaCovariance = StateCov<PvaErrorStateDef>` so covariance cannot pretend to be an RPY state.
+- [x] Add `pva_error_frame` for `pva_random` initialization so random covariance draws can be interpreted in ECEF or NED before conversion to the internal ECEF-resolved error convention.
+- [x] Rename lingering profiled stationary compile-time configs to `ProfiledEcefInsGnss` so compile-time config names describe the compiled product graph rather than a runtime trajectory scenario.
+- [x] Add explicit runtime log `enabled` flags with validation: enabled logs must provide `dt_s` or `rate_hz`, disabled logs may omit cadence.
+- [x] Clean dashboard legends so ECEF dashboards use x/y/z error and 3-sigma pairs, while NED dashboards show local N/E/D and body x/y/z pairs in the blank dashboard panel.
+- [x] Revisit gyro-bias initialization covariance relative to the configured deterministic IMU bias and adjust the default first-cut value to a more realistic milli-degree-per-second scale.
+- [x] Add or update scenario configs for the current validation set:
+  - [x] ideal truth reconstruction with GNSS and IMU errors disabled, expecting nearly zero reconstruction error and no discontinuities;
+  - [x] modeled IMU turn-on bias, in-run bias/random walk, and Gaussian white noise enabled;
+  - [x] additional unmodeled IMU error sources enabled to inspect estimator robustness;
+  - [x] full IMU debug logging enabled for diagnosis.
+- [ ] Begin compile-time config decomposition into reusable `components` headers plus scenario-level product/app headers.
+- [x] Begin runtime JSON decomposition into reusable component JSON files referenced from a scenario master JSON. Linked sub-files are resolved relative to the master input JSON path, for example `./otherfile.json` or `imu/imu_config.json`.
+- [x] Keep trajectory selection and profile details runtime-configurable. In this cleanup pass, support initial angular-rate parsing via `w_ib_b_radps`, `w_eb_b_radps`, and `w_nb_b_radps`; full force/moment 6-DOF dynamics remain a later trajectory-dynamics pass.
+- [x] Add or refresh tests for log schemas, runtime JSON include/link resolution, plot input contracts, IMU interval naming, compensation flag compatibility, and decomposed config examples.
+
+## Pass 5e.6 — Runtime config, covariance, and style hygiene follow-up
+
+- [ ] Finish compile-time config decomposition into reusable `components` headers plus scenario-level product/app headers now that trajectory behavior is runtime-selected rather than compile-time-selected.
+- [ ] Extend IMU runtime error config with optional 1-sigma fields for runtime random draws. If a user provides a `*_1sig` field, validation should interpret the configured field as a one-sigma bound and populate the concrete error value from a deterministic seeded random draw.
+- [ ] Revisit IMU error-term vocabulary in JSON and `ImuTriadErrorConfig`: consider standard names such as `bias_turnon`, `bias_inrun`, and clearly documented `random_walk`/white-noise semantics instead of the current mixed terminology.
+- [ ] Add IMU acceleration and angular-rate limit support to the simulator/runtime path.
+- [ ] Add configurable covariance floors per state-family/diagonal block to prevent covariance from becoming ill-conditioned or singular during idealized analysis runs.
+- [ ] Continue the repository-wide `auto` audit using the strengthened AGENTS rule. Replace nontrivial `auto` in math, Eigen, state, frame/unit, simulator, and logging code with explicit types unless it falls into the narrow allowed cases.
+
+## Pass 5e.7 — GNSS lever arm, sensor debug products, and GNSS velocity aiding
+
+- [ ] Add GNSS antenna lever-arm support before expanding velocity aiding:
+  - [ ] configure the lever arm in the simulator/runtime path;
+  - [ ] apply the lever arm in GNSS truth measurement generation;
+  - [ ] include the lever-arm contribution in `GnssPosModel` and its `H` matrix;
+  - [ ] add focused finite-difference Jacobian tests.
+- [ ] Add typed sensor debug logs and plots for simulated sensors:
+  - [ ] log the literal truth measurement and measured measurement in the measurement's own coordinates, such as truth/measured range-azimuth-elevation for a future radar or truth/measured ECEF position for GNSS position;
+  - [ ] do not require explicit measurement-error columns when the truth and measured quantities are sufficient to derive errors in analysis;
+  - [ ] plot truth and measured quantities overlaid, using black truth markers and green measured markers, with a lower error subplot when the error is derivable;
+  - [ ] plot measurement covariance bounds when available.
+- [ ] Add GNSS velocity aiding after lever-arm position support is stable. Wire the existing GNSS velocity model into the selected simulation/app config, include antenna lever-arm velocity terms, update analysis/logging products, and add finite-difference Jacobian tests.
+- [ ] Revisit realistic GNSS error/noise defaults once position and velocity aiding are both active.
 
 ## Frames, coordinates, and environment
 
@@ -698,7 +770,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ---
 
-# Phase 6 — First complete PCPF/ECEF INS
+# Phase 6 â€” First complete PCPF/ECEF INS
 
 **Goal:** Cross from a measurement-only estimator to a validated strapdown INS/GNSS navigation system.
 
@@ -740,7 +812,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ---
 
-# Phase 7 — Estimator validation and consistency
+# Phase 7 â€” Estimator validation and consistency
 
 **Goal:** Turn plots into repeatable engineering evidence.
 
@@ -765,7 +837,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ---
 
-# Phase 8 — Monte Carlo, logging, and performance
+# Phase 8 â€” Monte Carlo, logging, and performance
 
 **Goal:** Support trade studies and quantify estimator behavior across randomized runs.
 
@@ -797,7 +869,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ---
 
-# Phase 9 — Robust estimator and embedded readiness
+# Phase 9 â€” Robust estimator and embedded readiness
 
 **Goal:** Mature the framework after the first INS is demonstrably correct.
 

@@ -43,9 +43,9 @@ TEST_CASE("GNSS position Jacobian follows truth-minus-estimate error convention"
     using Model = navkit::core::models::GnssPosModel<StateDef>;
 
     const Model::State_t x = Model::State_t::Zero();
-    const Model::H_t H = Model::compute_h(x);
+    const Model::H_t h = Model::compute_h(x);
 
-    CHECK(H.template block<3, 3>(0, Error::Pos::i)
+    CHECK(h.template block<3, 3>(0, Error::Pos::i)
               .isApprox(Eigen::Matrix<navkit::core::Scalar_t, 3, 3>::Identity()));
 }
 
@@ -56,8 +56,8 @@ TEST_CASE("GNSS velocity Jacobian follows truth-minus-estimate error convention"
     using Model = navkit::core::models::GnssVelModel<StateDef>;
 
     const Model::State_t x = Model::State_t::Zero();
-    const Model::H_t H = Model::compute_h(x);
+    const Model::H_t h = Model::compute_h(x);
 
-    CHECK(H.template block<3, 3>(0, Error::Vel::i)
+    CHECK(h.template block<3, 3>(0, Error::Vel::i)
               .isApprox(Eigen::Matrix<navkit::core::Scalar_t, 3, 3>::Identity()));
 }

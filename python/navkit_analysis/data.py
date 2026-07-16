@@ -19,6 +19,8 @@ class RunData:
     """
 
     run_dir: Path
+    data_dir: Path
+    figures_dir: Path
     nav: pd.DataFrame
     gnss_pos_update: pd.DataFrame | None = None
     truth: pd.DataFrame | None = None
@@ -31,14 +33,54 @@ class RunData:
 def _read_optional_csv(path: Path) -> pd.DataFrame | None:
     if not path.exists():
         return None
-    return pd.read_csv(path)
+    frame = _read_navkit_csv(path)
+    if frame.empty:
+        return None
+    return frame
 
 
 def _read_first_existing_csv(paths: list[Path]) -> tuple[pd.DataFrame | None, Path | None]:
     for path in paths:
         if path.exists():
-            return pd.read_csv(path), path
+            frame = _read_navkit_csv(path)
+            if not frame.empty:
+                return frame, path
     return None, None
+
+
+def _read_navkit_csv(path: Path) -> pd.DataFrame:
+    return _coerce_numeric_columns(
+        pd.read_csv(path, na_values=["nan", "-nan", "nan(ind)", "-nan(ind)"])
+    )
+
+
+def _coerce_numeric_columns(frame: pd.DataFrame) -> pd.DataFrame:
+    result = frame.copy()
+    for column in result.columns:
+        converted = pd.to_numeric(result[column], errors="coerce")
+        original_non_null = result[column].notna()
+        converted_non_null = converted.notna()
+        if bool((converted_non_null | ~original_non_null).all()):
+            result[column] = converted
+    return result
+
+
+def _resolve_run_dirs(path: Path) -> tuple[Path, Path, Path]:
+    resolved = path.resolve()
+    if (resolved / "data").is_dir():
+        run_dir = resolved
+        data_dir = resolved / "data"
+        figures_dir = resolved / "figures"
+    elif resolved.name == "data":
+        data_dir = resolved
+        run_dir = resolved.parent
+        figures_dir = run_dir / "figures"
+    else:
+        run_dir = resolved
+        data_dir = resolved
+        figures_dir = resolved
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    return run_dir, data_dir, figures_dir
 
 
 def _require_columns(frame: pd.DataFrame, columns: list[str], source: Path) -> None:
@@ -173,12 +215,36 @@ def _derive_truth_error(nav: pd.DataFrame, truth: pd.DataFrame | None, imu: pd.D
     return pd.DataFrame(derived_columns)
 
 
+def _attach_nav_covariance(
+    correction: pd.DataFrame | None, nav: pd.DataFrame
+) -> pd.DataFrame | None:
+    if correction is None:
+        return None
+    result = correction.copy()
+    covariance_columns = [
+        column for column in nav.columns if column.startswith("sigma_") or column.startswith("P_")
+    ]
+    correction_time_s = pd.to_numeric(result["time_s"], errors="coerce")
+    nav_time_s = pd.to_numeric(nav["time_s"], errors="coerce")
+    interpolated_columns: dict[str, np.ndarray] = {}
+    for column in covariance_columns:
+        if column in result:
+            continue
+        nav_values = pd.to_numeric(nav[column], errors="coerce")
+        if nav_values.isna().any() or nav_time_s.isna().any() or correction_time_s.isna().any():
+            continue
+        interpolated_columns[column] = np.interp(correction_time_s, nav_time_s, nav_values)
+    if not interpolated_columns:
+        return result
+    return pd.concat([result, pd.DataFrame(interpolated_columns)], axis=1)
+
+
 def load_run(run_dir: Path) -> RunData:
     """Load standard NavKit run logs from a run directory."""
-    run_dir = run_dir.resolve()
+    run_dir, data_dir, figures_dir = _resolve_run_dirs(run_dir)
 
     nav, nav_path = _read_first_existing_csv(
-        [run_dir / "nav_estimate_ecef.csv", run_dir / "nav.csv"]
+        [data_dir / "nav_estimate_ecef.csv", run_dir / "nav_estimate_ecef.csv"]
     )
     if nav is None or nav_path is None:
         raise FileNotFoundError(f"missing navigation estimate log in {run_dir}")
@@ -210,17 +276,28 @@ def load_run(run_dir: Path) -> RunData:
         nav_path,
     )
 
-    gnss_pos_update_path = run_dir / "gnss_pos_update.csv"
-    gnss_pos_update = _read_optional_csv(gnss_pos_update_path)
-    truth, truth_path = _read_first_existing_csv(
-        [run_dir / "truth_trajectory_ecef.csv", run_dir / "truth.csv"]
+    gnss_pos_update, gnss_pos_update_path_optional = _read_first_existing_csv(
+        [data_dir / "gnss_pos_update.csv", run_dir / "gnss_pos_update.csv"]
     )
-    imu, imu_path = _read_first_existing_csv([run_dir / "imu_nominal.csv", run_dir / "imu.csv"])
+    gnss_pos_update_path = gnss_pos_update_path_optional or (data_dir / "gnss_pos_update.csv")
+    truth, truth_path = _read_first_existing_csv(
+        [data_dir / "truth_trajectory_ecef.csv", data_dir / "truth.csv", run_dir / "truth_trajectory_ecef.csv"]
+    )
+    imu, imu_path = _read_first_existing_csv(
+        [data_dir / "imu_nominal.csv", data_dir / "imu.csv", run_dir / "imu_nominal.csv"]
+    )
     imu_debug, imu_debug_path = _read_first_existing_csv(
-        [run_dir / "imu_debug_ecef.csv", run_dir / "imu_debug.csv"]
+        [
+            data_dir / "imu_debug_body.csv",
+            run_dir / "imu_debug_body.csv",
+        ]
     )
     filter_correction, filter_correction_path = _read_first_existing_csv(
-        [run_dir / "filter_correction_ecef.csv", run_dir / "filter_correction.csv"]
+        [
+            data_dir / "filter_correction_ecef.csv",
+            data_dir / "filter_correction.csv",
+            run_dir / "filter_correction_ecef.csv",
+        ]
     )
 
     if gnss_pos_update is not None:
@@ -277,13 +354,11 @@ def load_run(run_dir: Path) -> RunData:
             imu_debug,
             [
                 "time_s",
-                "a_bar_e_x_mps2",
-                "gravity_e_x_mps2",
-                "specific_force_e_x_mps2",
-                "delta_theta_eb_b_x_rad",
-                "delta_theta_ib_b_x_rad",
+                "omega_ib_b_x_radps",
+                "specific_force_ib_b_x_mps2",
+                "truth_delta_theta_ib_b_x_rad",
                 "meas_delta_theta_ib_b_x_rad",
-                "delta_v_ib_b_x_mps",
+                "truth_delta_v_ib_b_x_mps",
                 "meas_delta_v_ib_b_x_mps",
                 "truth_gyro_bias_b_x_radps",
                 "truth_accel_bias_b_x_mps2",
@@ -292,9 +367,12 @@ def load_run(run_dir: Path) -> RunData:
         )
 
     truth_error = _derive_truth_error(nav, truth, imu)
+    filter_correction = _attach_nav_covariance(filter_correction, nav)
 
     return RunData(
         run_dir=run_dir,
+        data_dir=data_dir,
+        figures_dir=figures_dir,
         nav=nav,
         gnss_pos_update=gnss_pos_update,
         truth=truth,

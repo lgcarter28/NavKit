@@ -96,7 +96,6 @@ inline void validate_imu_runtime_config(const nlohmann::json& cfg)
     const auto& imu = detail::require_object(cfg, "imu");
     detail::require_optional_string(imu, "type");
     detail::require_optional_unsigned_integer(imu, "seed");
-    detail::require_optional_bool(imu, "output_coning_sculling_compensated");
     validate_runtime_rate(imu, "imu");
     detail::require_optional_positive_number(imu, "sample_rate_hz");
     if ((imu.contains("dt_s") || imu.contains("rate_hz")) && imu.contains("sample_rate_hz")) {
@@ -134,8 +133,6 @@ inline sim::ImuSimulatorConfig imu_simulator_config_from_json(const nlohmann::js
     const auto& imu = cfg.at("imu");
     sim::ImuSimulatorConfig config;
     config.seed = imu.value("seed", 42U);
-    config.output_coning_sculling_compensated =
-        imu.value("output_coning_sculling_compensated", false);
 
     const auto type = imu.value("type", std::string{"ideal"});
     if (type == "ideal") {
@@ -153,12 +150,6 @@ inline sim::ImuSimulatorConfig imu_simulator_config_from_json(const nlohmann::js
                                                        .white_noise_psd = "white_noise_psd_m2ps3",
                                                        .quantization = "quantization_mps"});
     return config;
-}
-
-inline bool imu_outputs_coning_sculling_compensated(const nlohmann::json& cfg)
-{
-    const nlohmann::json& imu = detail::require_object(cfg, "imu");
-    return imu.value("output_coning_sculling_compensated", false);
 }
 
 } // namespace navkit::app_support

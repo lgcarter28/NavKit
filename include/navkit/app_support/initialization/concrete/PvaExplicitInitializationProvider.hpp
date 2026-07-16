@@ -20,7 +20,7 @@ struct PvaExplicitInitializationProvider
     {
         const auto& initialization = detail::require_object(cfg, "initialization");
         detail::require_initialization_type(initialization, runtime_type);
-        static_cast<void>(detail::pva_error_from_json(initialization));
+        detail::validate_pva_error_shape(initialization);
         detail::validate_pva_covariance_shape(initialization);
     }
 
@@ -30,8 +30,10 @@ struct PvaExplicitInitializationProvider
         const auto& initialization = cfg.at("initialization");
 
         NavInitialization nav_init = detail::base_nav_initialization(trajectory);
-        detail::apply_pva_error(nav_init, detail::pva_error_from_json(initialization));
-        nav_init.pva_cov = detail::pva_covariance_from_json(initialization);
+        const core::Vec3 reference_p_e_m = core::estimation::pos_e_m(nav_init.pva);
+        detail::apply_pva_error(nav_init,
+                                detail::pva_error_from_json(initialization, reference_p_e_m));
+        nav_init.pva_cov = detail::pva_covariance_from_json(initialization, reference_p_e_m);
         return nav_init;
     }
 };

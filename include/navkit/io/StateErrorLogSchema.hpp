@@ -223,6 +223,16 @@ std::vector<std::string> state_error_header(const std::string& value_prefix,
     return header;
 }
 
+template<typename Error>
+std::vector<std::string> state_error_value_header(const std::string& value_prefix)
+{
+    std::vector<std::string> labels = state_error_labels<Error>();
+    std::vector<std::string> header{"time_s"};
+    header.reserve(1U + labels.size());
+    append_prefixed_labels(header, value_prefix, labels);
+    return header;
+}
+
 template<typename Nominal, typename Error>
 std::vector<std::string> nominal_state_with_covariance_header(CovarianceLogMode covariance_mode)
 {
@@ -237,6 +247,16 @@ std::vector<std::string> nominal_state_with_covariance_header(CovarianceLogMode 
         append_triangular_covariance_header(header, error_labels);
     }
     return header;
+}
+
+template<typename Error, typename Vector>
+std::vector<double> state_error_value_row(const navkit::core::Time_t time_s, const Vector& values)
+{
+    std::vector<double> row;
+    row.reserve(static_cast<std::size_t>(1 + Error::N));
+    row.push_back(time_s);
+    append_state_error_values<Error>(row, values);
+    return row;
 }
 
 template<typename Error, typename Vector, typename Matrix>
