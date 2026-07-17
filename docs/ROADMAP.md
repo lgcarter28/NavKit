@@ -710,19 +710,18 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
   - [x] modeled IMU turn-on bias, in-run bias/random walk, and Gaussian white noise enabled;
   - [x] additional unmodeled IMU error sources enabled to inspect estimator robustness;
   - [x] full IMU debug logging enabled for diagnosis.
-- [ ] Begin compile-time config decomposition into reusable `components` headers plus scenario-level product/app headers.
+- [x] Defer compile-time config decomposition into reusable component headers to a dedicated follow-up; runtime JSON decomposition is complete enough for the current scenario work.
 - [x] Begin runtime JSON decomposition into reusable component JSON files referenced from a scenario master JSON. Linked sub-files are resolved relative to the master input JSON path, for example `./otherfile.json` or `imu/imu_config.json`.
 - [x] Keep trajectory selection and profile details runtime-configurable. In this cleanup pass, support initial angular-rate parsing via `w_ib_b_radps`, `w_eb_b_radps`, and `w_nb_b_radps`; full force/moment 6-DOF dynamics remain a later trajectory-dynamics pass.
 - [x] Add or refresh tests for log schemas, runtime JSON include/link resolution, plot input contracts, IMU interval naming, compensation flag compatibility, and decomposed config examples.
 
-## Pass 5e.6 — Runtime config, covariance, and style hygiene follow-up
+## Pass 5e.6 — Roadmap consolidation and bias covariance tuning
 
-- [ ] Finish compile-time config decomposition into reusable `components` headers plus scenario-level product/app headers now that trajectory behavior is runtime-selected rather than compile-time-selected.
-- [ ] Extend IMU runtime error config with optional 1-sigma fields for runtime random draws. If a user provides a `*_1sig` field, validation should interpret the configured field as a one-sigma bound and populate the concrete error value from a deterministic seeded random draw.
-- [ ] Revisit IMU error-term vocabulary in JSON and `ImuTriadErrorConfig`: consider standard names such as `bias_turnon`, `bias_inrun`, and clearly documented `random_walk`/white-noise semantics instead of the current mixed terminology.
-- [ ] Add IMU acceleration and angular-rate limit support to the simulator/runtime path.
-- [ ] Add configurable covariance floors per state-family/diagonal block to prevent covariance from becoming ill-conditioned or singular during idealized analysis runs.
-- [ ] Continue the repository-wide `auto` audit using the strengthened AGENTS rule. Replace nontrivial `auto` in math, Eigen, state, frame/unit, simulator, and logging code with explicit types unless it falls into the narrow allowed cases.
+- [x] Reconcile the recent 5e.4/5e.5 logging/config/plotting passes with the next GNSS and runtime-hygiene passes so finished points are marked complete and unresolved points are not left hidden in completed passes.
+- [x] Move broader follow-up work, including compile-time component-header decomposition, IMU 1-sigma randomization fields, IMU error-term naming, IMU limits, covariance floors, and repository-wide `auto` audit work, into a dedicated future hygiene pass.
+- [x] Move filter initial covariance into a selected immutable NavKit product config value using `InitialCovariance<StateDef>` and `diagonal_initial_covariance<StateDef>()`; tune the current examples to variance values corresponding to 50 milli-deg/s gyro bias and 100 micro-g accelerometer bias. App-support initialization may consume an explicitly configured runtime JSON override, but must not own fallback tuning constants or state-specific covariance defaults.
+- [x] Sweep app-support runtime parsing for hidden product/scenario fallback defaults. Require runtime-owned fields such as run name, output directory, logging cadences, simulator seeds/noise settings, trajectory duration, and trajectory cadence to come from runtime JSON instead of app-support helper literals.
+- [x] Add focused test coverage for the tuned default IMU bias covariance values.
 
 ## Pass 5e.7 — GNSS lever arm, sensor debug products, and GNSS velocity aiding
 
@@ -738,6 +737,15 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
   - [ ] plot measurement covariance bounds when available.
 - [ ] Add GNSS velocity aiding after lever-arm position support is stable. Wire the existing GNSS velocity model into the selected simulation/app config, include antenna lever-arm velocity terms, update analysis/logging products, and add finite-difference Jacobian tests.
 - [ ] Revisit realistic GNSS error/noise defaults once position and velocity aiding are both active.
+
+## Pass 5e.8 — Runtime hygiene, IMU config randomization, and covariance guardrails
+
+- [ ] Finish compile-time config decomposition into reusable `components` headers plus scenario-level product/app headers now that trajectory behavior is runtime-selected rather than compile-time-selected.
+- [ ] Extend IMU runtime error config with optional 1-sigma fields for runtime random draws. If a user provides a `*_1sig` field, validation should interpret the configured field as a one-sigma bound and populate the concrete error value from a deterministic seeded random draw.
+- [ ] Revisit IMU error-term vocabulary in JSON and `ImuTriadErrorConfig`: consider standard names such as `bias_turnon`, `bias_inrun`, and clearly documented `random_walk`/white-noise semantics instead of the current mixed terminology.
+- [ ] Add IMU acceleration and angular-rate limit support to the simulator/runtime path.
+- [ ] Add configurable covariance floors per state-family/diagonal block to prevent covariance from becoming ill-conditioned or singular during idealized analysis runs.
+- [ ] Continue the repository-wide `auto` audit using the strengthened AGENTS rule. Replace nontrivial `auto` in math, Eigen, state, frame/unit, simulator, and logging code with explicit types unless it falls into the narrow allowed cases.
 
 ## Frames, coordinates, and environment
 

@@ -82,6 +82,21 @@ check are the real validation path. Do not introduce a one-field slice just to
 carry a value that is only consumed locally inside one product graph; use a
 descriptive role constant instead.
 
+Compile-time config headers may provide values, but those values should be
+immutable product facts:
+
+- use `static constexpr` for scalar, enum, size, ID, boolean, and other
+  literal-like values;
+- use `inline static const` for non-literal fixed-size config objects such as
+  Eigen matrices;
+- do not expose mutable static config objects.
+
+Runtime JSON should populate runtime-owned values, not mutate compile-time
+config objects. If a runtime scenario can override a numeric object such as an
+initial covariance, app-support should parse a separate runtime value and choose
+between that value and the immutable compile-time default at the owning
+boundary.
+
 ### 3. NavKit configs collect reusable library slices
 
 A NavKit library/core config names reusable slices for the navigation library
@@ -288,6 +303,16 @@ tree, which exposes the stable application-facing alias:
 using AppConfig = navkit::selected_config::Config;
 ```
 
+App-support code validates, translates, and orchestrates selected configuration;
+it should not author product or scenario defaults. Scenario-specific values such
+as run name, output directory, logging cadence, simulator seeds, simulator noise
+levels, trajectory duration, and trajectory cadence belong in runtime JSON.
+Compile-time product choices such as selected state definitions, fixed buffer
+sizes, covariance cadence, and initial-covariance policy slices belong in the
+selected compile-time config. Reusable embedded-library defaults may live inside
+`include/navkit/core` only when they are deliberately part of the product-core
+contract. Do not hide fallback scenario behavior in app-support helpers.
+
 ## CMake selection model
 
 The CMake model is one compile-time configuration per build tree:
@@ -337,6 +362,53 @@ same implied order and frame before app support converts it into the internal
 ECEF-resolved state covariance. This validation lives in `navkit::app_support`
 because it is app/runtime-input glue, not reusable product-core NavKit
 configuration.
+
+Filter initial covariance is a separate product/runtime boundary. The compiled
+NavKit product config provides:
+
+```cpp
+using InitialCovariance_t =
+    navkit::core::estimation::InitialCovariance<StateDef>;
+
+inline static const InitialCovariance_t initial_covariance =
+    navkit::core::estimation::diagonal_initial_covariance<StateDef>(
+        navkit::core::estimation::InitialCovarianceDiagonal<StateDef>{
+            .values = {
+                // values in the selected error-state order
+            },
+        });
+```
+
+The `values` entries are variances, not sigmas, ordered exactly like the
+selected `StateDef::Error`. Runtime scenarios may override the filter initial
+covariance by adding `initialization.initial_covariance`:
+
+```json
+{
+  "initialization": {
+    "initial_covariance": {
+      "source": "runtime",
+      "diag": [ /* StateDef::Error::N variance values */ ]
+    }
+  }
+}
+```
+
+or:
+
+```json
+{
+  "initialization": {
+    "initial_covariance": {
+      "source": "runtime",
+      "full": [ /* row-major NxN covariance values */ ]
+    }
+  }
+}
+```
+
+If `initial_covariance` is absent, app-support uses the immutable compile-time
+`NavKit::initial_covariance`.
 
 The Python build wrapper forwards the same selection:
 

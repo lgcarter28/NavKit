@@ -23,17 +23,18 @@ inline void validate_runtime_rate(const nlohmann::json& cfg, std::string_view ob
     }
 }
 
-[[nodiscard]] inline core::Time_t dt_s_from_runtime_rate(const nlohmann::json& cfg,
-                                                         const core::Time_t default_dt_s)
+[[nodiscard]] inline core::Time_t dt_s_from_required_runtime_rate(const nlohmann::json& cfg,
+                                                                  std::string_view object_name)
 {
-    validate_runtime_rate(cfg, "runtime object");
+    validate_runtime_rate(cfg, object_name);
     if (cfg.contains("dt_s")) {
         return cfg.at("dt_s").get<core::Time_t>();
     }
     if (cfg.contains("rate_hz")) {
         return 1.0 / cfg.at("rate_hz").get<core::Time_t>();
     }
-    return default_dt_s;
+    detail::throw_runtime_config_error(std::string{object_name} +
+                                       " must specify one of 'dt_s' or 'rate_hz'");
 }
 
 } // namespace navkit::app_support

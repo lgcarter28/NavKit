@@ -23,7 +23,8 @@
     },
     "filter_correction": {
       "enabled": true,
-      "rate_hz": 10.0
+      "rate_hz": 10.0,
+      "covariance": "diagonal"
     },
     "measurement_statistics": {
       "enabled": true,

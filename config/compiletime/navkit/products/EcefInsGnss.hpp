@@ -43,6 +43,34 @@ struct ProductConfig
     using Profiler = core::profiling::NullProfiler;
     using Planet = core::environment::Wgs84;
     using Gravity = core::environment::J2<Planet>;
+    using InitialCovariance_t = core::estimation::InitialCovariance<StateDef>;
+    inline static const InitialCovariance_t initial_covariance =
+        core::estimation::diagonal_initial_covariance<StateDef>(
+            core::estimation::InitialCovarianceDiagonal<StateDef>{
+                .values =
+                    {
+                        // Pos
+                        10000.0,
+                        10000.0,
+                        10000.0,
+                        // Vel
+                        100.0,
+                        100.0,
+                        100.0,
+                        // AttRotVec
+                        0.007615435494667714,
+                        0.007615435494667714,
+                        0.030461741978670857,
+                        // GyroB
+                        7.615435494667714e-7,
+                        7.615435494667714e-7,
+                        7.615435494667714e-7,
+                        // AccB
+                        9.61703842225e-7,
+                        9.61703842225e-7,
+                        9.61703842225e-7,
+                    },
+            });
     static constexpr std::size_t imu_buffer_capacity = 1024U;
     static constexpr std::size_t covariance_history_capacity = 256U;
     static constexpr core::Time_t covariance_update_rate_hz = 100.0;

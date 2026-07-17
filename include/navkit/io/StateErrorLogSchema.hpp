@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstddef>
 #include <nlohmann/json.hpp>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -28,18 +29,19 @@ inline CovarianceLogMode covariance_log_mode_from_json(const nlohmann::json& cfg
                                                        const char* logging_key)
 {
     if (!cfg.contains("logging") || !cfg.at("logging").contains(logging_key)) {
-        return CovarianceLogMode::Diagonal;
+        throw std::runtime_error("missing logging covariance config for " +
+                                 std::string{logging_key});
     }
 
     const nlohmann::json& logging = cfg.at("logging").at(logging_key);
-    const std::string mode = logging.value("covariance", std::string("diagonal"));
+    const std::string mode = logging.at("covariance").get<std::string>();
     if (mode == "diagonal") {
         return CovarianceLogMode::Diagonal;
     }
     if (mode == "triangular") {
         return CovarianceLogMode::Triangular;
     }
-    return CovarianceLogMode::Diagonal;
+    throw std::runtime_error("unsupported logging covariance mode for " + std::string{logging_key});
 }
 
 inline const char* covariance_log_mode_name(CovarianceLogMode mode)

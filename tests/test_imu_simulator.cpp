@@ -189,7 +189,8 @@ TEST_CASE("IMU runtime config parser accepts ideal and error-model shapes")
     using navkit::app_support::imu_simulator_config_from_json;
     using navkit::app_support::validate_imu_runtime_config;
 
-    const nlohmann::json ideal = {{"imu", {{"type", "ideal"}, {"seed", 11U}}}};
+    const nlohmann::json ideal =
+        nlohmann::json{{"imu", {{"type", "ideal"}, {"rate_hz", 200.0}, {"seed", 11U}}}};
     CHECK_NOTHROW(validate_imu_runtime_config(ideal));
     CHECK(imu_simulator_config_from_json(ideal).seed == 11U);
 

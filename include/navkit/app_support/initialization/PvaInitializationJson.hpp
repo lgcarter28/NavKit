@@ -124,8 +124,8 @@ pva_error_from_json(const nlohmann::json& initialization, const core::Vec3& refe
 
 [[nodiscard]] inline std::string pva_error_frame_from_json(const nlohmann::json& initialization)
 {
-    require_optional_string(initialization, "pva_error_frame");
-    const std::string frame = initialization.value("pva_error_frame", std::string{"ecef"});
+    require_string(initialization, "pva_error_frame");
+    const std::string frame = initialization.at("pva_error_frame").get<std::string>();
     if (frame != "ecef" && frame != "ned") {
         throw_runtime_config_error("initialization.pva_error_frame must be 'ecef' or 'ned'");
     }

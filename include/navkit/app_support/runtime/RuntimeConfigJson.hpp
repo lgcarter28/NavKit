@@ -45,12 +45,28 @@ inline void require_optional_string(const nlohmann::json& cfg, std::string_view 
     }
 }
 
+inline void require_string(const nlohmann::json& cfg, std::string_view path)
+{
+    if (!cfg.contains(std::string(path))) {
+        throw_runtime_config_error("missing required string " + quoted_path(path));
+    }
+    require_optional_string(cfg, path);
+}
+
 inline void require_optional_bool(const nlohmann::json& cfg, std::string_view path)
 {
     const auto iter = cfg.find(std::string(path));
     if (iter != cfg.end() && !iter->is_boolean()) {
         throw_runtime_config_error("expected " + quoted_path(path) + " to be a boolean");
     }
+}
+
+inline void require_bool(const nlohmann::json& cfg, std::string_view path)
+{
+    if (!cfg.contains(std::string(path))) {
+        throw_runtime_config_error("missing required boolean " + quoted_path(path));
+    }
+    require_optional_bool(cfg, path);
 }
 
 inline void require_optional_positive_number(const nlohmann::json& cfg, std::string_view path)
@@ -67,6 +83,14 @@ inline void require_optional_positive_number(const nlohmann::json& cfg, std::str
     }
 }
 
+inline void require_positive_number(const nlohmann::json& cfg, std::string_view path)
+{
+    if (!cfg.contains(std::string(path))) {
+        throw_runtime_config_error("missing required positive number " + quoted_path(path));
+    }
+    require_optional_positive_number(cfg, path);
+}
+
 inline void require_optional_nonnegative_number(const nlohmann::json& cfg, std::string_view path)
 {
     const auto iter = cfg.find(std::string(path));
@@ -81,6 +105,14 @@ inline void require_optional_nonnegative_number(const nlohmann::json& cfg, std::
     }
 }
 
+inline void require_nonnegative_number(const nlohmann::json& cfg, std::string_view path)
+{
+    if (!cfg.contains(std::string(path))) {
+        throw_runtime_config_error("missing required nonnegative number " + quoted_path(path));
+    }
+    require_optional_nonnegative_number(cfg, path);
+}
+
 inline void require_optional_unsigned_integer(const nlohmann::json& cfg, std::string_view path)
 {
     const auto iter = cfg.find(std::string(path));
@@ -93,6 +125,14 @@ inline void require_optional_unsigned_integer(const nlohmann::json& cfg, std::st
     if (iter->is_number_integer() && iter->get<std::int64_t>() < 0) {
         throw_runtime_config_error("expected " + quoted_path(path) + " to be an unsigned integer");
     }
+}
+
+inline void require_unsigned_integer(const nlohmann::json& cfg, std::string_view path)
+{
+    if (!cfg.contains(std::string(path))) {
+        throw_runtime_config_error("missing required unsigned integer " + quoted_path(path));
+    }
+    require_optional_unsigned_integer(cfg, path);
 }
 
 inline void require_optional_vec3(const nlohmann::json& cfg, std::string_view path)

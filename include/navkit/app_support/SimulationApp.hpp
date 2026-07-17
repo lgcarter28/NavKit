@@ -57,7 +57,7 @@ public:
         Filter& filter = navigator.filter();
         const NavInitialization nav_initialization =
             NavInitializationProvider::initialize(cfg, trajectory);
-        initialize_navigator<StateDef>(navigator, nav_initialization);
+        initialize_navigator<NavKit>(nav_initialization, cfg, navigator);
         TransferAlignmentProvider::template transfer_align<Navigator>(navigator, cfg, trajectory);
 
         Logger logger(run_settings.data_dir, run_settings.run_name, cfg);

@@ -94,16 +94,18 @@ inline sim::ImuTriadErrorConfig imu_triad_config_from_json(const nlohmann::json&
 inline void validate_imu_runtime_config(const nlohmann::json& cfg)
 {
     const auto& imu = detail::require_object(cfg, "imu");
-    detail::require_optional_string(imu, "type");
-    detail::require_optional_unsigned_integer(imu, "seed");
+    detail::require_string(imu, "type");
+    detail::require_unsigned_integer(imu, "seed");
     validate_runtime_rate(imu, "imu");
-    detail::require_optional_positive_number(imu, "sample_rate_hz");
-    if ((imu.contains("dt_s") || imu.contains("rate_hz")) && imu.contains("sample_rate_hz")) {
+    if (!imu.contains("dt_s") && !imu.contains("rate_hz")) {
+        detail::throw_runtime_config_error("imu must specify one of 'dt_s' or 'rate_hz'");
+    }
+    if (imu.contains("sample_rate_hz")) {
         detail::throw_runtime_config_error(
-            "imu must specify only one of 'dt_s', 'rate_hz', or legacy 'sample_rate_hz'");
+            "imu.sample_rate_hz is unsupported; use 'dt_s' or 'rate_hz'");
     }
 
-    const auto type = imu.value("type", std::string{"ideal"});
+    const std::string type = imu.at("type").get<std::string>();
     if (type != "ideal" && type != "error_model") {
         detail::throw_runtime_config_error("imu.type must be 'ideal' or 'error_model'");
     }
@@ -132,9 +134,9 @@ inline sim::ImuSimulatorConfig imu_simulator_config_from_json(const nlohmann::js
 
     const auto& imu = cfg.at("imu");
     sim::ImuSimulatorConfig config;
-    config.seed = imu.value("seed", 42U);
+    config.seed = imu.at("seed").get<unsigned int>();
 
-    const auto type = imu.value("type", std::string{"ideal"});
+    const std::string type = imu.at("type").get<std::string>();
     if (type == "ideal") {
         return config;
     }

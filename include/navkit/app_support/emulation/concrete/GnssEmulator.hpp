@@ -31,21 +31,24 @@ struct GnssEmulator
     {
         const auto& gnss = detail::require_object(cfg, RuntimeKey);
         validate_runtime_rate(gnss, RuntimeKey);
-        detail::require_optional_nonnegative_number(gnss, "sigma_h_m");
-        detail::require_optional_nonnegative_number(gnss, "sigma_v_m");
-        detail::require_optional_unsigned_integer(gnss, "seed");
-        detail::require_optional_bool(gnss, "noise_enabled");
+        if (!gnss.contains("dt_s") && !gnss.contains("rate_hz")) {
+            detail::throw_runtime_config_error("gnss must specify one of 'dt_s' or 'rate_hz'");
+        }
+        detail::require_nonnegative_number(gnss, "sigma_h_m");
+        detail::require_nonnegative_number(gnss, "sigma_v_m");
+        detail::require_unsigned_integer(gnss, "seed");
+        detail::require_bool(gnss, "noise_enabled");
     }
 
     static RuntimeConfig runtime_config_from_json(const nlohmann::json& cfg)
     {
         const auto& gnss_config = cfg.at(RuntimeKey);
         RuntimeConfig gnss_cfg;
-        gnss_cfg.dt_s = dt_s_from_runtime_rate(gnss_config, 1.0);
-        gnss_cfg.sigma_h_m = gnss_config.value("sigma_h_m", 3.0);
-        gnss_cfg.sigma_v_m = gnss_config.value("sigma_v_m", 5.0);
-        gnss_cfg.seed = gnss_config.value("seed", 42U);
-        gnss_cfg.noise_enabled = gnss_config.value("noise_enabled", true);
+        gnss_cfg.dt_s = dt_s_from_required_runtime_rate(gnss_config, RuntimeKey);
+        gnss_cfg.sigma_h_m = gnss_config.at("sigma_h_m").get<core::Scalar_t>();
+        gnss_cfg.sigma_v_m = gnss_config.at("sigma_v_m").get<core::Scalar_t>();
+        gnss_cfg.seed = gnss_config.at("seed").get<unsigned int>();
+        gnss_cfg.noise_enabled = gnss_config.at("noise_enabled").get<bool>();
         return gnss_cfg;
     }
 

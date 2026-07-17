@@ -6,6 +6,7 @@
 #include "navkit/app_support/config/SimulationAppConfigPolicy.hpp"
 #include "navkit/app_support/emulation/EmulatorRuntimeKeys.hpp"
 #include "navkit/app_support/emulation/concrete/ImuRuntimeConfig.hpp"
+#include "navkit/app_support/initialization/InitialCovarianceJson.hpp"
 #include "navkit/app_support/runtime/RunSettings.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
 #include "navkit/app_support/runtime/RuntimeRate.hpp"
@@ -50,8 +51,8 @@ void validate_runtime_config(const nlohmann::json& cfg)
     allowed_keys.push_back("transfer_alignment");
     detail::reject_unknown_top_level_keys(cfg, allowed_keys);
 
-    detail::require_optional_string(cfg, "run_name");
-    detail::require_optional_string(cfg, "output_dir");
+    detail::require_string(cfg, "run_name");
+    detail::require_string(cfg, "output_dir");
     validate_logging_runtime_config(cfg);
 
     const auto& trajectory = detail::require_object(cfg, "trajectory");
@@ -61,8 +62,11 @@ void validate_runtime_config(const nlohmann::json& cfg)
         detail::throw_runtime_config_error(
             "trajectory.type must be 'stationary' for the current navkit_sim trajectory provider");
     }
-    detail::require_optional_positive_number(trajectory, "duration_s");
+    detail::require_positive_number(trajectory, "duration_s");
     validate_runtime_rate(trajectory, "trajectory");
+    if (!trajectory.contains("dt_s") && !trajectory.contains("rate_hz")) {
+        detail::throw_runtime_config_error("trajectory must specify one of 'dt_s' or 'rate_hz'");
+    }
     detail::require_optional_vec3(trajectory, "p_e_m");
     detail::require_optional_vec3(trajectory, "p_lla_deg_m");
     detail::require_optional_vec3(trajectory, "v_e_mps");
@@ -107,6 +111,7 @@ void validate_runtime_config(const nlohmann::json& cfg)
     validate_imu_runtime_config(cfg);
 
     NavInitializationProvider::validate_runtime_config(cfg);
+    detail::validate_runtime_initial_covariance_shape<typename Config::NavKit::StateDef>(cfg);
     TransferAlignmentProvider::validate_runtime_config(cfg);
 }
 

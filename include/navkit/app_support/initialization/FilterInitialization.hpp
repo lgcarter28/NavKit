@@ -3,90 +3,24 @@
 
 #pragma once
 
+#include "navkit/app_support/initialization/InitialCovarianceJson.hpp"
 #include "navkit/app_support/initialization/NavInitialization.hpp"
 #include "navkit/core/config/Types.hpp"
 #include "navkit/core/estimation/filter/FilterPolicy.hpp"
-#include "navkit/core/estimation/navigator/PvaStateDef.hpp"
 #include "navkit/core/estimation/state/State.hpp"
 #include "navkit/core/math/Quaternion.hpp"
 
-#include <Eigen/Dense>
+#include <nlohmann/json.hpp>
 
 namespace navkit::app_support
 {
 
-namespace detail
+template<typename InitializerConfig, navkit::core::estimation::FilterPolicy Filter>
+void initialize_filter_from_nav_initialization(const NavInitialization& nav_init,
+                                               const nlohmann::json& cfg,
+                                               Filter& filter)
 {
-
-template<typename TargetRow, typename TargetCol, typename SourceRow, typename SourceCol, typename P>
-void copy_pva_covariance_block(P& target_covariance,
-                               const core::estimation::PvaCovariance& pva_covariance)
-{
-    target_covariance.template block<TargetRow::sz, TargetCol::sz>(TargetRow::i, TargetCol::i) =
-        pva_covariance.template block<SourceRow::sz, SourceCol::sz>(SourceRow::i, SourceCol::i);
-}
-
-template<navkit::core::estimation::StateSpaceDefPolicy StateDef, typename P>
-void copy_pva_covariance(P& target_covariance,
-                         const core::estimation::PvaCovariance& pva_covariance)
-{
-    using Error = typename StateDef::Error;
-
-    copy_pva_covariance_block<typename Error::Pos,
-                              typename Error::Pos,
-                              core::estimation::PvaErrorStateDef::Pos,
-                              core::estimation::PvaErrorStateDef::Pos>(target_covariance,
-                                                                       pva_covariance);
-    copy_pva_covariance_block<typename Error::Pos,
-                              typename Error::Vel,
-                              core::estimation::PvaErrorStateDef::Pos,
-                              core::estimation::PvaErrorStateDef::Vel>(target_covariance,
-                                                                       pva_covariance);
-    copy_pva_covariance_block<typename Error::Pos,
-                              typename Error::AttRotVec,
-                              core::estimation::PvaErrorStateDef::Pos,
-                              core::estimation::PvaErrorStateDef::AttRotVec>(target_covariance,
-                                                                             pva_covariance);
-
-    copy_pva_covariance_block<typename Error::Vel,
-                              typename Error::Pos,
-                              core::estimation::PvaErrorStateDef::Vel,
-                              core::estimation::PvaErrorStateDef::Pos>(target_covariance,
-                                                                       pva_covariance);
-    copy_pva_covariance_block<typename Error::Vel,
-                              typename Error::Vel,
-                              core::estimation::PvaErrorStateDef::Vel,
-                              core::estimation::PvaErrorStateDef::Vel>(target_covariance,
-                                                                       pva_covariance);
-    copy_pva_covariance_block<typename Error::Vel,
-                              typename Error::AttRotVec,
-                              core::estimation::PvaErrorStateDef::Vel,
-                              core::estimation::PvaErrorStateDef::AttRotVec>(target_covariance,
-                                                                             pva_covariance);
-
-    copy_pva_covariance_block<typename Error::AttRotVec,
-                              typename Error::Pos,
-                              core::estimation::PvaErrorStateDef::AttRotVec,
-                              core::estimation::PvaErrorStateDef::Pos>(target_covariance,
-                                                                       pva_covariance);
-    copy_pva_covariance_block<typename Error::AttRotVec,
-                              typename Error::Vel,
-                              core::estimation::PvaErrorStateDef::AttRotVec,
-                              core::estimation::PvaErrorStateDef::Vel>(target_covariance,
-                                                                       pva_covariance);
-    copy_pva_covariance_block<typename Error::AttRotVec,
-                              typename Error::AttRotVec,
-                              core::estimation::PvaErrorStateDef::AttRotVec,
-                              core::estimation::PvaErrorStateDef::AttRotVec>(target_covariance,
-                                                                             pva_covariance);
-}
-
-} // namespace detail
-
-template<navkit::core::estimation::StateSpaceDefPolicy StateDef,
-         navkit::core::estimation::FilterPolicy Filter>
-void initialize_filter_from_nav_initialization(Filter& filter, const NavInitialization& nav_init)
-{
+    using StateDef = typename InitializerConfig::StateDef;
     using Nominal = typename StateDef::Nominal;
 
     typename Filter::State_t initial_state = Filter::State_t::Zero();
@@ -99,23 +33,17 @@ void initialize_filter_from_nav_initialization(Filter& filter, const NavInitiali
 
     filter.set_state(initial_state);
 
-    typename Filter::P_t initial_covariance = Filter::P_t::Identity();
-    initial_covariance *= 1.0e-6;
-    detail::copy_pva_covariance<StateDef>(initial_covariance, nav_init.pva_cov);
-    if constexpr (requires { typename StateDef::Error::GyroB; }) {
-        constexpr core::Scalar_t gyro_bias_sigma_radps = 8.726646259971648e-4;
-        constexpr core::Scalar_t gyro_bias_variance = gyro_bias_sigma_radps * gyro_bias_sigma_radps;
-        initial_covariance.template block<3, 3>(StateDef::Error::GyroB::i,
-                                                StateDef::Error::GyroB::i) =
-            Eigen::Matrix<core::Scalar_t, 3, 3>::Identity() * gyro_bias_variance;
-    }
+    const typename Filter::P_t initial_covariance =
+        detail::initial_covariance_from_json<StateDef>(cfg, InitializerConfig::initial_covariance);
     filter.set_covariance(initial_covariance);
 }
 
-template<navkit::core::estimation::StateSpaceDefPolicy StateDef, typename Navigator>
-void initialize_navigator(Navigator& navigator, const NavInitialization& nav_init)
+template<typename InitializerConfig, typename Navigator>
+void initialize_navigator(const NavInitialization& nav_init,
+                          const nlohmann::json& cfg,
+                          Navigator& navigator)
 {
-    initialize_filter_from_nav_initialization<StateDef>(navigator.filter(), nav_init);
+    initialize_filter_from_nav_initialization<InitializerConfig>(nav_init, cfg, navigator.filter());
 }
 
 } // namespace navkit::app_support
