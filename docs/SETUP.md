@@ -263,8 +263,9 @@ These scripts provide a consistent cross-platform workflow and abstract away pla
 |---------|---------|
 | `build.py` | Configure, build, and rebuild NavKit using Conan and CMake |
 | `run_tests.py` | Execute the complete unit test suite |
-| `run_first_sim.py` | Run the default stationary GNSS simulation |
-| `run_analysis.py` | Generate plots and analysis from simulation logs |
+| `run_sim.py` | Run a selected runtime scenario with the built simulation executable |
+| `run_analysis.py` | Generate plots and analysis from existing simulation logs |
+| `run_scenario.py` | Run a scenario, optionally override output location, and generate plots |
 | `timing_report.py` | Summarize a complete `navkit.timing.v1` timing artifact |
 | `resource_report.py` | Write and display coarse executable/library size reports for a build tree |
 | `format.py` | Run clang-format; also exposes clang-tidy for CI diagnostics |
@@ -338,7 +339,7 @@ configuration:
 
 ```bash
 python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/ProfiledEcefInsGnss.hpp
-python tools/run_first_sim.py --build-type Debug
+python tools/run_sim.py --build-type Debug --navkit-config apps/navkit_sim/ProfiledEcefInsGnss.hpp
 ```
 
 That writes `profile.csv` and `profile.trace.json` under
@@ -373,8 +374,11 @@ sessions use Ninja with MSVC without first opening a Visual Studio Developer
 Prompt.
 
 Run wrappers use `--build-type` to choose the Debug or Release executable from
-the default build tree. When you intentionally keep multiple build trees for
-different selected configs, pass the matching `--build-dir` to the run wrapper.
+the default build tree. `--navkit-config` is still a compile-time-config path:
+it locates the corresponding build tree and executable; it does not change an
+already-built executable at runtime. When you intentionally keep multiple build
+trees for different selected configs, pass the matching `--build-dir` to the run
+wrapper.
 
 `CMakePresets.json` also contains example selected-config presets such as
 `debug-ecef-ins-gnss`, `debug-profiled-ecef-ins-gnss`,
@@ -518,12 +522,31 @@ ctest --test-dir build/release/apps/navkit_sim/EcefInsGnss --output-on-failure -
 
 ---
 
-## Run the First Simulation
+## Run a Simulation Scenario
 
-Run the first stationary ECEF INS/GNSS-position simulation:
+Run the default stationary ECEF INS/GNSS-position scenario and generate plots:
 
 ```bash
-python tools/run_first_sim.py --build-type Debug
+python tools/run_scenario.py --build-type Debug
+```
+
+Run a specific runtime input and place all outputs under a chosen run folder:
+
+```bash
+python tools/run_scenario.py --build-type Release \
+  --config config/runtime/navkit_sim/ecef_ins_gnss.json \
+  --output-dir output/logs/my_case
+```
+
+`run_scenario.py` writes an `effective_runtime_config.json` into the selected
+output directory when `--output-dir` or `--run-name` overrides are provided,
+then runs the simulation and invokes `run_analysis.py` on that folder. Add
+`--no-plot` when only the C++ simulation should run.
+
+For sim-only workflows, use the lower-level runner:
+
+```bash
+python tools/run_sim.py --build-type Debug --config config/runtime/navkit_sim/ecef_ins_gnss.json
 ```
 
 Or manually, after building:
@@ -601,12 +624,12 @@ simulator type is compiled in.
 Example:
 
 ```bash
-python python/navkit_analysis/plots.py output/logs/ecef_ins_gnss_demo
+python tools/run_analysis.py output/logs/ecef_ins_gnss_demo
 ```
 
 Or, to display an interactive browser of the figures:
 ```bash
-python python/navkit_analysis/plots.py output/logs/ecef_ins_gnss_demo --show
+python tools/run_analysis.py output/logs/ecef_ins_gnss_demo --show
 ```
 
 Future plotting utilities will include:
@@ -634,7 +657,7 @@ output/logs/<run_name>/timing.json
 For the default stationary GNSS workflow:
 
 ```bash
-python tools/run_first_sim.py --build-type Debug
+python tools/run_sim.py --build-type Debug
 python tools/run_analysis.py output/logs/ecef_ins_gnss_demo
 ```
 
@@ -654,8 +677,7 @@ artifact during normal use:
 ```bash
 python tools/build.py --build-type Debug --skip-conan
 python tools/run_tests.py --build-type Debug
-python tools/run_first_sim.py --build-type Debug
-python tools/run_analysis.py output/logs/ecef_ins_gnss_demo
+python tools/run_scenario.py --build-type Debug
 ```
 
 Use `--timing-output <path>` on `build.py` or `run_tests.py` to write to a
@@ -877,9 +899,7 @@ python tools/build.py --build-type Debug --build-only
 
 python tools/run_tests.py --build-type Debug
 
-python tools/run_first_sim.py --build-type Debug
-
-python tools/run_analysis.py output/logs/ecef_ins_gnss_demo --show
+python tools/run_scenario.py --build-type Debug --show
 
 update CHANGELOG.md for changes worth tracking
 

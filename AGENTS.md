@@ -125,8 +125,7 @@ Use `python tools/build.py --build-type Release --clean --without-tests` when a 
 For changes affecting the simulation or navigation results, also run:
 
 ```powershell
-python tools/run_first_sim.py --build-type Debug
-python tools/run_analysis.py output/logs/stationary_gnss_demo --show
+python tools/run_scenario.py --build-type Debug --show
 ```
 
 Simulation logs belong under `output/logs/<run_name>/`. The analysis package is deliberately separate from the embedded C++ library.

@@ -26,6 +26,13 @@ from profile_report import (
     summarize,
     write_chrome_trace,
 )
+from runtime_config import (
+    apply_runtime_overrides,
+    load_runtime_config,
+    runtime_output_dir,
+    runtime_run_name,
+    write_effective_runtime_config,
+)
 
 
 def default_exe(build_dir: Path, build_type: str) -> Path:
@@ -43,32 +50,6 @@ def load_build_manifest(build_dir: Path) -> dict[str, object]:
     if not manifest_path.exists():
         return {}
     return json.loads(manifest_path.read_text(encoding="utf-8"))
-
-
-def merge_json_object(source: dict[str, object], target: dict[str, object]) -> None:
-    for key, value in source.items():
-        if key == "components":
-            continue
-        existing = target.get(key)
-        if isinstance(existing, dict) and isinstance(value, dict):
-            merge_json_object(value, existing)
-        else:
-            target[key] = value
-
-
-def load_runtime_config(path: Path) -> dict[str, object]:
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    merged: dict[str, object] = {}
-    components = raw.get("components", [])
-    if components:
-        if not isinstance(components, list):
-            raise ValueError("runtime config 'components' must be a list")
-        for component in components:
-            if not isinstance(component, str):
-                raise ValueError("runtime config component entries must be strings")
-            merge_json_object(load_runtime_config(path.parent / component), merged)
-    merge_json_object(raw, merged)
-    return merged
 
 
 def build_manifest_path(build_dir: Path) -> Path:
@@ -96,7 +77,7 @@ def remove_stale_profile_artifacts(output_dir: Path) -> bool:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Run the configured NavKit simulation app.")
     parser.add_argument("--build-type", choices=["Release", "Debug"], default="Release")
     parser.add_argument(
         "--build-dir",
@@ -111,10 +92,30 @@ def main() -> int:
     parser.add_argument(
         "--navkit-config",
         default=DEFAULT_NAVKIT_CONFIG,
-        help="Compile-time config header relative to config/compiletime.",
+        help=(
+            "Compile-time config header relative to config/compiletime. This locates the "
+            "matching build tree/executable; it does not switch a compiled executable at runtime."
+        ),
     )
     parser.add_argument(
         "--config", type=Path, default=Path("config/runtime/navkit_sim/ecef_ins_gnss.json")
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Override the runtime config output_dir. Writes an effective_runtime_config.json "
+            "into the selected output directory and runs the sim with that file."
+        ),
+    )
+    parser.add_argument(
+        "--run-name",
+        default=None,
+        help=(
+            "Override the runtime config run_name. Defaults to the output directory name when "
+            "--output-dir is provided."
+        ),
     )
     parser.add_argument(
         "--no-timing-report",
@@ -140,18 +141,24 @@ def main() -> int:
     build_manifest = load_build_manifest(build_dir)
     navkit_config = str(build_manifest.get("navkit_config", "unknown"))
 
-    runtime_config = load_runtime_config(args.config)
-    run_name = runtime_config.get("run_name", "ecef_ins_gnss_demo")
-    output_dir = Path(runtime_config.get("output_dir", f"output/logs/{run_name}"))
+    runtime_config = apply_runtime_overrides(
+        load_runtime_config(args.config), output_dir=args.output_dir, run_name=args.run_name
+    )
+    run_name = runtime_run_name(runtime_config)
+    output_dir = runtime_output_dir(runtime_config)
     data_dir = output_dir / "data"
     timing_path = data_dir / "timing.json"
     data_dir.mkdir(parents=True, exist_ok=True)
+
+    runtime_config_path = args.config
+    if args.output_dir is not None or args.run_name is not None:
+        runtime_config_path = write_effective_runtime_config(runtime_config, output_dir)
 
     if not remove_stale_profile_artifacts(data_dir):
         return 1
 
     exe = default_exe(build_dir, args.build_type)
-    command = [str(exe), str(args.config)]
+    command = [str(exe), str(runtime_config_path)]
     print(f"Build config: {navkit_config}")
     print(f"Running {' '.join(command)}")
 
@@ -165,7 +172,7 @@ def main() -> int:
         result=result,
         build_type=args.build_type,
         navkit_config=navkit_config,
-        tool_version="run_first_sim.py",
+        tool_version="run_sim.py",
     )
     if not args.no_timing_report:
         print()

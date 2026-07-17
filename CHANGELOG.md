@@ -40,6 +40,7 @@ This project follows
 - Shared runtime cadence parsing for `rate_hz` or `dt_s`, plus a small IMU runtime helper that keeps IMU simulator initialization/generation details out of the central simulation loop.
 - Compile-time medium-rate covariance cadence and bounded covariance-step history configuration for Navigator propagation products.
 - Runtime-configurable console, truth, nav-estimate, and measurement-statistics logging cadences so high-rate simulation no longer forces high-rate file or console output.
+- A `tools/run_scenario.py` workflow that runs a runtime scenario, can override output location/run name without mutating checked-in JSON, writes an effective runtime config, and then runs the standard analysis plots.
 
 ### Changed
 
@@ -122,12 +123,14 @@ This project follows
 - Reduced the v1 INS state definitions to bias-only PVA/IMU-error states by removing stale gyro and accelerometer scale-factor segments.
 - Moved reusable coning/sculling, planet-rate, gravity-gradient, quaternion/RPY, and simulation random-draw helpers toward their owning domains instead of keeping them inside the first ECEF INS and IMU simulator implementations.
 - Moved filter initial covariance into a selected immutable NavKit product config value using `InitialCovariance<StateDef>` and `diagonal_initial_covariance<StateDef>()`, tuned the current examples to variance values corresponding to 50 milli-deg/s gyro bias and 100 micro-g accelerometer bias, swept app-support runtime parsing to remove hidden scenario fallback defaults, and added runtime JSON override validation for configured initial covariance, including raw full-state forms and a frame-aware PVA plus remaining-error-state diagonal form.
+- Renamed the repo-level simulation wrapper from `tools/run_first_sim.py` to `tools/run_sim.py`, clarified that `--navkit-config` locates a compile-time-configured build tree rather than changing runtime behavior, and factored runtime JSON merge/output override handling into reusable tool helpers.
 
 ### Removed
 
 - Removed the public `SensorGraphConfigPolicy` helper and the `MeasurementModelsFromSensors_t` derivation path.
 
 - Placeholder `imu_gnss_straight_line.json` runtime config until the corresponding simulation path is real and validated.
+- Removed the obsolete `python/navkit_analysis/run_sim.py` package helper; simulation launching now belongs to repo-level tools.
 
 ### Fixed
 

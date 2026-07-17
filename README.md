@@ -152,11 +152,17 @@ For changes worth tracking, update `CHANGELOG.md`. If behavior, layout,
 tooling, or workflow changes, also reconcile `README.md` and `docs/SETUP.md`
 before the final checks.
 
-Run the working demonstration and analysis:
+Run the working demonstration and analysis in one command:
 
 ```text
-python tools/run_first_sim.py --build-type Debug
-python tools/run_analysis.py output/logs/stationary_gnss_demo --show
+python tools/run_scenario.py --build-type Debug --show
+```
+
+Run a specific runtime input and put all logs/figures under a chosen output
+folder:
+
+```text
+python tools/run_scenario.py --build-type Release --config config/runtime/navkit_sim/ecef_ins_gnss.json --output-dir output/logs/my_case
 ```
 
 ## Documentation

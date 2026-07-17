@@ -116,7 +116,7 @@ The easiest end-to-end profiling demo is the profiled stationary GNSS config:
 python tools/build.py --build-type Debug --skip-conan \
   --navkit-config apps/navkit_sim/ProfiledEcefInsGnss.hpp
 
-python tools/run_first_sim.py --build-type Debug
+python tools/run_sim.py --build-type Debug --navkit-config apps/navkit_sim/ProfiledEcefInsGnss.hpp
 ```
 
 That writes:
@@ -125,11 +125,11 @@ That writes:
 - `output/logs/ecef_ins_gnss_demo/profile_run_manifest.json`
 - `output/logs/ecef_ins_gnss_demo/profile.trace.json`
 
-`run_first_sim.py` reads the selected compile-time config from the build
-manifest written by `tools/build.py`; the compile-time config does not need to
-be repeated when running the executable. The runner prints the profile summary
-and writes the trace JSON automatically when `profile.csv` exists. Use
-`--no-profile-report` or `--no-profile-trace` for quieter runs.
+`run_sim.py --navkit-config` uses the compile-time config path to locate the
+matching build tree and executable; it does not switch the compiled executable
+at runtime. The runner prints the profile summary and writes the trace JSON
+automatically when `profile.csv` exists. Use `--no-profile-report` or
+`--no-profile-trace` for quieter runs.
 
 `--build-type` still matters because Debug and Release builds can coexist. If
 you keep multiple selected configs in separate build trees, pass `--build-dir`
