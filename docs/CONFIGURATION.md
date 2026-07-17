@@ -387,7 +387,6 @@ covariance by adding `initialization.initial_covariance`:
 {
   "initialization": {
     "initial_covariance": {
-      "source": "runtime",
       "diag": [ /* StateDef::Error::N variance values */ ]
     }
   }
@@ -400,7 +399,6 @@ or:
 {
   "initialization": {
     "initial_covariance": {
-      "source": "runtime",
       "full": [ /* row-major NxN covariance values */ ]
     }
   }

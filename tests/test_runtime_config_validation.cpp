@@ -327,8 +327,7 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects ambiguous initialization cova
 TEST_CASE("ECEF INS GNSS runtime validator rejects malformed runtime initial covariance")
 {
     auto cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("initialization")
-        .emplace("initial_covariance", nlohmann::json{{"source", "runtime"}, {"diag", {1.0, 2.0}}});
+    cfg.at("initialization").emplace("initial_covariance", nlohmann::json{{"diag", {1.0, 2.0}}});
 
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
@@ -338,8 +337,7 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts runtime initial covariance")
     auto cfg = valid_ecef_ins_gnss_runtime_config();
     cfg.at("initialization")
         .emplace("initial_covariance",
-                 nlohmann::json{{"source", "runtime"},
-                                {"diag",
+                 nlohmann::json{{"diag",
                                  {1.0,
                                   2.0,
                                   3.0,
@@ -483,9 +481,8 @@ TEST_CASE("Explicit PVA initialization provider accepts full row-major covarianc
     using Error = StateDef::Error;
     auto navigator = std::make_unique<NavKit::Navigator>();
     cfg.at("initialization")
-        .emplace(
-            "initial_covariance",
-            nlohmann::json{{"source", "runtime"}, {"full", identity_initial_covariance_full()}});
+        .emplace("initial_covariance",
+                 nlohmann::json{{"full", identity_initial_covariance_full()}});
     cfg.at("initialization").at("initial_covariance").at("full").at((0U * 15U) + 3U) = 0.25;
     cfg.at("initialization").at("initial_covariance").at("full").at((3U * 15U) + 0U) = 0.25;
     initialize_navigator<NavKit>(nav_init, cfg, *navigator);

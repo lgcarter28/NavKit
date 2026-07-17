@@ -9,7 +9,6 @@
 
 #include <cstddef>
 #include <nlohmann/json.hpp>
-#include <string>
 
 namespace navkit::app_support::detail
 {
@@ -31,12 +30,6 @@ inline void validate_runtime_initial_covariance_shape(const nlohmann::json& cfg)
     }
 
     const nlohmann::json& initial_covariance = *covariance_iter;
-    require_string(initial_covariance, "source");
-    const std::string source = initial_covariance.at("source").get<std::string>();
-    if (source != "runtime") {
-        throw_runtime_config_error("initialization.initial_covariance.source must be 'runtime'");
-    }
-
     const bool has_diag = initial_covariance.contains("diag");
     const bool has_full = initial_covariance.contains("full");
     if (has_diag == has_full) {

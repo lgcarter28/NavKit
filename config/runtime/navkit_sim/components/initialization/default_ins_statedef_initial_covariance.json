@@ -1,7 +1,6 @@
 {
   "initialization": {
     "initial_covariance": {
-      "source": "runtime",
       "diag": [
         10000.0,
         10000.0,
