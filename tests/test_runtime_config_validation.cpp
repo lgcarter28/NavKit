@@ -357,6 +357,37 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts runtime initial covariance")
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
 }
 
+TEST_CASE("ECEF INS GNSS runtime validator accepts frame-aware PVA initial covariance")
+{
+    auto cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("initialization")
+        .emplace(
+            "initial_covariance",
+            nlohmann::json{{"pva_frame", "ned"},
+                           {"pva_diag",
+                            {{"pos_m2", {1.0, 2.0, 3.0}},
+                             {"vel_m2ps2", {4.0, 5.0, 6.0}},
+                             {"att_rotvec_rad2", {7.0, 8.0, 9.0}}}},
+                           {"remaining_error_state_diag", {10.0, 11.0, 12.0, 13.0, 14.0, 15.0}}});
+
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+}
+
+TEST_CASE("ECEF INS GNSS runtime validator rejects malformed frame-aware PVA initial covariance")
+{
+    auto cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("initialization")
+        .emplace("initial_covariance",
+                 nlohmann::json{{"pva_frame", "ned"},
+                                {"pva_diag",
+                                 {{"pos_m2", {1.0, 2.0, 3.0}},
+                                  {"vel_m2ps2", {4.0, 5.0, 6.0}},
+                                  {"att_rotvec_rad2", {7.0, 8.0, 9.0}}}},
+                                {"remaining_error_state_diag", {10.0, 11.0}}});
+
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+}
+
 TEST_CASE("ECEF INS GNSS runtime validator rejects disabled transfer alignment inputs")
 {
     auto cfg = valid_ecef_ins_gnss_runtime_config();
@@ -488,6 +519,47 @@ TEST_CASE("Explicit PVA initialization provider accepts full row-major covarianc
     initialize_navigator<NavKit>(nav_init, cfg, *navigator);
     CHECK(navigator->filter().covariance()(Error::Pos::i, Error::Vel::i) == doctest::Approx(0.25));
     CHECK(navigator->filter().covariance()(Error::Vel::i, Error::Pos::i) == doctest::Approx(0.25));
+}
+
+TEST_CASE("Frame-aware PVA initial covariance populates the full filter covariance")
+{
+    using NavKit = EcefInsGnssAppConfig::NavKit;
+    using StateDef = NavKit::StateDef;
+    using Error = StateDef::Error;
+
+    auto cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("initialization")
+        .emplace(
+            "initial_covariance",
+            nlohmann::json{{"pva_frame", "ned"},
+                           {"pva_diag",
+                            {{"pos_m2", {1.0, 2.0, 3.0}},
+                             {"vel_m2ps2", {4.0, 5.0, 6.0}},
+                             {"att_rotvec_rad2", {7.0, 8.0, 9.0}}}},
+                           {"remaining_error_state_diag", {10.0, 11.0, 12.0, 13.0, 14.0, 15.0}}});
+    const auto trajectory = trajectory_run_from_json(cfg);
+    const auto nav_init =
+        EcefInsGnssAppConfig::NavInitializationProvider::initialize(cfg, trajectory);
+
+    auto navigator = std::make_unique<NavKit::Navigator>();
+    initialize_navigator<NavKit>(nav_init, cfg, *navigator);
+    const auto& covariance = navigator->filter().covariance();
+
+    CHECK(covariance(Error::Pos::i + 0, Error::Pos::i + 0) == doctest::Approx(3.0));
+    CHECK(covariance(Error::Pos::i + 1, Error::Pos::i + 1) == doctest::Approx(2.0));
+    CHECK(covariance(Error::Pos::i + 2, Error::Pos::i + 2) == doctest::Approx(1.0));
+    CHECK(covariance(Error::Vel::i + 0, Error::Vel::i + 0) == doctest::Approx(6.0));
+    CHECK(covariance(Error::Vel::i + 1, Error::Vel::i + 1) == doctest::Approx(5.0));
+    CHECK(covariance(Error::Vel::i + 2, Error::Vel::i + 2) == doctest::Approx(4.0));
+    CHECK(covariance(Error::AttRotVec::i + 0, Error::AttRotVec::i + 0) == doctest::Approx(9.0));
+    CHECK(covariance(Error::AttRotVec::i + 1, Error::AttRotVec::i + 1) == doctest::Approx(8.0));
+    CHECK(covariance(Error::AttRotVec::i + 2, Error::AttRotVec::i + 2) == doctest::Approx(7.0));
+    CHECK(covariance(Error::GyroB::i + 0, Error::GyroB::i + 0) == doctest::Approx(10.0));
+    CHECK(covariance(Error::GyroB::i + 1, Error::GyroB::i + 1) == doctest::Approx(11.0));
+    CHECK(covariance(Error::GyroB::i + 2, Error::GyroB::i + 2) == doctest::Approx(12.0));
+    CHECK(covariance(Error::AccB::i + 0, Error::AccB::i + 0) == doctest::Approx(13.0));
+    CHECK(covariance(Error::AccB::i + 1, Error::AccB::i + 1) == doctest::Approx(14.0));
+    CHECK(covariance(Error::AccB::i + 2, Error::AccB::i + 2) == doctest::Approx(15.0));
 }
 
 TEST_CASE("Random PVA initialization provider produces deterministic colored draws")

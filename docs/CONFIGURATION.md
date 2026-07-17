@@ -408,6 +408,38 @@ or:
 If `initial_covariance` is absent, app-support uses the immutable compile-time
 `NavKit::initial_covariance`.
 
+For INS-style scenarios, runtime JSON may also use a mixed structured form that
+keeps the PVA block frame-aware while leaving the remaining error-state terms
+generic and order-based:
+
+```json
+{
+  "initialization": {
+    "initial_covariance": {
+      "pva_frame": "ned",
+      "pva_diag": {
+        "pos_m2": [100.0, 100.0, 100.0],
+        "vel_m2ps2": [10.0, 10.0, 10.0],
+        "att_rotvec_rad2": [0.001, 0.001, 0.001]
+      },
+      "remaining_error_state_diag": [
+        /* variance values for every non-PVA error-state dimension */
+      ]
+    }
+  }
+}
+```
+
+`pva_frame` may be `"ecef"` or `"ned"`. The PVA block maps to
+`StateDef::Error::Pos`, `Vel`, and `AttRotVec`; NED-authored PVA covariance is
+rotated into the internal ECEF-resolved covariance at initialization using the
+startup reference position. `remaining_error_state_diag` fills all non-PVA
+error-state dimensions in the selected `StateDef::Error` order, skipping the
+PVA segments. For the default INS error state, those remaining values currently
+map to gyro bias followed by accelerometer bias. Exactly one runtime initial
+covariance form may be provided: raw `diag`, raw `full`, or the structured
+`pva_diag` plus `remaining_error_state_diag` form.
+
 The Python build wrapper forwards the same selection:
 
 ```text
