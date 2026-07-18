@@ -42,24 +42,26 @@ struct ValidMeasurement
     using H_t = Eigen::Matrix<Scalar_t, M, MeasurementModelPolicyTestErrorStateDef::N>;
     using K_t = Eigen::Matrix<Scalar_t, MeasurementModelPolicyTestErrorStateDef::N, M>;
 
-    struct NoiseContext
+    struct ObservationContext
     {
         Scalar_t sigma{1.0};
     };
 
-    static O_t obs(const State_t& unused_state)
+    static O_t obs(const State_t& unused_state, const ObservationContext& unused_context)
     {
         static_cast<void>(unused_state);
+        static_cast<void>(unused_context);
         return O_t::Zero();
     }
 
-    static H_t compute_h(const State_t& unused_state)
+    static H_t compute_h(const State_t& unused_state, const ObservationContext& unused_context)
     {
         static_cast<void>(unused_state);
+        static_cast<void>(unused_context);
         return H_t::Zero();
     }
 
-    static R_t compute_r(const NoiseContext& ctx)
+    static R_t compute_r(const ObservationContext& ctx)
     {
         return (ctx.sigma * ctx.sigma) * R_t::Identity();
     }
@@ -92,7 +94,7 @@ struct LocalReset
     }
 };
 
-struct MissingNoiseContext
+struct MissingObservationContext
 {
     static constexpr int M = 2;
     using State_t = NominalState<MeasurementModelPolicyTestStateDef>;
@@ -110,12 +112,12 @@ struct MissingGainType
     using R_t = Eigen::Matrix<Scalar_t, M, M>;
     using H_t = Eigen::Matrix<Scalar_t, M, MeasurementModelPolicyTestErrorStateDef::N>;
 
-    struct NoiseContext
+    struct ObservationContext
     {};
 
-    static O_t obs(const State_t&);
-    static H_t compute_h(const State_t&);
-    static R_t compute_r(const NoiseContext&);
+    static O_t obs(const State_t&, const ObservationContext&);
+    static H_t compute_h(const State_t&, const ObservationContext&);
+    static R_t compute_r(const ObservationContext&);
 };
 
 struct BadObservationReturn
@@ -127,12 +129,12 @@ struct BadObservationReturn
     using H_t = Eigen::Matrix<Scalar_t, M, MeasurementModelPolicyTestErrorStateDef::N>;
     using K_t = Eigen::Matrix<Scalar_t, MeasurementModelPolicyTestErrorStateDef::N, M>;
 
-    struct NoiseContext
+    struct ObservationContext
     {};
 
-    static R_t obs(const State_t&);
-    static H_t compute_h(const State_t&);
-    static R_t compute_r(const NoiseContext&);
+    static R_t obs(const State_t&, const ObservationContext&);
+    static H_t compute_h(const State_t&, const ObservationContext&);
+    static R_t compute_r(const ObservationContext&);
 };
 
 struct WrongGainDimensions
@@ -144,12 +146,12 @@ struct WrongGainDimensions
     using H_t = Eigen::Matrix<Scalar_t, M, MeasurementModelPolicyTestErrorStateDef::N>;
     using K_t = Eigen::Matrix<Scalar_t, M, MeasurementModelPolicyTestErrorStateDef::N>;
 
-    struct NoiseContext
+    struct ObservationContext
     {};
 
-    static O_t obs(const State_t&);
-    static H_t compute_h(const State_t&);
-    static R_t compute_r(const NoiseContext&);
+    static O_t obs(const State_t&, const ObservationContext&);
+    static H_t compute_h(const State_t&, const ObservationContext&);
+    static R_t compute_r(const ObservationContext&);
 };
 
 TEST_CASE("MeasurementModelPolicy accepts compatible measurement models")
@@ -167,7 +169,8 @@ TEST_CASE("MeasurementModelPolicy accepts compatible measurement models")
 
 TEST_CASE("MeasurementModelPolicy rejects incomplete or incompatible models")
 {
-    static_assert(!MeasurementModelPolicy<MissingNoiseContext, MeasurementModelPolicyTestStateDef>);
+    static_assert(
+        !MeasurementModelPolicy<MissingObservationContext, MeasurementModelPolicyTestStateDef>);
     static_assert(!MeasurementModelPolicy<MissingGainType, MeasurementModelPolicyTestStateDef>);
     static_assert(
         !MeasurementModelPolicy<BadObservationReturn, MeasurementModelPolicyTestStateDef>);
@@ -184,7 +187,7 @@ TEST_CASE("KalmanFilter accepts constrained measurement models at observation bo
     static_assert(std::is_default_constructible_v<Filter>);
 
     Filter filter;
-    ValidMeasurement::NoiseContext ctx{};
+    ValidMeasurement::ObservationContext ctx{};
     filter.observation_update<ValidMeasurement>(ValidMeasurement::O_t::Zero(), ctx);
 
     CHECK(filter.error_state().isZero());

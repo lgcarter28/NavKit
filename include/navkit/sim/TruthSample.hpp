@@ -21,6 +21,7 @@ struct TruthSample
     Eigen::Matrix<Scalar_t, 3, 1> v_e{Eigen::Matrix<Scalar_t, 3, 1>::Zero()};
     // Body-to-ECEF attitude. Applying q_b2e to a body-resolved vector resolves it in ECEF.
     Eigen::Quaternion<Scalar_t> q_b2e{Eigen::Quaternion<Scalar_t>::Identity()};
+    Eigen::Matrix<Scalar_t, 3, 1> w_ib_b_radps{Eigen::Matrix<Scalar_t, 3, 1>::Zero()};
 };
 
 } // namespace navkit::sim

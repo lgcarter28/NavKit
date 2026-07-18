@@ -10,6 +10,7 @@
 #include "navkit/io/LoggerPolicy.hpp"
 #include "navkit/io/RunLogger.hpp"
 #include "navkit/io/log_payloads/FilterCorrectionLogPayload.hpp"
+#include "navkit/io/log_payloads/GnssMeasurementLogPayload.hpp"
 #include "navkit/io/log_payloads/ImuDebugLogPayload.hpp"
 #include "navkit/io/log_payloads/ImuIncrementLogPayload.hpp"
 #include "navkit/io/log_payloads/MeasurementStatisticsLogPayload.hpp"
@@ -46,6 +47,7 @@ using Filter = navkit::core::estimation::KalmanFilter<
     navkit::core::estimation::DefaultResetPolicy<StateDef>,
     Sensors>;
 using GnssMeasurement = navkit::core::estimation::Measurement<3>;
+using GnssPositionPayload = GnssPositionLogPayload;
 using Statistics = navkit::core::estimation::MeasurementStatistics<Sensor>;
 using GnssUpdateLogProduct = GnssPositionUpdateLogProduct<Statistics>;
 using FilterCorrectionProduct = FilterCorrectionLogProduct<StateDef, Filter>;
@@ -193,7 +195,7 @@ public:
 TEST_CASE("log product policies describe concrete payload boundaries")
 {
     static_assert(LogProductPolicy<TruthLogProduct, navkit::sim::TruthSample>);
-    static_assert(LogProductPolicy<GnssPositionLogProduct, GnssMeasurement>);
+    static_assert(LogProductPolicy<GnssPositionLogProduct, GnssPositionPayload>);
     static_assert(LogProductPolicy<NavEstimateLogProduct<StateDef, Filter>,
                                    NavEstimateLogPayload<StateDef, Filter>>);
     static_assert(LogProductPolicy<ImuIncrementLogProduct, ImuIncrementLogPayload>);
@@ -209,7 +211,7 @@ TEST_CASE("log product policies describe concrete payload boundaries")
 
     static_assert(EcefInsGnssTestRunLogger::matching_product_count_v<navkit::sim::TruthSample> ==
                   1U);
-    static_assert(EcefInsGnssTestRunLogger::matching_product_count_v<GnssMeasurement> == 1U);
+    static_assert(EcefInsGnssTestRunLogger::matching_product_count_v<GnssPositionPayload> == 1U);
     static_assert(EcefInsGnssTestRunLogger::matching_product_count_v<
                       NavEstimateLogPayload<StateDef, Filter>> == 1U);
     static_assert(EcefInsGnssTestRunLogger::matching_product_count_v<ImuIncrementLogPayload> == 1U);
@@ -221,7 +223,7 @@ TEST_CASE("log product policies describe concrete payload boundaries")
     static_assert(EcefInsGnssTestRunLogger::matching_product_count_v<nlohmann::json> == 0U);
 
     static_assert(LoggerPolicy<EcefInsGnssTestRunLogger>);
-    static_assert(LoggerPayloadPolicy<EcefInsGnssTestRunLogger, GnssMeasurement>);
+    static_assert(LoggerPayloadPolicy<EcefInsGnssTestRunLogger, GnssPositionPayload>);
     static_assert(LoggerPayloadPolicy<EcefInsGnssTestRunLogger, ImuIncrementLogPayload>);
     static_assert(LoggerPayloadPolicy<EcefInsGnssTestRunLogger, ImuDebugLogPayload>);
     static_assert(LoggerPayloadPolicy<EcefInsGnssTestRunLogger,

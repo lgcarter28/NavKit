@@ -29,26 +29,26 @@ public:
     using Nominal = typename StateDef::Nominal;
     using Error = typename StateDef::Error;
 
-    struct NoiseContext
+    struct ObservationContext
     {
         Scalar_t sigma_alt{2.0};
     };
 
-    static H_t compute_h_impl(const State_t&)
+    static H_t compute_h_impl(const State_t&, const ObservationContext&)
     {
         H_t H = H_t::Zero();
         H(0, Error::Pos::i + 2) = -1.0;
         return H;
     }
 
-    static R_t compute_r_impl(const NoiseContext& ctx)
+    static R_t compute_r_impl(const ObservationContext& ctx)
     {
         R_t R = R_t::Zero();
         R(0, 0) = ctx.sigma_alt * ctx.sigma_alt;
         return R;
     }
 
-    static O_t obs_impl(const State_t& x)
+    static O_t obs_impl(const State_t& x, const ObservationContext&)
     {
         O_t out{};
         out(0) = segment<typename Nominal::Pos>(x).z();

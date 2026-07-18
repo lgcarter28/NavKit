@@ -30,7 +30,7 @@ public:
     using H_t = typename MeasurementModel_t::H_t;
     using R_t = typename MeasurementModel_t::R_t;
     using Measurement_t = Measurement<MeasurementModel_t::M>;
-    using NoiseContext_t = typename MeasurementModel_t::NoiseContext;
+    using ObservationContext_t = typename MeasurementModel_t::ObservationContext;
     using Diagnostics_t = Diagnostics;
 
     bool push(const Measurement_t& meas)
@@ -48,24 +48,24 @@ public:
         return m_buffer.pop(meas);
     }
 
-    [[nodiscard]] const NoiseContext_t& noise_context() const
+    [[nodiscard]] const ObservationContext_t& observation_context() const
     {
-        return m_noise_ctx;
+        return m_observation_ctx;
     }
 
-    NoiseContext_t& noise_context()
+    ObservationContext_t& observation_context()
     {
-        return m_noise_ctx;
+        return m_observation_ctx;
     }
 
-    void update_noise_context(const Measurement_t& meas)
+    void update_observation_context(const Measurement_t& meas)
     {
-        Noise::update(m_noise_ctx, meas);
+        Noise::update(m_observation_ctx, meas);
     }
 
 private:
     navkit::core::containers::RingBuffer<Measurement_t, BufferSize> m_buffer{};
-    NoiseContext_t m_noise_ctx{};
+    ObservationContext_t m_observation_ctx{};
 };
 
 } // namespace navkit::core::estimation

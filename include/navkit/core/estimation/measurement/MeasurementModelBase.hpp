@@ -23,20 +23,22 @@ public:
     using R_t = Eigen::Matrix<Scalar_t, M, M>;
     using K_t = Eigen::Matrix<Scalar_t, Error::N, M>;
 
-    template<typename NoiseContext>
-    static R_t compute_r(const NoiseContext& ctx)
+    template<typename ObservationContext>
+    static R_t compute_r(const ObservationContext& ctx)
     {
         return Derived::compute_r_impl(ctx);
     }
 
-    static H_t compute_h(const State_t& x)
+    template<typename ObservationContext>
+    static H_t compute_h(const State_t& x, const ObservationContext& ctx)
     {
-        return Derived::compute_h_impl(x);
+        return Derived::compute_h_impl(x, ctx);
     }
 
-    static O_t obs(const State_t& x)
+    template<typename ObservationContext>
+    static O_t obs(const State_t& x, const ObservationContext& ctx)
     {
-        return Derived::obs_impl(x);
+        return Derived::obs_impl(x, ctx);
     }
 };
 

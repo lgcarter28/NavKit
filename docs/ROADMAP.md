@@ -725,18 +725,18 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 
 ## Pass 5e.7 — GNSS lever arm, sensor debug products, and GNSS velocity aiding
 
-- [ ] Add GNSS antenna lever-arm support before expanding velocity aiding:
-  - [ ] configure the lever arm in the simulator/runtime path;
-  - [ ] apply the lever arm in GNSS truth measurement generation;
-  - [ ] include the lever-arm contribution in `GnssPosModel` and its `H` matrix;
-  - [ ] add focused finite-difference Jacobian tests.
-- [ ] Add typed sensor debug logs and plots for simulated sensors:
-  - [ ] log the literal truth measurement and measured measurement in the measurement's own coordinates, such as truth/measured range-azimuth-elevation for a future radar or truth/measured ECEF position for GNSS position;
-  - [ ] do not require explicit measurement-error columns when the truth and measured quantities are sufficient to derive errors in analysis;
-  - [ ] plot truth and measured quantities overlaid, using black truth markers and green measured markers, with a lower error subplot when the error is derivable;
-  - [ ] plot measurement covariance bounds when available.
-- [ ] Add GNSS velocity aiding after lever-arm position support is stable. Wire the existing GNSS velocity model into the selected simulation/app config, include antenna lever-arm velocity terms, update analysis/logging products, and add finite-difference Jacobian tests.
-- [ ] Revisit realistic GNSS error/noise defaults once position and velocity aiding are both active.
+- [x] Add GNSS antenna lever-arm support before expanding velocity aiding:
+  - [x] configure the lever arm in the simulator/runtime path;
+  - [x] apply the lever arm in GNSS truth measurement generation;
+  - [x] include the lever-arm contribution in `GnssPosModel` and its `H` matrix;
+  - [x] add focused finite-difference Jacobian tests.
+- [x] Add typed sensor debug logs and plots for simulated sensors:
+  - [x] log the literal truth measurement and measured measurement in the measurement's own coordinates, such as truth/measured range-azimuth-elevation for a future radar or truth/measured ECEF position for GNSS position;
+  - [x] do not require explicit measurement-error columns when the truth and measured quantities are sufficient to derive errors in analysis;
+  - [x] plot truth and measured quantities overlaid, using black truth markers and green measured markers, with a lower error subplot when the error is derivable;
+  - [x] plot measurement covariance bounds when available.
+- [x] Add GNSS velocity aiding after lever-arm position support is stable. Wire the existing GNSS velocity model into the selected simulation/app config, include antenna lever-arm velocity terms, update analysis/logging products, and add finite-difference Jacobian tests.
+- [x] Revisit realistic GNSS error/noise defaults once position and velocity aiding are both active.
 
 ## Pass 5e.8 — Runtime hygiene, IMU config randomization, and covariance guardrails
 
@@ -745,6 +745,7 @@ These decisions record conflicts and stale assumptions resolved during roadmap c
 - [ ] Revisit IMU error-term vocabulary in JSON and `ImuTriadErrorConfig`: consider standard names such as `bias_turnon`, `bias_inrun`, and clearly documented `random_walk`/white-noise semantics instead of the current mixed terminology.
 - [ ] Add IMU acceleration and angular-rate limit support to the simulator/runtime path.
 - [ ] Add configurable covariance floors per state-family/diagonal block to prevent covariance from becoming ill-conditioned or singular during idealized analysis runs.
+- [ ] When latent/replay measurement handling is implemented, carry per-measurement model context alongside buffered measurements. Current GNSS velocity lever-arm support updates sensor context immediately, which is sufficient for the current no-latency simulation loop but should not become the delayed-measurement architecture.
 - [ ] Continue the repository-wide `auto` audit using the strengthened AGENTS rule. Replace nontrivial `auto` in math, Eigen, state, frame/unit, simulator, and logging code with explicit types unless it falls into the narrow allowed cases.
 
 ## Frames, coordinates, and environment

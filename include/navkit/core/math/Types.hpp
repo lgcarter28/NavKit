@@ -11,5 +11,6 @@ namespace navkit::core
 {
 
 using Vec3 = Eigen::Matrix<Scalar_t, 3, 1>;
+using Mat3 = Eigen::Matrix<Scalar_t, 3, 3>;
 
 } // namespace navkit::core

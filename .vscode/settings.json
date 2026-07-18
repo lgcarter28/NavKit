@@ -1,12 +1,17 @@
 {
   "C_Cpp.default.cppStandard": "c++20",
   "cmake.configureOnOpen": false,
-  "editor.formatOnSave": true,
   "files.associations": {
     "*.hpp": "cpp",
     "Eigen/Dense": "cpp"
   },
   "editor.formatOnSave": true,
+  "[json]": {
+    "editor.formatOnSave": false
+  },
+  "[jsonc]": {
+    "editor.formatOnSave": false
+  },
   "[cpp]": {
     "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd"
   },

@@ -1,0 +1,20 @@
+{
+  "gnss": {
+    "rate_hz": 1.0,
+    "position_cov": {
+      "frame": "ned",
+      "diag": {
+        "pos_m2": [9.0, 9.0, 25.0]
+      }
+    },
+    "velocity_cov": {
+      "frame": "ned",
+      "diag": {
+        "vel_m2ps2": [0.04, 0.04, 0.04]
+      }
+    },
+    "p_b_ant_b_m": [0.0, 0.0, 0.0],
+    "seed": 42,
+    "noise_enabled": true
+  }
+}

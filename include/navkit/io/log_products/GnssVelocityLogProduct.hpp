@@ -14,14 +14,15 @@
 namespace navkit::io
 {
 
-class GnssPositionLogProduct
+class GnssVelocityLogProduct
 {
 public:
-    static constexpr std::string_view LogKey = "gnss";
+    static constexpr std::string_view LogKey = "gnss_velocity_ecef";
 
     void open(const std::filesystem::path& output_dir)
     {
-        m_csv.open(output_dir / "gnss.csv", {"time_s", "p_e_x_m", "p_e_y_m", "p_e_z_m"});
+        m_csv.open(output_dir / "gnss_velocity_ecef.csv",
+                   {"time_s", "v_e_x_mps", "v_e_y_mps", "v_e_z_mps"});
     }
 
     void set_metadata(const std::string& covariance_frame,
@@ -32,7 +33,7 @@ public:
             {"covariance_frame", covariance_frame}, {"covariance", covariance}, {"seed", seed}};
     }
 
-    void log(const GnssPositionLogPayload& payload)
+    void log(const GnssVelocityLogPayload& payload)
     {
         const core::estimation::Measurement<3>& meas = payload.measurement;
         m_csv.write_row(meas.time, meas.z.x(), meas.z.y(), meas.z.z());
@@ -45,15 +46,15 @@ public:
 
     nlohmann::json metadata() const
     {
-        return {{"schema", "gnss_pos_v1"},
-                {"file", "gnss.csv"},
-                {"units", {{"time", "s"}, {"p_e", "m"}}},
+        return {{"schema", "gnss_velocity_v1"},
+                {"file", "gnss_velocity_ecef.csv"},
+                {"units", {{"time", "s"}, {"v_e", "m/s"}}},
                 {"noise", m_noise}};
     }
 
     static nlohmann::json manifest_entry()
     {
-        return {{"csv", "gnss.csv"}, {"manifest", "gnss.meta.json"}};
+        return {{"csv", "gnss_velocity_ecef.csv"}, {"manifest", "gnss_velocity_ecef.meta.json"}};
     }
 
 private:

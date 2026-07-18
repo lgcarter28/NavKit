@@ -238,18 +238,17 @@ stationary_trajectory_config_from_json(const nlohmann::json& cfg)
     traj_cfg.p_e = detail::position_e_m_from_json(trajectory_config);
     traj_cfg.v_e = detail::velocity_e_mps_from_json(trajectory_config, traj_cfg.p_e);
     traj_cfg.q_b2e = detail::attitude_b2e_from_json(trajectory_config, traj_cfg.p_e);
+    traj_cfg.w_ib_b_radps = detail::angular_rate_ib_b_from_json(trajectory_config, traj_cfg.q_b2e);
     return traj_cfg;
 }
 
 inline TrajectoryRun trajectory_run_from_json(const nlohmann::json& cfg)
 {
     const sim::StationaryTrajectoryConfig traj_cfg = stationary_trajectory_config_from_json(cfg);
-    const nlohmann::json& trajectory_config = cfg.at("trajectory");
     return {.initial_position_e_m = traj_cfg.p_e,
             .initial_velocity_e_mps = traj_cfg.v_e,
             .initial_q_b2e = traj_cfg.q_b2e,
-            .initial_w_ib_b_radps =
-                detail::angular_rate_ib_b_from_json(trajectory_config, traj_cfg.q_b2e),
+            .initial_w_ib_b_radps = traj_cfg.w_ib_b_radps,
             .truth_samples = sim::TrajectoryGenerator::stationary(traj_cfg)};
 }
 

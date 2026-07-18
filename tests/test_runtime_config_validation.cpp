@@ -43,9 +43,9 @@ struct DuplicateSensorIdConfig
     using ImuSimulator = EcefInsGnssAppConfig::ImuSimulator;
     using EmulatorBindings =
         std::tuple<navkit::app_support::EmulatorBinding<navkit::app_support::GnssEmulator<0U>,
-                                                        NavKit::PrimaryGnssSensor>,
+                                                        NavKit::PrimaryGnssPositionSensor>,
                    navkit::app_support::EmulatorBinding<navkit::app_support::GnssEmulator<0U>,
-                                                        NavKit::PrimaryGnssSensor>>;
+                                                        NavKit::PrimaryGnssPositionSensor>>;
 };
 
 struct UnknownSensor
@@ -94,8 +94,9 @@ struct NotABinding
         {"imu", {{"type", "ideal"}, {"rate_hz", 1000.0}, {"seed", 42U}}},
         {"gnss",
          {{"dt_s", 1.0},
-          {"sigma_h_m", 3.0},
-          {"sigma_v_m", 5.0},
+          {"position_cov", {{"frame", "ned"}, {"diag", {{"pos_m2", {9.0, 9.0, 25.0}}}}}},
+          {"velocity_cov", {{"frame", "ned"}, {"diag", {{"vel_m2ps2", {0.04, 0.04, 0.04}}}}}},
+          {"p_b_ant_b_m", {0.0, 0.0, 0.0}},
           {"seed", 42U},
           {"noise_enabled", true}}},
         {"initialization",
@@ -122,6 +123,15 @@ struct NotABinding
     std::vector<double> values(81U, 0.0);
     for (std::size_t i = 0; i < 9U; ++i) {
         values.at((i * 9U) + i) = 1.0;
+    }
+    return values;
+}
+
+[[nodiscard]] std::vector<double> identity_vec3_cov_full()
+{
+    std::vector<double> values(9U, 0.0);
+    for (std::size_t i = 0; i < 3U; ++i) {
+        values.at((i * 3U) + i) = 1.0;
     }
     return values;
 }
@@ -156,13 +166,13 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts the documented input shape")
     static_assert(navkit::sim::ImuSimulatorPolicy<EcefInsGnssAppConfig::ImuSimulator>);
     static_assert(!SimulationAppConfigPolicy<DuplicateSensorIdConfig>);
     static_assert(!SimulationAppConfigPolicy<MissingTargetSensorConfig>);
-    static_assert(EmulatorPolicy<EcefInsGnssAppConfig::PrimaryGnssEmulator,
-                                 EcefInsGnssAppConfig::PrimaryGnssSensor,
+    static_assert(EmulatorPolicy<EcefInsGnssAppConfig::PrimaryGnssPositionEmulator,
+                                 EcefInsGnssAppConfig::PrimaryGnssPositionSensor,
                                  EcefInsGnssAppConfig::Logger>);
     static_assert(!EmulatorPolicy<NotAnEmulator,
-                                  EcefInsGnssAppConfig::PrimaryGnssSensor,
+                                  EcefInsGnssAppConfig::PrimaryGnssPositionSensor,
                                   EcefInsGnssAppConfig::Logger>);
-    static_assert(EmulatorBindingPolicy<EcefInsGnssAppConfig::PrimaryGnssBinding,
+    static_assert(EmulatorBindingPolicy<EcefInsGnssAppConfig::PrimaryGnssPositionBinding,
                                         EcefInsGnssAppConfig::Logger>);
     static_assert(!EmulatorBindingPolicy<NotABinding, EcefInsGnssAppConfig::Logger>);
     static_assert(EmulatorBindingTuplePolicy<EcefInsGnssAppConfig::EmulatorBindings,
@@ -181,11 +191,44 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts the documented input shape")
                                               MissingTargetSensorConfig::NavKit::Sensors,
                                               MissingTargetSensorConfig::Logger>);
     static_assert(emulator_binding_ids_unique_v<EcefInsGnssAppConfig::EmulatorBindings>);
-    static_assert(std::is_same_v<EmulatorFromId_t<EcefInsGnssAppConfig::PrimaryGnssEmulator::Id,
-                                                  EcefInsGnssAppConfig::EmulatorBindings>,
-                                 GnssEmulator<EcefInsGnssAppConfig::PrimaryGnssEmulator::Id>>);
+    static_assert(
+        std::is_same_v<EmulatorFromId_t<EcefInsGnssAppConfig::PrimaryGnssPositionEmulator::Id,
+                                        EcefInsGnssAppConfig::EmulatorBindings>,
+                       GnssEmulator<EcefInsGnssAppConfig::PrimaryGnssPositionEmulator::Id>>);
 
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+}
+
+TEST_CASE("ECEF INS GNSS runtime validator accepts GNSS full covariance")
+{
+    auto cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("gnss").at("position_cov") =
+        nlohmann::json{{"frame", "ecef"}, {"full", identity_vec3_cov_full()}};
+    cfg.at("gnss").at("velocity_cov") =
+        nlohmann::json{{"frame", "ecef"}, {"full", identity_vec3_cov_full()}};
+
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+}
+
+TEST_CASE("ECEF INS GNSS runtime validator rejects malformed GNSS covariance")
+{
+    auto cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("gnss").at("position_cov").at("frame") = "body";
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("gnss").at("position_cov").at("diag").at("pos_m2") = {1.0, -1.0, 1.0};
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("gnss").at("position_cov") =
+        nlohmann::json{{"frame", "ecef"}, {"full", {1.0, 2.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0}}};
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("gnss").at("position_cov") =
+        nlohmann::json{{"frame", "ecef"}, {"full", {1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0}}};
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
 
 TEST_CASE("Runtime JSON components merge relative to the scenario master")
@@ -207,7 +250,12 @@ TEST_CASE("Runtime JSON components merge relative to the scenario master")
     "rate_hz": 1000.0
   },
   "gnss": {
-    "sigma_h_m": 3.0
+    "position_cov": {
+      "frame": "ned",
+      "diag": {
+        "pos_m2": [9.0, 9.0, 25.0]
+      }
+    }
   }
 })";
     }
@@ -229,7 +277,8 @@ TEST_CASE("Runtime JSON components merge relative to the scenario master")
     CHECK(cfg.at("run_name").get<std::string>() == "json_component_test");
     CHECK(cfg.at("trajectory").at("duration_s").get<double>() == doctest::Approx(5.0));
     CHECK(cfg.at("trajectory").at("rate_hz").get<double>() == doctest::Approx(1000.0));
-    CHECK(cfg.at("gnss").at("sigma_h_m").get<double>() == doctest::Approx(3.0));
+    CHECK(cfg.at("gnss").at("position_cov").at("diag").at("pos_m2").at(0).get<double>() ==
+          doctest::Approx(9.0));
 
     std::filesystem::remove_all(temp_root);
 }
@@ -287,7 +336,7 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects missing runtime-owned simulat
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 
     cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("gnss").erase("sigma_h_m");
+    cfg.at("gnss").erase("position_cov");
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
 
@@ -458,8 +507,7 @@ TEST_CASE("ECEF INS GNSS runtime validator keeps numeric tuning runtime-configur
 {
     auto cfg = valid_ecef_ins_gnss_runtime_config();
     cfg.at("trajectory").at("duration_s") = 5.0;
-    cfg.at("gnss").at("sigma_h_m") = 0.0;
-    cfg.at("gnss").at("sigma_v_m") = 0.0;
+    cfg.at("gnss").at("position_cov").at("diag").at("pos_m2") = {0.0, 0.0, 0.0};
     cfg.at("initialization").at("pva_cov").at("diag").at(0) = 0.0;
 
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));

@@ -17,15 +17,15 @@ concept SensorPolicy =
         { Candidate::Id } -> std::convertible_to<SensorId>;
         typename Candidate::MeasurementModel_t;
         typename Candidate::Measurement_t;
-        typename Candidate::NoiseContext_t;
+        typename Candidate::ObservationContext_t;
         typename Candidate::Diagnostics_t;
     } && SensorDiagnosticsPolicy<typename Candidate::Diagnostics_t> &&
     requires(Candidate sensor, typename Candidate::Measurement_t measurement) {
         { sensor.push(measurement) } -> std::same_as<bool>;
         { sensor.has_measurement() } -> std::same_as<bool>;
         { sensor.pop(measurement) } -> std::same_as<bool>;
-        sensor.update_noise_context(measurement);
-        sensor.noise_context();
+        sensor.update_observation_context(measurement);
+        sensor.observation_context();
     };
 
 } // namespace navkit::core::estimation

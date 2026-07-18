@@ -5,7 +5,10 @@
 
 #include "navkit/core/estimation/measurement/MeasurementModelBase.hpp"
 #include "navkit/core/estimation/state/Segment.hpp"
+#include "navkit/core/estimation/state/StateAccessors.hpp"
 #include "navkit/core/estimation/state/StateDefPolicy.hpp"
+#include "navkit/core/math/Skew.hpp"
+#include "navkit/core/math/Types.hpp"
 
 #include <string_view>
 
@@ -29,26 +32,38 @@ public:
     using Nominal = typename StateDef::Nominal;
     using Error = typename StateDef::Error;
 
-    struct NoiseContext
+    struct ObservationContext
     {
-        Scalar_t sigma_v{0.2};
+        Mat3 R_e_m2ps2{(Vec3{0.04, 0.04, 0.04}).asDiagonal()};
+        Vec3 p_b_ant_b_m{Vec3::Zero()};
+        Vec3 omega_eb_b_radps{Vec3::Zero()};
     };
 
-    static H_t compute_h_impl(const State_t&)
+    static H_t compute_h_impl(const State_t& x, const ObservationContext& ctx)
     {
         H_t H = H_t::Zero();
         H.template block<3, 3>(0, Error::Vel::i) = Eigen::Matrix<Scalar_t, 3, 3>::Identity();
+        if constexpr (requires {
+                          typename Nominal::AttQuat;
+                          typename Error::AttRotVec;
+                      }) {
+            const Vec3 lever_arm_velocity_e_mps = navkit::core::estimation::q_b2e<StateDef>(x) *
+                                                  ctx.omega_eb_b_radps.cross(ctx.p_b_ant_b_m);
+            H.template block<3, 3>(0, Error::AttRotVec::i) =
+                -navkit::core::math::skew_symmetric(lever_arm_velocity_e_mps);
+        }
         return H;
     }
 
-    static R_t compute_r_impl(const NoiseContext& ctx)
+    static R_t compute_r_impl(const ObservationContext& ctx)
     {
-        return (ctx.sigma_v * ctx.sigma_v) * R_t::Identity();
+        return ctx.R_e_m2ps2;
     }
 
-    static O_t obs_impl(const State_t& x)
+    static O_t obs_impl(const State_t& x, const ObservationContext& ctx)
     {
-        return segment<typename Nominal::Vel>(x);
+        return segment<typename Nominal::Vel>(x) + (navkit::core::estimation::q_b2e<StateDef>(x) *
+                                                    ctx.omega_eb_b_radps.cross(ctx.p_b_ant_b_m));
     }
 };
 

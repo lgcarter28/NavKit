@@ -18,11 +18,11 @@ using SensorTestMeasurement = Measurement<SensorTestModel::M>;
 
 struct MeasurementDrivenNoisePolicy
 {
-    static void update(SensorTestModel::NoiseContext& context,
+    static void update(SensorTestModel::ObservationContext& context,
                        const SensorTestMeasurement& measurement)
     {
-        context.sigma_h = measurement.z(0);
-        context.sigma_v = measurement.z(1);
+        context.R_e_m2(0, 0) = measurement.z(0);
+        context.R_e_m2(2, 2) = measurement.z(1);
     }
 };
 
@@ -64,10 +64,10 @@ TEST_CASE("Sensor noise policy can update context from the measurement sample")
     Sensor<0U, SensorTestModel, 1, MeasurementDrivenNoisePolicy> sensor;
     auto measurement = make_measurement(1.0, 10.0);
 
-    sensor.update_noise_context(measurement);
+    sensor.update_observation_context(measurement);
 
-    CHECK(sensor.noise_context().sigma_h == doctest::Approx(10.0));
-    CHECK(sensor.noise_context().sigma_v == doctest::Approx(11.0));
+    CHECK(sensor.observation_context().R_e_m2(0, 0) == doctest::Approx(10.0));
+    CHECK(sensor.observation_context().R_e_m2(2, 2) == doctest::Approx(11.0));
 }
 
 } // namespace navkit::core::estimation::test

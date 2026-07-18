@@ -8,6 +8,7 @@
 #include "navkit/core/environment/planet/Wgs84.hpp"
 #include "navkit/core/estimation/navigator/propagation/EcefInsPropagation.hpp"
 #include "navkit/core/models/GnssPosModel.hpp"
+#include "navkit/core/models/GnssVelModel.hpp"
 #include "navkit/core/profiling/ProfileSinks.hpp"
 #include "navkit/core/profiling/ScopedProfiler.hpp"
 
@@ -47,17 +48,26 @@ struct ProductConfig
 
     // Public product graph.
     using StateDef = core::estimation::DefaultInsStateDef;
-    using PrimaryGnssMeasurementModel = core::models::GnssPosModel<StateDef>;
-    static constexpr core::estimation::SensorId primary_gnss_sensor_id = 0U;
+    using PrimaryGnssPositionMeasurementModel = core::models::GnssPosModel<StateDef>;
+    using PrimaryGnssVelocityMeasurementModel = core::models::GnssVelModel<StateDef>;
+    static constexpr core::estimation::SensorId primary_gnss_position_sensor_id = 0U;
+    static constexpr core::estimation::SensorId primary_gnss_velocity_sensor_id = 1U;
     static constexpr std::size_t primary_gnss_buffer_size = 16U;
     using PrimaryGnssDiagnostics = core::estimation::DefaultSensorDiagnostics;
-    using PrimaryGnssSensor = core::estimation::Sensor<primary_gnss_sensor_id,
-                                                       PrimaryGnssMeasurementModel,
-                                                       primary_gnss_buffer_size,
-                                                       core::estimation::GnssFixedNoisePolicy,
-                                                       PrimaryGnssDiagnostics>;
+    using PrimaryGnssPositionSensor =
+        core::estimation::Sensor<primary_gnss_position_sensor_id,
+                                 PrimaryGnssPositionMeasurementModel,
+                                 primary_gnss_buffer_size,
+                                 core::estimation::GnssFixedNoisePolicy,
+                                 PrimaryGnssDiagnostics>;
+    using PrimaryGnssVelocitySensor =
+        core::estimation::Sensor<primary_gnss_velocity_sensor_id,
+                                 PrimaryGnssVelocityMeasurementModel,
+                                 primary_gnss_buffer_size,
+                                 core::estimation::GnssFixedNoisePolicy,
+                                 PrimaryGnssDiagnostics>;
 
-    using Sensors = std::tuple<PrimaryGnssSensor>;
+    using Sensors = std::tuple<PrimaryGnssPositionSensor, PrimaryGnssVelocitySensor>;
 
     using ProfileClock = HostSteadyMicrosecondClock;
     using ProfileTick = typename ProfileClock::Tick;

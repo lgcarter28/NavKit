@@ -12,6 +12,14 @@ from navkit_analysis.figures.gnss_position_innovation import (
     plot_gnss_position_innovation,
 )
 from navkit_analysis.figures.gnss_position_nis import plot_gnss_position_nis
+from navkit_analysis.figures.gnss_sensor_debug import (
+    plot_gnss_position_debug,
+    plot_gnss_velocity_debug,
+)
+from navkit_analysis.figures.gnss_velocity_innovation import (
+    plot_gnss_velocity_innovation,
+)
+from navkit_analysis.figures.gnss_velocity_nis import plot_gnss_velocity_nis
 from navkit_analysis.figures.imu_increments import (
     plot_imu_debug_terms,
     plot_imu_increment_cumsums,
@@ -32,6 +40,10 @@ __all__ = [
     "plot_gnss_position_histograms",
     "plot_gnss_position_innovation",
     "plot_gnss_position_nis",
+    "plot_gnss_position_debug",
+    "plot_gnss_velocity_debug",
+    "plot_gnss_velocity_innovation",
+    "plot_gnss_velocity_nis",
     "plot_imu_debug_terms",
     "plot_imu_bias_truth_errors",
     "plot_imu_increment_cumsums",

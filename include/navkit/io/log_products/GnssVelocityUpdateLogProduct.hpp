@@ -1,0 +1,117 @@
+// Copyright (c) 2026 William Gordon Carter.
+// All Rights Reserved.
+
+#pragma once
+
+#include "navkit/io/CsvSchemaUtils.hpp"
+#include "navkit/io/CsvWriter.hpp"
+#include "navkit/io/log_payloads/MeasurementStatisticsLogPayload.hpp"
+
+#include <cmath>
+#include <filesystem>
+#include <nlohmann/json.hpp>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace navkit::io
+{
+
+template<typename Statistics>
+class GnssVelocityUpdateLogProduct
+{
+public:
+    static constexpr std::string_view LogKey = "gnss_vel_update";
+
+    void open(const std::filesystem::path& output_dir)
+    {
+        m_csv.open(output_dir / "gnss_vel_update.csv", header());
+    }
+
+    void log(const MeasurementStatisticsLogPayload<Statistics>& payload)
+    {
+        const Statistics& stats = payload.statistics;
+
+        static_assert(M == 3, "GNSS velocity update statistics must have measurement dimension 3.");
+        static_assert(Statistics::H_t::RowsAtCompileTime == M,
+                      "GNSS velocity update H rows must match the measurement dimension.");
+        static_assert(Statistics::K_t::ColsAtCompileTime == M,
+                      "GNSS velocity update K columns must match the measurement dimension.");
+
+        std::vector<double> row = {stats.time,
+                                   stats.accepted ? 1.0 : 0.0,
+                                   stats.nis,
+                                   stats.innovation(0),
+                                   stats.innovation(1),
+                                   stats.innovation(2),
+                                   std::sqrt(stats.innovation_covariance(0, 0)),
+                                   std::sqrt(stats.innovation_covariance(1, 1)),
+                                   std::sqrt(stats.innovation_covariance(2, 2))};
+
+        row.reserve(header().size());
+        detail::append_matrix_values(row, stats.innovation_covariance);
+        detail::append_matrix_values(row, stats.measurement_covariance);
+        detail::append_matrix_values(row, stats.jacobian_h);
+        detail::append_matrix_values(row, stats.kalman_gain);
+
+        m_csv.write_row_values(row);
+    }
+
+    void flush()
+    {
+        m_csv.flush();
+    }
+
+    static nlohmann::json metadata()
+    {
+        return {{"schema", "gnss_vel_update_v1"},
+                {"file", "gnss_vel_update.csv"},
+                {"model", "gnss_vel"},
+                {"measurement_dimension", M},
+                {"state_dimension", N},
+                {"units",
+                 {{"time", "s"},
+                  {"innovation", "m/s"},
+                  {"innovation_covariance", "m^2/s^2"},
+                  {"measurement_covariance", "m^2/s^2"},
+                  {"jacobian_h", "mixed"},
+                  {"kalman_gain", "mixed"},
+                  {"nis", "dimensionless"}}},
+                {"description",
+                 "GNSS velocity measurement update statistics. The CSV includes innovation, S, R, "
+                 "H, K, NIS, timestamp, and accepted flag."}};
+    }
+
+    static nlohmann::json manifest_entry()
+    {
+        return {{"csv", "gnss_vel_update.csv"}, {"manifest", "gnss_vel_update.meta.json"}};
+    }
+
+private:
+    static constexpr int M = Statistics::O_t::RowsAtCompileTime;
+    static constexpr int N = Statistics::H_t::ColsAtCompileTime;
+
+    static std::vector<std::string> header()
+    {
+        std::vector<std::string> result = {"time_s",
+                                           "accepted",
+                                           "nis",
+                                           "nu_v_e_x_mps",
+                                           "nu_v_e_y_mps",
+                                           "nu_v_e_z_mps",
+                                           "sigma_nu_v_e_x_mps",
+                                           "sigma_nu_v_e_y_mps",
+                                           "sigma_nu_v_e_z_mps"};
+
+        detail::append_matrix_header(result, "S", M, M);
+        detail::append_matrix_header(result, "R", M, M);
+        detail::append_matrix_header(result, "H", M, N);
+        detail::append_matrix_header(result, "K", N, M);
+
+        return result;
+    }
+
+    CsvWriter m_csv;
+};
+
+} // namespace navkit::io

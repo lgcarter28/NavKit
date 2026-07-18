@@ -3,7 +3,7 @@
     "components/logging/standard.json",
     "components/trajectory/stationary_ecef_1000hz.json",
     "components/imu/ideal_raw.json",
-    "components/gnss/ideal_position.json",
+    "components/gnss/truth_pos_vel.json",
     "components/initialization/perfect_pva.json"
   ],
   "run_name": "truth_reconstruction",

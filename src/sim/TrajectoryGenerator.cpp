@@ -18,6 +18,7 @@ std::vector<TruthSample> TrajectoryGenerator::stationary(const StationaryTraject
         s.p_e = cfg.p_e;
         s.v_e = cfg.v_e;
         s.q_b2e = cfg.q_b2e;
+        s.w_ib_b_radps = cfg.w_ib_b_radps;
         samples.push_back(s);
     }
 

@@ -8,8 +8,8 @@ namespace navkit::core::estimation
 
 struct DefaultNoisePolicy
 {
-    template<typename NoiseContext, typename Measurement>
-    static void update(NoiseContext&, const Measurement&)
+    template<typename ObservationContext, typename Measurement>
+    static void update(ObservationContext&, const Measurement&)
     {
         // default: do nothing
     }
@@ -17,10 +17,10 @@ struct DefaultNoisePolicy
 
 struct GnssFixedNoisePolicy
 {
-    template<typename NoiseContext, typename Measurement>
-    static void update(NoiseContext&, const Measurement&)
+    template<typename ObservationContext, typename Measurement>
+    static void update(ObservationContext&, const Measurement&)
     {
-        // GNSS noise is fixed by the model's default NoiseContext in this first draft.
+        // GNSS noise is fixed by the model's default ObservationContext in this first draft.
     }
 };
 

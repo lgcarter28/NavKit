@@ -67,15 +67,21 @@ TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
     static_assert(navkit::api::config::NavKitProductConfigPolicy<SimConfig>);
     static_assert(navkit::core::estimation::sensor_ids_unique_v<SimConfig::Sensors>);
     static_assert(
-        std::is_same_v<navkit::core::estimation::SensorFromId_t<SimConfig::primary_gnss_sensor_id,
-                                                                SimConfig::Sensors>,
-                       SimConfig::PrimaryGnssSensor>);
+        std::is_same_v<
+            navkit::core::estimation::SensorFromId_t<SimConfig::primary_gnss_position_sensor_id,
+                                                     SimConfig::Sensors>,
+            SimConfig::PrimaryGnssPositionSensor>);
+    static_assert(
+        std::is_same_v<
+            navkit::core::estimation::SensorFromId_t<SimConfig::primary_gnss_velocity_sensor_id,
+                                                     SimConfig::Sensors>,
+            SimConfig::PrimaryGnssVelocitySensor>);
     static_assert(std::is_same_v<navkit::app_support::LoggerConfig_t<SelectedAppConfig>,
                                  SelectedAppConfig::Logger>);
     static_assert(std::is_same_v<
                   SimConfig::Filter::MeasurementStatisticsTuple_t,
                   navkit::core::estimation::MeasurementStatisticsStorage_t<SimConfig::Sensors>>);
-    static_assert(std::is_same_v<SimConfig::PrimaryGnssSensor::Diagnostics_t,
+    static_assert(std::is_same_v<SimConfig::PrimaryGnssPositionSensor::Diagnostics_t,
                                  SimConfig::PrimaryGnssDiagnostics>);
 
     static_assert(std::is_same_v<ExampleConfig::Numeric::Scalar_t, navkit::core::Scalar_t>);
@@ -109,8 +115,10 @@ TEST_CASE("Concrete config composes at product-core sensor boundaries")
     static_assert(std::is_default_constructible_v<Sensor>);
     static_assert(std::is_default_constructible_v<GnssOnlySensor>);
     CHECK(SimConfig::primary_gnss_buffer_size == 16U);
-    CHECK(navkit::core::estimation::SensorIndexFromId_v<SimConfig::primary_gnss_sensor_id,
+    CHECK(navkit::core::estimation::SensorIndexFromId_v<SimConfig::primary_gnss_position_sensor_id,
                                                         SimConfig::Sensors> == 0U);
+    CHECK(navkit::core::estimation::SensorIndexFromId_v<SimConfig::primary_gnss_velocity_sensor_id,
+                                                        SimConfig::Sensors> == 1U);
 }
 
 } // namespace navkit::core::config::test

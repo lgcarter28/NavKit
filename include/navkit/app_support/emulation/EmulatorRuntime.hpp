@@ -122,7 +122,21 @@ private:
 
         auto& sensor = sensor_for_binding<Binding>(navigator);
         const auto measurement = Binding::Emulator_t::generate(runtime, sample);
-        Binding::Emulator_t::log_measurement(logger, measurement);
+        if constexpr (requires {
+                          Binding::Emulator_t::update_sensor_context(
+                              runtime, sample, measurement, sensor);
+                      }) {
+            Binding::Emulator_t::update_sensor_context(runtime, sample, measurement, sensor);
+        }
+
+        if constexpr (requires {
+                          Binding::Emulator_t::log_sample(runtime, sample, measurement, logger);
+                      }) {
+            Binding::Emulator_t::log_sample(runtime, sample, measurement, logger);
+        }
+        else {
+            Binding::Emulator_t::log_measurement(logger, measurement);
+        }
 
         if (!sensor.push(measurement)) {
             throw std::runtime_error("Sensor buffer overflow for configured emulator");

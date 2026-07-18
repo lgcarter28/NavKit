@@ -3,7 +3,7 @@
     "components/logging/debug_high_rate.json",
     "components/trajectory/stationary_ecef_1000hz.json",
     "components/imu/error_model_modeled.json",
-    "components/gnss/noisy_position.json",
+    "components/gnss/nominal_pos_vel.json",
     "components/initialization/default_pva_error.json"
   ],
   "run_name": "imu_debug",

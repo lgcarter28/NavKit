@@ -333,9 +333,8 @@ TEST_CASE("KalmanFilter observation update emits the configured profile point")
     ProfiledModel::O_t z;
     z.setZero();
 
-    ProfiledModel::NoiseContext ctx;
-    ctx.sigma_h = 1.0;
-    ctx.sigma_v = 1.0;
+    ProfiledModel::ObservationContext ctx;
+    ctx.R_e_m2 = navkit::core::Mat3::Identity();
 
     filter.observation_update<ProfiledModel>(z, 1.0, ctx, true);
 

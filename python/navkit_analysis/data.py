@@ -23,6 +23,9 @@ class RunData:
     figures_dir: Path
     nav: pd.DataFrame
     gnss_pos_update: pd.DataFrame | None = None
+    gnss_vel_update: pd.DataFrame | None = None
+    gnss_position_debug: pd.DataFrame | None = None
+    gnss_velocity_debug: pd.DataFrame | None = None
     truth: pd.DataFrame | None = None
     imu: pd.DataFrame | None = None
     imu_debug: pd.DataFrame | None = None
@@ -280,6 +283,22 @@ def load_run(run_dir: Path) -> RunData:
         [data_dir / "gnss_pos_update.csv", run_dir / "gnss_pos_update.csv"]
     )
     gnss_pos_update_path = gnss_pos_update_path_optional or (data_dir / "gnss_pos_update.csv")
+    gnss_vel_update, gnss_vel_update_path_optional = _read_first_existing_csv(
+        [data_dir / "gnss_vel_update.csv", run_dir / "gnss_vel_update.csv"]
+    )
+    gnss_vel_update_path = gnss_vel_update_path_optional or (data_dir / "gnss_vel_update.csv")
+    gnss_position_debug, gnss_position_debug_path = _read_first_existing_csv(
+        [
+            data_dir / "gnss_position_debug_ecef.csv",
+            run_dir / "gnss_position_debug_ecef.csv",
+        ]
+    )
+    gnss_velocity_debug, gnss_velocity_debug_path = _read_first_existing_csv(
+        [
+            data_dir / "gnss_velocity_debug_ecef.csv",
+            run_dir / "gnss_velocity_debug_ecef.csv",
+        ]
+    )
     truth, truth_path = _read_first_existing_csv(
         [data_dir / "truth_trajectory_ecef.csv", data_dir / "truth.csv", run_dir / "truth_trajectory_ecef.csv"]
     )
@@ -314,6 +333,58 @@ def load_run(run_dir: Path) -> RunData:
                 "nis",
             ],
             gnss_pos_update_path,
+        )
+
+    if gnss_vel_update is not None:
+        _require_columns(
+            gnss_vel_update,
+            [
+                "time_s",
+                "nu_v_e_x_mps",
+                "nu_v_e_y_mps",
+                "nu_v_e_z_mps",
+                "sigma_nu_v_e_x_mps",
+                "sigma_nu_v_e_y_mps",
+                "sigma_nu_v_e_z_mps",
+                "nis",
+            ],
+            gnss_vel_update_path,
+        )
+
+    if gnss_position_debug is not None and gnss_position_debug_path is not None:
+        _require_columns(
+            gnss_position_debug,
+            [
+                "time_s",
+                "truth_p_e_x_m",
+                "truth_p_e_y_m",
+                "truth_p_e_z_m",
+                "measured_p_e_x_m",
+                "measured_p_e_y_m",
+                "measured_p_e_z_m",
+                "sigma_p_e_x_m",
+                "sigma_p_e_y_m",
+                "sigma_p_e_z_m",
+            ],
+            gnss_position_debug_path,
+        )
+
+    if gnss_velocity_debug is not None and gnss_velocity_debug_path is not None:
+        _require_columns(
+            gnss_velocity_debug,
+            [
+                "time_s",
+                "truth_v_e_x_mps",
+                "truth_v_e_y_mps",
+                "truth_v_e_z_mps",
+                "measured_v_e_x_mps",
+                "measured_v_e_y_mps",
+                "measured_v_e_z_mps",
+                "sigma_v_e_x_mps",
+                "sigma_v_e_y_mps",
+                "sigma_v_e_z_mps",
+            ],
+            gnss_velocity_debug_path,
         )
 
     if truth is not None and truth_path is not None:
@@ -375,6 +446,9 @@ def load_run(run_dir: Path) -> RunData:
         figures_dir=figures_dir,
         nav=nav,
         gnss_pos_update=gnss_pos_update,
+        gnss_vel_update=gnss_vel_update,
+        gnss_position_debug=gnss_position_debug,
+        gnss_velocity_debug=gnss_velocity_debug,
         truth=truth,
         imu=imu,
         imu_debug=imu_debug,

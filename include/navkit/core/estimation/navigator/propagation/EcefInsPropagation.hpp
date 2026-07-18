@@ -13,6 +13,7 @@
 #include "navkit/core/estimation/navigator/propagation/EcefInsProcessNoise.hpp"
 #include "navkit/core/estimation/state/Segment.hpp"
 #include "navkit/core/estimation/state/State.hpp"
+#include "navkit/core/estimation/state/StateAccessors.hpp"
 #include "navkit/core/estimation/state/StateDefPolicy.hpp"
 #include "navkit/core/math/Quaternion.hpp"
 #include "navkit/core/math/Skew.hpp"
@@ -111,15 +112,6 @@ struct EcefInsPropagation
     }
 
     template<typename StateDef, typename State_t>
-    [[nodiscard]] static Eigen::Quaternion<Scalar_t> quaternion_b2e(const State_t& state)
-    {
-        using Nominal = typename StateDef::Nominal;
-        const Eigen::Matrix<Scalar_t, 4, 1> q_segment = segment<typename Nominal::AttQuat>(state);
-        return navkit::core::math::normalized_with_positive_scalar(
-            Eigen::Quaternion<Scalar_t>{q_segment(0), q_segment(1), q_segment(2), q_segment(3)});
-    }
-
-    template<typename StateDef, typename State_t>
     [[nodiscard]] static Vec3 gyro_bias_radps(const State_t& state)
     {
         using Nominal = typename StateDef::Nominal;
@@ -167,15 +159,6 @@ struct EcefInsPropagation
         segment<typename Nominal::Vel>(state) = value;
     }
 
-    template<typename StateDef, typename State_t>
-    static void set_quaternion_b2e(State_t& state, const Eigen::Quaternion<Scalar_t>& value)
-    {
-        const Eigen::Quaternion<Scalar_t> q =
-            navkit::core::math::normalized_with_positive_scalar(value);
-        using Nominal = typename StateDef::Nominal;
-        segment<typename Nominal::AttQuat>(state) << q.w(), q.x(), q.y(), q.z();
-    }
-
     template<typename StateDef>
     [[nodiscard]] static ErrorStateCov<StateDef>
     build_f_matrix(const NominalState<StateDef>& state, const MechanizedImuInterval& interval)
@@ -183,7 +166,7 @@ struct EcefInsPropagation
         using Error = typename StateDef::Error;
         ErrorStateCov<StateDef> F = ErrorStateCov<StateDef>::Zero();
 
-        const Eigen::Quaternion<Scalar_t> q_b2e = quaternion_b2e<StateDef>(state);
+        const Eigen::Quaternion<Scalar_t> q_b2e = navkit::core::estimation::q_b2e<StateDef>(state);
         const Eigen::Matrix<Scalar_t, 3, 3> C_b_e = q_b2e.toRotationMatrix();
         const Vec3 omega_ie_e = environment::planet_rate_fixed_radps<Planet>();
         const Eigen::Matrix<Scalar_t, 3, 3> Omega_ie_e =
@@ -213,7 +196,7 @@ struct EcefInsPropagation
     {
         using Error = typename StateDef::Error;
         Eigen::Matrix<Scalar_t, Error::N, 12> G = Eigen::Matrix<Scalar_t, Error::N, 12>::Zero();
-        const Eigen::Quaternion<Scalar_t> q_b2e = quaternion_b2e<StateDef>(state);
+        const Eigen::Quaternion<Scalar_t> q_b2e = navkit::core::estimation::q_b2e<StateDef>(state);
         const Eigen::Matrix<Scalar_t, 3, 3> C_b_e = q_b2e.toRotationMatrix();
 
         G.template block<3, 3>(Error::Vel::i, 3) = C_b_e;
@@ -333,7 +316,8 @@ private:
     {
         const Vec3 p_k = position_e_m<StateDef>(state_before);
         const Vec3 v_k = velocity_e_mps<StateDef>(state_before);
-        const Eigen::Quaternion<Scalar_t> q_b2e_k = quaternion_b2e<StateDef>(state_before);
+        const Eigen::Quaternion<Scalar_t> q_b2e_k =
+            navkit::core::estimation::q_b2e<StateDef>(state_before);
         const Eigen::Matrix<Scalar_t, 3, 3> C_b2e_k = q_b2e_k.toRotationMatrix();
 
         const Vec3 gravity_e = Gravity::acceleration(p_k);
@@ -350,7 +334,7 @@ private:
 
         set_position_e_m<StateDef>(state_after, p_next);
         set_velocity_e_mps<StateDef>(state_after, v_next);
-        set_quaternion_b2e<StateDef>(state_after, q_b2e_next);
+        navkit::core::estimation::set_q_b2e<StateDef>(state_after, q_b2e_next);
     }
 
     template<StateSpaceDefPolicy StateDef>
@@ -364,7 +348,7 @@ private:
             return {};
         }
 
-        const Eigen::Quaternion<Scalar_t> q_b2e = quaternion_b2e<StateDef>(state);
+        const Eigen::Quaternion<Scalar_t> q_b2e = navkit::core::estimation::q_b2e<StateDef>(state);
         const Vec3 earth_rate_b =
             q_b2e.conjugate() * environment::planet_rate_fixed_radps<Planet>();
         const Vec3 delta_theta_eb_b = corrected.delta_theta_ib_b_rad - (earth_rate_b * dt_s);

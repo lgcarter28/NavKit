@@ -19,19 +19,19 @@ using NoiseTestMeasurement = Measurement<NoiseTestModel::M>;
 
 struct ExactNoisePolicy
 {
-    static void update(NoiseTestModel::NoiseContext& ctx,
+    static void update(NoiseTestModel::ObservationContext& ctx,
                        const NoiseTestMeasurement& unused_measurement)
     {
         static_cast<void>(unused_measurement);
-        ctx.sigma_h = 4.0;
-        ctx.sigma_v = 6.0;
+        ctx.R_e_m2(0, 0) = 4.0;
+        ctx.R_e_m2(2, 2) = 6.0;
     }
 };
 
 struct MissingUpdate
 {};
 
-struct WrongNoiseContext
+struct WrongObservationContext
 {
     static void update(int& unused_context, const NoiseTestMeasurement& unused_measurement)
     {
@@ -42,7 +42,7 @@ struct WrongNoiseContext
 
 struct WrongMeasurementSample
 {
-    static void update(NoiseTestModel::NoiseContext& unused_context,
+    static void update(NoiseTestModel::ObservationContext& unused_context,
                        const Measurement<1>& unused_measurement)
     {
         static_cast<void>(unused_context);
@@ -52,7 +52,7 @@ struct WrongMeasurementSample
 
 struct ReturningUpdate
 {
-    static bool update(NoiseTestModel::NoiseContext& unused_context,
+    static bool update(NoiseTestModel::ObservationContext& unused_context,
                        const NoiseTestMeasurement& unused_measurement)
     {
         static_cast<void>(unused_context);
@@ -73,7 +73,7 @@ TEST_CASE("NoisePolicy accepts compatible noise policies")
 TEST_CASE("NoisePolicy rejects incompatible noise policies")
 {
     static_assert(!NoisePolicy<MissingUpdate, NoiseTestModel, NoiseTestMeasurement>);
-    static_assert(!NoisePolicy<WrongNoiseContext, NoiseTestModel, NoiseTestMeasurement>);
+    static_assert(!NoisePolicy<WrongObservationContext, NoiseTestModel, NoiseTestMeasurement>);
     static_assert(!NoisePolicy<WrongMeasurementSample, NoiseTestModel, NoiseTestMeasurement>);
     static_assert(!NoisePolicy<ReturningUpdate, NoiseTestModel, NoiseTestMeasurement>);
     static_assert(!NoisePolicy<ExactNoisePolicy, NoiseTestModel, Measurement<1>>);
@@ -94,9 +94,9 @@ TEST_CASE("Sensor accepts constrained noise policy and preserves fixed capacity"
     CHECK(sensor.push(meas));
     CHECK_FALSE(sensor.push(meas));
 
-    sensor.update_noise_context(meas);
-    CHECK(sensor.noise_context().sigma_h == doctest::Approx(4.0));
-    CHECK(sensor.noise_context().sigma_v == doctest::Approx(6.0));
+    sensor.update_observation_context(meas);
+    CHECK(sensor.observation_context().R_e_m2(0, 0) == doctest::Approx(4.0));
+    CHECK(sensor.observation_context().R_e_m2(2, 2) == doctest::Approx(6.0));
 }
 
 } // namespace navkit::core::estimation::test

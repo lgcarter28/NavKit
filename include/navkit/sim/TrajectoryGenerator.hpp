@@ -22,6 +22,7 @@ struct StationaryTrajectoryConfig
     Vec3 p_e{6378137.0, 0.0, 0.0};
     Vec3 v_e{Vec3::Zero()};
     Eigen::Quaternion<Scalar_t> q_b2e{Eigen::Quaternion<Scalar_t>::Identity()};
+    Vec3 w_ib_b_radps{Vec3::Zero()};
 };
 
 class TrajectoryGenerator

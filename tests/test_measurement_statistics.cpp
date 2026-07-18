@@ -46,7 +46,7 @@ struct StatisticsFixture
     Filter::ErrorState_t initial_error_state{Filter::ErrorState_t::Zero()};
     ErrorStateCov<StateDef> initial_covariance{ErrorStateCov<StateDef>::Identity()};
     Model::O_t measurement{Model::O_t::Zero()};
-    Model::NoiseContext noise{};
+    Model::ObservationContext noise{};
     Measurement<Model::M> sensor_measurement{};
 
     StatisticsFixture()
@@ -58,8 +58,7 @@ struct StatisticsFixture
         initial_covariance *= 100.0;
         filter.set_covariance(initial_covariance);
 
-        noise.sigma_h = 1.0;
-        noise.sigma_v = 1.0;
+        noise.R_e_m2 = navkit::core::Mat3::Identity();
 
         sensor_measurement.time = 0.0;
         sensor_measurement.z = measurement;
@@ -126,7 +125,7 @@ TEST_CASE("accepted measurement update records statistics and updates filter sta
     constexpr Time_t update_time = 12.5;
     Sensor sensor{};
     fixture.sensor_measurement.time = update_time;
-    sensor.noise_context() = fixture.noise;
+    sensor.observation_context() = fixture.noise;
     CHECK(sensor.push(fixture.sensor_measurement));
 
     CHECK_FALSE(fixture.filter.measurement_statistics_available<Sensor>());
@@ -161,16 +160,15 @@ TEST_CASE("sensor diagnostics can disable measurement statistics storage")
     DisabledStatisticsFilter filter{};
     DisabledStatisticsSensor sensor{};
     Measurement<Model::M> measurement{};
-    Model::NoiseContext noise{};
+    Model::ObservationContext noise{};
 
     DisabledStatisticsFilter::State_t x = DisabledStatisticsFilter::State_t::Zero();
     x.template segment<3>(Nominal::Pos::i) << 10.0, -2.0, 5.0;
     filter.set_state(x);
     filter.set_covariance(ErrorStateCov<StateDef>::Identity() * 100.0);
 
-    noise.sigma_h = 1.0;
-    noise.sigma_v = 1.0;
-    sensor.noise_context() = noise;
+    noise.R_e_m2 = navkit::core::Mat3::Identity();
+    sensor.observation_context() = noise;
     CHECK(sensor.push(measurement));
 
     filter.process_sensor(sensor);

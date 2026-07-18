@@ -168,7 +168,7 @@ public:
     template<MeasurementModelPolicy<StateDef> MeasurementModel>
     void observation_update(const typename MeasurementModel::O_t& z,
                             Time_t time,
-                            const typename MeasurementModel::NoiseContext& ctx,
+                            const typename MeasurementModel::ObservationContext& ctx,
                             bool accepted = true)
     {
         observation_update_impl<MeasurementModel, void>(z, time, ctx, accepted);
@@ -176,7 +176,7 @@ public:
 
     template<MeasurementModelPolicy<StateDef> MeasurementModel>
     void observation_update(const typename MeasurementModel::O_t& z,
-                            const typename MeasurementModel::NoiseContext& ctx)
+                            const typename MeasurementModel::ObservationContext& ctx)
     {
         observation_update<MeasurementModel>(z, 0.0, ctx, true);
     }
@@ -191,9 +191,9 @@ public:
             if (!sensor.pop(meas)) {
                 break;
             }
-            sensor.update_noise_context(meas);
+            sensor.update_observation_context(meas);
             observation_update_impl<MeasurementModel, Sensor>(
-                meas.z, meas.time, sensor.noise_context(), true);
+                meas.z, meas.time, sensor.observation_context(), true);
         }
     }
 
@@ -230,15 +230,15 @@ private:
     template<MeasurementModelPolicy<StateDef> MeasurementModel, typename Sensor>
     void observation_update_impl(const typename MeasurementModel::O_t& z,
                                  Time_t time,
-                                 const typename MeasurementModel::NoiseContext& ctx,
+                                 const typename MeasurementModel::ObservationContext& ctx,
                                  bool accepted)
     {
         auto profile_scope =
             Profiler::profile(navkit::core::profiling::ProfilePoint::KalmanObservationUpdate);
         static_cast<void>(profile_scope);
 
-        const typename MeasurementModel::O_t innov = z - MeasurementModel::obs(m_x);
-        const typename MeasurementModel::H_t H = MeasurementModel::compute_h(m_x);
+        const typename MeasurementModel::O_t innov = z - MeasurementModel::obs(m_x, ctx);
+        const typename MeasurementModel::H_t H = MeasurementModel::compute_h(m_x, ctx);
         const typename MeasurementModel::R_t R = MeasurementModel::compute_r(ctx);
 
         typename MeasurementModel::R_t S{};
