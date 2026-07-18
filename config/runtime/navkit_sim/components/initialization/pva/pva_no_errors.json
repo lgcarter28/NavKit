@@ -1,0 +1,10 @@
+{
+  "pva_initialization": {
+    "type": "pva_error",
+    "pva_error": {
+      "p_e_m": [0.0, 0.0, 0.0],
+      "v_e_mps": [0.0, 0.0, 0.0],
+      "rotvec_b2e_rad": [0.0, 0.0, 0.0]
+    }
+  }
+}

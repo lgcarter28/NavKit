@@ -16,9 +16,10 @@ namespace navkit::app_support
 {
 
 template<typename InitializerConfig, navkit::core::estimation::FilterPolicy Filter>
-void initialize_filter_from_nav_initialization(const NavInitialization& nav_init,
-                                               const nlohmann::json& cfg,
-                                               Filter& filter)
+void initialize_filter_from_nav_initialization(
+    const NavInitialization<typename InitializerConfig::StateDef>& nav_init,
+    const nlohmann::json& cfg,
+    Filter& filter)
 {
     using StateDef = typename InitializerConfig::StateDef;
     using Nominal = typename StateDef::Nominal;
@@ -33,16 +34,24 @@ void initialize_filter_from_nav_initialization(const NavInitialization& nav_init
 
     filter.set_state(initial_state);
 
-    const typename Filter::P_t initial_covariance = detail::initial_covariance_from_json<StateDef>(
-        cfg, InitializerConfig::initial_covariance, core::estimation::pos_e_m(nav_init.pva));
-    filter.set_covariance(initial_covariance);
+    (void)cfg;
+    filter.set_covariance(nav_init.covariance);
 }
 
 template<typename InitializerConfig, typename Navigator>
-void initialize_navigator(const NavInitialization& nav_init,
+void initialize_navigator(const PvaInitialization& pva_init,
                           const nlohmann::json& cfg,
                           Navigator& navigator)
 {
+    using StateDef = typename InitializerConfig::StateDef;
+    const typename Navigator::Filter_t::P_t initial_covariance =
+        detail::initial_covariance_from_json<StateDef>(
+            cfg, InitializerConfig::initial_covariance, core::estimation::pos_e_m(pva_init.pva));
+    const NavInitialization<StateDef> nav_init{
+        .time_s = pva_init.time_s,
+        .pva = pva_init.pva,
+        .covariance = initial_covariance,
+    };
     initialize_filter_from_nav_initialization<InitializerConfig>(nav_init, cfg, navigator.filter());
 }
 

@@ -47,7 +47,8 @@ void validate_runtime_config(const nlohmann::json& cfg)
     allowed_keys.push_back("logging");
     allowed_keys.push_back("trajectory");
     allowed_keys.push_back("imu");
-    allowed_keys.push_back("initialization");
+    allowed_keys.push_back("pva_initialization");
+    allowed_keys.push_back("filter_initialization");
     allowed_keys.push_back("transfer_alignment");
     detail::reject_unknown_top_level_keys(cfg, allowed_keys);
 

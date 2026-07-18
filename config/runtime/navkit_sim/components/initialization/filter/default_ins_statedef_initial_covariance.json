@@ -1,5 +1,5 @@
 {
-  "initialization": {
+  "filter_initialization": {
     "initial_covariance": {
       "pva_frame": "ned",
       "pva_diag": {

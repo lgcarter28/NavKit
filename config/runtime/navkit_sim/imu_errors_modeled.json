@@ -2,9 +2,9 @@
   "components": [
     "components/logging/standard.json",
     "components/trajectory/stationary_ecef_1000hz.json",
-    "components/imu/error_model_modeled.json",
+    "components/imu/error_model_unmodeled.json",
     "components/gnss/nominal_pos_vel.json",
-    "components/initialization/default_pva_error.json"
+    "components/initialization/pva/pva_random_error_default.json"
   ],
   "run_name": "imu_errors_modeled",
   "output_dir": "output/logs/imu_errors_modeled"

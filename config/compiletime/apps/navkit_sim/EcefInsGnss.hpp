@@ -56,7 +56,7 @@ struct EcefInsGnssConfig
     using ImuSimulator =
         ::navkit::sim::ImuSimulator<!NavKit::Propagation::apply_coning_sculling_compensation>;
 
-    using NavInitializationProvider = ::navkit::app_support::PvaExplicitInitializationProvider;
+    using NavInitializationProvider = ::navkit::app_support::PvaRuntimeInitializationProvider;
     using TransferAlignmentProvider = ::navkit::app_support::NoTransferAlignmentProvider;
 
     using Logger = ::navkit::io::RunLogger<

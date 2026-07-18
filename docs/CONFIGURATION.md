@@ -230,21 +230,31 @@ describes optional timestamped aiding after construction and startup
 initialization. Disabled transfer alignment should be explicit, usually through
 `NoTransferAlignmentProvider`, so a runtime `transfer_alignment` section is not
 silently ignored.
+Startup initialization is split into two runtime sections. `pva_initialization`
+generates the one-time nominal PVA message consumed by the Navigator, while
+`filter_initialization` optionally overrides the full Kalman filter initial
+covariance. This keeps simulator truth/error generation separate from the
+filter's covariance belief.
+Reusable runtime component JSON follows the same split under
+`config/runtime/navkit_sim/components/initialization/pva` and
+`config/runtime/navkit_sim/components/initialization/filter`.
+
 The built-in PVA initialization providers currently support deterministic
-`"type": "pva_error"` inputs and seeded random `"type": "pva_random"` draws
-from a configured `pva_cov`; selecting which provider is valid is a compile-time
-app-config decision. For deterministic PVA errors, vector keys encode the frame
-and units. ECEF-resolved errors use `p_e_m`, `v_e_mps`, and `rotvec_b2e_rad`.
-Local-level errors use `p_n_m`, `v_n_mps`, and `rotvec_b2n_rad`; app support
-converts those relative NED vectors to the internal ECEF-resolved
-initialization convention using the initial truth/reference position. The
-`pva_cov` `diag` or `full` matrix follows the same field ordering and frame
-conventions implied by the selected `pva_error` keys, then is rotated into the
-filter's ECEF-resolved small-angle attitude-error covariance before
-initialization. Random PVA initialization uses the same covariance ordering but
-has no deterministic `pva_error` keys, so `"type": "pva_random"` may provide
+`"type": "pva_error"` inputs, seeded random `"type": "pva_random_error"` draws
+from a configured `pva_error_cov`, and direct `"type": "pva_direct"` startup
+values. Selecting which provider is valid is a compile-time app-config
+decision; the default simulation app selects a runtime-dispatching provider
+that accepts all three PVA initializer forms. For deterministic PVA errors,
+vector keys encode the frame and units.
+ECEF-resolved errors use `p_e_m`, `v_e_mps`, and `rotvec_b2e_rad`. Local-level
+errors use `p_n_m`, `v_n_mps`, and `rotvec_b2n_rad`; app support converts those
+relative NED vectors to the internal ECEF-resolved initialization convention
+using the initial truth/reference position. Random PVA initialization has no
+deterministic `pva_error` keys, so `"type": "pva_random_error"` provides
 `"pva_error_frame": "ecef"` or `"pva_error_frame": "ned"` to state how the
-configured covariance should be interpreted before sampling.
+configured `pva_error_cov` `diag` or `full` matrix should be interpreted before
+sampling. Direct PVA initialization uses configured PVA values directly and
+does not apply a truth-relative error.
 
 The app and NavKit config trees are deliberately separate:
 
@@ -348,20 +358,17 @@ apps/navkit_sim/ProfiledEcefInsGnss.hpp
 ```
 
 Runtime JSON is still checked against the compiled app composition. For example,
-the stationary GNSS sim config currently requires `trajectory`, `imu`, `gnss`,
-and `initialization` sections, rejects unsupported `baro` and disabled
+the ECEF INS/GNSS sim config currently requires `trajectory`, `imu`, `gnss`,
+and `pva_initialization` sections, rejects unsupported `baro` and disabled
 `transfer_alignment` sections, and validates common numeric/vector fields before
-the simulation loop starts. The current initialization provider uses
-`"type": "pva_error"` with nested `pva_error` and `pva_cov` sections so runtime
-inputs describe startup PVA error and covariance explicitly while still passing
-only typed PVA navigation data into the configured Navigator. `pva_error` keys
-name the authored convention, for example `p_n_m`, `v_n_mps`, and
-`rotvec_b2n_rad` for intuitive local-level position, velocity, and
-roll/pitch/yaw-like small-angle attitude errors. The covariance section uses the
-same implied order and frame before app support converts it into the internal
-ECEF-resolved state covariance. This validation lives in `navkit::app_support`
-because it is app/runtime-input glue, not reusable product-core NavKit
-configuration.
+the simulation loop starts. The current default initializer uses
+`"type": "pva_random_error"` with nested `pva_error_cov` and
+`pva_error_frame` fields so runtime inputs describe the statistics of the
+startup PVA error draw while still passing only typed PVA navigation data into
+the configured Navigator. Deterministic `pva_error` and direct `pva_direct`
+examples are available for directed tests and debugging. This validation lives
+in `navkit::app_support` because it is app/runtime-input glue, not reusable
+product-core NavKit configuration.
 
 Filter initial covariance is a separate product/runtime boundary. The compiled
 NavKit product config provides:
@@ -381,11 +388,11 @@ inline static const InitialCovariance_t initial_covariance =
 
 The `values` entries are variances, not sigmas, ordered exactly like the
 selected `StateDef::Error`. Runtime scenarios may override the filter initial
-covariance by adding `initialization.initial_covariance`:
+covariance by adding `filter_initialization.initial_covariance`:
 
 ```json
 {
-  "initialization": {
+  "filter_initialization": {
     "initial_covariance": {
       "diag": [ /* StateDef::Error::N variance values */ ]
     }
@@ -397,7 +404,7 @@ or:
 
 ```json
 {
-  "initialization": {
+  "filter_initialization": {
     "initial_covariance": {
       "full": [ /* row-major NxN covariance values */ ]
     }
@@ -414,7 +421,7 @@ generic and order-based:
 
 ```json
 {
-  "initialization": {
+  "filter_initialization": {
     "initial_covariance": {
       "pva_frame": "ned",
       "pva_diag": {

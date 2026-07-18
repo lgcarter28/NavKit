@@ -99,13 +99,11 @@ struct NotABinding
           {"p_b_ant_b_m", {0.0, 0.0, 0.0}},
           {"seed", 42U},
           {"noise_enabled", true}}},
-        {"initialization",
-         {{"type", "pva_error"},
-          {"pva_error",
-           {{"p_n_m", {25.0, -15.0, 10.0}},
-            {"v_n_mps", {0.0, 0.0, 0.0}},
-            {"rotvec_b2n_rad", {0.0, 0.0, 0.0}}}},
-          {"pva_cov",
+        {"pva_initialization",
+         {{"type", "pva_random_error"},
+          {"seed", 7U},
+          {"pva_error_frame", "ned"},
+          {"pva_error_cov",
            {{"diag",
              {10000.0,
               10000.0,
@@ -147,12 +145,20 @@ struct NotABinding
 
 [[nodiscard]] nlohmann::json random_pva_runtime_config()
 {
-    auto cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("initialization").erase("pva_error");
-    cfg.at("initialization").at("type") = "pva_random";
-    cfg.at("initialization").at("pva_cov") = {{"full", identity_pva_cov_full()}};
-    cfg.at("initialization").emplace("pva_error_frame", "ecef");
-    cfg.at("initialization").emplace("seed", 7U);
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("pva_initialization").at("pva_error_cov") = {{"full", identity_pva_cov_full()}};
+    cfg.at("pva_initialization").at("pva_error_frame") = "ecef";
+    return cfg;
+}
+
+[[nodiscard]] nlohmann::json explicit_pva_runtime_config()
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("pva_initialization") = {{"type", "pva_error"},
+                                    {"pva_error",
+                                     {{"p_n_m", {25.0, -15.0, 10.0}},
+                                      {"v_n_mps", {0.0, 0.0, 0.0}},
+                                      {"rotvec_b2n_rad", {0.0, 0.0, 0.0}}}}};
     return cfg;
 }
 
@@ -342,32 +348,32 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects missing runtime-owned simulat
 
 TEST_CASE("ECEF INS GNSS runtime validator rejects missing initialization")
 {
-    auto cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.erase("initialization");
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.erase("pva_initialization");
 
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
 
 TEST_CASE("ECEF INS GNSS runtime validator rejects unsupported initialization type")
 {
-    auto cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("initialization").at("type") = "explicit_pva";
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("pva_initialization").at("type") = "explicit_pva";
 
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
 
 TEST_CASE("ECEF INS GNSS runtime validator rejects malformed initialization covariance")
 {
-    auto cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("initialization").at("pva_cov") = {{"diag", {1.0, 2.0}}};
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("pva_initialization").at("pva_error_cov") = {{"diag", {1.0, 2.0}}};
 
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
 
 TEST_CASE("ECEF INS GNSS runtime validator rejects ambiguous initialization covariance")
 {
-    auto cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("initialization").at("pva_cov") = {
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("pva_initialization").at("pva_error_cov") = {
         {"diag", {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0}}, {"full", identity_pva_cov_full()}};
 
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
@@ -375,64 +381,65 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects ambiguous initialization cova
 
 TEST_CASE("ECEF INS GNSS runtime validator rejects malformed runtime initial covariance")
 {
-    auto cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("initialization").emplace("initial_covariance", nlohmann::json{{"diag", {1.0, 2.0}}});
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace("filter_initialization",
+                nlohmann::json{{"initial_covariance", {{"diag", {1.0, 2.0}}}}});
 
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
 
 TEST_CASE("ECEF INS GNSS runtime validator accepts runtime initial covariance")
 {
-    auto cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("initialization")
-        .emplace("initial_covariance",
-                 nlohmann::json{{"diag",
-                                 {1.0,
-                                  2.0,
-                                  3.0,
-                                  4.0,
-                                  5.0,
-                                  6.0,
-                                  7.0,
-                                  8.0,
-                                  9.0,
-                                  10.0,
-                                  11.0,
-                                  12.0,
-                                  13.0,
-                                  14.0,
-                                  15.0}}});
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace("filter_initialization",
+                nlohmann::json{{"initial_covariance",
+                                {{"diag",
+                                  {1.0,
+                                   2.0,
+                                   3.0,
+                                   4.0,
+                                   5.0,
+                                   6.0,
+                                   7.0,
+                                   8.0,
+                                   9.0,
+                                   10.0,
+                                   11.0,
+                                   12.0,
+                                   13.0,
+                                   14.0,
+                                   15.0}}}}});
 
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
 }
 
 TEST_CASE("ECEF INS GNSS runtime validator accepts frame-aware PVA initial covariance")
 {
-    auto cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("initialization")
-        .emplace(
-            "initial_covariance",
-            nlohmann::json{{"pva_frame", "ned"},
-                           {"pva_diag",
-                            {{"pos_m2", {1.0, 2.0, 3.0}},
-                             {"vel_m2ps2", {4.0, 5.0, 6.0}},
-                             {"att_rotvec_rad2", {7.0, 8.0, 9.0}}}},
-                           {"remaining_error_state_diag", {10.0, 11.0, 12.0, 13.0, 14.0, 15.0}}});
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace(
+        "filter_initialization",
+        nlohmann::json{{"initial_covariance",
+                        {{"pva_frame", "ned"},
+                         {"pva_diag",
+                          {{"pos_m2", {1.0, 2.0, 3.0}},
+                           {"vel_m2ps2", {4.0, 5.0, 6.0}},
+                           {"att_rotvec_rad2", {7.0, 8.0, 9.0}}}},
+                         {"remaining_error_state_diag", {10.0, 11.0, 12.0, 13.0, 14.0, 15.0}}}}});
 
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
 }
 
 TEST_CASE("ECEF INS GNSS runtime validator rejects malformed frame-aware PVA initial covariance")
 {
-    auto cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("initialization")
-        .emplace("initial_covariance",
-                 nlohmann::json{{"pva_frame", "ned"},
-                                {"pva_diag",
-                                 {{"pos_m2", {1.0, 2.0, 3.0}},
-                                  {"vel_m2ps2", {4.0, 5.0, 6.0}},
-                                  {"att_rotvec_rad2", {7.0, 8.0, 9.0}}}},
-                                {"remaining_error_state_diag", {10.0, 11.0}}});
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace("filter_initialization",
+                nlohmann::json{{"initial_covariance",
+                                {{"pva_frame", "ned"},
+                                 {"pva_diag",
+                                  {{"pos_m2", {1.0, 2.0, 3.0}},
+                                   {"vel_m2ps2", {4.0, 5.0, 6.0}},
+                                   {"att_rotvec_rad2", {7.0, 8.0, 9.0}}}},
+                                 {"remaining_error_state_diag", {10.0, 11.0}}}}});
 
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
@@ -505,66 +512,75 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects unsupported covariance log mo
 
 TEST_CASE("ECEF INS GNSS runtime validator keeps numeric tuning runtime-configurable")
 {
-    auto cfg = valid_ecef_ins_gnss_runtime_config();
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
     cfg.at("trajectory").at("duration_s") = 5.0;
     cfg.at("gnss").at("position_cov").at("diag").at("pos_m2") = {0.0, 0.0, 0.0};
-    cfg.at("initialization").at("pva_cov").at("diag").at(0) = 0.0;
+    cfg.at("pva_initialization").at("pva_error_cov").at("diag").at(0) = 0.0;
 
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
 }
 
-TEST_CASE("Explicit PVA initialization provider preserves ECEF INS GNSS demo behavior")
+TEST_CASE("Explicit PVA initialization provider applies configured errors")
 {
-    const auto cfg = valid_ecef_ins_gnss_runtime_config();
-    const auto trajectory = trajectory_run_from_json(cfg);
+    const nlohmann::json cfg = explicit_pva_runtime_config();
+    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
 
-    const auto nav_init =
-        EcefInsGnssAppConfig::NavInitializationProvider::initialize(cfg, trajectory);
+    static_assert(NavInitializationProviderPolicy<PvaExplicitInitializationProvider>);
+    CHECK_NOTHROW(PvaExplicitInitializationProvider::validate_runtime_config(cfg));
 
-    CHECK(nav_init.time_s == doctest::Approx(0.0));
-    CHECK(core::estimation::pos_e_m(nav_init.pva)(0) == doctest::Approx(6378137.0 - 10.0));
-    CHECK(core::estimation::pos_e_m(nav_init.pva)(1) == doctest::Approx(-15.0));
-    CHECK(core::estimation::pos_e_m(nav_init.pva)(2) == doctest::Approx(25.0));
-    CHECK(core::estimation::vel_e_mps(nav_init.pva).isZero());
+    const PvaInitialization pva_init =
+        PvaExplicitInitializationProvider::initialize(cfg, trajectory);
+
+    CHECK(pva_init.time_s == doctest::Approx(0.0));
+    CHECK(core::estimation::pos_e_m(pva_init.pva)(0) == doctest::Approx(6378137.0 - 10.0));
+    CHECK(core::estimation::pos_e_m(pva_init.pva)(1) == doctest::Approx(-15.0));
+    CHECK(core::estimation::pos_e_m(pva_init.pva)(2) == doctest::Approx(25.0));
+    CHECK(core::estimation::vel_e_mps(pva_init.pva).isZero());
     CHECK(
-        core::estimation::rpy_b2e_rad(nav_init.pva)
+        core::estimation::rpy_b2e_rad(pva_init.pva)
             .isApprox(core::math::rpy_rad_from_quaternion(trajectory.truth_samples.front().q_b2e)));
-    CHECK(nav_init.pva_cov(0, 0) == doctest::Approx(10000.0));
-    CHECK(nav_init.pva_cov(3, 3) == doctest::Approx(100.0));
-    CHECK(nav_init.pva_cov(6, 6) == doctest::Approx(0.030461741978670857));
-    CHECK(nav_init.pva_cov(7, 7) == doctest::Approx(0.007615435494667714));
-    CHECK(nav_init.pva_cov(8, 8) == doctest::Approx(0.007615435494667714));
 }
 
-TEST_CASE("Explicit PVA initialization provider accepts full row-major covariance")
+TEST_CASE("Direct PVA initialization provider uses configured values")
 {
-    auto cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("initialization").at("pva_error") = {{"p_e_m", {25.0, -15.0, 10.0}},
-                                                {"v_e_mps", {0.0, 0.0, 0.0}},
-                                                {"rotvec_b2e_rad", {0.0, 0.0, 0.0}}};
-    auto full_cov = identity_pva_cov_full();
-    full_cov.at((0U * 9U) + 3U) = 0.25;
-    full_cov.at((3U * 9U) + 0U) = 0.25;
-    cfg.at("initialization").at("pva_cov") = {{"full", full_cov}};
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("pva_initialization") = {{"type", "pva_direct"},
+                                    {"pva",
+                                     {{"time_s", 12.5},
+                                      {"p_e_m", {1.0, 2.0, 3.0}},
+                                      {"v_e_mps", {4.0, 5.0, 6.0}},
+                                      {"rpy_b2e_rad", {0.1, 0.2, 0.3}}}}};
+    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
 
-    const auto trajectory = trajectory_run_from_json(cfg);
-    const auto nav_init =
-        EcefInsGnssAppConfig::NavInitializationProvider::initialize(cfg, trajectory);
+    static_assert(NavInitializationProviderPolicy<PvaDirectInitializationProvider>);
+    CHECK_NOTHROW(PvaDirectInitializationProvider::validate_runtime_config(cfg));
 
-    CHECK(nav_init.pva_cov(0, 0) == doctest::Approx(1.0));
-    CHECK(nav_init.pva_cov(0, 3) == doctest::Approx(0.25));
-    CHECK(nav_init.pva_cov(3, 0) == doctest::Approx(0.25));
+    const PvaInitialization pva_init = PvaDirectInitializationProvider::initialize(cfg, trajectory);
 
+    CHECK(pva_init.time_s == doctest::Approx(12.5));
+    CHECK(core::estimation::pos_e_m(pva_init.pva).isApprox(core::Vec3{1.0, 2.0, 3.0}));
+    CHECK(core::estimation::vel_e_mps(pva_init.pva).isApprox(core::Vec3{4.0, 5.0, 6.0}));
+    CHECK(core::estimation::rpy_b2e_rad(pva_init.pva).isApprox(core::Vec3{0.1, 0.2, 0.3}));
+}
+
+TEST_CASE("Full row-major filter initial covariance populates the Kalman filter")
+{
     using NavKit = EcefInsGnssAppConfig::NavKit;
     using StateDef = NavKit::StateDef;
     using Error = StateDef::Error;
-    auto navigator = std::make_unique<NavKit::Navigator>();
-    cfg.at("initialization")
-        .emplace("initial_covariance",
-                 nlohmann::json{{"full", identity_initial_covariance_full()}});
-    cfg.at("initialization").at("initial_covariance").at("full").at((0U * 15U) + 3U) = 0.25;
-    cfg.at("initialization").at("initial_covariance").at("full").at((3U * 15U) + 0U) = 0.25;
-    initialize_navigator<NavKit>(nav_init, cfg, *navigator);
+
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    std::vector<double> full_cov = identity_initial_covariance_full();
+    full_cov.at((0U * 15U) + 3U) = 0.25;
+    full_cov.at((3U * 15U) + 0U) = 0.25;
+    cfg.emplace("filter_initialization",
+                nlohmann::json{{"initial_covariance", {{"full", full_cov}}}});
+
+    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
+    const PvaInitialization pva_init = PvaRandomInitializationProvider::initialize(cfg, trajectory);
+
+    std::unique_ptr<NavKit::Navigator> navigator = std::make_unique<NavKit::Navigator>();
+    initialize_navigator<NavKit>(pva_init, cfg, *navigator);
     CHECK(navigator->filter().covariance()(Error::Pos::i, Error::Vel::i) == doctest::Approx(0.25));
     CHECK(navigator->filter().covariance()(Error::Vel::i, Error::Pos::i) == doctest::Approx(0.25));
 }
@@ -575,23 +591,22 @@ TEST_CASE("Frame-aware PVA initial covariance populates the full filter covarian
     using StateDef = NavKit::StateDef;
     using Error = StateDef::Error;
 
-    auto cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("initialization")
-        .emplace(
-            "initial_covariance",
-            nlohmann::json{{"pva_frame", "ned"},
-                           {"pva_diag",
-                            {{"pos_m2", {1.0, 2.0, 3.0}},
-                             {"vel_m2ps2", {4.0, 5.0, 6.0}},
-                             {"att_rotvec_rad2", {7.0, 8.0, 9.0}}}},
-                           {"remaining_error_state_diag", {10.0, 11.0, 12.0, 13.0, 14.0, 15.0}}});
-    const auto trajectory = trajectory_run_from_json(cfg);
-    const auto nav_init =
-        EcefInsGnssAppConfig::NavInitializationProvider::initialize(cfg, trajectory);
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace(
+        "filter_initialization",
+        nlohmann::json{{"initial_covariance",
+                        {{"pva_frame", "ned"},
+                         {"pva_diag",
+                          {{"pos_m2", {1.0, 2.0, 3.0}},
+                           {"vel_m2ps2", {4.0, 5.0, 6.0}},
+                           {"att_rotvec_rad2", {7.0, 8.0, 9.0}}}},
+                         {"remaining_error_state_diag", {10.0, 11.0, 12.0, 13.0, 14.0, 15.0}}}}});
+    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
+    const PvaInitialization pva_init = PvaRandomInitializationProvider::initialize(cfg, trajectory);
 
-    auto navigator = std::make_unique<NavKit::Navigator>();
-    initialize_navigator<NavKit>(nav_init, cfg, *navigator);
-    const auto& covariance = navigator->filter().covariance();
+    std::unique_ptr<NavKit::Navigator> navigator = std::make_unique<NavKit::Navigator>();
+    initialize_navigator<NavKit>(pva_init, cfg, *navigator);
+    const typename NavKit::Filter::P_t& covariance = navigator->filter().covariance();
 
     CHECK(covariance(Error::Pos::i + 0, Error::Pos::i + 0) == doctest::Approx(3.0));
     CHECK(covariance(Error::Pos::i + 1, Error::Pos::i + 1) == doctest::Approx(2.0));
@@ -612,43 +627,35 @@ TEST_CASE("Frame-aware PVA initial covariance populates the full filter covarian
 
 TEST_CASE("Random PVA initialization provider produces deterministic colored draws")
 {
-    const auto cfg = random_pva_runtime_config();
-    const auto trajectory = trajectory_run_from_json(cfg);
+    const nlohmann::json cfg = random_pva_runtime_config();
+    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
 
     static_assert(NavInitializationProviderPolicy<PvaRandomInitializationProvider>);
     CHECK_NOTHROW(PvaRandomInitializationProvider::validate_runtime_config(cfg));
 
-    const auto first = PvaRandomInitializationProvider::initialize(cfg, trajectory);
-    const auto second = PvaRandomInitializationProvider::initialize(cfg, trajectory);
+    const PvaInitialization first = PvaRandomInitializationProvider::initialize(cfg, trajectory);
+    const PvaInitialization second = PvaRandomInitializationProvider::initialize(cfg, trajectory);
 
     CHECK(core::estimation::pos_e_m(first.pva).isApprox(core::estimation::pos_e_m(second.pva)));
     CHECK(core::estimation::vel_e_mps(first.pva).isApprox(core::estimation::vel_e_mps(second.pva)));
     CHECK(core::estimation::rpy_b2e_rad(first.pva).isApprox(
         core::estimation::rpy_b2e_rad(second.pva)));
     CHECK_FALSE((core::estimation::pos_e_m(first.pva) - trajectory.initial_position_e_m).isZero());
-    CHECK(first.pva_cov(0, 0) == doctest::Approx(1.0));
 }
 
 TEST_CASE("Random PVA initialization provider accepts NED covariance frame")
 {
-    auto cfg = random_pva_runtime_config();
-    cfg.at("initialization").at("pva_error_frame") = "ned";
-    cfg.at("initialization").at("pva_cov") = {
+    nlohmann::json cfg = random_pva_runtime_config();
+    cfg.at("pva_initialization").at("pva_error_frame") = "ned";
+    cfg.at("pva_initialization").at("pva_error_cov") = {
         {"diag", {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0}}};
-    const auto trajectory = trajectory_run_from_json(cfg);
+    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
 
     CHECK_NOTHROW(PvaRandomInitializationProvider::validate_runtime_config(cfg));
-    const auto nav_init = PvaRandomInitializationProvider::initialize(cfg, trajectory);
+    const PvaInitialization pva_init = PvaRandomInitializationProvider::initialize(cfg, trajectory);
 
-    CHECK(nav_init.pva_cov(0, 0) == doctest::Approx(3.0));
-    CHECK(nav_init.pva_cov(1, 1) == doctest::Approx(2.0));
-    CHECK(nav_init.pva_cov(2, 2) == doctest::Approx(1.0));
-    CHECK(nav_init.pva_cov(3, 3) == doctest::Approx(6.0));
-    CHECK(nav_init.pva_cov(4, 4) == doctest::Approx(5.0));
-    CHECK(nav_init.pva_cov(5, 5) == doctest::Approx(4.0));
-    CHECK(nav_init.pva_cov(6, 6) == doctest::Approx(9.0));
-    CHECK(nav_init.pva_cov(7, 7) == doctest::Approx(8.0));
-    CHECK(nav_init.pva_cov(8, 8) == doctest::Approx(7.0));
+    CHECK_FALSE(
+        (core::estimation::pos_e_m(pva_init.pva) - trajectory.initial_position_e_m).isZero());
 }
 
 TEST_CASE("NavInitialization maps into the configured Navigator filter state")
@@ -658,10 +665,26 @@ TEST_CASE("NavInitialization maps into the configured Navigator filter state")
     using Nominal = StateDef::Nominal;
     using Error = StateDef::Error;
 
-    const auto cfg = valid_ecef_ins_gnss_runtime_config();
-    const auto trajectory = trajectory_run_from_json(cfg);
-    const auto nav_init =
-        EcefInsGnssAppConfig::NavInitializationProvider::initialize(cfg, trajectory);
+    nlohmann::json cfg = explicit_pva_runtime_config();
+    cfg.emplace(
+        "filter_initialization",
+        nlohmann::json{{"initial_covariance",
+                        {{"pva_frame", "ned"},
+                         {"pva_diag",
+                          {{"pos_m2", {10000.0, 10000.0, 10000.0}},
+                           {"vel_m2ps2", {100.0, 100.0, 100.0}},
+                           {"att_rotvec_rad2",
+                            {0.007615435494667714, 0.007615435494667714, 0.030461741978670857}}}},
+                         {"remaining_error_state_diag",
+                          {NavKit::initial_covariance(Error::GyroB::i + 0, Error::GyroB::i + 0),
+                           NavKit::initial_covariance(Error::GyroB::i + 1, Error::GyroB::i + 1),
+                           NavKit::initial_covariance(Error::GyroB::i + 2, Error::GyroB::i + 2),
+                           NavKit::initial_covariance(Error::AccB::i + 0, Error::AccB::i + 0),
+                           NavKit::initial_covariance(Error::AccB::i + 1, Error::AccB::i + 1),
+                           NavKit::initial_covariance(Error::AccB::i + 2, Error::AccB::i + 2)}}}}});
+    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
+    const PvaInitialization nav_init =
+        PvaExplicitInitializationProvider::initialize(cfg, trajectory);
     const Eigen::Quaternion<core::Scalar_t> expected_q_b2e =
         trajectory.truth_samples.front().q_b2e.normalized();
 
@@ -680,11 +703,11 @@ TEST_CASE("NavInitialization maps into the configured Navigator filter state")
     CHECK(filter.covariance()(Error::Pos::i, Error::Pos::i) == doctest::Approx(10000.0));
     CHECK(filter.covariance()(Error::Vel::i, Error::Vel::i) == doctest::Approx(100.0));
     CHECK(filter.covariance()(Error::AttRotVec::i, Error::AttRotVec::i) ==
-          doctest::Approx(0.007615435494667714));
+          doctest::Approx(0.030461741978670857));
     CHECK(filter.covariance()(Error::AttRotVec::i + 1, Error::AttRotVec::i + 1) ==
           doctest::Approx(0.007615435494667714));
     CHECK(filter.covariance()(Error::AttRotVec::i + 2, Error::AttRotVec::i + 2) ==
-          doctest::Approx(0.030461741978670857));
+          doctest::Approx(0.007615435494667714));
 
     CHECK(filter.covariance()(Error::GyroB::i, Error::GyroB::i) ==
           doctest::Approx(NavKit::initial_covariance(Error::GyroB::i, Error::GyroB::i)));

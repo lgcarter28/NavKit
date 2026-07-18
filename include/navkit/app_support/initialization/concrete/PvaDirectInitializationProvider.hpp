@@ -12,27 +12,21 @@
 namespace navkit::app_support
 {
 
-struct PvaExplicitInitializationProvider
+struct PvaDirectInitializationProvider
 {
-    static constexpr const char* runtime_type = "pva_error";
+    static constexpr const char* runtime_type = "pva_direct";
 
     static void validate_runtime_config(const nlohmann::json& cfg)
     {
         const nlohmann::json& initialization = detail::require_object(cfg, "pva_initialization");
         detail::require_pva_initialization_type(initialization, runtime_type);
-        detail::validate_pva_error_shape(initialization);
+        detail::validate_pva_direct_shape(initialization);
     }
 
     [[nodiscard]] static PvaInitialization initialize(const nlohmann::json& cfg,
-                                                      const TrajectoryRun& trajectory)
+                                                      const TrajectoryRun&)
     {
-        const nlohmann::json& initialization = cfg.at("pva_initialization");
-
-        PvaInitialization pva_init = detail::base_pva_initialization(trajectory);
-        const core::Vec3 reference_p_e_m = core::estimation::pos_e_m(pva_init.pva);
-        detail::apply_pva_error(pva_init,
-                                detail::pva_error_from_json(initialization, reference_p_e_m));
-        return pva_init;
+        return detail::pva_direct_from_json(cfg.at("pva_initialization"));
     }
 };
 

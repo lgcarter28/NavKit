@@ -55,9 +55,9 @@ public:
         std::unique_ptr<Navigator> navigator_storage = std::make_unique<Navigator>();
         Navigator& navigator = *navigator_storage;
         Filter& filter = navigator.filter();
-        const NavInitialization nav_initialization =
+        const PvaInitialization pva_initialization =
             NavInitializationProvider::initialize(cfg, trajectory);
-        initialize_navigator<NavKit>(nav_initialization, cfg, navigator);
+        initialize_navigator<NavKit>(pva_initialization, cfg, navigator);
         TransferAlignmentProvider::template transfer_align<Navigator>(navigator, cfg, trajectory);
 
         Logger logger(run_settings.data_dir, run_settings.run_name, cfg);

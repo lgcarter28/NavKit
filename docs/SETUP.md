@@ -533,9 +533,7 @@ python tools/run_scenario.py --build-type Debug
 Run a specific runtime input and place all outputs under a chosen run folder:
 
 ```bash
-python tools/run_scenario.py --build-type Release \
-  --config config/runtime/navkit_sim/ecef_ins_gnss.json \
-  --output-dir output/logs/my_case
+python tools/run_scenario.py --build-type Release --config config/runtime/navkit_sim/ecef_ins_gnss_runtime_covariance.json --output-dir output/logs/my_case
 ```
 
 `run_scenario.py` writes an `effective_runtime_config.json` into the selected
@@ -554,19 +552,19 @@ Or manually, after building:
 Windows Debug:
 
 ```powershell
-build\\debug\\apps\\navkit_sim\\EcefInsGnss\apps\navkit_sim\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
+build\\debug\\apps\\navkit_sim\\EcefInsGnss\apps\navkit_sim\navkit_sim.exe config\runtime\navkit_sim\ecef_ins_gnss.json
 ```
 
 Windows Release:
 
 ```powershell
-build\\release\\apps\\navkit_sim\\EcefInsGnss\apps\navkit_sim\navkit_sim.exe config\runtime\navkit_sim\stationary_gnss.json
+build\\release\\apps\\navkit_sim\\EcefInsGnss\apps\navkit_sim\navkit_sim.exe config\runtime\navkit_sim\ecef_ins_gnss.json
 ```
 
 Linux Debug:
 
 ```bash
-build/debug/apps/navkit_sim/EcefInsGnss/apps/navkit_sim/navkit_sim config/runtime/navkit_sim/stationary_gnss.json
+build/debug/apps/navkit_sim/EcefInsGnss/apps/navkit_sim/navkit_sim config/runtime/navkit_sim/ecef_ins_gnss.json
 ```
 
 The simulation generates logs under:
@@ -594,28 +592,28 @@ timing.json
 CSV is used for time-history logs. JSON is used for runtime input bundles,
 per-log metadata, the hierarchical run manifest, and lightweight workflow
 timing artifacts. Runtime input bundles such as
-`config/runtime/navkit_sim/stationary_gnss.json` are executable inputs, not
+`config/runtime/navkit_sim/ecef_ins_gnss.json` are executable inputs, not
 NavKit library compile-time configuration. The selected app validates the
 runtime JSON before running; for the stationary GNSS app, that means required
-`trajectory`, `imu`, `gnss`, and `initialization` sections must exist,
+`trajectory`, `imu`, `gnss`, and `pva_initialization` sections must exist,
 unsupported `baro` or disabled `transfer_alignment` sections are rejected, and
 common vector/numeric fields must have the expected shape. Runtime sections
 that describe update cadence may specify either `rate_hz` or `dt_s`, but not
 both. The optional `logging` section uses the same cadence shape for independent
 console, truth, nav, and measurement-statistics output rates, so simulation
 system rates do not force file or console logging rates. The current stationary
-GNSS initializer uses `"type": "pva_error"` with nested `pva_error` and `pva_cov`
-sections to keep startup PVA error/covariance input in app support while
-product-core code consumes only typed PVA navigation initialization data.
+GNSS initializer uses `"type": "pva_random_error"` with nested `pva_error_cov`
+and `pva_error_frame` fields to keep startup PVA error generation in app support
+while product-core code consumes only typed PVA navigation initialization data.
 Initialization error keys encode the authored frame and units. For example,
 `p_n_m`, `v_n_mps`, and `rotvec_b2n_rad` author relative errors in the local
 NED frame, while `p_e_m`, `v_e_mps`, and `rotvec_b2e_rad` author them directly
-in ECEF. The covariance `diag` or row-major `full` matrix follows the same
-position/velocity/attitude-error order and frame implied by those keys before
-app support converts it into the internal ECEF-resolved filter covariance. The
-`imu` section selects the simulator runtime mode, such as `"type": "ideal"` or a
-configured error model, while the app compile-time config selects which IMU
-simulator type is compiled in.
+in ECEF for explicit error examples. PVA initialization covariance describes
+only the random startup-message error draw; full Kalman filter initial
+covariance is configured separately through the optional `filter_initialization`
+section. The `imu` section selects the simulator runtime mode, such as
+`"type": "ideal"` or a configured error model, while the app compile-time config
+selects which IMU simulator type is compiled in.
 
 ---
 

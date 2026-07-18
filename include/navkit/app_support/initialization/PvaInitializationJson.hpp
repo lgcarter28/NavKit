@@ -23,37 +23,48 @@
 namespace navkit::app_support::detail
 {
 
-static constexpr std::size_t pva_cov_diag_count = 9U;
-static constexpr std::size_t pva_cov_full_count = 81U;
+static constexpr std::size_t pva_error_cov_diag_count = 9U;
+static constexpr std::size_t pva_error_cov_full_count = 81U;
 
-inline void require_initialization_type(const nlohmann::json& initialization,
-                                        const std::string& expected_type)
+inline void require_pva_initialization_type(const nlohmann::json& initialization,
+                                            const std::string& expected_type)
 {
     require_optional_string(initialization, "type");
     const auto type_iter = initialization.find("type");
     if (type_iter == initialization.end()) {
-        throw_runtime_config_error("missing required initialization.type");
+        throw_runtime_config_error("missing required pva_initialization.type");
     }
     if (type_iter->get<std::string>() != expected_type) {
-        throw_runtime_config_error("initialization.type must be '" + expected_type +
+        throw_runtime_config_error("pva_initialization.type must be '" + expected_type +
                                    "' for the selected compile-time app config");
     }
 }
 
-[[nodiscard]] inline NavInitialization base_nav_initialization(const TrajectoryRun& trajectory)
+[[nodiscard]] inline std::string
+pva_initialization_type_from_json(const nlohmann::json& initialization)
 {
-    NavInitialization nav_init;
+    require_optional_string(initialization, "type");
+    const auto type_iter = initialization.find("type");
+    if (type_iter == initialization.end()) {
+        throw_runtime_config_error("missing required pva_initialization.type");
+    }
+    return type_iter->get<std::string>();
+}
+
+[[nodiscard]] inline PvaInitialization base_pva_initialization(const TrajectoryRun& trajectory)
+{
+    PvaInitialization pva_init;
     if (trajectory.truth_samples.empty()) {
-        core::estimation::pos_e_m(nav_init.pva) = trajectory.initial_position_e_m;
-        return nav_init;
+        core::estimation::pos_e_m(pva_init.pva) = trajectory.initial_position_e_m;
+        return pva_init;
     }
 
     const auto& truth = trajectory.truth_samples.front();
-    nav_init.time_s = truth.time;
-    core::estimation::pos_e_m(nav_init.pva) = truth.p_e;
-    core::estimation::vel_e_mps(nav_init.pva) = truth.v_e;
-    core::estimation::rpy_b2e_rad(nav_init.pva) = core::math::rpy_rad_from_quaternion(truth.q_b2e);
-    return nav_init;
+    pva_init.time_s = truth.time;
+    core::estimation::pos_e_m(pva_init.pva) = truth.p_e;
+    core::estimation::vel_e_mps(pva_init.pva) = truth.v_e;
+    core::estimation::rpy_b2e_rad(pva_init.pva) = core::math::rpy_rad_from_quaternion(truth.q_b2e);
+    return pva_init;
 }
 
 [[nodiscard]] inline core::Vec3 required_vec3_from_object(const nlohmann::json& cfg,
@@ -69,7 +80,7 @@ inline void require_exactly_one_pva_error_key(const nlohmann::json& pva_error,
 {
     const int count = count_present(pva_error, keys);
     if (count != 1) {
-        throw_runtime_config_error("initialization.pva_error must specify exactly one " +
+        throw_runtime_config_error("pva_initialization.pva_error must specify exactly one " +
                                    group_name + " convention");
     }
 }
@@ -87,6 +98,30 @@ inline void validate_pva_error_shape(const nlohmann::json& initialization)
     require_optional_vec3(pva_error, "v_n_mps");
     require_optional_vec3(pva_error, "rotvec_b2e_rad");
     require_optional_vec3(pva_error, "rotvec_b2n_rad");
+}
+
+inline void validate_pva_direct_shape(const nlohmann::json& initialization)
+{
+    const nlohmann::json& pva = require_object(initialization, "pva");
+    require_vec3(pva, "p_e_m");
+    require_vec3(pva, "v_e_mps");
+    require_vec3(pva, "rpy_b2e_rad");
+    require_optional_nonnegative_number(pva, "time_s");
+}
+
+[[nodiscard]] inline PvaInitialization pva_direct_from_json(const nlohmann::json& initialization)
+{
+    validate_pva_direct_shape(initialization);
+    const nlohmann::json& pva = initialization.at("pva");
+
+    PvaInitialization pva_init;
+    if (pva.contains("time_s")) {
+        pva_init.time_s = pva.at("time_s").get<core::Time_t>();
+    }
+    core::estimation::pos_e_m(pva_init.pva) = required_vec3_from_object(pva, "p_e_m");
+    core::estimation::vel_e_mps(pva_init.pva) = required_vec3_from_object(pva, "v_e_mps");
+    core::estimation::rpy_b2e_rad(pva_init.pva) = required_vec3_from_object(pva, "rpy_b2e_rad");
+    return pva_init;
 }
 
 [[nodiscard]] inline Eigen::Matrix<core::Scalar_t, 3, 3>
@@ -127,45 +162,46 @@ pva_error_from_json(const nlohmann::json& initialization, const core::Vec3& refe
     require_string(initialization, "pva_error_frame");
     const std::string frame = initialization.at("pva_error_frame").get<std::string>();
     if (frame != "ecef" && frame != "ned") {
-        throw_runtime_config_error("initialization.pva_error_frame must be 'ecef' or 'ned'");
+        throw_runtime_config_error("pva_initialization.pva_error_frame must be 'ecef' or 'ned'");
     }
     return frame;
 }
 
-inline void validate_pva_covariance_shape(const nlohmann::json& initialization)
+inline void validate_pva_error_covariance_shape(const nlohmann::json& initialization)
 {
-    const auto& pva_cov = require_object(initialization, "pva_cov");
-    const bool has_diag = pva_cov.contains("diag");
-    const bool has_full = pva_cov.contains("full");
+    const auto& pva_error_cov = require_object(initialization, "pva_error_cov");
+    const bool has_diag = pva_error_cov.contains("diag");
+    const bool has_full = pva_error_cov.contains("full");
 
     if (has_diag == has_full) {
         throw_runtime_config_error(
-            "initialization.pva_cov must contain exactly one of 'diag' or 'full'");
+            "pva_initialization.pva_error_cov must contain exactly one of 'diag' or 'full'");
     }
 
     if (has_diag) {
-        require_numeric_array(pva_cov, "diag", pva_cov_diag_count);
+        require_numeric_array(pva_error_cov, "diag", pva_error_cov_diag_count);
     }
     else {
-        require_numeric_array(pva_cov, "full", pva_cov_full_count);
+        require_numeric_array(pva_error_cov, "full", pva_error_cov_full_count);
     }
 }
 
 [[nodiscard]] inline core::estimation::PvaCovariance
-pva_covariance_from_json(const nlohmann::json& initialization, const core::Vec3& reference_p_e_m)
+pva_error_covariance_from_json(const nlohmann::json& initialization,
+                               const core::Vec3& reference_p_e_m)
 {
-    validate_pva_covariance_shape(initialization);
-    const auto& pva_cov = initialization.at("pva_cov");
+    validate_pva_error_covariance_shape(initialization);
+    const auto& pva_error_cov = initialization.at("pva_error_cov");
 
     core::estimation::PvaCovariance covariance = core::estimation::PvaCovariance::Zero();
-    if (pva_cov.contains("diag")) {
-        const auto& diag = pva_cov.at("diag");
+    if (pva_error_cov.contains("diag")) {
+        const auto& diag = pva_error_cov.at("diag");
         for (int i = 0; i < core::estimation::PvaErrorStateDef::N; ++i) {
             covariance(i, i) = diag.at(static_cast<std::size_t>(i)).get<core::Scalar_t>();
         }
     }
     else {
-        const auto& full = pva_cov.at("full");
+        const auto& full = pva_error_cov.at("full");
         for (int row = 0; row < core::estimation::PvaErrorStateDef::N; ++row) {
             for (int col = 0; col < core::estimation::PvaErrorStateDef::N; ++col) {
                 const auto index =
@@ -210,17 +246,17 @@ pva_covariance_from_json(const nlohmann::json& initialization, const core::Vec3&
     return T * covariance * T.transpose();
 }
 
-inline void apply_pva_error(NavInitialization& nav_init,
+inline void apply_pva_error(PvaInitialization& pva_init,
                             const core::estimation::PvaErrorState& error)
 {
-    core::estimation::pos_e_m(nav_init.pva) += core::estimation::pos_error_e_m(error);
-    core::estimation::vel_e_mps(nav_init.pva) += core::estimation::vel_error_e_mps(error);
+    core::estimation::pos_e_m(pva_init.pva) += core::estimation::pos_error_e_m(error);
+    core::estimation::vel_e_mps(pva_init.pva) += core::estimation::vel_error_e_mps(error);
 
     const Eigen::Quaternion<core::Scalar_t> q_b2e =
-        core::math::quaternion_from_rpy_rad(core::estimation::rpy_b2e_rad(nav_init.pva));
+        core::math::quaternion_from_rpy_rad(core::estimation::rpy_b2e_rad(pva_init.pva));
     const Eigen::Quaternion<core::Scalar_t> delta_q =
         core::math::quaternion_from_rotvec_rad(core::estimation::att_rotvec_e_rad(error));
-    core::estimation::rpy_b2e_rad(nav_init.pva) =
+    core::estimation::rpy_b2e_rad(pva_init.pva) =
         core::math::rpy_rad_from_quaternion(delta_q * q_b2e);
 }
 
@@ -229,12 +265,13 @@ sample_pva_error(const core::estimation::PvaCovariance& covariance, const std::u
 {
     Eigen::SelfAdjointEigenSolver<core::estimation::PvaCovariance> solver(covariance);
     if (solver.info() != Eigen::Success) {
-        throw_runtime_config_error("initialization.pva_cov eigensolve failed");
+        throw_runtime_config_error("pva_initialization.pva_error_cov eigensolve failed");
     }
 
     constexpr core::Scalar_t tolerance = -1.0e-12;
     if (solver.eigenvalues().minCoeff() < tolerance) {
-        throw_runtime_config_error("initialization.pva_cov must be positive semidefinite");
+        throw_runtime_config_error(
+            "pva_initialization.pva_error_cov must be positive semidefinite");
     }
 
     core::estimation::PvaErrorState normal = core::estimation::PvaErrorState::Zero();

@@ -1,0 +1,11 @@
+{
+  "pva_initialization": {
+    "type": "pva_direct",
+    "pva": {
+      "time_s": 0.0,
+      "p_e_m": [6378137.0, 0.0, 0.0],
+      "v_e_mps": [0.0, 0.0, 0.0],
+      "rpy_b2e_rad": [0.0, 0.0, 0.0]
+    }
+  }
+}

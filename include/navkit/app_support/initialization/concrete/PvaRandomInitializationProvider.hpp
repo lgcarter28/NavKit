@@ -15,29 +15,29 @@ namespace navkit::app_support
 
 struct PvaRandomInitializationProvider
 {
-    static constexpr const char* runtime_type = "pva_random";
+    static constexpr const char* runtime_type = "pva_random_error";
 
     static void validate_runtime_config(const nlohmann::json& cfg)
     {
-        const auto& initialization = detail::require_object(cfg, "initialization");
-        detail::require_initialization_type(initialization, runtime_type);
-        detail::validate_pva_covariance_shape(initialization);
+        const nlohmann::json& initialization = detail::require_object(cfg, "pva_initialization");
+        detail::require_pva_initialization_type(initialization, runtime_type);
+        detail::validate_pva_error_covariance_shape(initialization);
         (void)detail::pva_error_frame_from_json(initialization);
         detail::require_unsigned_integer(initialization, "seed");
     }
 
-    [[nodiscard]] static NavInitialization initialize(const nlohmann::json& cfg,
+    [[nodiscard]] static PvaInitialization initialize(const nlohmann::json& cfg,
                                                       const TrajectoryRun& trajectory)
     {
-        const auto& initialization = cfg.at("initialization");
-        NavInitialization nav_init = detail::base_nav_initialization(trajectory);
-        const core::Vec3 reference_p_e_m = core::estimation::pos_e_m(nav_init.pva);
-        const auto covariance = detail::pva_covariance_from_json(initialization, reference_p_e_m);
-        const auto seed = initialization.at("seed").get<std::uint64_t>();
+        const nlohmann::json& initialization = cfg.at("pva_initialization");
+        PvaInitialization pva_init = detail::base_pva_initialization(trajectory);
+        const core::Vec3 reference_p_e_m = core::estimation::pos_e_m(pva_init.pva);
+        const core::estimation::PvaCovariance covariance =
+            detail::pva_error_covariance_from_json(initialization, reference_p_e_m);
+        const std::uint64_t seed = initialization.at("seed").get<std::uint64_t>();
 
-        detail::apply_pva_error(nav_init, detail::sample_pva_error(covariance, seed));
-        nav_init.pva_cov = covariance;
-        return nav_init;
+        detail::apply_pva_error(pva_init, detail::sample_pva_error(covariance, seed));
+        return pva_init;
     }
 };
 

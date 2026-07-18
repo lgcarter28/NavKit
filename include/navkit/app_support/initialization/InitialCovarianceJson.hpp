@@ -47,7 +47,7 @@ initial_covariance_pva_frame_from_json(const nlohmann::json& initial_covariance)
     const std::string frame = initial_covariance.at("pva_frame").get<std::string>();
     if (frame != "ecef" && frame != "ned") {
         throw_runtime_config_error(
-            "initialization.initial_covariance.pva_frame must be 'ecef' or 'ned'");
+            "filter_initialization.initial_covariance.pva_frame must be 'ecef' or 'ned'");
     }
     return frame;
 }
@@ -68,17 +68,18 @@ validate_runtime_initial_covariance_pva_diag_shape(const nlohmann::json& initial
 template<navkit::core::estimation::StateSpaceDefPolicy StateDef>
 inline void validate_runtime_initial_covariance_shape(const nlohmann::json& cfg)
 {
-    const auto initialization_iter = cfg.find("initialization");
-    if (initialization_iter == cfg.end() || !initialization_iter->is_object()) {
+    const auto filter_initialization_iter = cfg.find("filter_initialization");
+    if (filter_initialization_iter == cfg.end() || !filter_initialization_iter->is_object()) {
         return;
     }
 
-    const auto covariance_iter = initialization_iter->find("initial_covariance");
-    if (covariance_iter == initialization_iter->end()) {
+    const auto covariance_iter = filter_initialization_iter->find("initial_covariance");
+    if (covariance_iter == filter_initialization_iter->end()) {
         return;
     }
     if (!covariance_iter->is_object()) {
-        throw_runtime_config_error("expected 'initialization.initial_covariance' to be an object");
+        throw_runtime_config_error(
+            "expected 'filter_initialization.initial_covariance' to be an object");
     }
 
     const nlohmann::json& initial_covariance = *covariance_iter;
@@ -91,8 +92,8 @@ inline void validate_runtime_initial_covariance_shape(const nlohmann::json& cfg)
         (has_diag ? 1 : 0) + (has_full ? 1 : 0) + (has_pva_diag ? 1 : 0);
     if (covariance_form_count != 1) {
         throw_runtime_config_error(
-            "initialization.initial_covariance must contain exactly one of 'diag', 'full', or "
-            "'pva_diag' with 'remaining_error_state_diag'");
+            "filter_initialization.initial_covariance must contain exactly one of 'diag', 'full', "
+            "or 'pva_diag' with 'remaining_error_state_diag'");
     }
 
     if (has_diag) {
@@ -114,8 +115,8 @@ inline void validate_runtime_initial_covariance_shape(const nlohmann::json& cfg)
     }
     else {
         throw_runtime_config_error(
-            "initialization.initial_covariance pva_diag form requires Pos, Vel, and AttRotVec "
-            "error-state segments");
+            "filter_initialization.initial_covariance pva_diag form requires Pos, Vel, and "
+            "AttRotVec error-state segments");
     }
 }
 
@@ -176,13 +177,13 @@ initial_covariance_from_json(
     const navkit::core::estimation::InitialCovariance<StateDef>& compile_time_covariance,
     const navkit::core::Vec3& reference_p_e_m)
 {
-    const auto initialization_iter = cfg.find("initialization");
-    if (initialization_iter == cfg.end() || !initialization_iter->is_object()) {
+    const auto filter_initialization_iter = cfg.find("filter_initialization");
+    if (filter_initialization_iter == cfg.end() || !filter_initialization_iter->is_object()) {
         return compile_time_covariance;
     }
 
-    const auto covariance_iter = initialization_iter->find("initial_covariance");
-    if (covariance_iter == initialization_iter->end()) {
+    const auto covariance_iter = filter_initialization_iter->find("initial_covariance");
+    if (covariance_iter == filter_initialization_iter->end()) {
         return compile_time_covariance;
     }
 
