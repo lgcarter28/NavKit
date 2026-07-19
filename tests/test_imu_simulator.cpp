@@ -274,10 +274,66 @@ TEST_CASE("IMU runtime config parser accepts seeded variance and covariance draw
     const ImuSimulatorConfig first = imu_simulator_config_from_json(random_error_model);
     const ImuSimulatorConfig second = imu_simulator_config_from_json(random_error_model);
 
-    CHECK(first.gyro.bias_turnon.isApprox(second.gyro.bias_turnon));
-    CHECK(first.gyro.scale_factor.isApprox(second.gyro.scale_factor));
-    CHECK(first.accel.bias_turnon.isApprox(second.accel.bias_turnon));
-    CHECK(first.accel.nonorthogonality.isApprox(second.accel.nonorthogonality));
+    CHECK(first.gyro.bias_turnon.isZero());
+    CHECK(first.gyro.scale_factor.isZero());
+    CHECK(first.accel.bias_turnon.isZero());
+    CHECK(first.accel.nonorthogonality.isZero());
+    CHECK(first.gyro_random.bias_turnon.enabled);
+    CHECK(first.gyro_random.scale_factor.enabled);
+    CHECK(first.accel_random.bias_turnon.enabled);
+    CHECK(first.accel_random.nonorthogonality.enabled);
+    CHECK(first.gyro_random.bias_turnon.covariance.isApprox(core::Mat3::Identity()));
+    CHECK(first.gyro_random.scale_factor.covariance.isApprox(core::Mat3::Identity()));
+    CHECK(first.accel_random.bias_turnon.covariance.isApprox(core::Mat3::Identity()));
+    CHECK(first.accel_random.nonorthogonality.covariance.isApprox(core::Mat3::Identity()));
+
+    CHECK(first.gyro_random.bias_turnon.covariance.isApprox(
+        second.gyro_random.bias_turnon.covariance));
+    CHECK(first.gyro_random.scale_factor.covariance.isApprox(
+        second.gyro_random.scale_factor.covariance));
+    CHECK(first.accel_random.bias_turnon.covariance.isApprox(
+        second.accel_random.bias_turnon.covariance));
+    CHECK(first.accel_random.nonorthogonality.covariance.isApprox(
+        second.accel_random.nonorthogonality.covariance));
+
+    const DefaultImuSimulator first_simulator(first);
+    const DefaultImuSimulator second_simulator(second);
+    CHECK(first_simulator.config().gyro.bias_turnon.isApprox(
+        second_simulator.config().gyro.bias_turnon));
+    CHECK(first_simulator.config().gyro.scale_factor.isApprox(
+        second_simulator.config().gyro.scale_factor));
+    CHECK(first_simulator.config().accel.bias_turnon.isApprox(
+        second_simulator.config().accel.bias_turnon));
+    CHECK(first_simulator.config().accel.nonorthogonality.isApprox(
+        second_simulator.config().accel.nonorthogonality));
+}
+
+TEST_CASE("IMU runtime config parser normalizes diagonal variance to covariance")
+{
+    using navkit::app_support::imu_simulator_config_from_json;
+
+    const nlohmann::json diagonal_config = {
+        {"imu",
+         {{"type", "error_model"},
+          {"seed", 1U},
+          {"rate_hz", 100.0},
+          {"gyro", {{"bias_turnon_var_rad2ps2", {1.0, 2.0, 3.0}}}},
+          {"accel", nlohmann::json::object()}}}};
+    const nlohmann::json full_config = {
+        {"imu",
+         {{"type", "error_model"},
+          {"seed", 1U},
+          {"rate_hz", 100.0},
+          {"gyro", {{"bias_turnon_cov_rad2ps2", {1.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 3.0}}}},
+          {"accel", nlohmann::json::object()}}}};
+
+    const ImuSimulatorConfig diagonal = imu_simulator_config_from_json(diagonal_config);
+    const ImuSimulatorConfig full = imu_simulator_config_from_json(full_config);
+
+    CHECK(diagonal.gyro_random.bias_turnon.enabled);
+    CHECK(full.gyro_random.bias_turnon.enabled);
+    CHECK(diagonal.gyro_random.bias_turnon.covariance.isApprox(
+        full.gyro_random.bias_turnon.covariance));
 }
 
 TEST_CASE("IMU runtime config parser rejects malformed error-model inputs")

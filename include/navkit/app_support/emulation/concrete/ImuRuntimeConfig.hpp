@@ -7,11 +7,9 @@
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
 #include "navkit/app_support/runtime/RuntimeRate.hpp"
 #include "navkit/sim/ImuSimulator.hpp"
-#include "navkit/sim/RandomDraw.hpp"
 
 #include <Eigen/Eigenvalues>
 #include <nlohmann/json.hpp>
-#include <random>
 #include <string>
 #include <string_view>
 
@@ -159,23 +157,9 @@ inline void validate_imu_triad_config(const nlohmann::json& triad,
     return covariance;
 }
 
-[[nodiscard]] inline core::Vec3 vec3_direct_or_random_from_json(const nlohmann::json& triad,
-                                                                const std::string_view direct_key,
-                                                                const std::string_view var_key,
-                                                                const std::string_view cov_key,
-                                                                std::mt19937& rng)
+[[nodiscard]] inline core::Mat3 diag_cov3_from_json(const nlohmann::json& value)
 {
-    if (json_contains(triad, direct_key)) {
-        return vec3_from_json<core::Vec3>(triad.at(std::string(direct_key)));
-    }
-    if (json_contains(triad, var_key)) {
-        return sim::draw_normal_diag_cov<3>(
-            vec3_from_json<core::Vec3>(triad.at(std::string(var_key))), rng);
-    }
-    if (json_contains(triad, cov_key)) {
-        return sim::draw_normal_cov<3>(cov3_from_json(triad.at(std::string(cov_key))), rng);
-    }
-    return core::Vec3::Zero();
+    return vec3_from_json<core::Vec3>(value).asDiagonal();
 }
 
 [[nodiscard]] inline core::Vec3 optional_vec3_from_json(const nlohmann::json& triad,
@@ -187,23 +171,45 @@ inline void validate_imu_triad_config(const nlohmann::json& triad,
     return core::Vec3::Zero();
 }
 
-inline sim::ImuTriadErrorConfig imu_triad_config_from_json(const nlohmann::json& triad,
-                                                           const ImuTriadRuntimeKeys& keys,
-                                                           std::mt19937& rng)
+[[nodiscard]] inline sim::ImuRandomVectorConfig random_vector_config_from_json(
+    const nlohmann::json& triad, const std::string_view var_key, const std::string_view cov_key)
+{
+    if (json_contains(triad, var_key)) {
+        return {.enabled = true, .covariance = diag_cov3_from_json(triad.at(std::string(var_key)))};
+    }
+    if (json_contains(triad, cov_key)) {
+        return {.enabled = true, .covariance = cov3_from_json(triad.at(std::string(cov_key)))};
+    }
+    return {};
+}
+
+inline sim::ImuTriadErrorConfig imu_triad_error_config_from_json(const nlohmann::json& triad,
+                                                                 const ImuTriadRuntimeKeys& keys)
 {
     sim::ImuTriadErrorConfig config;
-    config.bias_turnon = vec3_direct_or_random_from_json(
-        triad, keys.bias_turnon, keys.bias_turnon_var, keys.bias_turnon_cov, rng);
+    config.bias_turnon = optional_vec3_from_json(triad, keys.bias_turnon);
     config.bias_inrun_psd = optional_vec3_from_json(triad, keys.bias_inrun_psd);
     config.output_random_walk_psd = optional_vec3_from_json(triad, keys.output_random_walk_psd);
-    config.scale_factor = vec3_direct_or_random_from_json(
-        triad, "scale_factor", keys.scale_factor_var, keys.scale_factor_cov, rng);
-    config.misalignment_rad = vec3_direct_or_random_from_json(
-        triad, "misalignment_rad", keys.misalignment_var, keys.misalignment_cov, rng);
-    config.nonorthogonality = vec3_direct_or_random_from_json(
-        triad, "nonorthogonality", keys.nonorthogonality_var, keys.nonorthogonality_cov, rng);
+    config.scale_factor = optional_vec3_from_json(triad, "scale_factor");
+    config.misalignment_rad = optional_vec3_from_json(triad, "misalignment_rad");
+    config.nonorthogonality = optional_vec3_from_json(triad, "nonorthogonality");
     config.quantization = optional_vec3_from_json(triad, keys.quantization);
     config.limit = optional_vec3_from_json(triad, keys.limit);
+    return config;
+}
+
+inline sim::ImuTriadStochasticConfig
+imu_triad_stochastic_config_from_json(const nlohmann::json& triad, const ImuTriadRuntimeKeys& keys)
+{
+    sim::ImuTriadStochasticConfig config;
+    config.bias_turnon =
+        random_vector_config_from_json(triad, keys.bias_turnon_var, keys.bias_turnon_cov);
+    config.scale_factor =
+        random_vector_config_from_json(triad, keys.scale_factor_var, keys.scale_factor_cov);
+    config.misalignment_rad =
+        random_vector_config_from_json(triad, keys.misalignment_var, keys.misalignment_cov);
+    config.nonorthogonality =
+        random_vector_config_from_json(triad, keys.nonorthogonality_var, keys.nonorthogonality_cov);
     return config;
 }
 
@@ -291,11 +297,14 @@ inline sim::ImuSimulatorConfig imu_simulator_config_from_json(const nlohmann::js
         return config;
     }
 
-    std::mt19937 draw_rng(config.seed);
     config.gyro =
-        detail::imu_triad_config_from_json(imu.at("gyro"), detail::gyro_runtime_keys(), draw_rng);
+        detail::imu_triad_error_config_from_json(imu.at("gyro"), detail::gyro_runtime_keys());
     config.accel =
-        detail::imu_triad_config_from_json(imu.at("accel"), detail::accel_runtime_keys(), draw_rng);
+        detail::imu_triad_error_config_from_json(imu.at("accel"), detail::accel_runtime_keys());
+    config.gyro_random =
+        detail::imu_triad_stochastic_config_from_json(imu.at("gyro"), detail::gyro_runtime_keys());
+    config.accel_random = detail::imu_triad_stochastic_config_from_json(
+        imu.at("accel"), detail::accel_runtime_keys());
     return config;
 }
 

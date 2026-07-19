@@ -217,8 +217,10 @@ the selected simulation loop; runtime JSON configures that simulator's runtime
 mode and numeric error parameters. IMU runtime error-model keys use explicit
 deterministic/static and stochastic/in-run names. Static terms such as
 `bias_turnon`, `scale_factor`, `misalignment`, and `nonorthogonality` may be
-configured directly or generated from seeded diagonal variance/full covariance
-fields. In-run stochastic terms use PSD keys such as
+configured directly or described by seeded diagonal variance/full covariance
+fields. Runtime parsing validates and normalizes those descriptions, while the
+selected simulator owns the random-number generator and realizes the stochastic
+draws. In-run stochastic terms use PSD keys such as
 `bias_inrun_psd`, `angle_random_walk_psd`, and
 `velocity_random_walk_psd`. Exactly one direct/random form is valid for each
 static term, and stale key names are rejected during runtime validation rather

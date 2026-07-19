@@ -32,11 +32,14 @@ make the emulator mode and every enabled error source explicit. A v1 shape is:
 }
 \end{verbatim}
 
-Direct deterministic triad terms may instead be provided as seeded random
+Direct deterministic triad terms may instead be described as seeded random
 draws using the matching variance or full covariance key, such as
 \texttt{bias\_turnon\_var\_rad2ps2} or
 \texttt{bias\_turnon\_cov\_rad2ps2}. A single term must use exactly one form:
-direct value, diagonal variance, or full covariance.
+direct value, diagonal variance, or full covariance. Runtime configuration
+parsing validates and stores this declarative description; the IMU simulator
+owns the random stream and realizes the configured random terms when the
+simulator is constructed or initialized.
 
 \section{Validation Rules}
 
@@ -73,4 +76,6 @@ The selected app compile-time config determines whether an IMU emulator exists
 and which NavKit sensor or Navigator input stream it feeds. Runtime JSON
 selects numerical error parameters and seeds for that configured emulator. A
 runtime \texttt{imu} section must not be silently ignored when the compiled app
-does not provide an IMU emulator.
+does not provide an IMU emulator. Runtime parsing must not perform stochastic
+draws; simulator/emulator objects own random-number generators and stochastic
+state.

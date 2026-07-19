@@ -21,10 +21,13 @@ using navkit::core::environment::Wgs84;
 template<bool OutputConingScullingCompensated>
 ImuSimulator<OutputConingScullingCompensated>::ImuSimulator(const ImuSimulatorConfig& cfg)
     : m_cfg(cfg)
-    , m_gyro_bias_radps(cfg.gyro.bias_turnon)
-    , m_accel_bias_mps2(cfg.accel.bias_turnon)
     , m_rng(cfg.seed)
-{}
+{
+    realize_random_terms(m_cfg.gyro, m_cfg.gyro_random);
+    realize_random_terms(m_cfg.accel, m_cfg.accel_random);
+    m_gyro_bias_radps = m_cfg.gyro.bias_turnon;
+    m_accel_bias_mps2 = m_cfg.accel.bias_turnon;
+}
 
 template<bool OutputConingScullingCompensated>
 ImuIncrement
@@ -235,6 +238,30 @@ template<bool OutputConingScullingCompensated>
 Vec3 ImuSimulator<OutputConingScullingCompensated>::draw_normal_vector(const Vec3& covariance_diag)
 {
     return draw_normal_diag_cov<3>(covariance_diag, m_rng);
+}
+
+template<bool OutputConingScullingCompensated>
+Vec3 ImuSimulator<OutputConingScullingCompensated>::draw_normal_covariance(const Mat3& covariance)
+{
+    return draw_normal_cov<3>(covariance, m_rng);
+}
+
+template<bool OutputConingScullingCompensated>
+void ImuSimulator<OutputConingScullingCompensated>::realize_random_terms(
+    ImuTriadErrorConfig& config, const ImuTriadStochasticConfig& stochastic)
+{
+    if (stochastic.bias_turnon.enabled) {
+        config.bias_turnon = draw_normal_covariance(stochastic.bias_turnon.covariance);
+    }
+    if (stochastic.scale_factor.enabled) {
+        config.scale_factor = draw_normal_covariance(stochastic.scale_factor.covariance);
+    }
+    if (stochastic.misalignment_rad.enabled) {
+        config.misalignment_rad = draw_normal_covariance(stochastic.misalignment_rad.covariance);
+    }
+    if (stochastic.nonorthogonality.enabled) {
+        config.nonorthogonality = draw_normal_covariance(stochastic.nonorthogonality.covariance);
+    }
 }
 
 template<bool OutputConingScullingCompensated>

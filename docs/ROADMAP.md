@@ -67,16 +67,6 @@ These are preserved at high level so the roadmap stays readable. Detailed pass-b
 
 NavKit is currently in Phase 5: ECEF INS/GNSS stabilization and hardening. The active passes below are the current working scope; unrelated future backlog lives in the dedicated phase detail files linked at the end of this roadmap.
 
-## Pass 5.9: simulator/emulator stochastic config ownership
-
-- [ ] Sweep all simulator/emulator runtime config paths for temporary RNGs or stochastic realization inside parsing helpers. JSON/runtime config code should validate and translate declarative config only; simulators/emulators that own stochastic behavior should own their RNGs and realize random draws at construction/initialization or runtime as appropriate.
-- [ ] Move IMU runtime random draws out of JSON parsing and into `ImuSimulator` ownership. Runtime config parsing should validate and translate declarative config only; simulator construction/initialization should realize stochastic terms using the simulator-owned RNG.
-- [ ] Replace temporary RNG usage in `ImuRuntimeConfig` with plain parsed descriptors: direct values for deterministic terms, and one full covariance matrix per randomizable triad term in C++ storage. Runtime JSON may continue to accept diagonal variance or full covariance forms, but parsing should normalize both into the stored covariance matrix representation.
-- [ ] Preserve exactly-one-form validation for each randomizable IMU term: direct value, diagonal variance, full covariance, or omitted. Avoid storing both variance and covariance in C++ structs.
-- [ ] Keep `ImuSimulatorConfig` clear about realized deterministic values versus stochastic descriptors, and ensure the simulator logs or exposes the realized turn-on/config draws needed for run debugging.
-- [ ] Apply the same ownership rule to GNSS and any other current simulator/emulator random sources: declarative covariance/noise config belongs in parsed config, while generated noise samples and seeded stochastic state belong in the simulator/emulator that produces the data.
-- [ ] Add tests showing deterministic JSON parsing has no stochastic side effects, repeated simulator construction with the same seed realizes identical random draws, and diagonal-variance JSON produces the same covariance representation as the equivalent full diagonal covariance JSON.
-
 ## Pass 5.10: full-rate IMU cumulative increment logging
 
 - [ ] Move IMU cumulative increment ownership out of `ImuIncrementLogProduct` and into the full-rate IMU runtime/simulator path so cumulative sums are updated for every generated IMU sample, not only for rows that pass the runtime logging-rate gate.

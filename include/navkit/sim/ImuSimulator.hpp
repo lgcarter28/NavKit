@@ -14,10 +14,25 @@
 namespace navkit::sim
 {
 
+using navkit::core::Mat3;
 using navkit::core::Scalar_t;
 using navkit::core::Time_t;
 using navkit::core::Vec3;
 using navkit::core::estimation::ImuIncrement;
+
+struct ImuRandomVectorConfig
+{
+    bool enabled{false};
+    Mat3 covariance{Mat3::Zero()};
+};
+
+struct ImuTriadStochasticConfig
+{
+    ImuRandomVectorConfig bias_turnon{};
+    ImuRandomVectorConfig scale_factor{};
+    ImuRandomVectorConfig misalignment_rad{};
+    ImuRandomVectorConfig nonorthogonality{};
+};
 
 struct ImuTriadErrorConfig
 {
@@ -40,6 +55,8 @@ struct ImuSimulatorConfig
     unsigned int seed{42U};
     ImuTriadErrorConfig gyro{};
     ImuTriadErrorConfig accel{};
+    ImuTriadStochasticConfig gyro_random{};
+    ImuTriadStochasticConfig accel_random{};
 };
 
 struct ImuInterval
@@ -121,6 +138,11 @@ public:
         return m_accel_bias_mps2;
     }
 
+    [[nodiscard]] const ImuSimulatorConfig& config() const
+    {
+        return m_cfg;
+    }
+
     [[nodiscard]] bool output_coning_sculling_compensated() const
     {
         return output_coning_sculling_compensated_v;
@@ -128,6 +150,9 @@ public:
 
 private:
     [[nodiscard]] Vec3 draw_normal_vector(const Vec3& covariance_diag);
+    [[nodiscard]] Vec3 draw_normal_covariance(const Mat3& covariance);
+    void realize_random_terms(ImuTriadErrorConfig& config,
+                              const ImuTriadStochasticConfig& stochastic);
     void update_biases(Time_t dt_s);
 
     ImuSimulatorConfig m_cfg;

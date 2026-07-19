@@ -70,6 +70,16 @@
 - [x] Improved console status output with aligned LLA position, NED velocity, and NED attitude Euler-angle quantities.
 - [x] Updated runtime configuration and IMU emulator algorithm documentation for the new IMU config contract.
 
+## Pass 5.9: simulator/emulator stochastic config ownership
+
+- [x] Moved IMU random draw realization out of runtime JSON parsing and into `ImuSimulator`, which owns the seeded random-number generator and realized stochastic state.
+- [x] Reworked IMU runtime parsing to validate and translate declarative direct/variance/covariance forms without stochastic side effects.
+- [x] Normalized IMU diagonal variance and full covariance JSON forms into one C++ covariance descriptor per randomizable triad term.
+- [x] Preserved direct/static IMU error values, PSD-driven in-run stochastic terms, limits, and quantization as plain parsed config.
+- [x] Confirmed GNSS simulator/emulator stochastic ownership already follows the same boundary: runtime config stores seed/covariance, while `GnssSimulator` owns noise draws.
+- [x] Added tests for deterministic parsing, seeded simulator realization, and equivalent diagonal/full covariance descriptors.
+- [x] Updated configuration and IMU emulator docs to state that runtime parsing is declarative and simulator/emulator objects own stochastic draws.
+
 ## Phase 5 follow-forward
 
-Unresolved expansion/hardening work from Phase 5 now lives in active roadmap passes for Gauss-Markov IMU dynamics, covariance floors, unused-parameter cleanup, and advanced restart initialization, plus future phase files for Monte Carlo, trajectory-source expansion, transfer alignment, sensor scheduling, validation metrics, latent replay, robust status/error handling, and embedded readiness.
+Unresolved expansion/hardening work from Phase 5 now lives in active roadmap passes for full-rate IMU cumulative increment logging, Gauss-Markov IMU dynamics, covariance floors, unused-parameter cleanup, and advanced restart initialization, plus future phase files for Monte Carlo, trajectory-source expansion, transfer alignment, sensor scheduling, validation metrics, latent replay, robust status/error handling, and embedded readiness.
