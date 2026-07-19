@@ -188,7 +188,7 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts the documented input shape")
     static_assert(TransferAlignmentProviderPolicy<EcefInsGnssAppConfig::TransferAlignmentProvider,
                                                   EcefInsGnssAppConfig::NavKit::Navigator>);
     static_assert(navkit::core::estimation::InitialCovarianceConfigPolicy<
-                  EcefInsGnssAppConfig::NavKit,
+                  EcefInsGnssAppConfig::NavKit::InitialCovariance,
                   EcefInsGnssAppConfig::NavKit::StateDef>);
     static_assert(!EmulatorBindingTuplePolicy<DuplicateSensorIdConfig::EmulatorBindings,
                                               DuplicateSensorIdConfig::NavKit::Sensors,
@@ -676,12 +676,18 @@ TEST_CASE("NavInitialization maps into the configured Navigator filter state")
                            {"att_rotvec_rad2",
                             {0.007615435494667714, 0.007615435494667714, 0.030461741978670857}}}},
                          {"remaining_error_state_diag",
-                          {NavKit::initial_covariance(Error::GyroB::i + 0, Error::GyroB::i + 0),
-                           NavKit::initial_covariance(Error::GyroB::i + 1, Error::GyroB::i + 1),
-                           NavKit::initial_covariance(Error::GyroB::i + 2, Error::GyroB::i + 2),
-                           NavKit::initial_covariance(Error::AccB::i + 0, Error::AccB::i + 0),
-                           NavKit::initial_covariance(Error::AccB::i + 1, Error::AccB::i + 1),
-                           NavKit::initial_covariance(Error::AccB::i + 2, Error::AccB::i + 2)}}}}});
+                          {NavKit::InitialCovariance::initial_covariance(Error::GyroB::i + 0,
+                                                                         Error::GyroB::i + 0),
+                           NavKit::InitialCovariance::initial_covariance(Error::GyroB::i + 1,
+                                                                         Error::GyroB::i + 1),
+                           NavKit::InitialCovariance::initial_covariance(Error::GyroB::i + 2,
+                                                                         Error::GyroB::i + 2),
+                           NavKit::InitialCovariance::initial_covariance(Error::AccB::i + 0,
+                                                                         Error::AccB::i + 0),
+                           NavKit::InitialCovariance::initial_covariance(Error::AccB::i + 1,
+                                                                         Error::AccB::i + 1),
+                           NavKit::InitialCovariance::initial_covariance(Error::AccB::i + 2,
+                                                                         Error::AccB::i + 2)}}}}});
     const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
     const PvaInitialization nav_init =
         PvaExplicitInitializationProvider::initialize(cfg, trajectory);
@@ -710,9 +716,11 @@ TEST_CASE("NavInitialization maps into the configured Navigator filter state")
           doctest::Approx(0.007615435494667714));
 
     CHECK(filter.covariance()(Error::GyroB::i, Error::GyroB::i) ==
-          doctest::Approx(NavKit::initial_covariance(Error::GyroB::i, Error::GyroB::i)));
+          doctest::Approx(
+              NavKit::InitialCovariance::initial_covariance(Error::GyroB::i, Error::GyroB::i)));
     CHECK(filter.covariance()(Error::AccB::i, Error::AccB::i) ==
-          doctest::Approx(NavKit::initial_covariance(Error::AccB::i, Error::AccB::i)));
+          doctest::Approx(
+              NavKit::InitialCovariance::initial_covariance(Error::AccB::i, Error::AccB::i)));
 }
 
 } // namespace navkit::app_support::test

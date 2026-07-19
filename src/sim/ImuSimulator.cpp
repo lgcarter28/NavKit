@@ -21,8 +21,8 @@ using navkit::core::environment::Wgs84;
 template<bool OutputConingScullingCompensated>
 ImuSimulator<OutputConingScullingCompensated>::ImuSimulator(const ImuSimulatorConfig& cfg)
     : m_cfg(cfg)
-    , m_gyro_bias_radps(cfg.gyro.bias)
-    , m_accel_bias_mps2(cfg.accel.bias)
+    , m_gyro_bias_radps(cfg.gyro.bias_turnon)
+    , m_accel_bias_mps2(cfg.accel.bias_turnon)
     , m_rng(cfg.seed)
 {}
 
@@ -117,6 +117,22 @@ Vec3 ImuSimulator<OutputConingScullingCompensated>::quantize(const Vec3& value, 
     return result;
 }
 
+namespace
+{
+
+[[nodiscard]] Vec3 saturate_absolute_limit(const Vec3& value, const Vec3& limit)
+{
+    Vec3 result = value;
+    for (Eigen::Index axis = 0; axis < result.size(); ++axis) {
+        if (limit(axis) > 0.0) {
+            result(axis) = std::clamp(result(axis), -limit(axis), limit(axis));
+        }
+    }
+    return result;
+}
+
+} // namespace
+
 template<bool OutputConingScullingCompensated>
 bool ImuSimulator<OutputConingScullingCompensated>::generate(const TruthSample& previous,
                                                              const TruthSample& current,
@@ -150,14 +166,17 @@ bool ImuSimulator<OutputConingScullingCompensated>::generate(const TruthSample& 
 
     update_biases(interval.dt_s);
 
-    const Vec3 gyro_noise = draw_normal_vector(m_cfg.gyro.white_noise_psd / interval.dt_s);
-    const Vec3 accel_noise = draw_normal_vector(m_cfg.accel.white_noise_psd / interval.dt_s);
+    const Vec3 gyro_noise = draw_normal_vector(m_cfg.gyro.output_random_walk_psd / interval.dt_s);
+    const Vec3 accel_noise = draw_normal_vector(m_cfg.accel.output_random_walk_psd / interval.dt_s);
 
-    const Vec3 raw_gyro_radps = calibration_matrix_apply(interval.omega_ib_b_radps, m_cfg.gyro) +
-                                m_gyro_bias_radps + gyro_noise;
-    const Vec3 raw_accel_mps2 =
+    const Vec3 raw_gyro_radps =
+        saturate_absolute_limit(calibration_matrix_apply(interval.omega_ib_b_radps, m_cfg.gyro) +
+                                    m_gyro_bias_radps + gyro_noise,
+                                m_cfg.gyro.limit);
+    const Vec3 raw_accel_mps2 = saturate_absolute_limit(
         calibration_matrix_apply(interval.specific_force_ib_b_mps2, m_cfg.accel) +
-        m_accel_bias_mps2 + accel_noise;
+            m_accel_bias_mps2 + accel_noise,
+        m_cfg.accel.limit);
 
     increment = {};
     increment.time_s = interval.time_s;
@@ -221,8 +240,8 @@ Vec3 ImuSimulator<OutputConingScullingCompensated>::draw_normal_vector(const Vec
 template<bool OutputConingScullingCompensated>
 void ImuSimulator<OutputConingScullingCompensated>::update_biases(Time_t dt_s)
 {
-    m_gyro_bias_radps += draw_normal_vector(m_cfg.gyro.bias_random_walk_psd * dt_s);
-    m_accel_bias_mps2 += draw_normal_vector(m_cfg.accel.bias_random_walk_psd * dt_s);
+    m_gyro_bias_radps += draw_normal_vector(m_cfg.gyro.bias_inrun_psd * dt_s);
+    m_accel_bias_mps2 += draw_normal_vector(m_cfg.accel.bias_inrun_psd * dt_s);
 }
 
 template class ImuSimulator<false>;

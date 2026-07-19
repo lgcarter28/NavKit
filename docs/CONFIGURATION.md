@@ -125,22 +125,15 @@ apps consume:
 struct EcefInsGnssConfig
 {
     using StateDef = navkit::core::estimation::DefaultInsStateDef;
-    using PrimaryGnssMeasurementModel = navkit::core::models::GnssPosModel<StateDef>;
-    static constexpr navkit::core::estimation::SensorId primary_gnss_sensor_id = 0U;
-    static constexpr std::size_t primary_gnss_buffer_size = 16U;
-    using PrimaryGnssDiagnostics = navkit::core::estimation::DefaultSensorDiagnostics;
-
-    using PrimaryGnssSensor =
-        navkit::core::estimation::Sensor<primary_gnss_sensor_id,
-                                         PrimaryGnssMeasurementModel,
-                                         primary_gnss_buffer_size,
-                                         navkit::core::estimation::GnssFixedNoisePolicy,
-                                         PrimaryGnssDiagnostics>;
-
-    using Sensors = std::tuple<PrimaryGnssSensor>;
+    using SensorGraph = components::PrimaryGnssPosVelSensors<StateDef>;
+    using InitialCovariance = components::DefaultInsInitialCovariance;
+    using PropagationConfig = components::EcefInsGnssPropagation;
+    using PrimaryGnssPositionSensor = typename SensorGraph::PrimaryGnssPositionSensor;
+    using PrimaryGnssVelocitySensor = typename SensorGraph::PrimaryGnssVelocitySensor;
+    using Sensors = typename SensorGraph::Sensors;
     using Profiler = navkit::core::profiling::NullProfiler;
     using Filter = /* concrete filter type */;
-    using Propagation = navkit::core::estimation::NoOpPropagation;
+    using Propagation = typename PropagationConfig::Propagation;
     using NavigatorUpdate = /* concrete update policy type */;
     using Navigator = /* concrete navigator type */;
 };
@@ -221,7 +214,15 @@ receivers, unambiguous. App configs also select the logger adapter type at
 compile time; runtime JSON still owns run-specific choices such as run name and
 output directory. App configs also select the concrete IMU simulator type used by
 the selected simulation loop; runtime JSON configures that simulator's runtime
-mode and numeric error parameters. Logger adapters are composed from concrete log products with
+mode and numeric error parameters. IMU runtime error-model keys use explicit
+deterministic/static and stochastic/in-run names. Static terms such as
+`bias_turnon`, `scale_factor`, `misalignment`, and `nonorthogonality` may be
+configured directly or generated from seeded diagonal variance/full covariance
+fields. In-run stochastic terms use PSD keys such as
+`bias_inrun_psd`, `angle_random_walk_psd`, and
+`velocity_random_walk_psd`. Exactly one direct/random form is valid for each
+static term, and stale key names are rejected during runtime validation rather
+than silently ignored. Logger adapters are composed from concrete log products with
 `navkit::io::RunLogger<...>`; the selected app config owns the product set.
 Startup navigation data is also an app boundary: `NavInitializationProvider`
 turns runtime input, simulated truth, saved state, or future embedded inputs
@@ -371,24 +372,35 @@ in `navkit::app_support` because it is app/runtime-input glue, not reusable
 product-core NavKit configuration.
 
 Filter initial covariance is a separate product/runtime boundary. The compiled
-NavKit product config provides:
+NavKit product config selects an initial-covariance component:
 
 ```cpp
-using InitialCovariance_t =
-    navkit::core::estimation::InitialCovariance<StateDef>;
-
-inline static const InitialCovariance_t initial_covariance =
-    navkit::core::estimation::diagonal_initial_covariance<StateDef>(
-        navkit::core::estimation::InitialCovarianceDiagonal<StateDef>{
-            .values = {
-                // values in the selected error-state order
-            },
-        });
+using InitialCovariance = components::DefaultInsInitialCovariance;
 ```
 
-The `values` entries are variances, not sigmas, ordered exactly like the
-selected `StateDef::Error`. Runtime scenarios may override the filter initial
-covariance by adding `filter_initialization.initial_covariance`:
+The selected component provides immutable compile-time covariance storage, for
+example:
+
+```cpp
+struct DefaultInsInitialCovariance
+{
+    using StateDef = navkit::core::estimation::DefaultInsStateDef;
+    using InitialCovariance_t =
+        navkit::core::estimation::InitialCovariance<StateDef>;
+
+    inline static const InitialCovariance_t initial_covariance =
+        navkit::core::estimation::diagonal_initial_covariance<StateDef>(
+            navkit::core::estimation::InitialCovarianceDiagonal<StateDef>{
+                .values = {
+                    // values in the selected error-state order
+                },
+            });
+};
+```
+
+The `values` entries are variances, not sigmas, ordered exactly like the selected
+`StateDef::Error`. Runtime scenarios may override the filter initial covariance
+by adding `filter_initialization.initial_covariance`:
 
 ```json
 {
@@ -413,7 +425,7 @@ or:
 ```
 
 If `initial_covariance` is absent, app-support uses the immutable compile-time
-`NavKit::initial_covariance`.
+`NavKit::InitialCovariance::initial_covariance`.
 
 For INS-style scenarios, runtime JSON may also use a mixed structured form that
 keeps the PVA block frame-aware while leaving the remaining error-state terms

@@ -60,6 +60,16 @@
 - [x] Added filter initial covariance runtime overrides, including diagonal, full, and PVA-plus-remaining-error-state forms.
 - [x] Removed redundant runtime covariance source fields.
 
+## Pass 5.8: runtime hygiene and IMU variance randomization
+
+- [x] Decomposed ECEF INS/GNSS compile-time product and app configs into reusable `components` headers plus scenario-level aggregate headers.
+- [x] Updated IMU simulator and runtime JSON vocabulary to explicit `bias_turnon`, `bias_inrun`, `scale_factor`, `angle_random_walk`, and `velocity_random_walk` terms.
+- [x] Added seeded runtime variance/covariance draws for deterministic static IMU triad terms and validation that rejects ambiguous direct/random forms.
+- [x] Added IMU angular-rate and acceleration saturation limits.
+- [x] Added real-spec-inspired IMU runtime examples for consumer, industrial, tactical, and navigation-grade IMUs.
+- [x] Improved console status output with aligned LLA position, NED velocity, and NED attitude Euler-angle quantities.
+- [x] Updated runtime configuration and IMU emulator algorithm documentation for the new IMU config contract.
+
 ## Phase 5 follow-forward
 
-Unresolved expansion/hardening work from Phase 5 now lives in active roadmap passes for runtime hygiene, IMU variance randomization, advanced restart/Monte Carlo initialization, trajectory-source expansion, transfer alignment, sensor scheduling, validation metrics, latent replay, robust status/error handling, and embedded readiness.
+Unresolved expansion/hardening work from Phase 5 now lives in active roadmap passes for Gauss-Markov IMU dynamics, covariance floors, unused-parameter cleanup, and advanced restart initialization, plus future phase files for Monte Carlo, trajectory-source expansion, transfer alignment, sensor scheduling, validation metrics, latent replay, robust status/error handling, and embedded readiness.

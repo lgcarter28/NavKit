@@ -4,117 +4,34 @@
 #pragma once
 
 #include "navkit/api/config/ConfigApi.hpp"
-#include "navkit/core/environment/gravity/J2.hpp"
-#include "navkit/core/environment/planet/Wgs84.hpp"
-#include "navkit/core/estimation/navigator/propagation/EcefInsPropagation.hpp"
-#include "navkit/core/models/GnssPosModel.hpp"
-#include "navkit/core/models/GnssVelModel.hpp"
-#include "navkit/core/profiling/ProfileSinks.hpp"
-#include "navkit/core/profiling/ScopedProfiler.hpp"
-
-#include <chrono>
-#include <cstddef>
-#include <cstdint>
-#include <string_view>
-#include <tuple>
+#include "navkit/products/components/DefaultInsInitialCovariance.hpp"
+#include "navkit/products/components/DefaultNumericConfig.hpp"
+#include "navkit/products/components/EcefInsGnssPropagation.hpp"
+#include "navkit/products/components/PrimaryGnssPosVelSensors.hpp"
+#include "navkit/products/components/Profilers.hpp"
 
 namespace navkit::config::navkit::products::profiled_ecef_ins_gnss
 {
 
-struct NumericConfig
-{
-    using Scalar_t = core::Scalar_t;
-    using Time_t = core::Time_t;
-};
-
-struct HostSteadyMicrosecondClock
-{
-    using Tick = std::uint64_t;
-
-    static constexpr std::string_view source = "std::chrono::steady_clock";
-    static constexpr double tick_period_us = 1.0;
-
-    static Tick now()
-    {
-        const auto now = std::chrono::steady_clock::now().time_since_epoch();
-        return static_cast<Tick>(
-            std::chrono::duration_cast<std::chrono::microseconds>(now).count());
-    }
-};
-
 struct ProductConfig
 {
-    using Numeric = NumericConfig;
-
-    // Public product graph.
+    using Numeric = components::DefaultNumericConfig;
     using StateDef = core::estimation::DefaultInsStateDef;
-    using PrimaryGnssPositionMeasurementModel = core::models::GnssPosModel<StateDef>;
-    using PrimaryGnssVelocityMeasurementModel = core::models::GnssVelModel<StateDef>;
-    static constexpr core::estimation::SensorId primary_gnss_position_sensor_id = 0U;
-    static constexpr core::estimation::SensorId primary_gnss_velocity_sensor_id = 1U;
-    static constexpr std::size_t primary_gnss_buffer_size = 16U;
-    using PrimaryGnssDiagnostics = core::estimation::DefaultSensorDiagnostics;
-    using PrimaryGnssPositionSensor =
-        core::estimation::Sensor<primary_gnss_position_sensor_id,
-                                 PrimaryGnssPositionMeasurementModel,
-                                 primary_gnss_buffer_size,
-                                 core::estimation::GnssFixedNoisePolicy,
-                                 PrimaryGnssDiagnostics>;
-    using PrimaryGnssVelocitySensor =
-        core::estimation::Sensor<primary_gnss_velocity_sensor_id,
-                                 PrimaryGnssVelocityMeasurementModel,
-                                 primary_gnss_buffer_size,
-                                 core::estimation::GnssFixedNoisePolicy,
-                                 PrimaryGnssDiagnostics>;
+    using SensorGraph = components::PrimaryGnssPosVelSensors<StateDef>;
+    using InitialCovariance = components::DefaultInsInitialCovariance;
+    using PropagationConfig = components::EcefInsGnssPropagation;
+    using Profiling = components::HostRingBufferProfiling;
 
-    using Sensors = std::tuple<PrimaryGnssPositionSensor, PrimaryGnssVelocitySensor>;
+    using PrimaryGnssDiagnostics = typename SensorGraph::PrimaryGnssDiagnostics;
+    using PrimaryGnssPositionSensor = typename SensorGraph::PrimaryGnssPositionSensor;
+    using PrimaryGnssVelocitySensor = typename SensorGraph::PrimaryGnssVelocitySensor;
+    using Sensors = typename SensorGraph::Sensors;
 
-    using ProfileClock = HostSteadyMicrosecondClock;
-    using ProfileTick = typename ProfileClock::Tick;
-    using ProfileSink = core::profiling::RingBufferProfileSink<ProfileTick, 4096U>;
-    using Profiler = core::profiling::ScopedProfiler<ProfileClock, ProfileSink>;
-    using Planet = core::environment::Wgs84;
-    using Gravity = core::environment::J2<Planet>;
-    using InitialCovariance_t = core::estimation::InitialCovariance<StateDef>;
-    inline static const InitialCovariance_t initial_covariance =
-        core::estimation::diagonal_initial_covariance<StateDef>(
-            core::estimation::InitialCovarianceDiagonal<StateDef>{
-                .values =
-                    {
-                        // Pos
-                        10000.0,
-                        10000.0,
-                        10000.0,
-                        // Vel
-                        100.0,
-                        100.0,
-                        100.0,
-                        // AttRotVec
-                        0.007615435494667714,
-                        0.007615435494667714,
-                        0.030461741978670857,
-                        // GyroB
-                        7.615435494667714e-7,
-                        7.615435494667714e-7,
-                        7.615435494667714e-7,
-                        // AccB
-                        9.61703842225e-7,
-                        9.61703842225e-7,
-                        9.61703842225e-7,
-                    },
-            });
-    static constexpr std::size_t imu_buffer_capacity = 1024U;
-    static constexpr std::size_t covariance_history_capacity = 256U;
-    static constexpr core::Time_t covariance_update_rate_hz = 100.0;
-    static constexpr bool apply_coning_sculling_compensation = true;
-    using Propagation =
-        core::estimation::EcefInsPropagation<Planet,
-                                             Gravity,
-                                             core::estimation::EcefInsZeroProcessNoise,
-                                             imu_buffer_capacity,
-                                             covariance_history_capacity,
-                                             covariance_update_rate_hz,
-                                             apply_coning_sculling_compensation>;
+    using Profiler = typename Profiling::Profiler;
+    using ProfileClock = typename Profiling::ProfileClock;
+    using ProfileTick = typename Profiling::ProfileTick;
+    using ProfileSink = typename Profiling::ProfileSink;
+    using Propagation = typename PropagationConfig::Propagation;
 
     using Filter =
         core::estimation::KalmanFilter<StateDef,

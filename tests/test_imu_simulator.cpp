@@ -112,9 +112,9 @@ TEST_CASE("IMU triad calibration applies scale, nonorthogonality, and misalignme
 TEST_CASE("IMU simulator applies deterministic bias and quantization to raw increments")
 {
     ImuSimulatorConfig config;
-    config.gyro.bias = Vec3{0.26, 0.0, 0.0};
+    config.gyro.bias_turnon = Vec3{0.26, 0.0, 0.0};
     config.gyro.quantization = Vec3{0.1, 0.0, 0.0};
-    config.accel.bias = Vec3{0.0, 0.2, 0.0};
+    config.accel.bias_turnon = Vec3{0.0, 0.2, 0.0};
 
     DefaultImuSimulator simulator(config);
 
@@ -166,8 +166,8 @@ TEST_CASE("IMU simulator seeded stochastic terms are deterministic")
 {
     ImuSimulatorConfig config;
     config.seed = 7U;
-    config.gyro.white_noise_psd = Vec3{1.0e-6, 2.0e-6, 3.0e-6};
-    config.accel.bias_random_walk_psd = Vec3{1.0e-4, 2.0e-4, 3.0e-4};
+    config.gyro.output_random_walk_psd = Vec3{1.0e-6, 2.0e-6, 3.0e-6};
+    config.accel.bias_inrun_psd = Vec3{1.0e-4, 2.0e-4, 3.0e-4};
 
     DefaultImuSimulator first(config);
     DefaultImuSimulator second(config);
@@ -194,32 +194,90 @@ TEST_CASE("IMU runtime config parser accepts ideal and error-model shapes")
     CHECK_NOTHROW(validate_imu_runtime_config(ideal));
     CHECK(imu_simulator_config_from_json(ideal).seed == 11U);
 
-    const nlohmann::json error_model = {{"imu",
-                                         {{"type", "error_model"},
-                                          {"seed", 12U},
-                                          {"rate_hz", 200.0},
-                                          {"gyro",
-                                           {{"bias_radps", {1.0, 2.0, 3.0}},
-                                            {"bias_rw_psd_rad2ps3", {0.0, 0.0, 0.0}},
-                                            {"white_noise_psd_rad2ps", {1.0e-6, 2.0e-6, 3.0e-6}},
-                                            {"scale_factor", {0.1, 0.2, 0.3}},
-                                            {"misalignment_rad", {0.01, 0.02, 0.03}},
-                                            {"nonorthogonality", {0.001, 0.002, 0.003}},
-                                            {"quantization_rad", {0.0, 0.0, 0.0}}}},
-                                          {"accel",
-                                           {{"bias_mps2", {4.0, 5.0, 6.0}},
-                                            {"bias_rw_psd_m2ps5", {0.0, 0.0, 0.0}},
-                                            {"white_noise_psd_m2ps3", {4.0e-6, 5.0e-6, 6.0e-6}},
-                                            {"scale_factor", {0.4, 0.5, 0.6}},
-                                            {"misalignment_rad", {0.04, 0.05, 0.06}},
-                                            {"nonorthogonality", {0.004, 0.005, 0.006}},
-                                            {"quantization_mps", {0.0, 0.0, 0.0}}}}}}};
+    const nlohmann::json error_model = {
+        {"imu",
+         {{"type", "error_model"},
+          {"seed", 12U},
+          {"rate_hz", 200.0},
+          {"gyro",
+           {{"bias_turnon_radps", {1.0, 2.0, 3.0}},
+            {"bias_inrun_psd_rad2ps3", {0.0, 0.0, 0.0}},
+            {"angle_random_walk_psd_rad2ps", {1.0e-6, 2.0e-6, 3.0e-6}},
+            {"scale_factor", {0.1, 0.2, 0.3}},
+            {"misalignment_rad", {0.01, 0.02, 0.03}},
+            {"nonorthogonality", {0.001, 0.002, 0.003}},
+            {"angular_rate_limit_radps", {0.0, 0.0, 0.0}},
+            {"quantization_rad", {0.0, 0.0, 0.0}}}},
+          {"accel",
+           {{"bias_turnon_mps2", {4.0, 5.0, 6.0}},
+            {"bias_inrun_psd_m2ps5", {0.0, 0.0, 0.0}},
+            {"velocity_random_walk_psd_m2ps3", {4.0e-6, 5.0e-6, 6.0e-6}},
+            {"scale_factor", {0.4, 0.5, 0.6}},
+            {"misalignment_rad", {0.04, 0.05, 0.06}},
+            {"nonorthogonality", {0.004, 0.005, 0.006}},
+            {"acceleration_limit_mps2", {0.0, 0.0, 0.0}},
+            {"quantization_mps", {0.0, 0.0, 0.0}}}}}}};
 
     CHECK_NOTHROW(validate_imu_runtime_config(error_model));
     const auto parsed = imu_simulator_config_from_json(error_model);
     CHECK(parsed.seed == 12U);
-    CHECK(parsed.gyro.bias.x() == doctest::Approx(1.0));
-    CHECK(parsed.accel.bias.z() == doctest::Approx(6.0));
+    CHECK(parsed.gyro.bias_turnon.x() == doctest::Approx(1.0));
+    CHECK(parsed.accel.bias_turnon.z() == doctest::Approx(6.0));
+    CHECK(parsed.gyro.limit.isZero());
+    CHECK(parsed.accel.limit.isZero());
+}
+
+TEST_CASE("IMU simulator applies configured absolute rate and acceleration limits")
+{
+    ImuSimulatorConfig config;
+    config.gyro.bias_turnon = Vec3{10.0, 0.0, 0.0};
+    config.gyro.limit = Vec3{0.25, 0.0, 0.0};
+    config.accel.bias_turnon = Vec3{0.0, -10.0, 0.0};
+    config.accel.limit = Vec3{0.0, 0.5, 0.0};
+
+    DefaultImuSimulator simulator(config);
+    ImuIncrement increment;
+    REQUIRE(simulator.generate(stationary_sample(0.0), stationary_sample(1.0), increment));
+
+    CHECK(increment.delta_theta_ib_b_rad.x() == doctest::Approx(0.25));
+    CHECK(increment.delta_v_ib_b_mps.y() == doctest::Approx(-0.5));
+}
+
+TEST_CASE("IMU runtime config parser accepts seeded variance and covariance draws")
+{
+    using navkit::app_support::imu_simulator_config_from_json;
+    using navkit::app_support::validate_imu_runtime_config;
+
+    const nlohmann::json random_error_model = {
+        {"imu",
+         {{"type", "error_model"},
+          {"seed", 12U},
+          {"rate_hz", 200.0},
+          {"gyro",
+           {{"bias_turnon_var_rad2ps2", {1.0, 1.0, 1.0}},
+            {"bias_inrun_psd_rad2ps3", {0.0, 0.0, 0.0}},
+            {"angle_random_walk_psd_rad2ps", {0.0, 0.0, 0.0}},
+            {"scale_factor_cov", {1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0}},
+            {"misalignment_rad", {0.0, 0.0, 0.0}},
+            {"nonorthogonality", {0.0, 0.0, 0.0}},
+            {"quantization_rad", {0.0, 0.0, 0.0}}}},
+          {"accel",
+           {{"bias_turnon_var_m2ps4", {1.0, 1.0, 1.0}},
+            {"bias_inrun_psd_m2ps5", {0.0, 0.0, 0.0}},
+            {"velocity_random_walk_psd_m2ps3", {0.0, 0.0, 0.0}},
+            {"scale_factor", {0.0, 0.0, 0.0}},
+            {"misalignment_rad", {0.0, 0.0, 0.0}},
+            {"nonorthogonality_cov", {1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0}},
+            {"quantization_mps", {0.0, 0.0, 0.0}}}}}}};
+
+    CHECK_NOTHROW(validate_imu_runtime_config(random_error_model));
+    const ImuSimulatorConfig first = imu_simulator_config_from_json(random_error_model);
+    const ImuSimulatorConfig second = imu_simulator_config_from_json(random_error_model);
+
+    CHECK(first.gyro.bias_turnon.isApprox(second.gyro.bias_turnon));
+    CHECK(first.gyro.scale_factor.isApprox(second.gyro.scale_factor));
+    CHECK(first.accel.bias_turnon.isApprox(second.accel.bias_turnon));
+    CHECK(first.accel.nonorthogonality.isApprox(second.accel.nonorthogonality));
 }
 
 TEST_CASE("IMU runtime config parser rejects malformed error-model inputs")
@@ -230,18 +288,36 @@ TEST_CASE("IMU runtime config parser rejects malformed error-model inputs")
                     std::runtime_error);
     CHECK_THROWS_AS(validate_imu_runtime_config(nlohmann::json{{"imu", {{"type", "error_model"}}}}),
                     std::runtime_error);
-    CHECK_THROWS_AS(validate_imu_runtime_config(
-                        nlohmann::json{{"imu",
-                                        {{"type", "error_model"},
-                                         {"gyro", {{"white_noise_psd_rad2ps", {-1.0, 0.0, 0.0}}}},
-                                         {"accel", nlohmann::json::object()}}}}),
+    CHECK_THROWS_AS(validate_imu_runtime_config(nlohmann::json{
+                        {"imu",
+                         {{"type", "error_model"},
+                          {"gyro", {{"angle_random_walk_psd_rad2ps", {-1.0, 0.0, 0.0}}}},
+                          {"accel", nlohmann::json::object()}}}}),
                     std::runtime_error);
     CHECK_THROWS_AS(
         validate_imu_runtime_config(nlohmann::json{{"imu",
                                                     {{"type", "error_model"},
-                                                     {"gyro", {{"bias_radps", {1.0, 2.0}}}},
+                                                     {"gyro", {{"bias_turnon_radps", {1.0, 2.0}}}},
                                                      {"accel", nlohmann::json::object()}}}}),
         std::runtime_error);
+    CHECK_THROWS_AS(
+        validate_imu_runtime_config(nlohmann::json{{"imu",
+                                                    {{"type", "error_model"},
+                                                     {"seed", 1U},
+                                                     {"rate_hz", 100.0},
+                                                     {"gyro", {{"bias_radps", {0.0, 0.0, 0.0}}}},
+                                                     {"accel", nlohmann::json::object()}}}}),
+        std::runtime_error);
+    CHECK_THROWS_AS(validate_imu_runtime_config(
+                        nlohmann::json{{"imu",
+                                        {{"type", "error_model"},
+                                         {"seed", 1U},
+                                         {"rate_hz", 100.0},
+                                         {"gyro",
+                                          {{"bias_turnon_radps", {0.0, 0.0, 0.0}},
+                                           {"bias_turnon_var_rad2ps2", {1.0, 1.0, 1.0}}}},
+                                         {"accel", nlohmann::json::object()}}}}),
+                    std::runtime_error);
 }
 
 } // namespace navkit::sim::test

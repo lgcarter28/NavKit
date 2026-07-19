@@ -1,0 +1,25 @@
+{
+  "imu": {
+    "type": "error_model",
+    "rate_hz": 1000.0,
+    "seed": 9900,
+    "gyro": {
+      "bias_turnon_var_rad2ps2": [7.6154e-13, 7.6154e-13, 7.6154e-13],
+      "bias_inrun_psd_rad2ps3": [1.0e-16, 1.0e-16, 1.0e-16],
+      "angle_random_walk_psd_rad2ps": [1.0e-13, 1.0e-13, 1.0e-13],
+      "scale_factor_var": [1.0e-10, 1.0e-10, 1.0e-10],
+      "misalignment_var_rad2": [1.0e-12, 1.0e-12, 1.0e-12],
+      "nonorthogonality_var": [1.0e-12, 1.0e-12, 1.0e-12],
+      "angular_rate_limit_radps": [8.72665, 8.72665, 8.72665]
+    },
+    "accel": {
+      "bias_turnon_var_m2ps4": [9.6236e-9, 9.6236e-9, 9.6236e-9],
+      "bias_inrun_psd_m2ps5": [1.0e-12, 1.0e-12, 1.0e-12],
+      "velocity_random_walk_psd_m2ps3": [1.0e-9, 1.0e-9, 1.0e-9],
+      "scale_factor_var": [1.0e-10, 1.0e-10, 1.0e-10],
+      "misalignment_var_rad2": [1.0e-12, 1.0e-12, 1.0e-12],
+      "nonorthogonality_var": [1.0e-12, 1.0e-12, 1.0e-12],
+      "acceleration_limit_mps2": [196.133, 196.133, 196.133]
+    }
+  }
+}

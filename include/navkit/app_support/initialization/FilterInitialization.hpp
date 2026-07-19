@@ -46,7 +46,9 @@ void initialize_navigator(const PvaInitialization& pva_init,
     using StateDef = typename InitializerConfig::StateDef;
     const typename Navigator::Filter_t::P_t initial_covariance =
         detail::initial_covariance_from_json<StateDef>(
-            cfg, InitializerConfig::initial_covariance, core::estimation::pos_e_m(pva_init.pva));
+            cfg,
+            InitializerConfig::InitialCovariance::initial_covariance,
+            core::estimation::pos_e_m(pva_init.pva));
     const NavInitialization<StateDef> nav_init{
         .time_s = pva_init.time_s,
         .pva = pva_init.pva,

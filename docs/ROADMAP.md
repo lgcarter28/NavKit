@@ -67,27 +67,37 @@ These are preserved at high level so the roadmap stays readable. Detailed pass-b
 
 NavKit is currently in Phase 5: ECEF INS/GNSS stabilization and hardening. The active passes below are the current working scope; unrelated future backlog lives in the dedicated phase detail files linked at the end of this roadmap.
 
-## Pass 5.8: runtime hygiene and IMU variance randomization
+## Pass 5.9: simulator/emulator stochastic config ownership
 
-- [ ] Finish compile-time config decomposition into reusable `components` headers plus scenario-level product/app headers now that trajectory behavior is runtime-selected rather than compile-time-selected.
-- [ ] Extend IMU runtime error config with optional variance/covariance fields for deterministic runtime random draws, matching the existing initialization and GNSS covariance JSON style. Prefer names such as `bias_turnon_var`, `scale_factor_var`, or `misalignment_cov` over sigma/`1sig` names. Validation should reject ambiguous direct-value-plus-random-draw forms unless the schema explicitly allows both, and seeded draws should populate the concrete simulator error values before the run starts.
-- [ ] Revisit IMU error-term vocabulary in JSON and `ImuTriadErrorConfig`: make JSON and C++ config names match the selected convention, including `bias_turnon`, `bias_inrun`, `scale_factor`, and `angle_random_walk`/`velocity_random_walk` style terms for gyro and accelerometer stochastic noise, instead of the current mixed terminology.
-- [ ] Add IMU acceleration and angular-rate limit support to the simulator/runtime path.
-- [ ] Add real-spec-sheet-inspired IMU runtime config examples covering representative grades: BMI160-class consumer, VN100-class industrial, HG1700-class tactical, and HG9900-class navigation IMUs. Keep units, variance/covariance interpretation, and seeded randomization behavior explicit in the config comments/docs.
-- [ ] Improve the runtime console status output to show intuitive navigation quantities: LLA position, NED velocity, and NED attitude Euler angles in degrees, formatted in aligned columns for readable long-run monitoring.
+- [ ] Sweep all simulator/emulator runtime config paths for temporary RNGs or stochastic realization inside parsing helpers. JSON/runtime config code should validate and translate declarative config only; simulators/emulators that own stochastic behavior should own their RNGs and realize random draws at construction/initialization or runtime as appropriate.
+- [ ] Move IMU runtime random draws out of JSON parsing and into `ImuSimulator` ownership. Runtime config parsing should validate and translate declarative config only; simulator construction/initialization should realize stochastic terms using the simulator-owned RNG.
+- [ ] Replace temporary RNG usage in `ImuRuntimeConfig` with plain parsed descriptors: direct values for deterministic terms, and one full covariance matrix per randomizable triad term in C++ storage. Runtime JSON may continue to accept diagonal variance or full covariance forms, but parsing should normalize both into the stored covariance matrix representation.
+- [ ] Preserve exactly-one-form validation for each randomizable IMU term: direct value, diagonal variance, full covariance, or omitted. Avoid storing both variance and covariance in C++ structs.
+- [ ] Keep `ImuSimulatorConfig` clear about realized deterministic values versus stochastic descriptors, and ensure the simulator logs or exposes the realized turn-on/config draws needed for run debugging.
+- [ ] Apply the same ownership rule to GNSS and any other current simulator/emulator random sources: declarative covariance/noise config belongs in parsed config, while generated noise samples and seeded stochastic state belong in the simulator/emulator that produces the data.
+- [ ] Add tests showing deterministic JSON parsing has no stochastic side effects, repeated simulator construction with the same seed realizes identical random draws, and diagonal-variance JSON produces the same covariance representation as the equivalent full diagonal covariance JSON.
 
-## Pass 5.9: first-order Gauss-Markov IMU dynamics
+## Pass 5.10: full-rate IMU cumulative increment logging
 
+- [ ] Move IMU cumulative increment ownership out of `ImuIncrementLogProduct` and into the full-rate IMU runtime/simulator path so cumulative sums are updated for every generated IMU sample, not only for rows that pass the runtime logging-rate gate.
+- [ ] Extend the IMU log payload to carry full-rate run cumulative sums for truth/ideal and measured increments; make the log product write supplied cumulative snapshots rather than accumulating internally.
+- [ ] Preserve lower-rate logging as a snapshot mechanism: when IMU logging is decimated, each logged row should contain the latest increment plus the full-rate run cumulative sums up to that timestamp.
+- [ ] Update IMU cumsum plot titles/labels or metadata to make clear they are full-rate cumulative increment snapshots, and keep any future log-interval sums distinct from run cumulative sums.
+- [ ] Add a focused test or scenario check that verifies cumulative Z specific-force/velocity increment growth remains correct when IMU generation runs faster than IMU logging.
+
+## Pass 5.11: first-order Gauss-Markov IMU dynamics
+
+- [ ] Update the LaTeX algorithm references first: `imu_emulator_v1` for first-order Gauss-Markov IMU modeling, and `navigator_ecef_v1` for the matching IMU error-state modeling and strapdown navigation dynamic equations.
 - [ ] Upgrade IMU bias/error dynamics from pure random walk to first-order Gauss-Markov models where appropriate.
 - [ ] Keep the IMU simulator/emulator dynamics, filter STM, process-noise discretization, runtime config, docs, logs, and plots consistent.
 - [ ] Add tests or scenario diagnostics that distinguish the first-order Gauss-Markov behavior from the existing pure-random-walk behavior.
 
-## Pass 5.10: covariance floors and unused-parameter cleanup
+## Pass 5.12: covariance floors and unused-parameter cleanup
 
 - [ ] Add configurable covariance floors per state-family/diagonal block to prevent covariance from becoming ill-conditioned or singular during idealized analysis runs.
 - [ ] Sweep app-support and core seams for stale unused-parameter breadcrumbs such as `(void)cfg;`. Remove unused parameters and simplify call sites when the signature no longer needs the value; keep explicit `(void)name;` only when preserving a required concept/API signature is intentional.
 
-## Pass 5.11: advanced restart initialization groundwork
+## Pass 5.13: advanced restart initialization groundwork
 
 - [ ] Preserve the normal startup path as the clean default: `pva_initialization` provides the required nominal PVA message, and `filter_initialization.initial_covariance` provides the full Kalman filter covariance belief. Do not pollute this path with Monte Carlo, simulator truth-error, or restore-only concepts.
 - [ ] Add an optional direct non-PVA nominal state override for restore/manual analysis use cases. This belongs under `filter_initialization` as an explicit advanced feature, should initialize selected non-PVA nominal estimated states such as gyro and accelerometer bias estimates, and should not masquerade as transfer alignment or PVA initialization.

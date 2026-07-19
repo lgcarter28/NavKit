@@ -9,6 +9,9 @@
 #include "navkit/app_support/emulation/concrete/ImuRuntime.hpp"
 #include "navkit/app_support/logging/MeasurementStatisticsLogger.hpp"
 #include "navkit/app_support/runtime/RunSettings.hpp"
+#include "navkit/core/frames/Geodetic.hpp"
+#include "navkit/core/frames/LocalLevel.hpp"
+#include "navkit/core/math/Quaternion.hpp"
 #include "navkit/core/math/Types.hpp"
 #include "navkit/io/log_payloads/FilterCorrectionLogPayload.hpp"
 #include "navkit/io/log_payloads/ImuDebugLogPayload.hpp"
@@ -143,19 +146,28 @@ private:
         const core::Vec3 v_e = filter.state().template segment<3>(Nominal::Vel::i);
         const Eigen::Matrix<core::Scalar_t, 4, 1> q_b2e =
             filter.state().template segment<4>(Nominal::AttQuat::i);
-        std::printf("t=%8.3f s | p_e=[%.3f %.3f %.3f] m | v_e=[%.6f %.6f %.6f] m/s | q_b2e=[%.6e "
-                    "%.6e %.6e %.6e]\n",
+        const Eigen::Quaternion<core::Scalar_t> q_b2e_quat{q_b2e(0), q_b2e(1), q_b2e(2), q_b2e(3)};
+        const core::Mat3 C_e2n = core::frames::ecef_to_ned_matrix(p_e);
+        const Eigen::Quaternion<core::Scalar_t> q_e2n{C_e2n};
+        const Eigen::Quaternion<core::Scalar_t> q_b2n = q_e2n * q_b2e_quat.normalized();
+        const core::Vec3 p_lla_deg_m = core::frames::ecef_m_to_lla_deg_m(p_e);
+        const core::Vec3 v_n_mps = C_e2n * v_e;
+        const core::Vec3 rpy_b2n_deg =
+            core::math::rpy_rad_from_quaternion(q_b2n) * (180.0 / 3.14159265358979323846);
+
+        std::printf("t=%9.3f s | lat=%11.6f deg lon=%12.6f deg h=%9.2f m | "
+                    "v_ned=[%9.3f %9.3f %9.3f] m/s | "
+                    "rpy_b2n=[%8.3f %8.3f %8.3f] deg\n",
                     time_s,
-                    p_e.x(),
-                    p_e.y(),
-                    p_e.z(),
-                    v_e.x(),
-                    v_e.y(),
-                    v_e.z(),
-                    q_b2e(0),
-                    q_b2e(1),
-                    q_b2e(2),
-                    q_b2e(3));
+                    p_lla_deg_m.x(),
+                    p_lla_deg_m.y(),
+                    p_lla_deg_m.z(),
+                    v_n_mps.x(),
+                    v_n_mps.y(),
+                    v_n_mps.z(),
+                    rpy_b2n_deg.x(),
+                    rpy_b2n_deg.y(),
+                    rpy_b2n_deg.z());
     }
 
     Logger& m_logger;

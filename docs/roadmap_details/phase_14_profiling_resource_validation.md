@@ -10,6 +10,10 @@
 
 ## Pass 14.2: resource and allocation validation
 
+- [ ] Add a quick embedded-core smoke-size target that links only `navkit::core`, instantiates the selected embedded-facing navigator/filter/sensor graph, avoids `navkit::sim`, `navkit::io`, JSON, filesystem, and app-support dependencies, and reports the Release executable/library size as an early embedded footprint baseline.
+- [ ] Keep the first embedded smoke target intentionally small: force representative template instantiation and, if practical, run one no-IO update path with compile-time config only. Use it to expose accidental core-to-desktop dependency leaks before adding stricter tooling.
+- [ ] Add a rigorous embedded resource evidence pass after the quick smoke target: emit map files, report `.text`, `.rdata`/read-only data, `.data`, `.bss`, static object footprint, and obvious large symbols; document the selected compiler flags, target/toolchain assumptions, and link-time dead-stripping behavior.
+- [ ] Add package/install-tree smoke validation for the embedded-core target once install rules mature, so resource evidence can be collected from packaged artifacts rather than only the developer build tree.
 - [ ] Extend allocation/resource checks to sensor queues, estimator update operations, propagation, mechanization, and logging seams.
 - [ ] Add runtime and memory summaries appropriate for simulator qualification runs.
 - [ ] Add runtime and memory budgets to CI or target qualification tests.

@@ -1,0 +1,45 @@
+// Copyright (c) 2026 William Gordon Carter.
+// All Rights Reserved.
+
+#pragma once
+
+#include "navkit/api/config/ConfigApi.hpp"
+
+namespace navkit::config::navkit::products::components
+{
+
+struct DefaultInsInitialCovariance
+{
+    using StateDef = core::estimation::DefaultInsStateDef;
+    using InitialCovariance_t = core::estimation::InitialCovariance<StateDef>;
+
+    inline static const InitialCovariance_t initial_covariance =
+        core::estimation::diagonal_initial_covariance<StateDef>(
+            core::estimation::InitialCovarianceDiagonal<StateDef>{
+                .values =
+                    {
+                        // Pos
+                        10000.0,
+                        10000.0,
+                        10000.0,
+                        // Vel
+                        100.0,
+                        100.0,
+                        100.0,
+                        // AttRotVec
+                        0.007615435494667714,
+                        0.007615435494667714,
+                        0.030461741978670857,
+                        // GyroB
+                        7.615435494667714e-7,
+                        7.615435494667714e-7,
+                        7.615435494667714e-7,
+                        // AccB
+                        9.61703842225e-7,
+                        9.61703842225e-7,
+                        9.61703842225e-7,
+                    },
+            });
+};
+
+} // namespace navkit::config::navkit::products::components

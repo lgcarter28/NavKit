@@ -21,9 +21,9 @@ using navkit::core::estimation::ImuIncrement;
 
 struct ImuTriadErrorConfig
 {
-    Vec3 bias{Vec3::Zero()};
-    Vec3 bias_random_walk_psd{Vec3::Zero()};
-    Vec3 white_noise_psd{Vec3::Zero()};
+    Vec3 bias_turnon{Vec3::Zero()};
+    Vec3 bias_inrun_psd{Vec3::Zero()};
+    Vec3 output_random_walk_psd{Vec3::Zero()};
     Vec3 scale_factor{Vec3::Zero()};
     // [alpha_x, alpha_y, alpha_z], radians.
     Vec3 misalignment_rad{Vec3::Zero()};
@@ -31,6 +31,8 @@ struct ImuTriadErrorConfig
     Vec3 nonorthogonality{Vec3::Zero()};
     // Zero disables quantization on that axis.
     Vec3 quantization{Vec3::Zero()};
+    // Zero disables absolute-value saturation on that axis.
+    Vec3 limit{Vec3::Zero()};
 };
 
 struct ImuSimulatorConfig

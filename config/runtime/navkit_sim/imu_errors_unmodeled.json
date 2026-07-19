@@ -2,7 +2,7 @@
   "components": [
     "components/logging/standard.json",
     "components/trajectory/stationary_ecef_1000hz.json",
-    "components/imu/error_model_unmodeled.json",
+    "components/imu/specs/hg1700_tactical.json",
     "components/gnss/nominal_pos_vel.json",
     "components/initialization/pva/pva_random_error_default.json"
   ],

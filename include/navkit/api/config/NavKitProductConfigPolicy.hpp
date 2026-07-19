@@ -24,7 +24,7 @@ concept NavKitProductConfigPolicy = requires {
     typename Candidate::StateDef;
     typename Candidate::Sensors;
     typename Candidate::Profiler;
-    typename Candidate::InitialCovariance_t;
+    typename Candidate::InitialCovariance;
     typename Candidate::Filter;
     typename Candidate::Propagation;
     typename Candidate::NavigatorUpdate;
@@ -37,8 +37,9 @@ concept NavKitProductConfigPolicy = requires {
     requires navkit::core::estimation::FilterPolicy<typename Candidate::Filter>;
     requires std::same_as<typename Candidate::Filter::Sensors_t, typename Candidate::Sensors>;
     requires navkit::core::profiling::ProfilerPolicy<typename Candidate::Profiler>;
-    requires navkit::core::estimation::InitialCovarianceConfigPolicy<Candidate,
-                                                                     typename Candidate::StateDef>;
+    requires navkit::core::estimation::InitialCovarianceConfigPolicy<
+        typename Candidate::InitialCovariance,
+        typename Candidate::StateDef>;
     requires navkit::core::estimation::PropagationPolicy<typename Candidate::Propagation,
                                                          typename Candidate::StateDef>;
     requires navkit::core::estimation::NavigatorUpdatePolicy<typename Candidate::NavigatorUpdate,

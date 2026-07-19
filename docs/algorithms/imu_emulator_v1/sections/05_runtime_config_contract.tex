@@ -10,25 +10,33 @@ make the emulator mode and every enabled error source explicit. A v1 shape is:
   "rate_hz": 1000.0,
   "seed": 12345,
   "gyro": {
-    "bias_radps": [0, 0, 0],
-    "bias_rw_psd_rad2ps3": [0, 0, 0],
-    "white_noise_psd_rad2ps": [0, 0, 0],
+    "bias_turnon_radps": [0, 0, 0],
+    "bias_inrun_psd_rad2ps3": [0, 0, 0],
+    "angle_random_walk_psd_rad2ps": [0, 0, 0],
     "scale_factor": [0, 0, 0],
     "misalignment_rad": [0, 0, 0],
     "nonorthogonality": [0, 0, 0],
-    "quantization_rad": [0, 0, 0]
+    "quantization_rad": [0, 0, 0],
+    "angular_rate_limit_radps": [0, 0, 0]
   },
   "accel": {
-    "bias_mps2": [0, 0, 0],
-    "bias_rw_psd_m2ps5": [0, 0, 0],
-    "white_noise_psd_m2ps3": [0, 0, 0],
+    "bias_turnon_mps2": [0, 0, 0],
+    "bias_inrun_psd_m2ps5": [0, 0, 0],
+    "velocity_random_walk_psd_m2ps3": [0, 0, 0],
     "scale_factor": [0, 0, 0],
     "misalignment_rad": [0, 0, 0],
     "nonorthogonality": [0, 0, 0],
-    "quantization_mps": [0, 0, 0]
+    "quantization_mps": [0, 0, 0],
+    "acceleration_limit_mps2": [0, 0, 0]
   }
 }
 \end{verbatim}
+
+Direct deterministic triad terms may instead be provided as seeded random
+draws using the matching variance or full covariance key, such as
+\texttt{bias\_turnon\_var\_rad2ps2} or
+\texttt{bias\_turnon\_cov\_rad2ps2}. A single term must use exactly one form:
+direct value, diagonal variance, or full covariance.
 
 \section{Validation Rules}
 
@@ -40,8 +48,12 @@ Runtime validation must reject:
     \item missing gyro or accelerometer sections when \texttt{type} is
     \texttt{error\_model};
     \item vectors with dimension other than three;
+    \item covariance arrays with dimension other than nine, nonsymmetric
+    values, or negative eigenvalues;
+    \item ambiguous direct/random fields for the same error term;
     \item negative spectral densities;
     \item negative quantization steps;
+    \item negative rate or acceleration limits;
     \item unsupported emulator types.
 \end{itemize}
 
