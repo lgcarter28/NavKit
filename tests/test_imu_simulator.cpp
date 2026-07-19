@@ -1,6 +1,7 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
+#include "navkit/app_support/emulation/concrete/ImuRuntime.hpp"
 #include "navkit/app_support/emulation/concrete/ImuRuntimeConfig.hpp"
 #include "navkit/core/environment/gravity/J2.hpp"
 #include "navkit/core/environment/planet/Wgs84.hpp"
@@ -32,10 +33,32 @@ using DefaultImuSimulator = ImuSimulator<>;
     return sample;
 }
 
+[[nodiscard]] TruthSample stationary_body_z_specific_force_sample(navkit::core::Time_t time_s)
+{
+    constexpr double half_pi_rad = 1.57079632679489661923;
+
+    TruthSample sample = stationary_sample(time_s);
+    sample.q_b2e = Eigen::AngleAxisd(half_pi_rad, Vec3::UnitY());
+    return sample;
+}
+
 [[nodiscard]] bool approx_vec(const Vec3& actual, const Vec3& expected, double tolerance = 1.0e-12)
 {
     return actual.isApprox(expected, tolerance);
 }
+
+struct RecordingNavigator
+{
+    int push_count{0};
+    navkit::core::estimation::ImuIncrement last_increment{};
+
+    [[nodiscard]] bool push_imu(const navkit::core::estimation::ImuIncrement& increment)
+    {
+        ++push_count;
+        last_increment = increment;
+        return true;
+    }
+};
 
 } // namespace
 
@@ -160,6 +183,38 @@ TEST_CASE("IMU simulator stateful generation consumes consecutive samples")
     CHECK(increment.delta_v_ib_b_mps.z() == doctest::Approx(0.0));
 
     CHECK_FALSE(simulator.generate(stationary_sample(0.25), increment));
+}
+
+TEST_CASE("IMU runtime cumulative increments advance at generation rate")
+{
+    const nlohmann::json config =
+        nlohmann::json{{"imu", {{"type", "ideal"}, {"seed", 1U}, {"rate_hz", 1000.0}}}};
+
+    navkit::app_support::ImuRuntime<DefaultImuSimulator> runtime(config);
+    RecordingNavigator navigator{};
+    navkit::app_support::ImuRuntimeSample first_output{};
+    navkit::app_support::ImuRuntimeSample second_output{};
+    navkit::app_support::ImuRuntimeSample third_output{};
+
+    REQUIRE(runtime.process(stationary_body_z_specific_force_sample(0.0), navigator, first_output));
+    CHECK_FALSE(first_output.generated);
+    CHECK(navigator.push_count == 0);
+
+    REQUIRE(
+        runtime.process(stationary_body_z_specific_force_sample(1.0), navigator, second_output));
+    REQUIRE(runtime.process(stationary_body_z_specific_force_sample(2.0), navigator, third_output));
+
+    CHECK(navigator.push_count == 2);
+    CHECK(second_output.generated);
+    CHECK(third_output.generated);
+    CHECK(second_output.truth.delta_v_ib_b_mps.z() > 0.0);
+    CHECK(third_output.truth_cumsum_delta_v_ib_b_mps.z() ==
+          doctest::Approx(2.0 * second_output.truth.delta_v_ib_b_mps.z()));
+    CHECK(third_output.measured_cumsum_delta_v_ib_b_mps.z() ==
+          doctest::Approx(2.0 * second_output.measured.delta_v_ib_b_mps.z()));
+    CHECK(third_output.truth_cumsum_delta_theta_ib_b_rad.z() ==
+          doctest::Approx(second_output.truth.delta_theta_ib_b_rad.z() +
+                          third_output.truth.delta_theta_ib_b_rad.z()));
 }
 
 TEST_CASE("IMU simulator seeded stochastic terms are deterministic")

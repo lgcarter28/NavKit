@@ -67,14 +67,6 @@ These are preserved at high level so the roadmap stays readable. Detailed pass-b
 
 NavKit is currently in Phase 5: ECEF INS/GNSS stabilization and hardening. The active passes below are the current working scope; unrelated future backlog lives in the dedicated phase detail files linked at the end of this roadmap.
 
-## Pass 5.10: full-rate IMU cumulative increment logging
-
-- [ ] Move IMU cumulative increment ownership out of `ImuIncrementLogProduct` and into the full-rate IMU runtime/simulator path so cumulative sums are updated for every generated IMU sample, not only for rows that pass the runtime logging-rate gate.
-- [ ] Extend the IMU log payload to carry full-rate run cumulative sums for truth/ideal and measured increments; make the log product write supplied cumulative snapshots rather than accumulating internally.
-- [ ] Preserve lower-rate logging as a snapshot mechanism: when IMU logging is decimated, each logged row should contain the latest increment plus the full-rate run cumulative sums up to that timestamp.
-- [ ] Update IMU cumsum plot titles/labels or metadata to make clear they are full-rate cumulative increment snapshots, and keep any future log-interval sums distinct from run cumulative sums.
-- [ ] Add a focused test or scenario check that verifies cumulative Z specific-force/velocity increment growth remains correct when IMU generation runs faster than IMU logging.
-
 ## Pass 5.11: first-order Gauss-Markov IMU dynamics
 
 - [ ] Update the LaTeX algorithm references first: `imu_emulator_v1` for first-order Gauss-Markov IMU modeling, and `navigator_ecef_v1` for the matching IMU error-state modeling and strapdown navigation dynamic equations.

@@ -61,6 +61,11 @@ public:
             log_if_supported(io::ImuIncrementLogPayload{
                 .truth = imu_sample.truth,
                 .measured = imu_sample.measured,
+                .truth_cumsum_delta_theta_ib_b_rad = imu_sample.truth_cumsum_delta_theta_ib_b_rad,
+                .truth_cumsum_delta_v_ib_b_mps = imu_sample.truth_cumsum_delta_v_ib_b_mps,
+                .measured_cumsum_delta_theta_ib_b_rad =
+                    imu_sample.measured_cumsum_delta_theta_ib_b_rad,
+                .measured_cumsum_delta_v_ib_b_mps = imu_sample.measured_cumsum_delta_v_ib_b_mps,
                 .gyro_bias_truth_radps = imu_sample.gyro_bias_truth_radps,
                 .accel_bias_truth_mps2 = imu_sample.accel_bias_truth_mps2});
         }

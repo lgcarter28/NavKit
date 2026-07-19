@@ -124,6 +124,7 @@ This project follows
 - Moved reusable coning/sculling, planet-rate, gravity-gradient, quaternion/RPY, and simulation random-draw helpers toward their owning domains instead of keeping them inside the first ECEF INS and IMU simulator implementations.
 - Moved filter initial covariance into a selected immutable NavKit product config value using `InitialCovariance<StateDef>` and `diagonal_initial_covariance<StateDef>()`, tuned the current examples to variance values corresponding to 50 milli-deg/s gyro bias and 100 micro-g accelerometer bias, swept app-support runtime parsing to remove hidden scenario fallback defaults, and added runtime JSON override validation for configured initial covariance, including raw full-state forms and a frame-aware PVA plus remaining-error-state diagonal form.
 - Renamed the repo-level simulation wrapper from `tools/run_first_sim.py` to `tools/run_sim.py`, clarified that `--navkit-config` locates a compile-time-configured build tree rather than changing runtime behavior, and factored runtime JSON merge/output override handling into reusable tool helpers.
+- Moved IMU cumulative increment ownership from the nominal CSV log product into the full-rate IMU runtime path so decimated IMU log rows contain run cumulative snapshots rather than sums of only logged rows.
 
 ### Removed
 

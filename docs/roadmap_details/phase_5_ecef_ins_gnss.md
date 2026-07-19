@@ -80,6 +80,15 @@
 - [x] Added tests for deterministic parsing, seeded simulator realization, and equivalent diagonal/full covariance descriptors.
 - [x] Updated configuration and IMU emulator docs to state that runtime parsing is declarative and simulator/emulator objects own stochastic draws.
 
+## Pass 5.10: full-rate IMU cumulative increment logging
+
+- [x] Moved IMU cumulative increment ownership out of `ImuIncrementLogProduct` and into the full-rate IMU runtime path.
+- [x] Extended the IMU nominal log payload to carry full-rate run cumulative sums for truth/ideal and measured increments.
+- [x] Made lower-rate IMU logging a snapshot mechanism: each logged row writes the latest increment plus the full-rate run cumulative sums up to that timestamp.
+- [x] Updated IMU cumulative plot titles and CSV metadata to state that cumulative values are full-rate run snapshots.
+- [x] Added a focused runtime test that verifies cumulative body-Z specific-force/velocity increment growth remains correct across unlogged generated IMU samples.
+- [x] Ran the default ECEF INS/GNSS scenario and analysis plots to verify the updated CSV schema and figures.
+
 ## Phase 5 follow-forward
 
-Unresolved expansion/hardening work from Phase 5 now lives in active roadmap passes for full-rate IMU cumulative increment logging, Gauss-Markov IMU dynamics, covariance floors, unused-parameter cleanup, and advanced restart initialization, plus future phase files for Monte Carlo, trajectory-source expansion, transfer alignment, sensor scheduling, validation metrics, latent replay, robust status/error handling, and embedded readiness.
+Unresolved expansion/hardening work from Phase 5 now lives in active roadmap passes for Gauss-Markov IMU dynamics, covariance floors, unused-parameter cleanup, and advanced restart initialization, plus future phase files for Monte Carlo, trajectory-source expansion, transfer alignment, sensor scheduling, validation metrics, latent replay, robust status/error handling, and embedded readiness.

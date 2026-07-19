@@ -21,6 +21,10 @@ struct ImuRuntimeSample
     navkit::sim::ImuIntervalDebug debug{};
     core::estimation::ImuIncrement truth{};
     core::estimation::ImuIncrement measured{};
+    core::Vec3 truth_cumsum_delta_theta_ib_b_rad{core::Vec3::Zero()};
+    core::Vec3 truth_cumsum_delta_v_ib_b_mps{core::Vec3::Zero()};
+    core::Vec3 measured_cumsum_delta_theta_ib_b_rad{core::Vec3::Zero()};
+    core::Vec3 measured_cumsum_delta_v_ib_b_mps{core::Vec3::Zero()};
     core::Vec3 gyro_bias_truth_radps{core::Vec3::Zero()};
     core::Vec3 accel_bias_truth_mps2{core::Vec3::Zero()};
 };
@@ -64,12 +68,23 @@ public:
             output = {};
             return false;
         }
+        const core::estimation::ImuIncrement truth_increment =
+            ImuSimulator::increment_from_interval(interval);
+        m_truth_delta_theta_sum += truth_increment.delta_theta_ib_b_rad;
+        m_truth_delta_v_sum += truth_increment.delta_v_ib_b_mps;
+        m_measured_delta_theta_sum += increment.delta_theta_ib_b_rad;
+        m_measured_delta_v_sum += increment.delta_v_ib_b_mps;
+
         output = {};
         output.generated = true;
         output.interval = interval;
         output.debug = debug;
-        output.truth = ImuSimulator::increment_from_interval(interval);
+        output.truth = truth_increment;
         output.measured = increment;
+        output.truth_cumsum_delta_theta_ib_b_rad = m_truth_delta_theta_sum;
+        output.truth_cumsum_delta_v_ib_b_mps = m_truth_delta_v_sum;
+        output.measured_cumsum_delta_theta_ib_b_rad = m_measured_delta_theta_sum;
+        output.measured_cumsum_delta_v_ib_b_mps = m_measured_delta_v_sum;
         output.gyro_bias_truth_radps = m_simulator.gyro_bias_radps();
         output.accel_bias_truth_mps2 = m_simulator.accel_bias_mps2();
         return true;
@@ -92,6 +107,10 @@ public:
 
 private:
     ImuSimulator m_simulator;
+    core::Vec3 m_truth_delta_theta_sum{core::Vec3::Zero()};
+    core::Vec3 m_truth_delta_v_sum{core::Vec3::Zero()};
+    core::Vec3 m_measured_delta_theta_sum{core::Vec3::Zero()};
+    core::Vec3 m_measured_delta_v_sum{core::Vec3::Zero()};
     bool m_initialized{false};
     std::string_view m_last_error{};
 };

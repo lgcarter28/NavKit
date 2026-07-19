@@ -58,11 +58,6 @@ public:
 
     void log(const ImuIncrementLogPayload& payload)
     {
-        m_truth_delta_theta_sum += payload.truth.delta_theta_ib_b_rad;
-        m_truth_delta_v_sum += payload.truth.delta_v_ib_b_mps;
-        m_measured_delta_theta_sum += payload.measured.delta_theta_ib_b_rad;
-        m_measured_delta_v_sum += payload.measured.delta_v_ib_b_mps;
-
         m_csv.write_row(payload.measured.time_s,
                         payload.measured.dt_s,
                         payload.truth.delta_theta_ib_b_rad.x(),
@@ -77,18 +72,18 @@ public:
                         payload.measured.delta_v_ib_b_mps.x(),
                         payload.measured.delta_v_ib_b_mps.y(),
                         payload.measured.delta_v_ib_b_mps.z(),
-                        m_truth_delta_theta_sum.x(),
-                        m_truth_delta_theta_sum.y(),
-                        m_truth_delta_theta_sum.z(),
-                        m_truth_delta_v_sum.x(),
-                        m_truth_delta_v_sum.y(),
-                        m_truth_delta_v_sum.z(),
-                        m_measured_delta_theta_sum.x(),
-                        m_measured_delta_theta_sum.y(),
-                        m_measured_delta_theta_sum.z(),
-                        m_measured_delta_v_sum.x(),
-                        m_measured_delta_v_sum.y(),
-                        m_measured_delta_v_sum.z(),
+                        payload.truth_cumsum_delta_theta_ib_b_rad.x(),
+                        payload.truth_cumsum_delta_theta_ib_b_rad.y(),
+                        payload.truth_cumsum_delta_theta_ib_b_rad.z(),
+                        payload.truth_cumsum_delta_v_ib_b_mps.x(),
+                        payload.truth_cumsum_delta_v_ib_b_mps.y(),
+                        payload.truth_cumsum_delta_v_ib_b_mps.z(),
+                        payload.measured_cumsum_delta_theta_ib_b_rad.x(),
+                        payload.measured_cumsum_delta_theta_ib_b_rad.y(),
+                        payload.measured_cumsum_delta_theta_ib_b_rad.z(),
+                        payload.measured_cumsum_delta_v_ib_b_mps.x(),
+                        payload.measured_cumsum_delta_v_ib_b_mps.y(),
+                        payload.measured_cumsum_delta_v_ib_b_mps.z(),
                         payload.gyro_bias_truth_radps.x(),
                         payload.gyro_bias_truth_radps.y(),
                         payload.gyro_bias_truth_radps.z(),
@@ -111,8 +106,11 @@ public:
                   {"dt", "s"},
                   {"delta_theta_ib_b", "rad"},
                   {"delta_v_ib_b", "m/s"},
+                  {"cumsum_delta_theta_ib_b", "rad"},
+                  {"cumsum_delta_v_ib_b", "m/s"},
                   {"gyro_bias_b", "rad/s"},
-                  {"accel_bias_b", "m/s^2"}}}};
+                  {"accel_bias_b", "m/s^2"}}},
+                {"cumulative_sum_semantics", "full_rate_run_cumulative_snapshot"}};
     }
 
     static nlohmann::json manifest_entry()
@@ -122,10 +120,6 @@ public:
 
 private:
     CsvWriter m_csv;
-    core::Vec3 m_truth_delta_theta_sum{core::Vec3::Zero()};
-    core::Vec3 m_truth_delta_v_sum{core::Vec3::Zero()};
-    core::Vec3 m_measured_delta_theta_sum{core::Vec3::Zero()};
-    core::Vec3 m_measured_delta_v_sum{core::Vec3::Zero()};
 };
 
 } // namespace navkit::io

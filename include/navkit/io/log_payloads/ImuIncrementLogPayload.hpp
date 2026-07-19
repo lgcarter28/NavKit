@@ -14,6 +14,10 @@ struct ImuIncrementLogPayload
 {
     core::estimation::ImuIncrement truth;
     core::estimation::ImuIncrement measured;
+    core::Vec3 truth_cumsum_delta_theta_ib_b_rad{core::Vec3::Zero()};
+    core::Vec3 truth_cumsum_delta_v_ib_b_mps{core::Vec3::Zero()};
+    core::Vec3 measured_cumsum_delta_theta_ib_b_rad{core::Vec3::Zero()};
+    core::Vec3 measured_cumsum_delta_v_ib_b_mps{core::Vec3::Zero()};
     core::Vec3 gyro_bias_truth_radps{core::Vec3::Zero()};
     core::Vec3 accel_bias_truth_mps2{core::Vec3::Zero()};
 };
