@@ -1,0 +1,10 @@
+{
+  "propagation": {
+    "process_noise": {
+      "gyro_white_noise_psd_rad2ps": [1e-11, 1e-11, 1e-11],
+      "accel_white_noise_psd_m2ps3": [1e-7, 1e-7, 1e-7],
+      "gyro_bias_drive_psd_rad2ps3": [1e-14, 1e-14, 1e-14],
+      "accel_bias_drive_psd_m2ps5": [1e-10, 1e-10, 1e-10]
+    }
+  }
+}

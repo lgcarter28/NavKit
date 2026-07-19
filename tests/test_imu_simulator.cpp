@@ -9,6 +9,7 @@
 #include "test_main.hpp"
 
 #include <Eigen/Geometry>
+#include <cmath>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 
@@ -239,6 +240,28 @@ TEST_CASE("IMU simulator seeded stochastic terms are deterministic")
     CHECK(first.accel_bias_mps2().isApprox(second.accel_bias_mps2()));
 }
 
+TEST_CASE("IMU simulator applies first-order Gauss-Markov bias decay")
+{
+    ImuSimulatorConfig config;
+    config.gyro.bias_turnon = Vec3{1.0, -2.0, 3.0};
+    config.gyro.bias_correlation_rate_1ps = Vec3{0.5, 0.25, 0.0};
+    config.gyro.bias_inrun_psd = Vec3::Zero();
+    config.accel.bias_turnon = Vec3{4.0, -5.0, 6.0};
+    config.accel.bias_correlation_rate_1ps = Vec3{1.0, 0.5, 0.0};
+    config.accel.bias_inrun_psd = Vec3::Zero();
+
+    DefaultImuSimulator simulator(config);
+    ImuIncrement increment;
+    REQUIRE(simulator.generate(stationary_sample(0.0), stationary_sample(2.0), increment));
+
+    CHECK(simulator.gyro_bias_radps().x() == doctest::Approx(std::exp(-1.0)));
+    CHECK(simulator.gyro_bias_radps().y() == doctest::Approx(-2.0 * std::exp(-0.5)));
+    CHECK(simulator.gyro_bias_radps().z() == doctest::Approx(3.0));
+    CHECK(simulator.accel_bias_mps2().x() == doctest::Approx(4.0 * std::exp(-2.0)));
+    CHECK(simulator.accel_bias_mps2().y() == doctest::Approx(-5.0 * std::exp(-1.0)));
+    CHECK(simulator.accel_bias_mps2().z() == doctest::Approx(6.0));
+}
+
 TEST_CASE("IMU runtime config parser accepts ideal and error-model shapes")
 {
     using navkit::app_support::imu_simulator_config_from_json;
@@ -257,6 +280,7 @@ TEST_CASE("IMU runtime config parser accepts ideal and error-model shapes")
           {"gyro",
            {{"bias_turnon_radps", {1.0, 2.0, 3.0}},
             {"bias_inrun_psd_rad2ps3", {0.0, 0.0, 0.0}},
+            {"bias_correlation_rate_1ps", {0.1, 0.2, 0.3}},
             {"angle_random_walk_psd_rad2ps", {1.0e-6, 2.0e-6, 3.0e-6}},
             {"scale_factor", {0.1, 0.2, 0.3}},
             {"misalignment_rad", {0.01, 0.02, 0.03}},
@@ -266,6 +290,7 @@ TEST_CASE("IMU runtime config parser accepts ideal and error-model shapes")
           {"accel",
            {{"bias_turnon_mps2", {4.0, 5.0, 6.0}},
             {"bias_inrun_psd_m2ps5", {0.0, 0.0, 0.0}},
+            {"bias_correlation_rate_1ps", {0.4, 0.5, 0.6}},
             {"velocity_random_walk_psd_m2ps3", {4.0e-6, 5.0e-6, 6.0e-6}},
             {"scale_factor", {0.4, 0.5, 0.6}},
             {"misalignment_rad", {0.04, 0.05, 0.06}},
@@ -278,6 +303,8 @@ TEST_CASE("IMU runtime config parser accepts ideal and error-model shapes")
     CHECK(parsed.seed == 12U);
     CHECK(parsed.gyro.bias_turnon.x() == doctest::Approx(1.0));
     CHECK(parsed.accel.bias_turnon.z() == doctest::Approx(6.0));
+    CHECK(parsed.gyro.bias_correlation_rate_1ps.y() == doctest::Approx(0.2));
+    CHECK(parsed.accel.bias_correlation_rate_1ps.z() == doctest::Approx(0.6));
     CHECK(parsed.gyro.limit.isZero());
     CHECK(parsed.accel.limit.isZero());
 }
@@ -403,6 +430,12 @@ TEST_CASE("IMU runtime config parser rejects malformed error-model inputs")
                         {"imu",
                          {{"type", "error_model"},
                           {"gyro", {{"angle_random_walk_psd_rad2ps", {-1.0, 0.0, 0.0}}}},
+                          {"accel", nlohmann::json::object()}}}}),
+                    std::runtime_error);
+    CHECK_THROWS_AS(validate_imu_runtime_config(nlohmann::json{
+                        {"imu",
+                         {{"type", "error_model"},
+                          {"gyro", {{"bias_correlation_rate_1ps", {-0.1, 0.0, 0.0}}}},
                           {"accel", nlohmann::json::object()}}}}),
                     std::runtime_error);
     CHECK_THROWS_AS(

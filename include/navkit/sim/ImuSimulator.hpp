@@ -38,6 +38,7 @@ struct ImuTriadErrorConfig
 {
     Vec3 bias_turnon{Vec3::Zero()};
     Vec3 bias_inrun_psd{Vec3::Zero()};
+    Vec3 bias_correlation_rate_1ps{Vec3::Zero()};
     Vec3 output_random_walk_psd{Vec3::Zero()};
     Vec3 scale_factor{Vec3::Zero()};
     // [alpha_x, alpha_y, alpha_z], radians.

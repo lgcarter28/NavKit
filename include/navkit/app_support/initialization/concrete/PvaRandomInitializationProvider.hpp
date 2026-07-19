@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <nlohmann/json.hpp>
+#include <string>
 
 namespace navkit::app_support
 {
@@ -22,7 +23,11 @@ struct PvaRandomInitializationProvider
         const nlohmann::json& initialization = detail::require_object(cfg, "pva_initialization");
         detail::require_pva_initialization_type(initialization, runtime_type);
         detail::validate_pva_error_covariance_shape(initialization);
-        (void)detail::pva_error_frame_from_json(initialization);
+        const std::string pva_error_frame = detail::pva_error_frame_from_json(initialization);
+        if (pva_error_frame.empty()) {
+            detail::throw_runtime_config_error(
+                "pva_initialization.pva_error_frame must not be empty");
+        }
         detail::require_unsigned_integer(initialization, "seed");
     }
 

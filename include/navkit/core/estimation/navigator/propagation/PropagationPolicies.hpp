@@ -20,27 +20,37 @@ struct NoOpPropagation
         1U; // NOLINT(readability-identifier-naming)
     static constexpr bool apply_coning_sculling_compensation =
         false; // NOLINT(readability-identifier-naming)
+    struct RuntimeConfig_t
+    {};
+    inline static const RuntimeConfig_t runtime_config{};
+
+    void set_runtime_config(const RuntimeConfig_t&) {}
+
+    [[nodiscard]] const RuntimeConfig_t& runtime_config_value() const
+    {
+        return m_runtime_config;
+    }
 
     template<StateSpaceDefPolicy StateDef>
-    static bool process_imu_increment(const ImuIncrement& increment, NominalState<StateDef>&)
+    bool process_imu_increment(const ImuIncrement& increment, NominalState<StateDef>&) const
     {
         return increment.dt_s >= 0.0;
     }
 
     template<StateSpaceDefPolicy StateDef>
-    static bool process_imu_increment_pair(const ImuIncrement& first,
-                                           const ImuIncrement& second,
-                                           NominalState<StateDef>& state)
+    bool process_imu_increment_pair(const ImuIncrement& first,
+                                    const ImuIncrement& second,
+                                    NominalState<StateDef>& state) const
     {
         return process_imu_increment<StateDef>(first, state) &&
                process_imu_increment<StateDef>(second, state);
     }
 
     template<StateSpaceDefPolicy StateDef>
-    static bool covariance_step_from_increment(const NominalState<StateDef>&,
-                                               const ImuIncrement& increment,
-                                               ErrorStateCov<StateDef>& phi,
-                                               ErrorStateCov<StateDef>& qd)
+    bool covariance_step_from_increment(const NominalState<StateDef>&,
+                                        const ImuIncrement& increment,
+                                        ErrorStateCov<StateDef>& phi,
+                                        ErrorStateCov<StateDef>& qd) const
     {
         phi.setIdentity();
         qd.setZero();
@@ -48,15 +58,18 @@ struct NoOpPropagation
     }
 
     template<StateSpaceDefPolicy StateDef>
-    static bool covariance_step_from_increment_pair(const NominalState<StateDef>& state,
-                                                    const ImuIncrement& first,
-                                                    const ImuIncrement& second,
-                                                    ErrorStateCov<StateDef>& phi,
-                                                    ErrorStateCov<StateDef>& qd)
+    bool covariance_step_from_increment_pair(const NominalState<StateDef>& state,
+                                             const ImuIncrement& first,
+                                             const ImuIncrement& second,
+                                             ErrorStateCov<StateDef>& phi,
+                                             ErrorStateCov<StateDef>& qd) const
     {
         return covariance_step_from_increment<StateDef>(state, first, phi, qd) &&
                covariance_step_from_increment<StateDef>(state, second, phi, qd);
     }
+
+private:
+    RuntimeConfig_t m_runtime_config{};
 };
 
 } // namespace navkit::core::estimation

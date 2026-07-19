@@ -11,6 +11,7 @@
 #include "navkit/core/estimation/navigator/ImuConingSculling.hpp"
 #include "navkit/core/estimation/navigator/ImuIncrement.hpp"
 #include "navkit/core/estimation/navigator/propagation/EcefInsProcessNoise.hpp"
+#include "navkit/core/estimation/navigator/propagation/ImuBiasDynamics.hpp"
 #include "navkit/core/estimation/state/Segment.hpp"
 #include "navkit/core/estimation/state/State.hpp"
 #include "navkit/core/estimation/state/StateAccessors.hpp"
@@ -38,7 +39,8 @@ struct MechanizedImuInterval
 
 template<environment::RotatingPlanetPolicy Planet,
          environment::GravityPolicy Gravity,
-         typename ProcessNoise = EcefInsZeroProcessNoise,
+         EcefInsProcessNoiseConfigPolicy ProcessNoiseConfig = EcefInsZeroProcessNoise,
+         ImuBiasDynamicsConfigPolicy ImuBiasDynamicsConfig = ZeroGaussMarkovImuBiasDynamics,
          std::size_t ImuBufferCapacity = 512U,
          std::size_t CovarianceHistoryCapacity = 256U,
          Time_t CovarianceUpdateRateHz = 100.0,
@@ -55,9 +57,27 @@ struct EcefInsPropagation
     static constexpr Time_t covariance_update_rate_hz = CovarianceUpdateRateHz;
     static constexpr bool apply_coning_sculling_compensation =
         ApplyConingScullingCompensation; // NOLINT(readability-identifier-naming)
+    using ProcessNoise_t = typename ProcessNoiseConfig::ProcessNoise_t;
+    using ImuBiasDynamics_t = typename ImuBiasDynamicsConfig::ImuBiasDynamics_t;
+    struct RuntimeConfig_t
+    {
+        ProcessNoise_t process_noise{ProcessNoiseConfig::process_noise};
+        ImuBiasDynamics_t imu_bias_dynamics{ImuBiasDynamicsConfig::imu_bias_dynamics};
+    };
+    inline static const RuntimeConfig_t runtime_config{};
+
+    void set_runtime_config(const RuntimeConfig_t& config)
+    {
+        m_runtime_config = config;
+    }
+
+    [[nodiscard]] const RuntimeConfig_t& runtime_config_value() const
+    {
+        return m_runtime_config;
+    }
 
     template<StateSpaceDefPolicy StateDef>
-    static bool process_imu_increment(const ImuIncrement& increment, NominalState<StateDef>& state)
+    bool process_imu_increment(const ImuIncrement& increment, NominalState<StateDef>& state) const
     {
         const MechanizedImuInterval interval =
             corrected_interval_from_single<StateDef>(state, increment);
@@ -65,9 +85,9 @@ struct EcefInsPropagation
     }
 
     template<StateSpaceDefPolicy StateDef>
-    static bool process_imu_increment_pair(const ImuIncrement& first,
-                                           const ImuIncrement& second,
-                                           NominalState<StateDef>& state)
+    bool process_imu_increment_pair(const ImuIncrement& first,
+                                    const ImuIncrement& second,
+                                    NominalState<StateDef>& state) const
     {
         const MechanizedImuInterval interval =
             corrected_interval_from_pair<StateDef>(state, first, second);
@@ -75,26 +95,65 @@ struct EcefInsPropagation
     }
 
     template<StateSpaceDefPolicy StateDef>
+    bool covariance_step_from_increment(const NominalState<StateDef>& state,
+                                        const ImuIncrement& increment,
+                                        ErrorStateCov<StateDef>& phi,
+                                        ErrorStateCov<StateDef>& qd) const
+    {
+        const MechanizedImuInterval interval =
+            corrected_interval_from_single<StateDef>(state, increment);
+        return covariance_step_from_interval<StateDef>(state,
+                                                       interval,
+                                                       m_runtime_config.imu_bias_dynamics,
+                                                       m_runtime_config.process_noise,
+                                                       phi,
+                                                       qd);
+    }
+
+    template<StateSpaceDefPolicy StateDef>
     static bool covariance_step_from_increment(const NominalState<StateDef>& state,
                                                const ImuIncrement& increment,
+                                               const ImuBiasDynamics_t& bias_dynamics,
+                                               const ProcessNoise_t& process_noise,
                                                ErrorStateCov<StateDef>& phi,
                                                ErrorStateCov<StateDef>& qd)
     {
         const MechanizedImuInterval interval =
             corrected_interval_from_single<StateDef>(state, increment);
-        return covariance_step_from_interval<StateDef>(state, interval, phi, qd);
+        return covariance_step_from_interval<StateDef>(
+            state, interval, bias_dynamics, process_noise, phi, qd);
+    }
+
+    template<StateSpaceDefPolicy StateDef>
+    bool covariance_step_from_increment_pair(const NominalState<StateDef>& state,
+                                             const ImuIncrement& first,
+                                             const ImuIncrement& second,
+                                             ErrorStateCov<StateDef>& phi,
+                                             ErrorStateCov<StateDef>& qd) const
+    {
+        const MechanizedImuInterval interval =
+            corrected_interval_from_pair<StateDef>(state, first, second);
+        return covariance_step_from_interval<StateDef>(state,
+                                                       interval,
+                                                       m_runtime_config.imu_bias_dynamics,
+                                                       m_runtime_config.process_noise,
+                                                       phi,
+                                                       qd);
     }
 
     template<StateSpaceDefPolicy StateDef>
     static bool covariance_step_from_increment_pair(const NominalState<StateDef>& state,
                                                     const ImuIncrement& first,
                                                     const ImuIncrement& second,
+                                                    const ImuBiasDynamics_t& bias_dynamics,
+                                                    const ProcessNoise_t& process_noise,
                                                     ErrorStateCov<StateDef>& phi,
                                                     ErrorStateCov<StateDef>& qd)
     {
         const MechanizedImuInterval interval =
             corrected_interval_from_pair<StateDef>(state, first, second);
-        return covariance_step_from_interval<StateDef>(state, interval, phi, qd);
+        return covariance_step_from_interval<StateDef>(
+            state, interval, bias_dynamics, process_noise, phi, qd);
     }
 
     template<typename StateDef, typename State_t>
@@ -160,8 +219,10 @@ struct EcefInsPropagation
     }
 
     template<typename StateDef>
-    [[nodiscard]] static ErrorStateCov<StateDef>
-    build_f_matrix(const NominalState<StateDef>& state, const MechanizedImuInterval& interval)
+    [[nodiscard]] static ErrorStateCov<StateDef> build_f_matrix(
+        const NominalState<StateDef>& state,
+        const MechanizedImuInterval& interval,
+        const ImuBiasDynamics_t& bias_dynamics = ImuBiasDynamicsConfig::imu_bias_dynamics)
     {
         using Error = typename StateDef::Error;
         ErrorStateCov<StateDef> F = ErrorStateCov<StateDef>::Zero();
@@ -185,6 +246,12 @@ struct EcefInsPropagation
         F.template block<3, 3>(Error::AttRotVec::i, Error::AttRotVec::i) = -Omega_ie_e;
         if constexpr (requires { typename Error::GyroB; }) {
             F.template block<3, 3>(Error::AttRotVec::i, Error::GyroB::i) = -C_b_e;
+            F.template block<3, 3>(Error::GyroB::i, Error::GyroB::i) =
+                (-bias_dynamics.gyro_bias_correlation_rate_1ps).asDiagonal();
+        }
+        if constexpr (requires { typename Error::AccB; }) {
+            F.template block<3, 3>(Error::AccB::i, Error::AccB::i) =
+                (-bias_dynamics.accel_bias_correlation_rate_1ps).asDiagonal();
         }
 
         return F;
@@ -210,13 +277,14 @@ struct EcefInsPropagation
         return G;
     }
 
-    [[nodiscard]] static Eigen::Matrix<Scalar_t, 12, 12> build_qc_matrix()
+    [[nodiscard]] static Eigen::Matrix<Scalar_t, 12, 12>
+    build_qc_matrix(const ProcessNoise_t& process_noise = ProcessNoiseConfig::process_noise)
     {
         Eigen::Matrix<Scalar_t, 12, 12> Qc = Eigen::Matrix<Scalar_t, 12, 12>::Zero();
-        Qc.template block<3, 3>(0, 0) = ProcessNoise::gyro_white_noise_psd_rad2ps().asDiagonal();
-        Qc.template block<3, 3>(3, 3) = ProcessNoise::accel_white_noise_psd_m2ps3().asDiagonal();
-        Qc.template block<3, 3>(6, 6) = ProcessNoise::gyro_bias_rw_psd_rad2ps3().asDiagonal();
-        Qc.template block<3, 3>(9, 9) = ProcessNoise::accel_bias_rw_psd_m2ps5().asDiagonal();
+        Qc.template block<3, 3>(0, 0) = process_noise.gyro_white_noise_psd_rad2ps.asDiagonal();
+        Qc.template block<3, 3>(3, 3) = process_noise.accel_white_noise_psd_m2ps3.asDiagonal();
+        Qc.template block<3, 3>(6, 6) = process_noise.gyro_bias_drive_psd_rad2ps3.asDiagonal();
+        Qc.template block<3, 3>(9, 9) = process_noise.accel_bias_drive_psd_m2ps5.asDiagonal();
         return Qc;
     }
 
@@ -229,9 +297,11 @@ struct EcefInsPropagation
 
     template<typename StateDef>
     [[nodiscard]] static ErrorStateCov<StateDef>
-    first_order_qd(const Eigen::Matrix<Scalar_t, StateDef::Error::N, 12>& G, const Time_t dt_s)
+    first_order_qd(const Eigen::Matrix<Scalar_t, StateDef::Error::N, 12>& G,
+                   const Time_t dt_s,
+                   const ProcessNoise_t& process_noise = ProcessNoiseConfig::process_noise)
     {
-        return G * build_qc_matrix() * G.transpose() * dt_s;
+        return G * build_qc_matrix(process_noise) * G.transpose() * dt_s;
     }
 
 private:
@@ -279,6 +349,8 @@ private:
     template<StateSpaceDefPolicy StateDef>
     [[nodiscard]] static bool covariance_step_from_interval(const NominalState<StateDef>& state,
                                                             const MechanizedImuInterval& interval,
+                                                            const ImuBiasDynamics_t& bias_dynamics,
+                                                            const ProcessNoise_t& process_noise,
                                                             ErrorStateCov<StateDef>& phi,
                                                             ErrorStateCov<StateDef>& qd)
     {
@@ -288,10 +360,10 @@ private:
             return false;
         }
 
-        const ErrorStateCov<StateDef> F = build_f_matrix<StateDef>(state, interval);
+        const ErrorStateCov<StateDef> F = build_f_matrix<StateDef>(state, interval, bias_dynamics);
         const Eigen::Matrix<Scalar_t, StateDef::Error::N, 12> G = build_g_matrix<StateDef>(state);
         phi = first_order_phi<StateDef>(F, interval.dt_s);
-        qd = first_order_qd<StateDef>(G, interval.dt_s);
+        qd = first_order_qd<StateDef>(G, interval.dt_s, process_noise);
         return true;
     }
 
@@ -359,6 +431,8 @@ private:
                 .delta_theta_eb_b_rad = delta_theta_eb_b,
                 .specific_force_ib_b_mps2 = corrected.delta_v_ib_b_mps / dt_s};
     }
+
+    RuntimeConfig_t m_runtime_config{runtime_config};
 };
 
 } // namespace navkit::core::estimation

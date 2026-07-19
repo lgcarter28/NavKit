@@ -4,8 +4,11 @@
     "components/trajectory/stationary_ecef_1000hz.json",
     "components/imu/specs/hg1700_tactical.json",
     "components/gnss/nominal_pos_vel.json",
+    "components/propagation/default_ecef_ins_process_noise.json",
+    "components/propagation/default_gauss_markov_imu_bias_dynamics.json",
     "components/initialization/pva/pva_random_error_default.json",
-    "components/initialization/filter/default_ins_statedef_initial_covariance.json"
+    "components/initialization/filter/default_ins_statedef_initial_covariance.json",
+    "components/initialization/filter/default_ins_statedef_covariance_floor.json"
   ],
   "run_name": "ecef_ins_gnss_runtime_covariance",
   "output_dir": "output/logs/ecef_ins_gnss_runtime_covariance"

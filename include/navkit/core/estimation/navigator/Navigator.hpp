@@ -70,6 +70,16 @@ public:
         return m_sensors;
     }
 
+    Propagation_t& propagation()
+    {
+        return m_propagation;
+    }
+
+    [[nodiscard]] const Propagation_t& propagation() const
+    {
+        return m_propagation;
+    }
+
     template<std::size_t I>
     auto& sensor()
     {
@@ -186,12 +196,12 @@ private:
         CovarianceStep step{};
         step.time_s = increment.time_s;
         step.dt_s = increment.dt_s;
-        if (!Propagation_t::template covariance_step_from_increment<StateDef_t>(
+        if (!m_propagation.template covariance_step_from_increment<StateDef_t>(
                 state_before, increment, step.phi, step.qd)) {
             return false;
         }
-        if (!Propagation_t::template process_imu_increment<StateDef_t>(increment,
-                                                                       m_filter.state())) {
+        if (!m_propagation.template process_imu_increment<StateDef_t>(increment,
+                                                                      m_filter.state())) {
             return false;
         }
         accumulate_covariance_step(step);
@@ -204,11 +214,11 @@ private:
         CovarianceStep step{};
         step.time_s = second.time_s;
         step.dt_s = first.dt_s + second.dt_s;
-        if (!Propagation_t::template covariance_step_from_increment_pair<StateDef_t>(
+        if (!m_propagation.template covariance_step_from_increment_pair<StateDef_t>(
                 state_before, first, second, step.phi, step.qd)) {
             return false;
         }
-        if (!Propagation_t::template process_imu_increment_pair<StateDef_t>(
+        if (!m_propagation.template process_imu_increment_pair<StateDef_t>(
                 first, second, m_filter.state())) {
             return false;
         }
@@ -241,6 +251,7 @@ private:
     }
 
     Filter_t m_filter{};
+    Propagation_t m_propagation{};
     Sensors_t m_sensors{};
     ImuBuffer_t m_imu_buffer{};
     CovarianceHistory_t m_covariance_history{};

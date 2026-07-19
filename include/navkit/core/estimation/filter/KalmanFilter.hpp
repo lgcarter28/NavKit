@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "navkit/core/estimation/filter/CovarianceFloor.hpp"
 #include "navkit/core/estimation/filter/MeasurementStatistics.hpp"
 #include "navkit/core/estimation/filter/MeasurementStatisticsStorage.hpp"
 #include "navkit/core/estimation/filter/injection/InjectionPolicies.hpp"
@@ -107,12 +108,30 @@ public:
     void set_covariance(const P_t& P)
     {
         m_P = P;
+        apply_covariance_floor();
+    }
+
+    void set_covariance_floor(const P_t& floor)
+    {
+        m_covariance_floor = floor;
+        apply_covariance_floor();
+    }
+
+    [[nodiscard]] const P_t& covariance_floor() const
+    {
+        return m_covariance_floor;
     }
 
     void propagate_covariance(const P_t& phi, const P_t& qd)
     {
         m_P = (phi * m_P * phi.transpose()) + qd;
         m_P = 0.5 * (m_P + m_P.transpose());
+        apply_covariance_floor();
+    }
+
+    void apply_covariance_floor()
+    {
+        apply_diagonal_covariance_floor<StateDef>(m_P, m_covariance_floor);
     }
 
     template<SensorPolicy Sensor>
@@ -207,6 +226,7 @@ public:
     void reset()
     {
         Reset::reset_covariance(m_x, m_dx, m_P);
+        apply_covariance_floor();
         Reset::reset_dx(m_dx);
         m_pending_correction_valid = false;
     }
@@ -257,6 +277,7 @@ private:
         if (accepted) {
             m_dx += dx;
             m_P = P_f;
+            apply_covariance_floor();
             m_pending_correction_valid = true;
         }
     }
@@ -291,6 +312,7 @@ private:
     ErrorState_t m_dx{};
     ErrorState_t m_last_correction{};
     P_t m_P{};
+    P_t m_covariance_floor{P_t::Zero()};
     MeasurementStatisticsTuple_t m_measurement_stats{};
     bool m_pending_correction_valid{false};
     bool m_last_correction_valid{false};

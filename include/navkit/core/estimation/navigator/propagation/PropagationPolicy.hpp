@@ -16,27 +16,37 @@ namespace navkit::core::estimation
 
 template<typename Candidate, typename StateDef>
 concept PropagationPolicy =
-    StateSpaceDefPolicy<StateDef> && requires(NominalState<StateDef>& state,
-                                              const NominalState<StateDef>& const_state,
-                                              ErrorStateCov<StateDef>& phi,
-                                              ErrorStateCov<StateDef>& qd) {
+    StateSpaceDefPolicy<StateDef> &&
+    requires(Candidate& propagation,
+             const Candidate& const_propagation,
+             NominalState<StateDef>& state,
+             const NominalState<StateDef>& const_state,
+             const typename Candidate::RuntimeConfig_t& runtime_config,
+             ErrorStateCov<StateDef>& phi,
+             ErrorStateCov<StateDef>& qd) {
+        typename Candidate::RuntimeConfig_t;
         { Candidate::imu_buffer_capacity } -> std::convertible_to<std::size_t>;
         { Candidate::covariance_history_capacity } -> std::convertible_to<std::size_t>;
         { Candidate::covariance_update_rate_hz } -> std::convertible_to<Time_t>;
         { Candidate::apply_coning_sculling_compensation } -> std::convertible_to<bool>;
+        { Candidate::runtime_config } -> std::convertible_to<typename Candidate::RuntimeConfig_t>;
+        { propagation.set_runtime_config(runtime_config) } -> std::same_as<void>;
         {
-            Candidate::template process_imu_increment<StateDef>(ImuIncrement{}, state)
+            const_propagation.runtime_config_value()
+        } -> std::same_as<const typename Candidate::RuntimeConfig_t&>;
+        {
+            propagation.template process_imu_increment<StateDef>(ImuIncrement{}, state)
         } -> std::same_as<bool>;
         {
-            Candidate::template process_imu_increment_pair<StateDef>(
+            propagation.template process_imu_increment_pair<StateDef>(
                 ImuIncrement{}, ImuIncrement{}, state)
         } -> std::same_as<bool>;
         {
-            Candidate::template covariance_step_from_increment<StateDef>(
+            const_propagation.template covariance_step_from_increment<StateDef>(
                 const_state, ImuIncrement{}, phi, qd)
         } -> std::same_as<bool>;
         {
-            Candidate::template covariance_step_from_increment_pair<StateDef>(
+            const_propagation.template covariance_step_from_increment_pair<StateDef>(
                 const_state, ImuIncrement{}, ImuIncrement{}, phi, qd)
         } -> std::same_as<bool>;
     };

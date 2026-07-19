@@ -4,6 +4,7 @@
 #pragma once
 
 #include "navkit/api/config/ConfigApi.hpp"
+#include "navkit/products/components/DefaultInsCovarianceFloor.hpp"
 #include "navkit/products/components/DefaultInsInitialCovariance.hpp"
 #include "navkit/products/components/DefaultNumericConfig.hpp"
 #include "navkit/products/components/EcefInsGnssPropagation.hpp"
@@ -19,6 +20,7 @@ struct ProductConfig
     using StateDef = core::estimation::DefaultInsStateDef;
     using SensorGraph = components::PrimaryGnssPosVelSensors<StateDef>;
     using InitialCovariance = components::DefaultInsInitialCovariance;
+    using CovarianceFloor = components::DefaultInsCovarianceFloor;
     using PropagationConfig = components::EcefInsGnssPropagation;
     using Profiling = components::NullProfiling;
 

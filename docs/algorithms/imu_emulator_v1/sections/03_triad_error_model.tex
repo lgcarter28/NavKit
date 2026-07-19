@@ -90,7 +90,7 @@ $\boldsymbol{\alpha}=[\alpha_x,\alpha_y,\alpha_z]^T$, use
 This sign convention is part of the emulator contract and must be tested with
 single-axis cross-coupling cases.
 
-\section{Bias and Bias Random Walk}
+\section{Bias and First-Order Gauss-Markov Dynamics}
 
 Bias is modeled in physical rate units:
 \begin{align}
@@ -98,26 +98,50 @@ Bias is modeled in physical rate units:
 \bb_a &\in \R^3 && [\si{\meter\per\second\squared}].
 \end{align}
 
-If enabled, bias random walk follows
+The general first-order Gauss-Markov bias model is
 \begin{equation}
-\dot{\bb}=\wb_b,
+\dot{\bb}
+=
+-
+\operatorname{diag}(\boldsymbol\beta_b)\bb
++
+\wb_b,
 \qquad
 \E[\wb_b(t)\wb_b^T(\tau)]=S_b\delta(t-\tau).
+\label{eq:imu_bias_gauss_markov_continuous}
+\end{equation}
+Here $\boldsymbol\beta_b$ contains per-axis correlation rates in
+$\si{\per\second}$. Setting $\boldsymbol\beta_b=\zero$ recovers the random-walk
+model used by the original v1 emulator:
+\begin{equation}
+\dot{\bb}=\wb_b.
 \label{eq:imu_bias_random_walk_continuous}
 \end{equation}
-The discrete update over $\Delta t_k$ is
+
+For one axis with correlation rate $\beta$ and driving-noise PSD $S_b$, the
+exact discrete covariance over $\Delta t_k$ is
+\begin{equation}
+Q_{b,k}
+=
+\begin{cases}
+S_b\Delta t_k, & \beta=0,\\[4pt]
+\dfrac{S_b}{2\beta}
+\left(1-\exp(-2\beta\Delta t_k)\right), & \beta>0.
+\end{cases}
+\label{eq:imu_bias_gauss_markov_discrete_covariance}
+\end{equation}
+The corresponding discrete update is
 \begin{equation}
 \boxed{
 \bb_{k+1}
 =
-\bb_k
+\exp\!\left(-\operatorname{diag}(\boldsymbol\beta_b)\Delta t_k\right)\bb_k
 +
 \etab_{b,k},
 \qquad
-\etab_{b,k}\sim
-\mathcal{N}(\zero,S_b\Delta t_k).
+\etab_{b,k}\sim\mathcal{N}(\zero,Q_{b,k}).
 }
-\label{eq:imu_bias_random_walk_discrete}
+\label{eq:imu_bias_gauss_markov_discrete}
 \end{equation}
 
 \section{White Measurement Noise}

@@ -41,6 +41,9 @@ This project follows
 - Compile-time medium-rate covariance cadence and bounded covariance-step history configuration for Navigator propagation products.
 - Runtime-configurable console, truth, nav-estimate, and measurement-statistics logging cadences so high-rate simulation no longer forces high-rate file or console output.
 - A `tools/run_scenario.py` workflow that runs a runtime scenario, can override output location/run name without mutating checked-in JSON, writes an effective runtime config, and then runs the standard analysis plots.
+- Compile-time and runtime-selected first-order Gauss-Markov IMU error dynamics for ECEF INS covariance prediction, with matching IMU simulator bias-dynamics support and tests.
+- Compile-time and runtime-configurable covariance floors for selected filter error-state layouts, including diagonal and frame-aware INS PVA floor forms with validation and Navigator/filter application tests.
+- Split ECEF INS propagation runtime configuration into separately owned process-noise and IMU bias-dynamics payloads, with compile-time defaults, runtime JSON overrides, and focused validation.
 
 ### Changed
 
@@ -125,6 +128,7 @@ This project follows
 - Moved filter initial covariance into a selected immutable NavKit product config value using `InitialCovariance<StateDef>` and `diagonal_initial_covariance<StateDef>()`, tuned the current examples to variance values corresponding to 50 milli-deg/s gyro bias and 100 micro-g accelerometer bias, swept app-support runtime parsing to remove hidden scenario fallback defaults, and added runtime JSON override validation for configured initial covariance, including raw full-state forms and a frame-aware PVA plus remaining-error-state diagonal form.
 - Renamed the repo-level simulation wrapper from `tools/run_first_sim.py` to `tools/run_sim.py`, clarified that `--navkit-config` locates a compile-time-configured build tree rather than changing runtime behavior, and factored runtime JSON merge/output override handling into reusable tool helpers.
 - Moved IMU cumulative increment ownership from the nominal CSV log product into the full-rate IMU runtime path so decimated IMU log rows contain run cumulative snapshots rather than sums of only logged rows.
+- Removed stale app-support/core unused-parameter breadcrumbs around filter initialization and runtime JSON validation while preserving intentional no-op parameters at required concept/API seams.
 
 ### Removed
 

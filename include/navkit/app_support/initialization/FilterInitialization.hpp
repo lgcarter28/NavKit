@@ -3,8 +3,10 @@
 
 #pragma once
 
+#include "navkit/app_support/initialization/CovarianceFloorJson.hpp"
 #include "navkit/app_support/initialization/InitialCovarianceJson.hpp"
 #include "navkit/app_support/initialization/NavInitialization.hpp"
+#include "navkit/app_support/runtime/PropagationRuntimeConfigJson.hpp"
 #include "navkit/core/config/Types.hpp"
 #include "navkit/core/estimation/filter/FilterPolicy.hpp"
 #include "navkit/core/estimation/state/State.hpp"
@@ -18,7 +20,7 @@ namespace navkit::app_support
 template<typename InitializerConfig, navkit::core::estimation::FilterPolicy Filter>
 void initialize_filter_from_nav_initialization(
     const NavInitialization<typename InitializerConfig::StateDef>& nav_init,
-    const nlohmann::json& cfg,
+    const typename Filter::P_t& covariance_floor,
     Filter& filter)
 {
     using StateDef = typename InitializerConfig::StateDef;
@@ -34,8 +36,15 @@ void initialize_filter_from_nav_initialization(
 
     filter.set_state(initial_state);
 
-    (void)cfg;
     filter.set_covariance(nav_init.covariance);
+    filter.set_covariance_floor(covariance_floor);
+}
+
+template<typename InitializerConfig, typename Propagation>
+void initialize_propagator(const nlohmann::json& cfg, Propagation& propagation)
+{
+    propagation.set_runtime_config(detail::propagation_runtime_config_from_json<Propagation>(
+        cfg, InitializerConfig::Propagation::runtime_config));
 }
 
 template<typename InitializerConfig, typename Navigator>
@@ -49,12 +58,19 @@ void initialize_navigator(const PvaInitialization& pva_init,
             cfg,
             InitializerConfig::InitialCovariance::initial_covariance,
             core::estimation::pos_e_m(pva_init.pva));
+    const typename Navigator::Filter_t::P_t covariance_floor =
+        detail::covariance_floor_from_json<StateDef>(
+            cfg,
+            InitializerConfig::CovarianceFloor::covariance_floor,
+            core::estimation::pos_e_m(pva_init.pva));
     const NavInitialization<StateDef> nav_init{
         .time_s = pva_init.time_s,
         .pva = pva_init.pva,
         .covariance = initial_covariance,
     };
-    initialize_filter_from_nav_initialization<InitializerConfig>(nav_init, cfg, navigator.filter());
+    initialize_filter_from_nav_initialization<InitializerConfig>(
+        nav_init, covariance_floor, navigator.filter());
+    initialize_propagator<InitializerConfig>(cfg, navigator.propagation());
 }
 
 } // namespace navkit::app_support

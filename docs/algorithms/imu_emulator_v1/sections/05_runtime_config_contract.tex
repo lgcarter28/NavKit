@@ -12,6 +12,7 @@ make the emulator mode and every enabled error source explicit. A v1 shape is:
   "gyro": {
     "bias_turnon_radps": [0, 0, 0],
     "bias_inrun_psd_rad2ps3": [0, 0, 0],
+    "bias_correlation_rate_1ps": [0, 0, 0],
     "angle_random_walk_psd_rad2ps": [0, 0, 0],
     "scale_factor": [0, 0, 0],
     "misalignment_rad": [0, 0, 0],
@@ -22,6 +23,7 @@ make the emulator mode and every enabled error source explicit. A v1 shape is:
   "accel": {
     "bias_turnon_mps2": [0, 0, 0],
     "bias_inrun_psd_m2ps5": [0, 0, 0],
+    "bias_correlation_rate_1ps": [0, 0, 0],
     "velocity_random_walk_psd_m2ps3": [0, 0, 0],
     "scale_factor": [0, 0, 0],
     "misalignment_rad": [0, 0, 0],
@@ -55,6 +57,7 @@ Runtime validation must reject:
     values, or negative eigenvalues;
     \item ambiguous direct/random fields for the same error term;
     \item negative spectral densities;
+    \item negative bias correlation rates;
     \item negative quantization steps;
     \item negative rate or acceleration limits;
     \item unsupported emulator types.
@@ -67,6 +70,8 @@ The ideal mode is equivalent to
 \bb_g=\bb_a=\zero,
 \qquad
 S_g=S_a=S_{bg}=S_{ba}=\zero,
+\qquad
+\boldsymbol{\beta}_g=\boldsymbol{\beta}_a=\zero,
 \end{equation}
 with quantization disabled.
 

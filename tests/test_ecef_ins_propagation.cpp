@@ -30,28 +30,28 @@ using ErrorStateDef = DefaultInsStateDef::Error;
 
 struct NonzeroProcessNoise
 {
-    [[nodiscard]] static Vec3 gyro_white_noise_psd_rad2ps()
-    {
-        return Vec3::Constant(1.0e-8);
-    }
+    using ProcessNoise_t = EcefInsProcessNoise;
 
-    [[nodiscard]] static Vec3 accel_white_noise_psd_m2ps3()
-    {
-        return Vec3::Constant(1.0e-4);
-    }
-
-    [[nodiscard]] static Vec3 gyro_bias_rw_psd_rad2ps3()
-    {
-        return Vec3::Constant(1.0e-10);
-    }
-
-    [[nodiscard]] static Vec3 accel_bias_rw_psd_m2ps5()
-    {
-        return Vec3::Constant(1.0e-6);
-    }
+    inline static const ProcessNoise_t process_noise{
+        .gyro_white_noise_psd_rad2ps = Vec3::Constant(1.0e-8),
+        .accel_white_noise_psd_m2ps3 = Vec3::Constant(1.0e-4),
+        .gyro_bias_drive_psd_rad2ps3 = Vec3::Constant(1.0e-10),
+        .accel_bias_drive_psd_m2ps5 = Vec3::Constant(1.0e-6),
+    };
 };
 
-using NoisyPropagation = EcefInsPropagation<Wgs84, J2<Wgs84>, NonzeroProcessNoise>;
+struct NonzeroImuBiasDynamics
+{
+    using ImuBiasDynamics_t = GaussMarkovImuBiasDynamics;
+
+    inline static const ImuBiasDynamics_t imu_bias_dynamics{
+        .gyro_bias_correlation_rate_1ps = Vec3::Constant(0.5),
+        .accel_bias_correlation_rate_1ps = Vec3::Constant(0.25),
+    };
+};
+
+using NoisyPropagation =
+    EcefInsPropagation<Wgs84, J2<Wgs84>, NonzeroProcessNoise, NonzeroImuBiasDynamics>;
 
 [[nodiscard]] sim::TruthSample stationary_sample(const Time_t time_s)
 {
@@ -121,8 +121,8 @@ TEST_CASE("Ideal stationary ECEF IMU increment preserves nominal PVA")
     ImuIncrement increment;
     REQUIRE(ideal_stationary_increment(increment));
 
-    REQUIRE(StationaryPropagation::process_imu_increment<DefaultInsStateDef>(increment,
-                                                                             filter.state()));
+    StationaryPropagation propagation;
+    REQUIRE(propagation.process_imu_increment<DefaultInsStateDef>(increment, filter.state()));
 
     const auto& state = filter.state();
     CHECK(segment<NominalStateDef::Pos>(state).isApprox(Vec3{Wgs84::a_m, 0.0, 0.0}, 1.0e-8));
@@ -144,8 +144,8 @@ TEST_CASE("Ideal stationary ECEF IMU increments keep pure strapdown bounded at 1
     for (int k = 1; k <= sample_count; ++k) {
         ImuIncrement increment;
         REQUIRE(simulator.generate(stationary_sample(static_cast<Time_t>(k) * dt_s), increment));
-        REQUIRE(StationaryPropagation::process_imu_increment<DefaultInsStateDef>(increment,
-                                                                                 filter.state()));
+        StationaryPropagation propagation;
+        REQUIRE(propagation.process_imu_increment<DefaultInsStateDef>(increment, filter.state()));
     }
 
     const auto& state = filter.state();
@@ -164,9 +164,10 @@ TEST_CASE("ECEF INS covariance prediction remains symmetric and process-noise dr
 
     StationaryFilter::P_t phi{};
     StationaryFilter::P_t qd{};
-    REQUIRE(NoisyPropagation::covariance_step_from_increment<DefaultInsStateDef>(
+    NoisyPropagation propagation;
+    REQUIRE(propagation.covariance_step_from_increment<DefaultInsStateDef>(
         filter.state(), increment, phi, qd));
-    REQUIRE(NoisyPropagation::process_imu_increment<DefaultInsStateDef>(increment, filter.state()));
+    REQUIRE(propagation.process_imu_increment<DefaultInsStateDef>(increment, filter.state()));
     filter.propagate_covariance(phi, qd);
 
     const auto& covariance = filter.covariance();
@@ -177,13 +178,31 @@ TEST_CASE("ECEF INS covariance prediction remains symmetric and process-noise dr
     CHECK(covariance(ErrorStateDef::AccB::i, ErrorStateDef::AccB::i) > 0.0);
 }
 
+TEST_CASE("ECEF INS covariance prediction applies Gauss-Markov bias damping")
+{
+    StationaryFilter filter;
+    initialize_stationary_filter(filter);
+    ImuIncrement increment;
+    REQUIRE(ideal_stationary_increment(increment));
+
+    StationaryFilter::P_t phi{};
+    StationaryFilter::P_t qd{};
+    NoisyPropagation propagation;
+    REQUIRE(propagation.covariance_step_from_increment<DefaultInsStateDef>(
+        filter.state(), increment, phi, qd));
+
+    CHECK(phi(ErrorStateDef::GyroB::i + 0, ErrorStateDef::GyroB::i + 0) == doctest::Approx(0.5));
+    CHECK(phi(ErrorStateDef::AccB::i + 0, ErrorStateDef::AccB::i + 0) == doctest::Approx(0.75));
+}
+
 TEST_CASE("ECEF INS propagation rejects invalid IMU intervals without throwing")
 {
     StationaryFilter filter;
     initialize_stationary_filter(filter);
 
-    CHECK_FALSE(StationaryPropagation::process_imu_increment<DefaultInsStateDef>(ImuIncrement{},
-                                                                                 filter.state()));
+    StationaryPropagation propagation;
+    CHECK_FALSE(
+        propagation.process_imu_increment<DefaultInsStateDef>(ImuIncrement{}, filter.state()));
 }
 
 } // namespace navkit::core::estimation::test

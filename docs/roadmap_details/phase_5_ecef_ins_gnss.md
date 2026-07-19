@@ -89,6 +89,37 @@
 - [x] Added a focused runtime test that verifies cumulative body-Z specific-force/velocity increment growth remains correct across unlogged generated IMU samples.
 - [x] Ran the default ECEF INS/GNSS scenario and analysis plots to verify the updated CSV schema and figures.
 
+## Pass 5.11: first-order Gauss-Markov IMU dynamics
+
+- [x] Updated the IMU emulator and ECEF navigator LaTeX algorithm references for first-order Gauss-Markov IMU bias dynamics, including bias correlation-rate notation and matching continuous-time F/Fk matrix blocks.
+- [x] Added a first-pass compile-time filter-facing dynamics payload for INS process-noise and bias-correlation configuration.
+- [x] Wired selected IMU bias dynamics through the ECEF INS propagation policy, Navigator-owned runtime selection, covariance-step construction, and runtime config validation.
+- [x] Added first-pass runtime JSON override support for selected propagation dynamics, following the compile-time-default/runtime-override pattern used by initial covariance.
+- [x] Added optional first-order Gauss-Markov bias propagation to the IMU simulator while preserving zero-correlation-rate random-walk behavior for existing configs.
+- [x] Added compile-time, runtime-validation, simulator, Navigator, and propagation tests that distinguish nonzero bias correlation from the previous pure-random-walk model.
+- [x] Verified formatting/copyright checks, Debug build, full Debug tests, default scenario analysis, and both affected LaTeX PDFs.
+
+## Pass 5.12: covariance floors and unused-parameter cleanup
+
+- [x] Added `CovarianceFloor<StateDef>`, diagonal floor construction helpers, and a covariance-floor config policy for immutable compile-time product defaults.
+- [x] Added a default INS covariance-floor component using the selected split INS error-state definition directly.
+- [x] Wired the selected covariance floor through the NavKit product config and filter initialization path so `KalmanFilter` applies floors after startup selection, covariance propagation, and measurement processing.
+- [x] Added runtime JSON override support for covariance floors under `filter_initialization.covariance_floor`, with raw diagonal and frame-aware PVA-plus-remaining-error-state diagonal forms.
+- [x] Added validation that rejects malformed, negative, ambiguous, and unsupported full-matrix covariance-floor runtime inputs.
+- [x] Added a zero-floor runtime component example that exercises the config path without changing the current ECEF INS/GNSS scenario behavior.
+- [x] Swept stale app-support/core unused-parameter breadcrumbs, removing obsolete `(void)cfg;` plumbing and replacing parser-result discard breadcrumbs with explicit validation checks while preserving intentional concept/API no-op parameters.
+- [x] Added compile-time, runtime-validation, and Navigator/filter covariance-floor tests.
+
+## Pass 5.13: filter/propagation configuration ownership cleanup
+
+- [x] Split ECEF INS process-noise configuration from first-order Gauss-Markov IMU bias dynamics so PSD values and bias-correlation rates have distinct compile-time and runtime ownership.
+- [x] Replaced the combined propagation runtime JSON object with `propagation.process_noise` and `propagation.imu_bias_dynamics`, each with focused validation and compile-time defaults.
+- [x] Moved propagation runtime configuration ownership into the selected propagation policy instance instead of storing propagation internals on `Navigator`.
+- [x] Moved covariance-floor ownership into `KalmanFilter`, with filter-owned clamping after set-covariance, covariance propagation, accepted measurement updates, and reset-policy covariance changes.
+- [x] Routed runtime propagation configuration and covariance-floor selection through `initialize_navigator()` so `SimulationApp` stays focused on orchestration rather than member-object tuning.
+- [x] Updated propagation/filter policy tests and runtime-validation tests to exercise the new member-owned configuration seams.
+- [x] Updated configuration documentation and changelog entries to describe the split propagation configuration and filter-owned covariance floor.
+
 ## Phase 5 follow-forward
 
-Unresolved expansion/hardening work from Phase 5 now lives in active roadmap passes for Gauss-Markov IMU dynamics, covariance floors, unused-parameter cleanup, and advanced restart initialization, plus future phase files for Monte Carlo, trajectory-source expansion, transfer alignment, sensor scheduling, validation metrics, latent replay, robust status/error handling, and embedded readiness.
+Unresolved expansion/hardening work from Phase 5 now lives in the active roadmap pass for advanced restart initialization, plus future phase files for Monte Carlo, trajectory-source expansion, transfer alignment, sensor scheduling, validation metrics, latent replay, robust status/error handling, and embedded readiness.

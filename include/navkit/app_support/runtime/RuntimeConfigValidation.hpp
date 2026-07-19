@@ -6,7 +6,9 @@
 #include "navkit/app_support/config/SimulationAppConfigPolicy.hpp"
 #include "navkit/app_support/emulation/EmulatorRuntimeKeys.hpp"
 #include "navkit/app_support/emulation/concrete/ImuRuntimeConfig.hpp"
+#include "navkit/app_support/initialization/CovarianceFloorJson.hpp"
 #include "navkit/app_support/initialization/InitialCovarianceJson.hpp"
+#include "navkit/app_support/runtime/PropagationRuntimeConfigJson.hpp"
 #include "navkit/app_support/runtime/RunSettings.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
 #include "navkit/app_support/runtime/RuntimeRate.hpp"
@@ -49,6 +51,7 @@ void validate_runtime_config(const nlohmann::json& cfg)
     allowed_keys.push_back("imu");
     allowed_keys.push_back("pva_initialization");
     allowed_keys.push_back("filter_initialization");
+    allowed_keys.push_back("propagation");
     allowed_keys.push_back("transfer_alignment");
     detail::reject_unknown_top_level_keys(cfg, allowed_keys);
 
@@ -113,6 +116,8 @@ void validate_runtime_config(const nlohmann::json& cfg)
 
     NavInitializationProvider::validate_runtime_config(cfg);
     detail::validate_runtime_initial_covariance_shape<typename Config::NavKit::StateDef>(cfg);
+    detail::validate_runtime_covariance_floor_shape<typename Config::NavKit::StateDef>(cfg);
+    detail::validate_runtime_propagation_config_shape<typename Config::NavKit::Propagation>(cfg);
     TransferAlignmentProvider::validate_runtime_config(cfg);
 }
 

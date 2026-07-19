@@ -25,6 +25,7 @@ struct ImuTriadRuntimeKeys
     std::string_view bias_turnon_var;
     std::string_view bias_turnon_cov;
     std::string_view bias_inrun_psd;
+    std::string_view bias_correlation_rate_1ps;
     std::string_view output_random_walk_psd;
     std::string_view scale_factor_var;
     std::string_view scale_factor_cov;
@@ -117,6 +118,7 @@ inline void validate_imu_triad_config(const nlohmann::json& triad,
                                    keys.bias_turnon_var,
                                    keys.bias_turnon_cov,
                                    keys.bias_inrun_psd,
+                                   keys.bias_correlation_rate_1ps,
                                    keys.output_random_walk_psd,
                                    "scale_factor",
                                    keys.scale_factor_var,
@@ -133,6 +135,7 @@ inline void validate_imu_triad_config(const nlohmann::json& triad,
     validate_direct_or_random_vec3(
         triad, keys.bias_turnon, keys.bias_turnon_var, keys.bias_turnon_cov);
     require_optional_nonnegative_vec3(triad, keys.bias_inrun_psd);
+    require_optional_nonnegative_vec3(triad, keys.bias_correlation_rate_1ps);
     require_optional_nonnegative_vec3(triad, keys.output_random_walk_psd);
     validate_direct_or_random_vec3(
         triad, "scale_factor", keys.scale_factor_var, keys.scale_factor_cov);
@@ -189,6 +192,8 @@ inline sim::ImuTriadErrorConfig imu_triad_error_config_from_json(const nlohmann:
     sim::ImuTriadErrorConfig config;
     config.bias_turnon = optional_vec3_from_json(triad, keys.bias_turnon);
     config.bias_inrun_psd = optional_vec3_from_json(triad, keys.bias_inrun_psd);
+    config.bias_correlation_rate_1ps =
+        optional_vec3_from_json(triad, keys.bias_correlation_rate_1ps);
     config.output_random_walk_psd = optional_vec3_from_json(triad, keys.output_random_walk_psd);
     config.scale_factor = optional_vec3_from_json(triad, "scale_factor");
     config.misalignment_rad = optional_vec3_from_json(triad, "misalignment_rad");
@@ -219,6 +224,7 @@ imu_triad_stochastic_config_from_json(const nlohmann::json& triad, const ImuTria
             .bias_turnon_var = "bias_turnon_var_rad2ps2",
             .bias_turnon_cov = "bias_turnon_cov_rad2ps2",
             .bias_inrun_psd = "bias_inrun_psd_rad2ps3",
+            .bias_correlation_rate_1ps = "bias_correlation_rate_1ps",
             .output_random_walk_psd = "angle_random_walk_psd_rad2ps",
             .scale_factor_var = "scale_factor_var",
             .scale_factor_cov = "scale_factor_cov",
@@ -236,6 +242,7 @@ imu_triad_stochastic_config_from_json(const nlohmann::json& triad, const ImuTria
             .bias_turnon_var = "bias_turnon_var_m2ps4",
             .bias_turnon_cov = "bias_turnon_cov_m2ps4",
             .bias_inrun_psd = "bias_inrun_psd_m2ps5",
+            .bias_correlation_rate_1ps = "bias_correlation_rate_1ps",
             .output_random_walk_psd = "velocity_random_walk_psd_m2ps3",
             .scale_factor_var = "scale_factor_var",
             .scale_factor_cov = "scale_factor_cov",

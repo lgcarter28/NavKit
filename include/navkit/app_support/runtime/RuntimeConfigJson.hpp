@@ -202,8 +202,8 @@ inline bool contains_key(const std::vector<std::string_view>& keys, const std::s
 inline void reject_unknown_top_level_keys(const nlohmann::json& cfg,
                                           const std::vector<std::string_view>& allowed_keys)
 {
-    for (const auto& [key, unused] : cfg.items()) {
-        (void)unused;
+    for (const auto& item : cfg.items()) {
+        const std::string& key = item.key();
         if (!contains_key(allowed_keys, key)) {
             throw_runtime_config_error("unknown top-level key '" + key + "'");
         }

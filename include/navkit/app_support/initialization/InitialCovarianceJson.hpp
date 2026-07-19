@@ -56,7 +56,11 @@ inline void
 validate_runtime_initial_covariance_pva_diag_shape(const nlohmann::json& initial_covariance,
                                                    const std::size_t remaining_error_state_count)
 {
-    (void)initial_covariance_pva_frame_from_json(initial_covariance);
+    const std::string pva_frame = initial_covariance_pva_frame_from_json(initial_covariance);
+    if (pva_frame.empty()) {
+        throw_runtime_config_error(
+            "filter_initialization.initial_covariance.pva_frame must not be empty");
+    }
     const nlohmann::json& pva_diag = require_object(initial_covariance, "pva_diag");
     require_numeric_array(pva_diag, "pos_m2", 3U);
     require_numeric_array(pva_diag, "vel_m2ps2", 3U);

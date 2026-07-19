@@ -134,6 +134,32 @@ namespace
     return result;
 }
 
+[[nodiscard]] Vec3
+gauss_markov_bias_drive_covariance(const Vec3& psd, const Vec3& correlation_rate_1ps, Time_t dt_s)
+{
+    Vec3 covariance = Vec3::Zero();
+    for (Eigen::Index axis = 0; axis < covariance.size(); ++axis) {
+        const Scalar_t beta = correlation_rate_1ps(axis);
+        if (beta > 0.0) {
+            covariance(axis) = (psd(axis) / (2.0 * beta)) * (1.0 - std::exp(-2.0 * beta * dt_s));
+        }
+        else {
+            covariance(axis) = psd(axis) * dt_s;
+        }
+    }
+    return covariance;
+}
+
+void propagate_bias_mean(Vec3& bias, const Vec3& correlation_rate_1ps, Time_t dt_s)
+{
+    for (Eigen::Index axis = 0; axis < bias.size(); ++axis) {
+        const Scalar_t beta = correlation_rate_1ps(axis);
+        if (beta > 0.0) {
+            bias(axis) *= std::exp(-beta * dt_s);
+        }
+    }
+}
+
 } // namespace
 
 template<bool OutputConingScullingCompensated>
@@ -267,8 +293,13 @@ void ImuSimulator<OutputConingScullingCompensated>::realize_random_terms(
 template<bool OutputConingScullingCompensated>
 void ImuSimulator<OutputConingScullingCompensated>::update_biases(Time_t dt_s)
 {
-    m_gyro_bias_radps += draw_normal_vector(m_cfg.gyro.bias_inrun_psd * dt_s);
-    m_accel_bias_mps2 += draw_normal_vector(m_cfg.accel.bias_inrun_psd * dt_s);
+    propagate_bias_mean(m_gyro_bias_radps, m_cfg.gyro.bias_correlation_rate_1ps, dt_s);
+    propagate_bias_mean(m_accel_bias_mps2, m_cfg.accel.bias_correlation_rate_1ps, dt_s);
+
+    m_gyro_bias_radps += draw_normal_vector(gauss_markov_bias_drive_covariance(
+        m_cfg.gyro.bias_inrun_psd, m_cfg.gyro.bias_correlation_rate_1ps, dt_s));
+    m_accel_bias_mps2 += draw_normal_vector(gauss_markov_bias_drive_covariance(
+        m_cfg.accel.bias_inrun_psd, m_cfg.accel.bias_correlation_rate_1ps, dt_s));
 }
 
 template class ImuSimulator<false>;

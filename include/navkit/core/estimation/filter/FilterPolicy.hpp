@@ -36,6 +36,8 @@ concept FilterPolicy =
         { const_filter.covariance() } -> std::same_as<const typename Candidate::P_t&>;
         { filter.set_state(state) } -> std::same_as<void>;
         { filter.set_covariance(covariance) } -> std::same_as<void>;
+        { filter.set_covariance_floor(covariance) } -> std::same_as<void>;
+        { const_filter.covariance_floor() } -> std::same_as<const typename Candidate::P_t&>;
         { filter.propagate_covariance(covariance, covariance) } -> std::same_as<void>;
     };
 

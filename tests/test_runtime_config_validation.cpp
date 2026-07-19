@@ -8,6 +8,7 @@
 #include "navkit/app_support/emulation/EmulatorBindingTuplePolicy.hpp"
 #include "navkit/app_support/emulation/EmulatorPolicy.hpp"
 #include "navkit/app_support/emulation/concrete/GnssEmulator.hpp"
+#include "navkit/app_support/initialization/CovarianceFloorJson.hpp"
 #include "navkit/app_support/initialization/FilterInitialization.hpp"
 #include "navkit/app_support/initialization/NavInitializationProviderPolicy.hpp"
 #include "navkit/app_support/initialization/TransferAlignmentProviderPolicy.hpp"
@@ -143,6 +144,18 @@ struct NotABinding
     return values;
 }
 
+[[nodiscard]] nlohmann::json runtime_propagation_json()
+{
+    return nlohmann::json{{"process_noise",
+                           {{"gyro_white_noise_psd_rad2ps", {1.0e-11, 1.0e-11, 1.0e-11}},
+                            {"accel_white_noise_psd_m2ps3", {1.0e-7, 1.0e-7, 1.0e-7}},
+                            {"gyro_bias_drive_psd_rad2ps3", {1.0e-14, 1.0e-14, 1.0e-14}},
+                            {"accel_bias_drive_psd_m2ps5", {1.0e-10, 1.0e-10, 1.0e-10}}}},
+                          {"imu_bias_dynamics",
+                           {{"gyro_bias_correlation_rate_1ps", {0.25, 0.25, 0.25}},
+                            {"accel_bias_correlation_rate_1ps", {0.5, 0.5, 0.5}}}}};
+}
+
 [[nodiscard]] nlohmann::json random_pva_runtime_config()
 {
     nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
@@ -190,6 +203,13 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts the documented input shape")
     static_assert(navkit::core::estimation::InitialCovarianceConfigPolicy<
                   EcefInsGnssAppConfig::NavKit::InitialCovariance,
                   EcefInsGnssAppConfig::NavKit::StateDef>);
+    static_assert(navkit::core::estimation::CovarianceFloorConfigPolicy<
+                  EcefInsGnssAppConfig::NavKit::CovarianceFloor,
+                  EcefInsGnssAppConfig::NavKit::StateDef>);
+    static_assert(navkit::core::estimation::EcefInsProcessNoiseConfigPolicy<
+                  EcefInsGnssAppConfig::NavKit::PropagationConfig::ProcessNoise>);
+    static_assert(navkit::core::estimation::ImuBiasDynamicsConfigPolicy<
+                  EcefInsGnssAppConfig::NavKit::PropagationConfig::ImuBiasDynamics>);
     static_assert(!EmulatorBindingTuplePolicy<DuplicateSensorIdConfig::EmulatorBindings,
                                               DuplicateSensorIdConfig::NavKit::Sensors,
                                               DuplicateSensorIdConfig::Logger>);
@@ -413,6 +433,68 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts runtime initial covariance")
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
 }
 
+TEST_CASE("ECEF INS GNSS runtime validator accepts runtime covariance floor")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace(
+        "filter_initialization",
+        nlohmann::json{
+            {"covariance_floor",
+             {{"diag",
+               {0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 4.0, 4.0}}}}});
+
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+}
+
+TEST_CASE("ECEF INS GNSS runtime validator rejects malformed runtime covariance floor")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace("filter_initialization",
+                nlohmann::json{{"covariance_floor", {{"diag", {1.0, 2.0}}}}});
+
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace(
+        "filter_initialization",
+        nlohmann::json{
+            {"covariance_floor",
+             {{"diag",
+               {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0}}}}});
+
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace(
+        "filter_initialization",
+        nlohmann::json{{"covariance_floor", {{"full", identity_initial_covariance_full()}}}});
+
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+}
+
+TEST_CASE("ECEF INS GNSS runtime validator accepts runtime propagation config")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace("propagation", runtime_propagation_json());
+
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+}
+
+TEST_CASE("ECEF INS GNSS runtime validator rejects malformed runtime propagation config")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace("propagation", runtime_propagation_json());
+    cfg.at("propagation").at("process_noise").erase("gyro_white_noise_psd_rad2ps");
+
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace("propagation", runtime_propagation_json());
+    cfg.at("propagation").at("imu_bias_dynamics").at("gyro_bias_correlation_rate_1ps").at(0) = -1.0;
+
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+}
+
 TEST_CASE("ECEF INS GNSS runtime validator accepts frame-aware PVA initial covariance")
 {
     nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
@@ -623,6 +705,63 @@ TEST_CASE("Frame-aware PVA initial covariance populates the full filter covarian
     CHECK(covariance(Error::AccB::i + 0, Error::AccB::i + 0) == doctest::Approx(13.0));
     CHECK(covariance(Error::AccB::i + 1, Error::AccB::i + 1) == doctest::Approx(14.0));
     CHECK(covariance(Error::AccB::i + 2, Error::AccB::i + 2) == doctest::Approx(15.0));
+}
+
+TEST_CASE("Runtime covariance floor populates and clamps the Navigator filter covariance")
+{
+    using NavKit = EcefInsGnssAppConfig::NavKit;
+    using StateDef = NavKit::StateDef;
+    using Error = StateDef::Error;
+
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace(
+        "filter_initialization",
+        nlohmann::json{{"covariance_floor",
+                        {{"pva_frame", "ned"},
+                         {"pva_diag",
+                          {{"pos_m2", {1.0, 2.0, 3.0}},
+                           {"vel_m2ps2", {4.0, 5.0, 6.0}},
+                           {"att_rotvec_rad2", {7.0, 8.0, 9.0}}}},
+                         {"remaining_error_state_diag", {10.0, 11.0, 12.0, 13.0, 14.0, 15.0}}}}});
+    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
+    const PvaInitialization pva_init = PvaRandomInitializationProvider::initialize(cfg, trajectory);
+
+    std::unique_ptr<NavKit::Navigator> navigator = std::make_unique<NavKit::Navigator>();
+    typename NavKit::Filter::P_t covariance = NavKit::Filter::P_t::Zero();
+    navigator->filter().set_covariance(covariance);
+    navigator->filter().set_covariance_floor(detail::covariance_floor_from_json<StateDef>(
+        cfg, NavKit::CovarianceFloor::covariance_floor, core::estimation::pos_e_m(pva_init.pva)));
+
+    CHECK(navigator->filter().covariance()(Error::Pos::i + 0, Error::Pos::i + 0) ==
+          doctest::Approx(3.0));
+    CHECK(navigator->filter().covariance()(Error::Pos::i + 1, Error::Pos::i + 1) ==
+          doctest::Approx(2.0));
+    CHECK(navigator->filter().covariance()(Error::Pos::i + 2, Error::Pos::i + 2) ==
+          doctest::Approx(1.0));
+    CHECK(navigator->filter().covariance()(Error::GyroB::i + 0, Error::GyroB::i + 0) ==
+          doctest::Approx(10.0));
+    CHECK(navigator->filter().covariance()(Error::AccB::i + 2, Error::AccB::i + 2) ==
+          doctest::Approx(15.0));
+}
+
+TEST_CASE("Runtime propagation override populates the Navigator propagation policy")
+{
+    using NavKit = EcefInsGnssAppConfig::NavKit;
+
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace("propagation", runtime_propagation_json());
+
+    std::unique_ptr<NavKit::Navigator> navigator = std::make_unique<NavKit::Navigator>();
+    navigator->propagation().set_runtime_config(
+        detail::propagation_runtime_config_from_json<NavKit::Propagation>(
+            cfg, NavKit::Propagation::runtime_config));
+
+    CHECK(navigator->propagation()
+              .runtime_config_value()
+              .imu_bias_dynamics.gyro_bias_correlation_rate_1ps.x() == doctest::Approx(0.25));
+    CHECK(navigator->propagation()
+              .runtime_config_value()
+              .imu_bias_dynamics.accel_bias_correlation_rate_1ps.z() == doctest::Approx(0.5));
 }
 
 TEST_CASE("Random PVA initialization provider produces deterministic colored draws")

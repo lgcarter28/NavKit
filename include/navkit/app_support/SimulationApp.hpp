@@ -32,6 +32,7 @@ public:
     using StateDef = typename NavKit::StateDef;
     using Filter = typename NavKit::Filter;
     using Navigator = typename NavKit::Navigator;
+    using Propagation = typename NavKit::Propagation;
     using EmulatorBindings = typename Config::EmulatorBindings;
     using NavInitializationProvider = typename Config::NavInitializationProvider;
     using TransferAlignmentProvider = typename Config::TransferAlignmentProvider;

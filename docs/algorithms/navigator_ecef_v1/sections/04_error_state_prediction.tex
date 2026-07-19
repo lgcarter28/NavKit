@@ -29,7 +29,9 @@ Define
 \Omega_{ie}^{e} &= \crossmat{\omegab_{ie}^{e}},\\
 \hat{\fb}_{ib}^{e} &= \hat{C}_b^e\hat{\fb}_{ib}^{b},\\
 G_p^e &=
-\left.\frac{\partial\gb^e}{\partial\pb_{eb}^e}\right|_{\hat{\pb}_{eb}^{e}}.
+\left.\frac{\partial\gb^e}{\partial\pb_{eb}^e}\right|_{\hat{\pb}_{eb}^{e}},\\
+B_g &= \operatorname{diag}(\boldsymbol{\beta}_g),\\
+B_a &= \operatorname{diag}(\boldsymbol{\beta}_a).
 \end{align}
 For Earth products, $G_p^e$ should come from the selected WGS-84/J2-capable
 gravity policy rather than a hard-coded spherical approximation.
@@ -65,7 +67,8 @@ G_p^e\delta\pb^{e}
 
 \subsection{IMU Error Models}
 
-The v1 IMU error model separates white measurement noise from bias random walk:
+The v1 IMU error model separates white measurement noise from first-order
+Gauss-Markov bias dynamics:
 \begin{align}
 \delta\omegab_{ib}^{b}
 &\approx
@@ -84,11 +87,20 @@ The corresponding IMU bias error equations are
 \begin{align}
 \delta\dot{\bb}_g
 &=
+-
+B_g\delta\bb_g
++
 \mathbf{w}_{bg},\\
 \delta\dot{\bb}_a
 &=
+-
+B_a\delta\bb_a
++
 \mathbf{w}_{ba}.
 \end{align}
+Here $\boldsymbol{\beta}_g$ and $\boldsymbol{\beta}_a$ are per-axis bias
+correlation rates in $\si{\per\second}$. Setting either rate vector to zero
+recovers the random-walk model for that bias family.
 These signs match the attitude-error convention in
 \cref{eq:v1_attitude_error_dcm_relation} and the derivation in the broader
 NavKit reference \cite{groves2013,sola2018}.
@@ -112,8 +124,8 @@ F =
 \zero & \I & \zero & \zero & \zero\\
 G_p^e & -2\Omega_{ie}^{e} & -\crossmat{\hat{\fb}_{ib}^{e}} & \zero & -\hat{C}_b^e\\
 \zero & \zero & -\Omega_{ie}^{e} & -\hat{C}_b^e & \zero\\
-\zero & \zero & \zero & \zero & \zero\\
-\zero & \zero & \zero & \zero & \zero
+\zero & \zero & \zero & -B_g & \zero\\
+\zero & \zero & \zero & \zero & -B_a
 \end{bmatrix},
 \label{eq:v1_f_matrix}
 \end{equation}
@@ -142,7 +154,8 @@ S_{ba}
 \end{equation}
 Here $S_g$ is gyro white-noise spectral density, $S_a$ is accelerometer
 white-noise spectral density, and $S_{bg}$ and $S_{ba}$ are the gyro- and
-accelerometer-bias random-walk spectral densities.
+accelerometer-bias driving-noise spectral densities. When the matching
+correlation rate is zero, the driving-noise PSD is the random-walk PSD.
 \begin{center}
 \begin{tabular}{lll}
 \toprule
@@ -150,8 +163,10 @@ Block & Meaning & Units \\
 \midrule
 $S_g$ & gyro white angular-rate noise PSD & $\si{\radian^2\per\second}$ \\
 $S_a$ & accelerometer white specific-force noise PSD & $\si{\meter^2\per\second^3}$ \\
-$S_{bg}$ & gyro-bias random-walk PSD & $\si{\radian^2\per\second^3}$ \\
-$S_{ba}$ & accelerometer-bias random-walk PSD & $\si{\meter^2\per\second^5}$ \\
+$S_{bg}$ & gyro-bias driving-noise PSD & $\si{\radian^2\per\second^3}$ \\
+$S_{ba}$ & accelerometer-bias driving-noise PSD & $\si{\meter^2\per\second^5}$ \\
+$\boldsymbol{\beta}_g$ & gyro-bias correlation rate & $\si{\per\second}$ \\
+$\boldsymbol{\beta}_a$ & accelerometer-bias correlation rate & $\si{\per\second}$ \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -186,7 +201,9 @@ With
 G_{p,k}^{e} &=
 \left.
 \frac{\partial\gb^e}{\partial\pb_{eb}^{e}}
-\right|_{\hat{\pb}_{eb,k}^{e}},
+\right|_{\hat{\pb}_{eb,k}^{e}},\\
+B_{g,k} &= \operatorname{diag}(\boldsymbol{\beta}_{g,k}),\\
+B_{a,k} &= \operatorname{diag}(\boldsymbol{\beta}_{a,k}),
 \end{align}
 the v1 interval-specific continuous-time dynamics matrix is
 \begin{equation}
@@ -196,8 +213,8 @@ F_k =
 \zero & \I & \zero & \zero & \zero\\
 G_{p,k}^{e} & -2\Omega_{ie}^{e} & -\crossmat{\hat{\fb}_{ib,k}^{e}} & \zero & -\hat{C}_{b,k}^{e}\\
 \zero & \zero & -\Omega_{ie}^{e} & -\hat{C}_{b,k}^{e} & \zero\\
-\zero & \zero & \zero & \zero & \zero\\
-\zero & \zero & \zero & \zero & \zero
+\zero & \zero & \zero & -B_{g,k} & \zero\\
+\zero & \zero & \zero & \zero & -B_{a,k}
 \end{bmatrix}.
 }
 \label{eq:v1_fk_matrix}
@@ -305,7 +322,8 @@ For tests and code review, the following frozen-attitude, frozen-noise blocks
 are useful sanity checks. Define
 $S_a^e=\hat{C}_b^eS_a\hat{C}_e^b$ and
 $S_{ba}^e=\hat{C}_b^eS_{ba}\hat{C}_e^b$. If only accelerometer white noise
-and accelerometer-bias random walk are considered in the
+and the accelerometer-bias random-walk special case
+($\boldsymbol{\beta}_a=\zero$) are considered in the
 $[\delta\pb^e,\delta\vb^e,\delta\bb_a]$ substate, then
 \begin{equation}
 Q_{pva}
@@ -323,6 +341,7 @@ Q_{pva}
 \end{bmatrix}.
 \end{equation}
 Similarly, for the $[\delta\boldsymbol{\theta},\delta\bb_g]$ substate,
+with $\boldsymbol{\beta}_g=\zero$,
 \begin{equation}
 Q_{\theta g}
 \approx

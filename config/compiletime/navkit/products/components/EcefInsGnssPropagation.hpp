@@ -7,6 +7,8 @@
 #include "navkit/core/environment/gravity/J2.hpp"
 #include "navkit/core/environment/planet/Wgs84.hpp"
 #include "navkit/core/estimation/navigator/propagation/EcefInsPropagation.hpp"
+#include "navkit/products/components/DefaultEcefInsProcessNoise.hpp"
+#include "navkit/products/components/DefaultGaussMarkovImuBiasDynamics.hpp"
 
 #include <cstddef>
 
@@ -17,20 +19,22 @@ struct EcefInsGnssPropagation
 {
     using Planet = core::environment::Wgs84;
     using Gravity = core::environment::J2<Planet>;
+    using ProcessNoise = DefaultEcefInsProcessNoise;
+    using ImuBiasDynamics = DefaultGaussMarkovImuBiasDynamics;
 
     static constexpr std::size_t imu_buffer_capacity = 1024U;
     static constexpr std::size_t covariance_history_capacity = 256U;
     static constexpr core::Time_t covariance_update_rate_hz = 100.0;
     static constexpr bool apply_coning_sculling_compensation = true;
 
-    using Propagation =
-        core::estimation::EcefInsPropagation<Planet,
-                                             Gravity,
-                                             core::estimation::EcefInsZeroProcessNoise,
-                                             imu_buffer_capacity,
-                                             covariance_history_capacity,
-                                             covariance_update_rate_hz,
-                                             apply_coning_sculling_compensation>;
+    using Propagation = core::estimation::EcefInsPropagation<Planet,
+                                                             Gravity,
+                                                             ProcessNoise,
+                                                             ImuBiasDynamics,
+                                                             imu_buffer_capacity,
+                                                             covariance_history_capacity,
+                                                             covariance_update_rate_hz,
+                                                             apply_coning_sculling_compensation>;
 };
 
 } // namespace navkit::config::navkit::products::components

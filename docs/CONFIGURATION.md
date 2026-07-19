@@ -378,6 +378,7 @@ NavKit product config selects an initial-covariance component:
 
 ```cpp
 using InitialCovariance = components::DefaultInsInitialCovariance;
+using CovarianceFloor = components::DefaultInsCovarianceFloor;
 ```
 
 The selected component provides immutable compile-time covariance storage, for
@@ -460,6 +461,107 @@ PVA segments. For the default INS error state, those remaining values currently
 map to gyro bias followed by accelerometer bias. Exactly one runtime initial
 covariance form may be provided: raw `diag`, raw `full`, or the structured
 `pva_diag` plus `remaining_error_state_diag` form.
+
+Covariance floors use the same ownership pattern. A selected NavKit product
+config provides an immutable compile-time floor:
+
+```cpp
+struct DefaultInsCovarianceFloor
+{
+    using StateDef = navkit::core::estimation::DefaultInsStateDef;
+    using CovarianceFloor_t =
+        navkit::core::estimation::CovarianceFloor<StateDef>;
+
+    inline static const CovarianceFloor_t covariance_floor =
+        navkit::core::estimation::diagonal_covariance_floor<StateDef>(
+            navkit::core::estimation::CovarianceFloorDiagonal<StateDef>{
+                .values = {
+                    // floor variances in the selected error-state order
+                },
+            });
+};
+```
+
+The floor entries are variances on the covariance diagonal. A value of `0.0`
+means no floor for that error-state element. Runtime scenarios may override the
+compiled floor with:
+
+```json
+{
+  "filter_initialization": {
+    "covariance_floor": {
+      "diag": [ /* StateDef::Error::N nonnegative variance-floor values */ ]
+    }
+  }
+}
+```
+
+INS-style scenarios may also use the same frame-aware PVA-plus-remaining shape
+used by initial covariance:
+
+```json
+{
+  "filter_initialization": {
+    "covariance_floor": {
+      "pva_frame": "ned",
+      "pva_diag": {
+        "pos_m2": [0.0, 0.0, 0.0],
+        "vel_m2ps2": [0.0, 0.0, 0.0],
+        "att_rotvec_rad2": [0.0, 0.0, 0.0]
+      },
+      "remaining_error_state_diag": [
+        /* nonnegative floor variances for non-PVA error-state dimensions */
+      ]
+    }
+  }
+}
+```
+
+Covariance-floor runtime overrides intentionally support diagonal/state-family
+forms only. They clamp diagonal covariance entries after initialization,
+covariance propagation, and measurement processing; they do not implement a
+full positive-semidefinite matrix lower-bound operation.
+
+Propagation configuration follows the same compile-time-default/runtime-override
+pattern, but the selected propagation policy owns the values it consumes. For
+the ECEF INS/GNSS product, process-noise PSDs and first-order Gauss-Markov IMU
+bias dynamics are intentionally separate components:
+
+```cpp
+using ProcessNoise = components::DefaultEcefInsProcessNoise;
+using ImuBiasDynamics = components::DefaultGaussMarkovImuBiasDynamics;
+```
+
+`ProcessNoise` owns the continuous-time white-noise and bias-drive PSD values
+used to build the `Q_c` matrix. `ImuBiasDynamics` owns the bias correlation
+rates used in the continuous-time `F` matrix. Keeping these separate avoids
+mixing stochastic driving-noise intensity with deterministic bias-state
+dynamics.
+
+Runtime scenarios may override either or both under `propagation`:
+
+```json
+{
+  "propagation": {
+    "process_noise": {
+      "gyro_white_noise_psd_rad2ps": [1.0e-11, 1.0e-11, 1.0e-11],
+      "accel_white_noise_psd_m2ps3": [1.0e-7, 1.0e-7, 1.0e-7],
+      "gyro_bias_drive_psd_rad2ps3": [1.0e-14, 1.0e-14, 1.0e-14],
+      "accel_bias_drive_psd_m2ps5": [1.0e-10, 1.0e-10, 1.0e-10]
+    },
+    "imu_bias_dynamics": {
+      "gyro_bias_correlation_rate_1ps": [0.0002777778, 0.0002777778, 0.0002777778],
+      "accel_bias_correlation_rate_1ps": [0.0002777778, 0.0002777778, 0.0002777778]
+    }
+  }
+}
+```
+
+All entries are nonnegative. A bias-correlation rate of `0.0` preserves the
+v1 random-walk bias model for that axis. Runtime initialization applies these
+values through `initialize_navigator()`, which configures the selected
+propagation instance and filter instance without spreading tuning defaults into
+the application loop.
 
 The Python build wrapper forwards the same selection:
 

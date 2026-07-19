@@ -40,6 +40,7 @@ Detailed historical phase notes are preserved under `docs/roadmap_details/`. Thi
 - [x] Runtime initialization is split into `pva_initialization` and `filter_initialization`.
 - [x] PVA initialization supports random error, explicit error, no-error, and direct-value component examples.
 - [x] Filter initial covariance supports compile-time defaults and runtime overrides with diagonal, full, and PVA-plus-remaining-error-state forms.
+- [x] Filter covariance floors support compile-time defaults and runtime overrides with diagonal and PVA-plus-remaining-error-state forms.
 - [x] Runtime scenario configs include default ECEF INS/GNSS, runtime covariance override, IMU debug, modeled/unmodeled IMU-error, and truth-reconstruction scenarios.
 - [x] Simulation outputs are organized under `output/logs/<run_name>/data` and `output/logs/<run_name>/figures`.
 - [x] Offline analysis produces ECEF/NED error/covariance plots, dashboard plots, filter-correction plots, GNSS debug plots, IMU increment/debug/error plots, innovation plots, NIS/p-value plots, and histograms.
@@ -67,19 +68,7 @@ These are preserved at high level so the roadmap stays readable. Detailed pass-b
 
 NavKit is currently in Phase 5: ECEF INS/GNSS stabilization and hardening. The active passes below are the current working scope; unrelated future backlog lives in the dedicated phase detail files linked at the end of this roadmap.
 
-## Pass 5.11: first-order Gauss-Markov IMU dynamics
-
-- [ ] Update the LaTeX algorithm references first: `imu_emulator_v1` for first-order Gauss-Markov IMU modeling, and `navigator_ecef_v1` for the matching IMU error-state modeling and strapdown navigation dynamic equations.
-- [ ] Upgrade IMU bias/error dynamics from pure random walk to first-order Gauss-Markov models where appropriate.
-- [ ] Keep the IMU simulator/emulator dynamics, filter STM, process-noise discretization, runtime config, docs, logs, and plots consistent.
-- [ ] Add tests or scenario diagnostics that distinguish the first-order Gauss-Markov behavior from the existing pure-random-walk behavior.
-
-## Pass 5.12: covariance floors and unused-parameter cleanup
-
-- [ ] Add configurable covariance floors per state-family/diagonal block to prevent covariance from becoming ill-conditioned or singular during idealized analysis runs.
-- [ ] Sweep app-support and core seams for stale unused-parameter breadcrumbs such as `(void)cfg;`. Remove unused parameters and simplify call sites when the signature no longer needs the value; keep explicit `(void)name;` only when preserving a required concept/API signature is intentional.
-
-## Pass 5.13: advanced restart initialization groundwork
+## Pass 5.14: advanced restart initialization groundwork
 
 - [ ] Preserve the normal startup path as the clean default: `pva_initialization` provides the required nominal PVA message, and `filter_initialization.initial_covariance` provides the full Kalman filter covariance belief. Do not pollute this path with Monte Carlo, simulator truth-error, or restore-only concepts.
 - [ ] Add an optional direct non-PVA nominal state override for restore/manual analysis use cases. This belongs under `filter_initialization` as an explicit advanced feature, should initialize selected non-PVA nominal estimated states such as gyro and accelerometer bias estimates, and should not masquerade as transfer alignment or PVA initialization.

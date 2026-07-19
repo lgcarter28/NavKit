@@ -4,6 +4,7 @@
 #pragma once
 
 #include "navkit/core/config/ConfigPolicy.hpp"
+#include "navkit/core/estimation/filter/CovarianceFloorConfigPolicy.hpp"
 #include "navkit/core/estimation/filter/FilterPolicy.hpp"
 #include "navkit/core/estimation/filter/InitialCovarianceConfigPolicy.hpp"
 #include "navkit/core/estimation/navigator/NavigatorUpdatePolicy.hpp"
@@ -25,6 +26,7 @@ concept NavKitProductConfigPolicy = requires {
     typename Candidate::Sensors;
     typename Candidate::Profiler;
     typename Candidate::InitialCovariance;
+    typename Candidate::CovarianceFloor;
     typename Candidate::Filter;
     typename Candidate::Propagation;
     typename Candidate::NavigatorUpdate;
@@ -39,6 +41,9 @@ concept NavKitProductConfigPolicy = requires {
     requires navkit::core::profiling::ProfilerPolicy<typename Candidate::Profiler>;
     requires navkit::core::estimation::InitialCovarianceConfigPolicy<
         typename Candidate::InitialCovariance,
+        typename Candidate::StateDef>;
+    requires navkit::core::estimation::CovarianceFloorConfigPolicy<
+        typename Candidate::CovarianceFloor,
         typename Candidate::StateDef>;
     requires navkit::core::estimation::PropagationPolicy<typename Candidate::Propagation,
                                                          typename Candidate::StateDef>;

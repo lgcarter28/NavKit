@@ -24,7 +24,7 @@ the software contract and must be covered by deterministic tests.
 \section{Rate-to-Increment Conversion}
 
 Given interval-average truth inputs, independently update gyro and accelerometer
-bias states using \cref{eq:imu_bias_random_walk_discrete}. Then generate raw
+bias states using \cref{eq:imu_bias_gauss_markov_discrete}. Then generate raw
 interval-average triad outputs:
 \begin{align}
 \tilde{\omegab}_{ib,k}^{b}
@@ -92,11 +92,13 @@ For reproducibility, the emulator owns deterministic random streams. A valid
 implementation must make these draws repeatable for a fixed seed, runtime
 config, and truth input sequence:
 \begin{align}
-\etab_{bg,k} &\sim \mathcal{N}(\zero,S_{bg}\Delta t_k),&
-\etab_{ba,k} &\sim \mathcal{N}(\zero,S_{ba}\Delta t_k),\\
+\etab_{bg,k} &\sim \mathcal{N}(\zero,Q_{bg,k}),&
+\etab_{ba,k} &\sim \mathcal{N}(\zero,Q_{ba,k}),\\
 \nb_{g,k} &\sim \mathcal{N}\left(\zero,S_g/\Delta t_k\right),&
 \nb_{a,k} &\sim \mathcal{N}\left(\zero,S_a/\Delta t_k\right).
 \end{align}
+The bias-noise covariances $Q_{bg,k}$ and $Q_{ba,k}$ are computed per axis
+from \cref{eq:imu_bias_gauss_markov_discrete_covariance}.
 
 \begin{implbox}
 For v1, generate increments from interval-average rates and specific forces.
@@ -118,7 +120,8 @@ For each interval $k$:
     $\bar{\fb}_{ib,k}^{b}$ from
     \cref{eq:imu_average_specific_force_from_ecef_truth}.
     \item Propagate gyro and accelerometer biases with
-    \cref{eq:imu_bias_random_walk_discrete}, if enabled.
+    \cref{eq:imu_bias_gauss_markov_discrete}; random walk is the
+    $\boldsymbol\beta_b=\zero$ special case.
     \item Draw interval-average white measurement noise from
     \cref{eq:imu_interval_average_white_noise}, if enabled.
     \item Apply the forward triad model in \cref{eq:imu_forward_triad_model}.
