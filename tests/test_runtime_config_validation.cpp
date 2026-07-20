@@ -472,6 +472,40 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects malformed runtime covariance 
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
 
+TEST_CASE("ECEF INS GNSS runtime validator accepts non-PVA nominal state override")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace(
+        "filter_initialization",
+        nlohmann::json{{"nominal_state",
+                        {{"non_pva_values", {1.0e-4, 2.0e-4, 3.0e-4, 1.0e-3, 2.0e-3, 3.0e-3}}}}});
+
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+}
+
+TEST_CASE("ECEF INS GNSS runtime validator rejects malformed non-PVA nominal state override")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace("filter_initialization",
+                nlohmann::json{{"nominal_state", {{"non_pva_values", {1.0, 2.0}}}}});
+
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace("filter_initialization",
+                nlohmann::json{{"nominal_state", {{"gyro_bias_radps", {1.0e-4, 2.0e-4, 3.0e-4}}}}});
+
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+}
+
+TEST_CASE("ECEF INS GNSS runtime validator rejects unknown filter initialization keys")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace("filter_initialization", nlohmann::json{{"monte_carlo_truth_error", {}}});
+
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+}
+
 TEST_CASE("ECEF INS GNSS runtime validator accepts runtime propagation config")
 {
     nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
@@ -528,7 +562,11 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects malformed frame-aware PVA ini
 
 TEST_CASE("ECEF INS GNSS runtime validator rejects disabled transfer alignment inputs")
 {
-    auto cfg = valid_ecef_ins_gnss_runtime_config();
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace(
+        "filter_initialization",
+        nlohmann::json{{"nominal_state",
+                        {{"non_pva_values", {1.0e-4, 2.0e-4, 3.0e-4, 1.0e-3, 2.0e-3, 3.0e-3}}}}});
     cfg.emplace("transfer_alignment", nlohmann::json{{"type", "pva_aiding"}});
 
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
@@ -827,6 +865,10 @@ TEST_CASE("NavInitialization maps into the configured Navigator filter state")
                                                                          Error::AccB::i + 1),
                            NavKit::InitialCovariance::initial_covariance(Error::AccB::i + 2,
                                                                          Error::AccB::i + 2)}}}}});
+    cfg.at("filter_initialization")
+        .emplace(
+            "nominal_state",
+            nlohmann::json{{"non_pva_values", {1.0e-4, 2.0e-4, 3.0e-4, 1.0e-3, 2.0e-3, 3.0e-3}}});
     const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
     const PvaInitialization nav_init =
         PvaExplicitInitializationProvider::initialize(cfg, trajectory);
@@ -860,6 +902,12 @@ TEST_CASE("NavInitialization maps into the configured Navigator filter state")
     CHECK(filter.covariance()(Error::AccB::i, Error::AccB::i) ==
           doctest::Approx(
               NavKit::InitialCovariance::initial_covariance(Error::AccB::i, Error::AccB::i)));
+    CHECK(filter.state()(Nominal::GyroB::i + 0) == doctest::Approx(1.0e-4));
+    CHECK(filter.state()(Nominal::GyroB::i + 1) == doctest::Approx(2.0e-4));
+    CHECK(filter.state()(Nominal::GyroB::i + 2) == doctest::Approx(3.0e-4));
+    CHECK(filter.state()(Nominal::AccB::i + 0) == doctest::Approx(1.0e-3));
+    CHECK(filter.state()(Nominal::AccB::i + 1) == doctest::Approx(2.0e-3));
+    CHECK(filter.state()(Nominal::AccB::i + 2) == doctest::Approx(3.0e-3));
 }
 
 } // namespace navkit::app_support::test

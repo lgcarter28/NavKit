@@ -6,6 +6,7 @@
 #include "navkit/app_support/initialization/CovarianceFloorJson.hpp"
 #include "navkit/app_support/initialization/InitialCovarianceJson.hpp"
 #include "navkit/app_support/initialization/NavInitialization.hpp"
+#include "navkit/app_support/initialization/NominalStateOverrideJson.hpp"
 #include "navkit/app_support/runtime/PropagationRuntimeConfigJson.hpp"
 #include "navkit/core/config/Types.hpp"
 #include "navkit/core/estimation/filter/FilterPolicy.hpp"
@@ -70,6 +71,7 @@ void initialize_navigator(const PvaInitialization& pva_init,
     };
     initialize_filter_from_nav_initialization<InitializerConfig>(
         nav_init, covariance_floor, navigator.filter());
+    detail::apply_runtime_nominal_state_override<StateDef>(cfg, navigator.filter().state());
     initialize_propagator<InitializerConfig>(cfg, navigator.propagation());
 }
 

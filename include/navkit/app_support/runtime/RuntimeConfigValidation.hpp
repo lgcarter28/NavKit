@@ -8,6 +8,7 @@
 #include "navkit/app_support/emulation/concrete/ImuRuntimeConfig.hpp"
 #include "navkit/app_support/initialization/CovarianceFloorJson.hpp"
 #include "navkit/app_support/initialization/InitialCovarianceJson.hpp"
+#include "navkit/app_support/initialization/NominalStateOverrideJson.hpp"
 #include "navkit/app_support/runtime/PropagationRuntimeConfigJson.hpp"
 #include "navkit/app_support/runtime/RunSettings.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
@@ -15,14 +16,39 @@
 
 #include <nlohmann/json.hpp>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 namespace navkit::app_support
 {
 
 namespace detail
 {
+
+inline void validate_filter_initialization_runtime_config_shape(const nlohmann::json& cfg)
+{
+    const nlohmann::json::const_iterator filter_initialization_iter =
+        cfg.find("filter_initialization");
+    if (filter_initialization_iter == cfg.end()) {
+        return;
+    }
+    if (!filter_initialization_iter->is_object()) {
+        throw_runtime_config_error("expected 'filter_initialization' to be an object");
+    }
+
+    const std::vector<std::string_view> allowed_filter_initialization_keys{
+        "initial_covariance", "covariance_floor", "nominal_state"};
+    for (nlohmann::json::const_iterator iter = filter_initialization_iter->begin();
+         iter != filter_initialization_iter->end();
+         ++iter) {
+        const std::string& key = iter.key();
+        if (!contains_key(allowed_filter_initialization_keys, key)) {
+            throw_runtime_config_error("unknown key '" + key + "' in 'filter_initialization'");
+        }
+    }
+}
 
 template<typename EmulatorBindings, std::size_t... Is>
 void validate_emulator_runtime_config(const nlohmann::json& cfg, std::index_sequence<Is...>)
@@ -115,8 +141,10 @@ void validate_runtime_config(const nlohmann::json& cfg)
     validate_imu_runtime_config(cfg);
 
     NavInitializationProvider::validate_runtime_config(cfg);
+    detail::validate_filter_initialization_runtime_config_shape(cfg);
     detail::validate_runtime_initial_covariance_shape<typename Config::NavKit::StateDef>(cfg);
     detail::validate_runtime_covariance_floor_shape<typename Config::NavKit::StateDef>(cfg);
+    detail::validate_runtime_nominal_state_override_shape<typename Config::NavKit::StateDef>(cfg);
     detail::validate_runtime_propagation_config_shape<typename Config::NavKit::Propagation>(cfg);
     TransferAlignmentProvider::validate_runtime_config(cfg);
 }

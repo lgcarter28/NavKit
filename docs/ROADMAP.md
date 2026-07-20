@@ -68,13 +68,9 @@ These are preserved at high level so the roadmap stays readable. Detailed pass-b
 
 NavKit is currently in Phase 5: ECEF INS/GNSS stabilization and hardening. The active passes below are the current working scope; unrelated future backlog lives in the dedicated phase detail files linked at the end of this roadmap.
 
-## Pass 5.14: advanced restart initialization groundwork
+## Active passes
 
-- [ ] Preserve the normal startup path as the clean default: `pva_initialization` provides the required nominal PVA message, and `filter_initialization.initial_covariance` provides the full Kalman filter covariance belief. Do not pollute this path with Monte Carlo, simulator truth-error, or restore-only concepts.
-- [ ] Add an optional direct non-PVA nominal state override for restore/manual analysis use cases. This belongs under `filter_initialization` as an explicit advanced feature, should initialize selected non-PVA nominal estimated states such as gyro and accelerometer bias estimates, and should not masquerade as transfer alignment or PVA initialization.
-- [ ] Keep transfer alignment observation-driven. Transfer alignment may provide timestamped aiding data that lets the filter estimate corrections through normal measurement updates; it must not become a hidden mechanism for directly writing filter nominal states or pending correction vectors.
-- [ ] Keep product-core embedded code free of simulator truth/error context. Direct restore-style nominal state overrides may be product/app configuration, but Monte Carlo truth-relative initialization is app/sim/analysis infrastructure only.
-- [ ] Add focused tests demonstrating the separation: normal PVA/covariance startup remains unchanged, direct non-PVA nominal override initializes only selected state segments, and transfer alignment remains independent.
+No active Phase 5 pass is currently queued. Select the next implementation pass from the future phase detail files below or add a new focused Phase 5 stabilization pass here before executing more work.
 
 ## Future phase details
 

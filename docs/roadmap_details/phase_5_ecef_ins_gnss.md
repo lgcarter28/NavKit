@@ -120,6 +120,17 @@
 - [x] Updated propagation/filter policy tests and runtime-validation tests to exercise the new member-owned configuration seams.
 - [x] Updated configuration documentation and changelog entries to describe the split propagation configuration and filter-owned covariance floor.
 
+## Pass 5.14: advanced restart initialization groundwork
+
+- [x] Preserved the normal startup path as the clean default: `pva_initialization` provides the required nominal PVA message, while `filter_initialization.initial_covariance` provides the full Kalman filter covariance belief.
+- [x] Added an explicit advanced non-PVA nominal-state override under `filter_initialization.nominal_state.non_pva_values` for restore/manual-analysis use cases.
+- [x] Kept the restart override generic over the selected compile-time nominal state definition by validating and applying only values after the nominal PVA prefix.
+- [x] Kept PVA startup, filter covariance belief, restore/manual nominal-state overrides, transfer alignment, and future Monte Carlo truth-relative initialization as distinct concepts.
+- [x] Kept product-core embedded code free of simulator truth/error context; the restart override is runtime app-support initialization glue applied after normal PVA/covariance initialization.
+- [x] Added runtime validation that rejects malformed nominal-state override vectors, unknown `nominal_state` keys, and unknown top-level `filter_initialization` keys.
+- [x] Added a reusable example filter-initialization component for direct nominal gyro/accelerometer bias restart values without wiring it into normal scenarios.
+- [x] Added tests showing that normal initialization still maps PVA/covariance, direct non-PVA nominal overrides initialize only selected state segments, malformed/unknown restart inputs are rejected, and transfer alignment remains independent.
+
 ## Phase 5 follow-forward
 
-Unresolved expansion/hardening work from Phase 5 now lives in the active roadmap pass for advanced restart initialization, plus future phase files for Monte Carlo, trajectory-source expansion, transfer alignment, sensor scheduling, validation metrics, latent replay, robust status/error handling, and embedded readiness.
+Unresolved expansion/hardening work from Phase 5 now lives in future phase files for Monte Carlo, trajectory-source expansion, transfer alignment, sensor scheduling, validation metrics, latent replay, robust status/error handling, and embedded readiness.

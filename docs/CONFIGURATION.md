@@ -522,6 +522,41 @@ forms only. They clamp diagonal covariance entries after initialization,
 covariance propagation, and measurement processing; they do not implement a
 full positive-semidefinite matrix lower-bound operation.
 
+Advanced restore/manual-analysis runs may also initialize selected non-PVA
+nominal state estimates under `filter_initialization.nominal_state`:
+
+```json
+{
+  "filter_initialization": {
+    "nominal_state": {
+      "non_pva_values": [
+        0.0001, 0.0002, 0.0003,
+        0.001, 0.002, 0.003
+      ]
+    }
+  }
+}
+```
+
+This is intentionally not part of normal startup. The clean default path is
+still:
+
+1. `pva_initialization` creates the required nominal PVA message.
+2. `filter_initialization.initial_covariance` selects the full Kalman filter
+   covariance belief.
+3. Optional `filter_initialization.covariance_floor` clamps configured
+   covariance diagonal entries.
+
+The `nominal_state.non_pva_values` vector is interpreted in the selected
+nominal state definition's non-PVA order. For the default INS nominal state,
+that currently means gyro-bias estimate followed by accelerometer-bias estimate.
+The expected vector length is validated against the selected compile-time state
+definition. This override is for explicit restore/manual-analysis cases that
+need to seed non-PVA nominal estimates. It does not accept PVA fields, does not
+encode simulator truth errors, and does not replace transfer alignment.
+Transfer alignment remains observation-driven through normal measurement/update
+paths.
+
 Propagation configuration follows the same compile-time-default/runtime-override
 pattern, but the selected propagation policy owns the values it consumes. For
 the ECEF INS/GNSS product, process-noise PSDs and first-order Gauss-Markov IMU

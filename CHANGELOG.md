@@ -44,6 +44,7 @@ This project follows
 - Compile-time and runtime-selected first-order Gauss-Markov IMU error dynamics for ECEF INS covariance prediction, with matching IMU simulator bias-dynamics support and tests.
 - Compile-time and runtime-configurable covariance floors for selected filter error-state layouts, including diagonal and frame-aware INS PVA floor forms with validation and Navigator/filter application tests.
 - Split ECEF INS propagation runtime configuration into separately owned process-noise and IMU bias-dynamics payloads, with compile-time defaults, runtime JSON overrides, and focused validation.
+- Runtime filter nominal-state restart overrides for selected non-PVA nominal state values under `filter_initialization.nominal_state.non_pva_values`, with validation and initialization tests.
 
 ### Changed
 
@@ -129,6 +130,7 @@ This project follows
 - Renamed the repo-level simulation wrapper from `tools/run_first_sim.py` to `tools/run_sim.py`, clarified that `--navkit-config` locates a compile-time-configured build tree rather than changing runtime behavior, and factored runtime JSON merge/output override handling into reusable tool helpers.
 - Moved IMU cumulative increment ownership from the nominal CSV log product into the full-rate IMU runtime path so decimated IMU log rows contain run cumulative snapshots rather than sums of only logged rows.
 - Removed stale app-support/core unused-parameter breadcrumbs around filter initialization and runtime JSON validation while preserving intentional no-op parameters at required concept/API seams.
+- Tightened runtime `filter_initialization` validation so unknown keys are rejected instead of silently expanding the startup contract.
 
 ### Removed
 
