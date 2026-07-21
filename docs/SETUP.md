@@ -266,6 +266,7 @@ These scripts provide a consistent cross-platform workflow and abstract away pla
 | `run_sim.py` | Run a selected runtime scenario with the built simulation executable |
 | `run_analysis.py` | Generate plots and analysis from existing simulation logs |
 | `run_scenario.py` | Run a scenario, optionally override output location, and generate plots |
+| `run_monte_carlo.py` | Run a seeded Monte Carlo campaign and generate aggregate plots |
 | `timing_report.py` | Summarize a complete `navkit.timing.v1` timing artifact |
 | `resource_report.py` | Write and display coarse executable/library size reports for a build tree |
 | `format.py` | Run clang-format; also exposes clang-tidy for CI diagnostics |
@@ -547,6 +548,33 @@ For sim-only workflows, use the lower-level runner:
 python tools/run_sim.py --build-type Debug --config config/runtime/navkit_sim/ecef_ins_gnss.json
 ```
 
+Run a small Monte Carlo campaign from a campaign JSON config:
+
+```bash
+python tools/run_monte_carlo.py config/runtime/monte_carlo/ecef_ins_gnss_smoke.json --build-type Release
+```
+
+Run a larger campaign without editing the smoke config:
+
+```bash
+python tools/run_monte_carlo.py config/runtime/monte_carlo/ecef_ins_gnss_smoke.json --build-type Release --run-count 100 --max-plot-points 1000
+```
+
+Override the campaign output root without editing the JSON:
+
+```bash
+python tools/run_monte_carlo.py config/runtime/monte_carlo/ecef_ins_gnss_smoke.json --output-root output/monte_carlo_scratch
+```
+
+The Monte Carlo runner resolves the linked nominal runtime scenario into a
+normal effective JSON object for each run, derives deterministic run-local seeds
+from the campaign master seed, runs the ordinary simulation executable, and
+writes replayable per-run `input.effective.json` files. Any generated run can
+therefore be replayed with `run_sim.py` or `run_scenario.py` by pointing at that
+effective config. Monte Carlo campaign configs should point at lean runtime
+scenarios such as `config/runtime/navkit_sim/ecef_ins_gnss_monte_carlo.json`,
+which use minimal low-rate logs appropriate for aggregate covariance plots.
+
 Or manually, after building:
 
 Windows Debug:
@@ -571,6 +599,21 @@ The simulation generates logs under:
 
 ```text
 output/logs/<run_name>/
+```
+
+Monte Carlo campaigns generate outputs under:
+
+```text
+output/monte_carlo/<campaign_name>/
+  campaign_config.effective.json
+  campaign_manifest.json
+  runs/
+    run_000000/
+      input.effective.json
+      run_manifest.json
+      data/
+  summary/
+    figures/
 ```
 
 Expected outputs:

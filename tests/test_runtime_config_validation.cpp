@@ -289,7 +289,9 @@ TEST_CASE("Runtime JSON components merge relative to the scenario master")
     {
         std::ofstream master_file{master_path};
         master_file << R"({
-  "components": ["components/base.json"],
+  "components": {
+    "base": "components/base.json"
+  },
   "run_name": "json_component_test",
   "trajectory": {
     "duration_s": 5.0

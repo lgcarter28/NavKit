@@ -373,6 +373,34 @@ examples are available for directed tests and debugging. This validation lives
 in `navkit::app_support` because it is app/runtime-input glue, not reusable
 product-core NavKit configuration.
 
+Scenario files may link reusable runtime components through explicit
+role-to-path entries. Component paths are resolved relative to the scenario
+file, loaded first, and then the scenario's inline values are merged on top:
+
+```json
+{
+  "run_name": "ecef_ins_gnss_demo",
+  "output_dir": "output/logs/ecef_ins_gnss_demo",
+  "components": {
+    "trajectory": "components/trajectory/stationary_ecef_1000hz.json",
+    "imu": "components/imu/specs/hg1700_tactical.json",
+    "gnss": "components/gnss/nominal_pos_vel.json",
+    "pva_initialization": "components/initialization/pva/pva_random_error_default.json"
+  },
+  "logging": {
+    "console": {
+      "enabled": true,
+      "rate_hz": 1.0
+    }
+  }
+}
+```
+
+The component keys document each fragment's scenario role and improve
+diagnostics. Logging is intentionally a run-level sibling of `components`
+because it describes what the scenario records, not the physical or estimator
+configuration of an individual component.
+
 Filter initial covariance is a separate product/runtime boundary. The compiled
 NavKit product config selects an initial-covariance component:
 
@@ -597,6 +625,68 @@ v1 random-walk bias model for that axis. Runtime initialization applies these
 values through `initialize_navigator()`, which configures the selected
 propagation instance and filter instance without spreading tuning defaults into
 the application loop.
+
+## Monte Carlo campaign configuration
+
+Monte Carlo campaigns are analysis-layer inputs that wrap an ordinary runtime
+scenario config. They do not create a second C++ simulation path; each campaign
+run writes a normal effective runtime JSON file and executes the selected
+simulation application.
+
+Example:
+
+```json
+{
+  "type": "monte_carlo_campaign",
+  "campaign_name": "ecef_ins_gnss_smoke_mc",
+  "nominal_config": "../navkit_sim/ecef_ins_gnss_monte_carlo.json",
+  "runs": {
+    "count": 3,
+    "start_index": 0
+  },
+  "randomization": {
+    "master_seed": 123456789,
+    "seed_policy": "derive_all"
+  },
+  "execution": {
+    "build_type": "Release",
+    "parallel_jobs": 1
+  },
+  "analysis": {
+    "max_plot_points": 1000
+  },
+  "output": {
+    "root": "output/monte_carlo",
+    "run_analysis": false
+  }
+}
+```
+
+`nominal_config` is resolved relative to the campaign JSON file. The nominal
+runtime scenario is loaded through the same component-linking logic used by the
+single-run tools. For the first implementation, `seed_policy` must be
+`derive_all`: the runner recursively discovers every `seed` field in the fully
+resolved effective runtime config and replaces it with a deterministic value
+derived from `master_seed`, `run_index`, and the JSON-pointer path to that seed.
+The derived seed map is written to each run manifest so a generated
+`input.effective.json` file is directly replayable.
+
+Monte Carlo scenarios should inline a lean run-level `logging` block in the
+nominal runtime scenario, as in
+`config/runtime/navkit_sim/ecef_ins_gnss_monte_carlo.json`. Aggregate
+state/covariance plots need truth trajectory, navigation estimate with
+triangular covariance, and a low-rate IMU nominal log when bias truth-error plots
+are desired. High-rate IMU increment logs, IMU debug logs, filter correction
+logs, measurement statistics, and console output should stay disabled unless
+that campaign explicitly analyzes them.
+
+Monte Carlo covariance figures are campaign-level products. They are broken out
+by state quantity and frame, with one subplot per axis. Each subplot shows faint
+individual run errors, the bold ensemble mean error, empirical ensemble
+`+/-3 sigma` bounds about zero, and the mean reported filter `+/-3 sigma` bounds
+about zero. `analysis.max_plot_points` decimates the common plotting time grid
+after loading/interpolation so large campaigns can stay visually useful without
+rendering every logged sample.
 
 The Python build wrapper forwards the same selection:
 

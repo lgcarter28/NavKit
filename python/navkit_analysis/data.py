@@ -51,10 +51,20 @@ def _read_first_existing_csv(paths: list[Path]) -> tuple[pd.DataFrame | None, Pa
     return None, None
 
 
-def _read_navkit_csv(path: Path) -> pd.DataFrame:
+def _read_navkit_csv(path: Path, usecols: set[str] | None = None) -> pd.DataFrame:
+    selected_columns = (lambda column: column in usecols) if usecols is not None else None
     return _coerce_numeric_columns(
-        pd.read_csv(path, na_values=["nan", "-nan", "nan(ind)", "-nan(ind)"])
+        pd.read_csv(
+            path,
+            na_values=["nan", "-nan", "nan(ind)", "-nan(ind)"],
+            usecols=selected_columns,
+        )
     )
+
+
+def read_navkit_csv(path: Path, usecols: set[str] | None = None) -> pd.DataFrame:
+    """Read a NavKit CSV log and coerce numeric columns."""
+    return _read_navkit_csv(path, usecols)
 
 
 def _coerce_numeric_columns(frame: pd.DataFrame) -> pd.DataFrame:
@@ -86,10 +96,20 @@ def _resolve_run_dirs(path: Path) -> tuple[Path, Path, Path]:
     return run_dir, data_dir, figures_dir
 
 
+def resolve_run_dirs(path: Path) -> tuple[Path, Path, Path]:
+    """Resolve a run path into run, data, and figures directories."""
+    return _resolve_run_dirs(path)
+
+
 def _require_columns(frame: pd.DataFrame, columns: list[str], source: Path) -> None:
     missing = [column for column in columns if column not in frame.columns]
     if missing:
         raise KeyError(f"{source} is missing required columns: {missing}")
+
+
+def require_columns(frame: pd.DataFrame, columns: list[str], source: Path) -> None:
+    """Validate required columns for a loaded NavKit log frame."""
+    _require_columns(frame, columns, source)
 
 
 def _normalized_quaternion_wxyz(values: np.ndarray) -> np.ndarray:
@@ -216,6 +236,13 @@ def _derive_truth_error(nav: pd.DataFrame, truth: pd.DataFrame | None, imu: pd.D
             derived_columns[column] = nav[column]
 
     return pd.DataFrame(derived_columns)
+
+
+def derive_truth_error_frame(
+    nav: pd.DataFrame, truth: pd.DataFrame | None, imu: pd.DataFrame | None
+) -> pd.DataFrame | None:
+    """Derive truth-relative state errors from the selected navigation logs."""
+    return _derive_truth_error(nav, truth, imu)
 
 
 def _attach_nav_covariance(

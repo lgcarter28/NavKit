@@ -36,7 +36,7 @@ Detailed historical phase notes are preserved under `docs/roadmap_details/`. Thi
 - [x] GNSS position and velocity aiding are wired through simulation, emulation, measurement models, update products, and plots.
 - [x] GNSS antenna lever-arm support exists in simulator truth generation and measurement-model Jacobians.
 - [x] IMU simulation generates deterministic increments from consecutive ECEF truth samples, including Earth rate, specific force, bias, bias random walk, white noise, scale factor, misalignment, non-orthogonality, quantization, and compile-time coning/sculling compensation compatibility.
-- [x] Runtime JSON configs are decomposed into reusable components for logging, trajectory, IMU, GNSS, PVA initialization, and filter initialization.
+- [x] Runtime JSON configs are decomposed into explicit role-keyed components for trajectory, IMU, GNSS, PVA initialization, filter initialization, and propagation overrides, while run-level logging stays inline in each scenario.
 - [x] Runtime initialization is split into `pva_initialization` and `filter_initialization`.
 - [x] PVA initialization supports random error, explicit error, no-error, and direct-value component examples.
 - [x] Filter initial covariance supports compile-time defaults and runtime overrides with diagonal, full, and PVA-plus-remaining-error-state forms.
@@ -45,6 +45,7 @@ Detailed historical phase notes are preserved under `docs/roadmap_details/`. Thi
 - [x] Simulation outputs are organized under `output/logs/<run_name>/data` and `output/logs/<run_name>/figures`.
 - [x] Offline analysis produces ECEF/NED error/covariance plots, dashboard plots, filter-correction plots, GNSS debug plots, IMU increment/debug/error plots, innovation plots, NIS/p-value plots, and histograms.
 - [x] `tools/run_scenario.py` provides a one-liner sim-plus-plot workflow.
+- [x] `tools/run_monte_carlo.py` provides a seeded campaign workflow with replayable generated run configs and first-pass aggregate covariance plots.
 - [x] LaTeX algorithm references exist for ECEF navigator v1 and IMU emulator v1.
 - [x] Setup, configuration, architecture, naming, founding, license, changelog, copyright, profiling, and roadmap documentation exists.
 - [x] Compile-time and runtime tests cover the current policy, config, simulation, logging, and initialization seams.
@@ -66,17 +67,24 @@ These are preserved at high level so the roadmap stays readable. Detailed pass-b
 
 ## Current phase
 
-NavKit is currently in Phase 5: ECEF INS/GNSS stabilization and hardening. The active passes below are the current working scope; unrelated future backlog lives in the dedicated phase detail files linked at the end of this roadmap.
+NavKit is currently in Phase 6: Monte Carlo and batch analysis. Phase 5 produced the first working ECEF INS/GNSS baseline; Phase 6 turns that single-run product into repeatable statistical evidence.
 
 ## Active passes
 
-No active Phase 5 pass is currently queued. Select the next implementation pass from the future phase detail files below or add a new focused Phase 5 stabilization pass here before executing more work.
+No active Phase 6 pass is currently queued. Select the next Monte Carlo pass from the Phase 6 follow-forward list below before executing more work.
+
+## Phase 6 follow-forward
+
+- [ ] Aggregate RMSE, NEES, NIS, failure counts, runtime, and resource summaries across campaign runs.
+- [ ] Generate comparison tables and reports across configurations.
+- [ ] Connect Monte Carlo execution to advanced analysis/restart initialization for deterministic seeded initial estimate errors and mid-trajectory restart studies.
+- [ ] Add Monte Carlo-specific schema/version metadata and compatibility rules for campaign manifests, aggregate reports, scenario-expanded runtime inputs, log schemas, and plot inputs.
 
 ## Future phase details
 
-Future backlog unrelated to the current Phase 5 stabilization scope lives in dedicated detail files:
+Future backlog unrelated to the current Phase 6 Monte Carlo scope lives in dedicated detail files:
 
-- [`phase_6_monte_carlo.md`](roadmap_details/phase_6_monte_carlo.md): Monte Carlo and batch-analysis support.
+- [`phase_6_monte_carlo.md`](roadmap_details/phase_6_monte_carlo.md): current Phase 6 completed-pass history and follow-forward detail.
 - [`phase_7_trajectory_provider.md`](roadmap_details/phase_7_trajectory_provider.md): trajectory provider, timebase, scenario, and reusable navigation-math expansion.
 - [`phase_8_estimator_validation.md`](roadmap_details/phase_8_estimator_validation.md): estimator validation, consistency metrics, and repeatable reports.
 - [`phase_9_status_error_handling.md`](roadmap_details/phase_9_status_error_handling.md): robust status/error handling before the later high-complexity phases.

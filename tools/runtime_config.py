@@ -29,13 +29,13 @@ def load_runtime_config(path: Path) -> JsonObject:
         raise ValueError("runtime config root must be a JSON object")
 
     merged: JsonObject = {}
-    components = raw.get("components", [])
+    components = raw.get("components", {})
     if components:
-        if not isinstance(components, list):
-            raise ValueError("runtime config 'components' must be a list")
-        for component in components:
+        if not isinstance(components, dict):
+            raise ValueError("runtime config 'components' must be an object")
+        for role, component in components.items():
             if not isinstance(component, str):
-                raise ValueError("runtime config component entries must be strings")
+                raise ValueError(f"runtime config component '{role}' must be a string")
             merge_json_object(load_runtime_config(path.parent / component), merged)
     merge_json_object(raw, merged)
     return merged

@@ -130,6 +130,16 @@ def _scale_for_label(label: str) -> float:
     return 1.0
 
 
+def state_error_scale(label: str) -> float:
+    """Return the plotting scale used for a state-error label."""
+    return _scale_for_label(label)
+
+
+def truth_error_frame_ecef(run: RunData) -> pd.DataFrame | None:
+    """Return the derived ECEF truth-error frame for a run."""
+    return run.truth_error
+
+
 def _plot_state_log(spec: StateLogSpec, run: RunData, save: bool) -> plt.Figure | None:
     frame = spec.frame
     if frame is None:
@@ -418,6 +428,11 @@ def _ned_dashboard_frame(run: RunData) -> pd.DataFrame | None:
         target,
     )
     return target
+
+
+def truth_error_frame_ned(run: RunData) -> pd.DataFrame | None:
+    """Return the NED/local-level truth-error frame for a run."""
+    return _ned_dashboard_frame(run)
 
 
 def plot_truth_errors_ned_dashboard(run: RunData, save: bool = True) -> plt.Figure | None:

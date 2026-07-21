@@ -3,9 +3,9 @@
     "initial_covariance": {
       "pva_frame": "ned",
       "pva_diag": {
-        "pos_m2": [1000.0, 1000.0, 1000.0],
-        "vel_m2ps2": [10.0, 10.0, 10.0],
-        "att_rotvec_rad2": [1e-3, 1e-3, 3e-3]
+        "pos_m2": [10000.0, 10000.0, 10000.0],
+        "vel_m2ps2": [100.0, 100.0, 100.0],
+        "att_rotvec_rad2": [1e-2, 1e-2, 3e-2]
       },
       "remaining_error_state_diag": [
         1e-9, 1e-9, 1e-9,

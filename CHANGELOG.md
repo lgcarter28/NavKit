@@ -45,6 +45,8 @@ This project follows
 - Compile-time and runtime-configurable covariance floors for selected filter error-state layouts, including diagonal and frame-aware INS PVA floor forms with validation and Navigator/filter application tests.
 - Split ECEF INS propagation runtime configuration into separately owned process-noise and IMU bias-dynamics payloads, with compile-time defaults, runtime JSON overrides, and focused validation.
 - Runtime filter nominal-state restart overrides for selected non-PVA nominal state values under `filter_initialization.nominal_state.non_pva_values`, with validation and initialization tests.
+- A seeded Monte Carlo campaign runner with generic JSON-pointer seed derivation, replayable per-run effective configs, campaign/run manifests, and first-pass aggregate error/covariance plots.
+- Monte Carlo-focused runtime scenario logging that keeps low-rate truth, navigation estimate, and IMU truth-bias logs while disabling high-volume debug/correction/statistics outputs.
 
 ### Changed
 
@@ -131,6 +133,8 @@ This project follows
 - Moved IMU cumulative increment ownership from the nominal CSV log product into the full-rate IMU runtime path so decimated IMU log rows contain run cumulative snapshots rather than sums of only logged rows.
 - Removed stale app-support/core unused-parameter breadcrumbs around filter initialization and runtime JSON validation while preserving intentional no-op parameters at required concept/API seams.
 - Tightened runtime `filter_initialization` validation so unknown keys are rejected instead of silently expanding the startup contract.
+- Exposed small reusable Python analysis helpers so Monte Carlo covariance plots share single-run scaling conventions while using a narrow aggregate-analysis loader.
+- Optimized Monte Carlo aggregate plotting to use a narrow run loader, optional plot decimation, aggregate plot timing, and CLI overrides for run count, start index, parallel jobs, and maximum plot points.
 
 ### Removed
 

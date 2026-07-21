@@ -54,16 +54,19 @@ inline nlohmann::json load_json_file_impl(const std::filesystem::path& path)
     nlohmann::json merged = nlohmann::json::object();
 
     if (raw.contains("components")) {
-        if (!raw.at("components").is_array()) {
-            throw std::runtime_error("JSON 'components' must be an array of relative paths");
+        if (!raw.at("components").is_object()) {
+            throw std::runtime_error("JSON 'components' must be an object of role-to-path entries");
         }
         const std::filesystem::path base_dir = normalized_path.parent_path();
-        for (const nlohmann::json& component : raw.at("components")) {
-            if (!component.is_string()) {
-                throw std::runtime_error("JSON component entries must be relative path strings");
+        for (auto component_iter = raw.at("components").begin();
+             component_iter != raw.at("components").end();
+             ++component_iter) {
+            if (!component_iter.value().is_string()) {
+                throw std::runtime_error("JSON component '" + component_iter.key() +
+                                         "' must be a relative path string");
             }
             const std::filesystem::path component_path =
-                base_dir / component.template get<std::string>();
+                base_dir / component_iter.value().template get<std::string>();
             merge_json_object(load_json_file_impl(component_path), merged);
         }
     }
