@@ -39,3 +39,18 @@ This phase contains the remaining embedded/product-hardening work after status/e
 - [ ] Add install/package validation: build, install, and run a minimal smoke scenario or executable from the install tree so packaged artifacts are tested separately from the developer build tree.
 - [ ] Document the expected `build/`, `install/`, `output/`, and CI artifact layout for users and release workflows.
 - [ ] Keep the owner-controlled release/tag/archive/backup workflow documented outside normal engineering tasks if it needs future maintenance.
+
+## Pass 15.6: binary logging and telemetry contract
+
+- [ ] Define a versioned, endian-explicit binary record envelope suitable for target logging and live telemetry: stream/schema identifier, record type, payload length, timestamp/clock domain, sequence number, and integrity field as appropriate for the selected transport.
+- [ ] Define the stable wire representation for scalar, fixed-size vector/matrix, quaternion, state, covariance, IMU increment, observation, estimator-health, and profiling payloads. Make frame, units, state-definition/schema identity, and covariance layout explicit in metadata rather than relying on host-native layout or implicit CSV-header conventions.
+- [ ] Define telemetry channel/record registration, compatibility, forward/backward handling, unknown-record skipping, alignment/packing, fragmentation, bounded-record-size, and corruption/recovery rules. Keep the initial contract allocation-free and deterministic on embedded targets.
+- [ ] Separate the portable binary data contract from transport adapters. The same records must support a target file/ring-buffer recorder, serial/CAN/UDP-style telemetry adapter, and desktop capture/replay without putting filesystem, sockets, JSON, or simulation dependencies into `navkit::core`.
+- [ ] Document the intended division of responsibility: embedded targets emit compact NavKit binary records; desktop Python tooling validates, decodes, and repackages them into HDF5/other analysis bundles. Direct C++ HDF5 logging remains out of scope.
+
+## Pass 15.7: binary recorder, decoder, and qualification tooling
+
+- [ ] Implement a fixed-capacity binary recorder/telemetry sink behind the Phase 15.6 contract, with explicit overflow/backpressure/drop accounting and no hidden allocation on the embedded-facing path.
+- [ ] Add desktop capture/replay and Python decoding/packaging utilities that ingest the binary records into the same shared analysis-data interface used by CSV and HDF5 inputs; preserve source schema, stream metadata, and loss/corruption diagnostics.
+- [ ] Add golden-byte compatibility tests, malformed/truncated/corrupt-record tests, endian/layout checks, decoder compatibility tests, and record round-trip coverage for the primary navigation, sensor, covariance, and profiling payloads.
+- [ ] Benchmark binary logging and telemetry throughput, storage footprint, CPU cost, and drop behavior against the existing desktop CSV/JSON path. Use that evidence to choose default logging paths per target profile rather than replacing CSV prematurely.

@@ -71,7 +71,31 @@ NavKit is currently in Phase 6: Monte Carlo and batch analysis. Phase 5 produced
 
 ## Active passes
 
-## Pass 6.3: Monte Carlo initialization support
+## Pass 6.3: schema versioning and compatibility
+
+- [ ] Add Monte Carlo-specific schema/version metadata and compatibility rules for campaign manifests, aggregate reports, scenario-expanded runtime inputs, log schemas, and plot inputs.
+- [ ] Define schema/version metadata for the future analysis bundle format, including bundle root metadata, per-run raw-data tables, per-run derived products, aggregate products, plot-ready cached arrays, units, frames, and derivation assumptions.
+- [ ] Define a small plot-spec/data-series schema that separates "what to plot" from "how to render it" so Matplotlib and interactive backends can share the same prepared data without duplicating domain plotting logic.
+- [ ] Define compatibility expectations for config schemas, log schemas, plot inputs, and aggregate report formats so older analysis artifacts can either be read deliberately or rejected with clear diagnostics.
+- [ ] Document the expected compatibility behavior for CSV-backed analysis, HDF5-backed analysis bundles, and mixed workflows where existing CSV campaign folders are packaged after the fact.
+- [ ] Document the migration/update policy for generated logs and reports before they become qualification evidence.
+
+## Pass 6.4: analysis bundle and interactive plotting infrastructure
+
+- [ ] Preserve current CSV logs as the simple portable raw desktop simulation artifact while prototyping an optional packed analysis artifact for large single-run and Monte Carlo workflows.
+- [ ] Add a Python packaging entry point, such as `tools/package_analysis.py`, that reads existing run/campaign folders, validates schemas, computes/cache common derived products, and writes an analysis bundle without changing C++ logging.
+- [ ] Prototype HDF5 as the first packed analysis bundle format for both single runs and Monte Carlo campaigns, with a reusable hierarchy such as `/runs/<run_id>/data`, `/runs/<run_id>/derived`, `/aggregate`, and `/metadata`.
+- [ ] Store schema version, source runtime configs, compile-time config metadata, seeds, log schema names, units, frame conventions, time-window/decimation choices, and derivation assumptions inside the bundle to avoid future post-processing footguns.
+- [ ] Cache high-cost derived products such as truth-aligned navigation errors, ECEF-to-NED transformed errors/covariances, NIS/NEES arrays, empirical covariance summaries, and selected downsampled plot-ready arrays.
+- [ ] Refactor plotting loaders so single-run and Monte Carlo plots can consume either raw CSV folders or a packed analysis bundle through a shared data-access interface with minimal duplicated plotting code.
+- [ ] Refactor plotting around shared prepared plot data/spec objects: domain plot builders should produce common series, labels, units, bounds, legends, and metadata once; backend renderers should only decide how to draw/export them.
+- [ ] Keep Matplotlib as the publication-quality static export backend while adding an interactive backend path for fast pan/zoom/hover inspection of selected large-data products and time windows.
+- [ ] Prototype Plotly as the first interactive backend, then evaluate whether Bokeh/HoloViews/Datashader is needed for very large campaigns; avoid duplicating every plot by routing both static and interactive rendering through the shared plot-spec layer.
+- [ ] Provide both named domain plot functions for common workflows, such as `plot_position_ned` and `plot_gyro_bias_body`, and a generic quick-XY plotting utility for ad hoc inspection of arbitrary bundle/CSV fields.
+- [ ] Benchmark raw CSV reload/regeneration against packaged-bundle reload/regeneration for representative single-run, 100-run, and 500-run campaigns.
+- [ ] Keep direct C++ HDF5 logging out of scope for this pass; capture the longer-term direction as embedded-optimized binary logging plus Python conversion/repackaging into HDF5 or other analysis formats.
+
+## Pass 6.5: Monte Carlo initialization support
 
 - [ ] Connect Monte Carlo execution to the Phase 5 advanced analysis/restart initialization path for deterministic seeded initial estimate errors and mid-trajectory restart studies.
 - [ ] Support deterministic seeded draws for initial estimate errors and simulator error terms without leaking simulator truth/error context into product-core code.
@@ -79,18 +103,12 @@ NavKit is currently in Phase 6: Monte Carlo and batch analysis. Phase 5 produced
 - [ ] For Monte Carlo estimate-error initialization, distinguish between directly setting nominal estimates and sampling estimate errors relative to truth. For persistent estimated states such as IMU biases, the statistically consistent form is `estimated_state = true_state + sampled_estimate_error`, so the actual initial estimate error falls within the configured covariance.
 - [ ] Introduce an explicit app/sim-side reference context before implementing truth-relative non-PVA initialization. A future `InitialEstimateReference`-style object should carry truth kinematics plus truth sensor error/calibration states, such as IMU turn-on/in-run bias, without letting app-support initialization reach into simulator internals ad hoc.
 
-## Pass 6.4: Monte Carlo covariance matching and bias-analysis scenarios
+## Pass 6.6: Monte Carlo covariance matching and bias-analysis scenarios
 
 - [ ] Add matched-covariance Monte Carlo scenarios where simulator truth-error distributions and filter initial covariance are intentionally aligned for consistency analysis.
 - [ ] Add conservative-covariance scenarios where the filter initial covariance intentionally exceeds the actual simulated initial error distribution.
 - [ ] Add gyro/accelerometer bias-specific Monte Carlo plots and report metrics that make initial bias-estimate covariance mismatch easy to diagnose.
 - [ ] Revisit default gyro and accelerometer bias initial covariance values after matched/non-matched scenarios exist, rather than tuning from a single conservative run.
-
-## Pass 6.5: schema versioning and compatibility
-
-- [ ] Add Monte Carlo-specific schema/version metadata and compatibility rules for campaign manifests, aggregate reports, scenario-expanded runtime inputs, log schemas, and plot inputs.
-- [ ] Define compatibility expectations for config schemas, log schemas, plot inputs, and aggregate report formats so older analysis artifacts can either be read deliberately or rejected with clear diagnostics.
-- [ ] Document the migration/update policy for generated logs and reports before they become qualification evidence.
 
 ## Future phase details
 
