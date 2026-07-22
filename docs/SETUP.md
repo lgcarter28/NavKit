@@ -266,7 +266,9 @@ These scripts provide a consistent cross-platform workflow and abstract away pla
 | `run_sim.py` | Run a selected runtime scenario with the built simulation executable |
 | `run_analysis.py` | Generate plots and analysis from existing simulation logs |
 | `run_scenario.py` | Run a scenario, optionally override output location, and generate plots |
-| `run_monte_carlo.py` | Run a seeded Monte Carlo campaign and generate aggregate plots |
+| `run_monte_carlo.py` | Run a seeded Monte Carlo campaign and generate aggregate plots/reports |
+| `compare_monte_carlo.py` | Compare existing Monte Carlo aggregate reports across campaigns |
+| `plot_monte_carlo.py` | Regenerate selected Monte Carlo aggregate plots from existing campaign logs |
 | `timing_report.py` | Summarize a complete `navkit.timing.v1` timing artifact |
 | `resource_report.py` | Write and display coarse executable/library size reports for a build tree |
 | `format.py` | Run clang-format; also exposes clang-tidy for CI diagnostics |
@@ -566,6 +568,19 @@ Override the campaign output root without editing the JSON:
 python tools/run_monte_carlo.py config/runtime/monte_carlo/ecef_ins_gnss_smoke.json --output-root output/monte_carlo_scratch
 ```
 
+Regenerate only one or two plots from an existing single run and open them
+interactively:
+
+```bash
+python tools/run_analysis.py output/logs/ecef_ins_gnss_demo --plot state_ned --start-time 10 --show
+```
+
+Regenerate selected Monte Carlo aggregate plots from an existing campaign:
+
+```bash
+python tools/plot_monte_carlo.py output/monte_carlo/ecef_ins_gnss_smoke_mc --plot attitude_ned --start-time 10 --show
+```
+
 The Monte Carlo runner resolves the linked nominal runtime scenario into a
 normal effective JSON object for each run, derives deterministic run-local seeds
 from the campaign master seed, runs the ordinary simulation executable, and
@@ -614,6 +629,20 @@ output/monte_carlo/<campaign_name>/
       data/
   summary/
     figures/
+    reports/
+      monte_carlo_summary.json
+      monte_carlo_report.md
+      state_axis_metrics.csv
+      state_group_metrics.csv
+      nis_metrics.csv
+      run_timing.csv
+      output_sizes.csv
+```
+
+Existing campaign reports can be compared without re-reading every run log:
+
+```bash
+python tools/compare_monte_carlo.py output/monte_carlo/campaign_a output/monte_carlo/campaign_b --output-dir output/monte_carlo_comparison
 ```
 
 Expected outputs:

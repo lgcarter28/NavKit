@@ -36,7 +36,8 @@
       "covariance": "diagonal"
     },
     "measurement_statistics": {
-      "enabled": false
+      "enabled": true,
+      "rate_hz": 1.0
     }
   }
 }

@@ -47,10 +47,13 @@ This project follows
 - Runtime filter nominal-state restart overrides for selected non-PVA nominal state values under `filter_initialization.nominal_state.non_pva_values`, with validation and initialization tests.
 - A seeded Monte Carlo campaign runner with generic JSON-pointer seed derivation, replayable per-run effective configs, campaign/run manifests, and first-pass aggregate error/covariance plots.
 - Monte Carlo-focused runtime scenario logging that keeps low-rate truth, navigation estimate, and IMU truth-bias logs while disabling high-volume debug/correction/statistics outputs.
+- Monte Carlo aggregate report generation with per-axis RMSE/coverage, state-family NEES, GNSS NIS, run timing, output-size summaries, and a comparison utility for existing campaign reports.
+- Plotting controls for selected single-run/Monte Carlo plot groups and post-run time windows, plus gyro-bias plot/report scaling in `deg/hr`.
 
 ### Changed
 
 - Reconciled README and setup documentation with the current implementation and build configuration.
+- Formatted console status timestamps as `HH:MM:SS.sss` while preserving raw `time_s` in CSV logs.
 - Updated the configured C++ language standard from C++20 to C++23.
 - Registered the StateDef policy tests in the configured test executable.
 - Ordered source mutation/checks before build and test verification.

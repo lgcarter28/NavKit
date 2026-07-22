@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-import math
+import csv
+import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,7 +21,10 @@ from navkit_analysis.data import (
     resolve_run_dirs,
 )
 from navkit_analysis.figures.state_errors import state_error_scale
+from navkit_analysis.statistics import chi_square_threshold
 from navkit_analysis.style import apply_nav_axes_style, apply_style
+
+REPORT_SCHEMA = "navkit.monte_carlo_report.v1"
 
 
 @dataclass(frozen=True)
@@ -56,8 +60,26 @@ class MonteCarloSeries:
 class MonteCarloRunFrames:
     """Minimal per-run frames required by Monte Carlo aggregate plots."""
 
+    run_dir: Path
     ecef: pd.DataFrame
     ned: pd.DataFrame | None
+
+
+@dataclass(frozen=True)
+class MonteCarloOutputSummary:
+    """Summary of generated Monte Carlo campaign-level analysis artifacts."""
+
+    figures: list[plt.Figure]
+    report_paths: dict[str, Path]
+    load_elapsed_s: float
+    aggregate_elapsed_s: float
+    plot_elapsed_s: float
+    report_elapsed_s: float
+
+
+def _quantity_name_from_output(output_name: str) -> str:
+    name = output_name.removeprefix("monte_carlo_error_covariance_")
+    return name.removesuffix(".png")
 
 
 ECEF_GROUPS = (
@@ -86,7 +108,7 @@ ECEF_GROUPS = (
         labels=("gyro_bias_b_x_radps", "gyro_bias_b_y_radps", "gyro_bias_b_z_radps"),
         axis_names=("x", "y", "z"),
         title="Monte Carlo Gyro Bias Error/Covariance",
-        ylabel="Gyro Bias [mdeg/s]",
+        ylabel="Gyro Bias [deg/hr]",
         output_name="monte_carlo_error_covariance_gyro_bias_body.png",
     ),
     MonteCarloStateGroup(
@@ -121,6 +143,12 @@ NED_GROUPS = (
         output_name="monte_carlo_error_covariance_attitude_ned.png",
     ),
 )
+
+
+def monte_carlo_plot_names() -> list[str]:
+    """Return supported Monte Carlo aggregate plot selector names."""
+    groups = (*ECEF_GROUPS, *NED_GROUPS)
+    return sorted(_quantity_name_from_output(group.output_name) for group in groups)
 
 
 def _read_first_existing_csv(
@@ -164,7 +192,7 @@ def _covariance_columns_for_labels(labels: tuple[str, str, str]) -> set[str]:
 
 def _monte_carlo_nav_columns() -> set[str]:
     columns = set(_required_nav_columns())
-    for group in ECEF_GROUPS[:3]:
+    for group in ECEF_GROUPS:
         columns.update(_covariance_columns_for_labels(group.labels))
     return columns
 
@@ -232,7 +260,11 @@ def load_monte_carlo_run_frames(run_dir: Path) -> MonteCarloRunFrames:
     if ecef is None:
         raise ValueError(f"could not derive truth-error frame for {run_dir}")
 
-    return MonteCarloRunFrames(ecef=ecef, ned=build_monte_carlo_ned_frame(ecef, truth))
+    return MonteCarloRunFrames(
+        run_dir=run_dir,
+        ecef=ecef,
+        ned=build_monte_carlo_ned_frame(ecef, truth),
+    )
 
 
 def load_successful_runs(run_dirs: list[Path]) -> list[MonteCarloRunFrames]:
@@ -360,6 +392,8 @@ def aggregate_monte_carlo_group(
     frames: list[pd.DataFrame],
     group: MonteCarloStateGroup,
     max_plot_points: int | None = None,
+    start_time_s: float | None = None,
+    end_time_s: float | None = None,
 ) -> MonteCarloSeries | None:
     """Aggregate one state group across runs on the first run's time grid."""
     if not frames:
@@ -374,6 +408,12 @@ def aggregate_monte_carlo_group(
             return None
 
     time_s = reference["time_s"].to_numpy()
+    if start_time_s is not None:
+        time_s = time_s[time_s >= start_time_s]
+    if end_time_s is not None:
+        time_s = time_s[time_s <= end_time_s]
+    if len(time_s) == 0:
+        return None
     if max_plot_points is not None and len(time_s) > max_plot_points:
         indices = np.unique(np.linspace(0, len(time_s) - 1, max_plot_points, dtype=int))
         time_s = time_s[indices]
@@ -423,19 +463,32 @@ def aggregate_monte_carlo_group(
 
 
 def aggregate_monte_carlo_series(
-    runs: list[MonteCarloRunFrames], max_plot_points: int | None = None
+    runs: list[MonteCarloRunFrames],
+    max_plot_points: int | None = None,
+    selected: list[str] | None = None,
+    start_time_s: float | None = None,
+    end_time_s: float | None = None,
 ) -> list[MonteCarloSeries]:
     """Build all first-pass Monte Carlo error/covariance aggregate series."""
     ecef_frames = [run.ecef for run in runs]
     ned_frames = [run.ned for run in runs if run.ned is not None]
+    selected_names = set(selected or [])
 
     series: list[MonteCarloSeries] = []
     for group in ECEF_GROUPS:
-        aggregate = aggregate_monte_carlo_group(ecef_frames, group, max_plot_points)
+        if selected_names and _quantity_name_from_output(group.output_name) not in selected_names:
+            continue
+        aggregate = aggregate_monte_carlo_group(
+            ecef_frames, group, max_plot_points, start_time_s, end_time_s
+        )
         if aggregate is not None:
             series.append(aggregate)
     for group in NED_GROUPS:
-        aggregate = aggregate_monte_carlo_group(ned_frames, group, max_plot_points)
+        if selected_names and _quantity_name_from_output(group.output_name) not in selected_names:
+            continue
+        aggregate = aggregate_monte_carlo_group(
+            ned_frames, group, max_plot_points, start_time_s, end_time_s
+        )
         if aggregate is not None:
             series.append(aggregate)
     return series
@@ -521,8 +574,481 @@ def save_monte_carlo_figure(fig: plt.Figure, out: Path) -> Path:
     return out
 
 
+def _quantity_name(series: MonteCarloSeries) -> str:
+    return _quantity_name_from_output(series.output_name)
+
+
+def _safe_mean(values: np.ndarray) -> float | None:
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return None
+    return float(np.mean(finite))
+
+
+def _safe_percentile(values: np.ndarray, percentile: float) -> float | None:
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return None
+    return float(np.percentile(finite, percentile))
+
+
+def _safe_max(values: np.ndarray) -> float | None:
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return None
+    return float(np.max(finite))
+
+
+def _safe_ratio(numerator: np.ndarray, denominator: np.ndarray) -> np.ndarray:
+    ratio = np.full_like(numerator, np.nan)
+    nonzero = denominator > 0.0
+    ratio[nonzero] = numerator[nonzero] / denominator[nonzero]
+    return ratio
+
+
+def _summary_stats(values: np.ndarray) -> dict[str, float | int | None]:
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return {
+            "count": 0,
+            "mean": None,
+            "min": None,
+            "max": None,
+            "p50": None,
+            "p95": None,
+            "p99": None,
+            "sum": None,
+        }
+    return {
+        "count": int(finite.size),
+        "mean": float(np.mean(finite)),
+        "min": float(np.min(finite)),
+        "max": float(np.max(finite)),
+        "p50": float(np.percentile(finite, 50.0)),
+        "p95": float(np.percentile(finite, 95.0)),
+        "p99": float(np.percentile(finite, 99.0)),
+        "sum": float(np.sum(finite)),
+    }
+
+
+def _state_axis_metric_rows(series_items: list[MonteCarloSeries]) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for series in series_items:
+        for axis_index, axis_name in enumerate(series.axis_names):
+            run_errors = series.scale * series.run_errors[:, :, axis_index]
+            mean_error = series.scale * series.mean_error[:, axis_index]
+            empirical_sigma = series.scale * series.empirical_sigma[:, axis_index]
+            filter_sigma = series.scale * series.mean_filter_sigma[:, axis_index]
+            filter_bound = 3.0 * filter_sigma
+            empirical_bound = 3.0 * empirical_sigma
+            sigma_ratio = _safe_ratio(empirical_sigma, filter_sigma)
+            within_filter = np.abs(run_errors) <= filter_bound
+            within_empirical = (
+                np.abs(run_errors - mean_error[None, :]) <= empirical_bound[None, :]
+            )
+            rows.append(
+                {
+                    "quantity": _quantity_name(series),
+                    "axis": axis_name,
+                    "unit": series.ylabel,
+                    "run_count": series.run_count,
+                    "sample_count": int(run_errors.shape[1]),
+                    "rmse": float(np.sqrt(np.mean(np.square(run_errors)))),
+                    "final_rmse": float(np.sqrt(np.mean(np.square(run_errors[:, -1])))),
+                    "final_mean_error": float(mean_error[-1]),
+                    "max_abs_mean_error": _safe_max(np.abs(mean_error)),
+                    "final_empirical_3sigma": float(empirical_bound[-1]),
+                    "final_mean_filter_3sigma": float(filter_bound[-1]),
+                    "mean_empirical_to_filter_sigma_ratio": _safe_mean(sigma_ratio),
+                    "filter_3sigma_coverage": float(np.mean(within_filter)),
+                    "empirical_3sigma_coverage": float(np.mean(within_empirical)),
+                }
+            )
+    return rows
+
+
+def _group_nees_from_frame(frame: pd.DataFrame, labels: tuple[str, str, str]) -> np.ndarray | None:
+    covariance = _covariance_series(frame, list(labels))
+    if covariance is None:
+        return None
+    error_columns = [f"error_{label}" for label in labels]
+    if any(column not in frame for column in error_columns):
+        return None
+    errors = frame[error_columns].to_numpy()
+    try:
+        solved = np.linalg.solve(covariance, errors[:, :, None])[:, :, 0]
+    except np.linalg.LinAlgError:
+        return None
+    return np.sum(errors * solved, axis=1)
+
+
+def _state_group_metric_rows(
+    runs: list[MonteCarloRunFrames], series_items: list[MonteCarloSeries]
+) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    ecef_frames = [run.ecef for run in runs]
+    series_by_labels = {series.labels: series for series in series_items}
+    for group in ECEF_GROUPS:
+        nees_runs = [
+            nees
+            for frame in ecef_frames
+            if (nees := _group_nees_from_frame(frame, group.labels)) is not None
+        ]
+        if not nees_runs:
+            continue
+        nees_array = np.concatenate(nees_runs)
+        series = series_by_labels.get(group.labels)
+        dof = 3
+        final_sigma_ratio = (
+            _safe_mean(_safe_ratio(series.empirical_sigma[-1], series.mean_filter_sigma[-1]))
+            if series is not None
+            else None
+        )
+        rows.append(
+            {
+                "quantity": group.output_name.removeprefix(
+                    "monte_carlo_error_covariance_"
+                ).removesuffix(".png"),
+                "frame": "ecef" if not group.output_name.endswith("_body.png") else "body",
+                "dof": dof,
+                "run_count": len(nees_runs),
+                "sample_count": int(nees_array.size),
+                "mean_nees": _safe_mean(nees_array),
+                "normalized_mean_nees": _safe_mean(nees_array / dof),
+                "p95_nees": _safe_percentile(nees_array, 95.0),
+                "p99_nees": _safe_percentile(nees_array, 99.0),
+                "chi2_95_coverage": float(
+                    np.mean(nees_array <= chi_square_threshold(0.95, dof))
+                ),
+                "chi2_99_coverage": float(
+                    np.mean(nees_array <= chi_square_threshold(0.99, dof))
+                ),
+                "final_mean_empirical_to_filter_sigma_ratio": final_sigma_ratio,
+            }
+        )
+    return rows
+
+
+def _read_json(path: Path) -> dict[str, object] | None:
+    if not path.exists():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _file_size_bytes(path: Path) -> int:
+    return sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
+
+
+def _run_timing_rows(run_dirs: list[Path]) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for run_dir in run_dirs:
+        run_manifest = _read_json(run_dir / "run_manifest.json") or {}
+        timing = _read_json(run_dir / "data" / "timing.json") or {}
+        commands = timing.get("commands", {})
+        simulation_elapsed_s = None
+        if isinstance(commands, dict):
+            command = commands.get("stationary_simulation")
+            if isinstance(command, dict):
+                simulation_elapsed_s = command.get("elapsed_s")
+        rows.append(
+            {
+                "run_id": run_dir.name,
+                "status": run_manifest.get("status"),
+                "return_code": run_manifest.get("return_code"),
+                "runner_elapsed_s": run_manifest.get("elapsed_s"),
+                "simulation_elapsed_s": simulation_elapsed_s,
+                "output_bytes": _file_size_bytes(run_dir),
+                "data_bytes": _file_size_bytes(run_dir / "data"),
+            }
+        )
+    return rows
+
+
+def _output_size_rows(run_dirs: list[Path]) -> list[dict[str, object]]:
+    totals: dict[str, int] = {}
+    for run_dir in run_dirs:
+        data_dir = run_dir / "data"
+        if not data_dir.exists():
+            continue
+        for item in data_dir.iterdir():
+            if item.is_file():
+                totals[item.name] = totals.get(item.name, 0) + item.stat().st_size
+    return [
+        {
+            "file_name": file_name,
+            "total_bytes": total_bytes,
+            "mean_bytes_per_run": total_bytes / max(len(run_dirs), 1),
+        }
+        for file_name, total_bytes in sorted(totals.items())
+    ]
+
+
+def _nis_metric_rows(run_dirs: list[Path]) -> list[dict[str, object]]:
+    specs = [
+        ("gnss_position", "gnss_pos_update.csv", 3),
+        ("gnss_velocity", "gnss_vel_update.csv", 3),
+    ]
+    rows: list[dict[str, object]] = []
+    for product, file_name, dof in specs:
+        nis_values: list[np.ndarray] = []
+        accepted_values: list[np.ndarray] = []
+        populated_runs = 0
+        for run_dir in run_dirs:
+            path = run_dir / "data" / file_name
+            if not path.exists():
+                continue
+            frame = read_navkit_csv(path, {"accepted", "nis"})
+            if frame.empty or "nis" not in frame:
+                continue
+            populated_runs += 1
+            nis_values.append(frame["nis"].to_numpy())
+            if "accepted" in frame:
+                accepted_values.append(frame["accepted"].to_numpy())
+        if nis_values:
+            nis = np.concatenate(nis_values)
+            accepted = (
+                np.concatenate(accepted_values).astype(bool)
+                if accepted_values
+                else np.ones_like(nis, dtype=bool)
+            )
+            rows.append(
+                {
+                    "product": product,
+                    "dof": dof,
+                    "run_count": populated_runs,
+                    "sample_count": int(nis.size),
+                    "accepted_count": int(np.sum(accepted)),
+                    "accepted_fraction": float(np.mean(accepted)),
+                    "mean_nis": _safe_mean(nis),
+                    "normalized_mean_nis": _safe_mean(nis / dof),
+                    "p95_nis": _safe_percentile(nis, 95.0),
+                    "p99_nis": _safe_percentile(nis, 99.0),
+                    "chi2_95_coverage": float(
+                        np.mean(nis <= chi_square_threshold(0.95, dof))
+                    ),
+                    "chi2_99_coverage": float(
+                        np.mean(nis <= chi_square_threshold(0.99, dof))
+                    ),
+                }
+            )
+        else:
+            rows.append(
+                {
+                    "product": product,
+                    "dof": dof,
+                    "run_count": 0,
+                    "sample_count": 0,
+                    "accepted_count": 0,
+                    "accepted_fraction": None,
+                    "mean_nis": None,
+                    "normalized_mean_nis": None,
+                    "p95_nis": None,
+                    "p99_nis": None,
+                    "chi2_95_coverage": None,
+                    "chi2_99_coverage": None,
+                }
+            )
+    return rows
+
+
+def _write_csv(path: Path, rows: list[dict[str, object]]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = sorted({key for row in rows for key in row})
+    with path.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
+def _markdown_optional_float(value: object, precision: int = 6) -> str:
+    if value is None:
+        return "n/a"
+    if isinstance(value, float):
+        return f"{value:.{precision}g}"
+    return str(value)
+
+
+def write_monte_carlo_reports(
+    run_dirs: list[Path],
+    runs: list[MonteCarloRunFrames],
+    series_items: list[MonteCarloSeries],
+    reports_dir: Path,
+    campaign_metadata: dict[str, object] | None = None,
+) -> dict[str, Path]:
+    """Write first-pass Monte Carlo aggregate metrics and report artifacts."""
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    metadata = campaign_metadata or {}
+    state_axis_metrics = _state_axis_metric_rows(series_items)
+    state_group_metrics = _state_group_metric_rows(runs, series_items)
+    nis_metrics = _nis_metric_rows(run_dirs)
+    run_timing = _run_timing_rows(run_dirs)
+    output_sizes = _output_size_rows(run_dirs)
+
+    runner_elapsed = np.array(
+        [
+            row["runner_elapsed_s"]
+            for row in run_timing
+            if isinstance(row["runner_elapsed_s"], (int, float))
+        ],
+        dtype=float,
+    )
+    simulation_elapsed = np.array(
+        [
+            row["simulation_elapsed_s"]
+            for row in run_timing
+            if isinstance(row["simulation_elapsed_s"], (int, float))
+        ],
+        dtype=float,
+    )
+    output_bytes = np.array([row["output_bytes"] for row in run_timing], dtype=float)
+    data_bytes = np.array([row["data_bytes"] for row in run_timing], dtype=float)
+
+    report: dict[str, object] = {
+        "schema": REPORT_SCHEMA,
+        "campaign_name": metadata.get("campaign_name"),
+        "run_count": metadata.get("run_count", len(run_dirs)),
+        "passed_count": metadata.get("passed_count", len(run_dirs)),
+        "failed_count": metadata.get("failed_count", 0),
+        "successful_aggregate_count": len(run_dirs),
+        "state_axis_metrics": state_axis_metrics,
+        "state_group_metrics": state_group_metrics,
+        "nis_metrics": nis_metrics,
+        "timing_summary": {
+            "runner_elapsed_s": _summary_stats(runner_elapsed),
+            "simulation_elapsed_s": _summary_stats(simulation_elapsed),
+        },
+        "output_size_summary": {
+            "output_bytes": _summary_stats(output_bytes),
+            "data_bytes": _summary_stats(data_bytes),
+        },
+    }
+
+    json_path = reports_dir / "monte_carlo_summary.json"
+    json_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    paths = {
+        "summary_json": json_path,
+        "state_axis_metrics_csv": _write_csv(
+            reports_dir / "state_axis_metrics.csv", state_axis_metrics
+        ),
+        "state_group_metrics_csv": _write_csv(
+            reports_dir / "state_group_metrics.csv", state_group_metrics
+        ),
+        "nis_metrics_csv": _write_csv(reports_dir / "nis_metrics.csv", nis_metrics),
+        "run_timing_csv": _write_csv(reports_dir / "run_timing.csv", run_timing),
+        "output_sizes_csv": _write_csv(reports_dir / "output_sizes.csv", output_sizes),
+    }
+
+    # Keep the Markdown writer deliberately simple and stable; the JSON/CSV files
+    # are the machine-readable qualification artifacts.
+    report_path = reports_dir / "monte_carlo_report.md"
+    lines = [
+        "# Monte Carlo Aggregate Report",
+        "",
+        f"- Runs: {report['run_count']}",
+        f"- Passed: {report['passed_count']}",
+        f"- Failed: {report['failed_count']}",
+        "- Mean runner elapsed: "
+        f"{_markdown_optional_float(report['timing_summary']['runner_elapsed_s']['mean'], 3)} s",
+        "- Total output: "
+        f"{_markdown_optional_float(report['output_size_summary']['output_bytes']['sum'], 3)} bytes",
+        "",
+        "## State axis metrics",
+        "",
+        "| Quantity | Axis | RMSE | Final RMSE | Final mean | Final empirical 3 sigma | Final filter 3 sigma | Filter 3 sigma coverage |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for row in state_axis_metrics:
+        lines.append(
+            "| "
+            f"{row['quantity']} | {row['axis']} | "
+            f"{_markdown_optional_float(row['rmse'])} | "
+            f"{_markdown_optional_float(row['final_rmse'])} | "
+            f"{_markdown_optional_float(row['final_mean_error'])} | "
+            f"{_markdown_optional_float(row['final_empirical_3sigma'])} | "
+            f"{_markdown_optional_float(row['final_mean_filter_3sigma'])} | "
+            f"{_markdown_optional_float(row['filter_3sigma_coverage'], 4)} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## NIS metrics",
+            "",
+            "| Product | Samples | Mean NIS | Normalized mean NIS | chi2 95% coverage | chi2 99% coverage |",
+            "| --- | ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
+    for row in nis_metrics:
+        lines.append(
+            "| "
+            f"{row['product']} | {row['sample_count']} | "
+            f"{_markdown_optional_float(row['mean_nis'])} | "
+            f"{_markdown_optional_float(row['normalized_mean_nis'])} | "
+            f"{_markdown_optional_float(row['chi2_95_coverage'], 4)} | "
+            f"{_markdown_optional_float(row['chi2_99_coverage'], 4)} |"
+        )
+    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    paths["markdown_report"] = report_path
+    return paths
+
+
+def generate_monte_carlo_outputs(
+    run_dirs: list[Path],
+    summary_dir: Path,
+    max_plot_points: int | None = None,
+    campaign_metadata: dict[str, object] | None = None,
+    selected: list[str] | None = None,
+    start_time_s: float | None = None,
+    end_time_s: float | None = None,
+) -> MonteCarloOutputSummary:
+    """Generate campaign-level Monte Carlo figures and reports from run logs."""
+    apply_style()
+    started_s = time.perf_counter()
+    runs = load_successful_runs(run_dirs)
+    load_elapsed_s = time.perf_counter() - started_s
+
+    aggregate_started_s = time.perf_counter()
+    series = aggregate_monte_carlo_series(
+        runs, max_plot_points, selected, start_time_s, end_time_s
+    )
+    aggregate_elapsed_s = time.perf_counter() - aggregate_started_s
+
+    plot_started_s = time.perf_counter()
+    figures_dir = summary_dir / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    figures = [plot_monte_carlo_series(item, figures_dir) for item in series]
+    plot_elapsed_s = time.perf_counter() - plot_started_s
+
+    report_started_s = time.perf_counter()
+    report_paths = write_monte_carlo_reports(
+        run_dirs, runs, series, summary_dir / "reports", campaign_metadata
+    )
+    report_elapsed_s = time.perf_counter() - report_started_s
+
+    print(
+        "Monte Carlo analysis timing: "
+        f"load={load_elapsed_s:.3f} s, "
+        f"aggregate={aggregate_elapsed_s:.3f} s, "
+        f"plot={plot_elapsed_s:.3f} s, "
+        f"report={report_elapsed_s:.3f} s"
+    )
+    return MonteCarloOutputSummary(
+        figures=figures,
+        report_paths=report_paths,
+        load_elapsed_s=load_elapsed_s,
+        aggregate_elapsed_s=aggregate_elapsed_s,
+        plot_elapsed_s=plot_elapsed_s,
+        report_elapsed_s=report_elapsed_s,
+    )
+
+
 def plot_monte_carlo_aggregates(
-    run_dirs: list[Path], figures_dir: Path, max_plot_points: int | None = None
+    run_dirs: list[Path],
+    figures_dir: Path,
+    max_plot_points: int | None = None,
+    selected: list[str] | None = None,
+    start_time_s: float | None = None,
+    end_time_s: float | None = None,
 ) -> list[plt.Figure]:
     """Generate all first-pass Monte Carlo aggregate covariance figures."""
     apply_style()
@@ -531,7 +1057,9 @@ def plot_monte_carlo_aggregates(
     load_elapsed_s = time.perf_counter() - started_s
 
     aggregate_started_s = time.perf_counter()
-    series = aggregate_monte_carlo_series(runs, max_plot_points)
+    series = aggregate_monte_carlo_series(
+        runs, max_plot_points, selected, start_time_s, end_time_s
+    )
     aggregate_elapsed_s = time.perf_counter() - aggregate_started_s
 
     plot_started_s = time.perf_counter()

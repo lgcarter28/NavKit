@@ -24,6 +24,7 @@ from runtime_config import JsonObject, load_runtime_config
 CAMPAIGN_SCHEMA = "navkit.monte_carlo_campaign.v1"
 RUN_SCHEMA = "navkit.monte_carlo_run.v1"
 SUPPORTED_SEED_POLICY = "derive_all"
+UINT32_MASK = (1 << 32) - 1
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,8 @@ class CampaignConfig:
     build_type: str
     parallel_jobs: int
     max_plot_points: int | None
+    plot_start_time_s: float | None
+    plot_end_time_s: float | None
     output_root: Path
     run_analysis: bool
     navkit_config: str
@@ -110,6 +113,15 @@ def optional_string(value: dict[str, Any], key: str, default: str, path: str) ->
     return item
 
 
+def optional_float(value: dict[str, Any], key: str, path: str) -> float | None:
+    item = value.get(key)
+    if item is None:
+        return None
+    if not isinstance(item, int | float):
+        raise ValueError(f"expected '{path}.{key}' to be a number")
+    return float(item)
+
+
 def resolve_relative_to_config(config_path: Path, candidate: str) -> Path:
     path = Path(candidate)
     if path.is_absolute():
@@ -126,6 +138,8 @@ def load_campaign_config(
     start_index_override: int | None,
     parallel_jobs_override: int | None,
     max_plot_points_override: int | None,
+    plot_start_time_s_override: float | None,
+    plot_end_time_s_override: float | None,
     navkit_config: str,
     generator: str,
     build_dir: Path | None,
@@ -187,6 +201,22 @@ def load_campaign_config(
         raise ValueError("analysis.max_plot_points must be an integer when provided")
     if max_plot_points is not None and max_plot_points <= 1:
         raise ValueError("analysis.max_plot_points must be greater than one")
+    plot_start_time_s = (
+        plot_start_time_s_override
+        if plot_start_time_s_override is not None
+        else optional_float(analysis, "start_time_s", "analysis")
+    )
+    plot_end_time_s = (
+        plot_end_time_s_override
+        if plot_end_time_s_override is not None
+        else optional_float(analysis, "end_time_s", "analysis")
+    )
+    if (
+        plot_start_time_s is not None
+        and plot_end_time_s is not None
+        and plot_end_time_s <= plot_start_time_s
+    ):
+        raise ValueError("analysis.end_time_s must be greater than analysis.start_time_s")
 
     output = require_object(root.get("output", {}), "output")
     output_root = output_root_override or Path(
@@ -205,6 +235,8 @@ def load_campaign_config(
         build_type=build_type,
         parallel_jobs=parallel_jobs,
         max_plot_points=max_plot_points,
+        plot_start_time_s=plot_start_time_s,
+        plot_end_time_s=plot_end_time_s,
         output_root=output_root,
         run_analysis=run_analysis,
         navkit_config=navkit_config,
@@ -255,7 +287,7 @@ def set_json_pointer(root: JsonObject, pointer: str, value: int) -> None:
 def derive_seed(master_seed: int, run_index: int, json_pointer: str) -> int:
     message = f"{master_seed}:{run_index}:{json_pointer}".encode("utf-8")
     digest = hashlib.blake2b(message, digest_size=8).digest()
-    seed = int.from_bytes(digest, byteorder="little", signed=False) & 0xFFFFFFFF
+    seed = int.from_bytes(digest, byteorder="little", signed=False) & UINT32_MASK
     return 1 if seed == 0 else seed
 
 
@@ -392,6 +424,8 @@ def write_campaign_config(config: CampaignConfig, seed_paths: list[str]) -> None
             },
             "analysis": {
                 "max_plot_points": config.max_plot_points,
+                "start_time_s": config.plot_start_time_s,
+                "end_time_s": config.plot_end_time_s,
             },
             "output": {
                 "root": str(config.output_root),
@@ -403,9 +437,12 @@ def write_campaign_config(config: CampaignConfig, seed_paths: list[str]) -> None
 
 
 def write_campaign_manifest(
-    config: CampaignConfig, results: list[RunResult], plot_elapsed_s: float | None
+    config: CampaignConfig,
+    results: list[RunResult],
+    output_summary: dict[str, Any] | None,
 ) -> None:
     root_dir = campaign_dir(config)
+    output_summary = output_summary or {}
     write_json(
         root_dir / "campaign_manifest.json",
         {
@@ -417,7 +454,10 @@ def write_campaign_manifest(
             "run_count": len(results),
             "passed_count": sum(1 for result in results if result.status == "passed"),
             "failed_count": sum(1 for result in results if result.status != "passed"),
-            "plot_elapsed_s": plot_elapsed_s,
+            "plot_elapsed_s": output_summary.get("plot_elapsed_s"),
+            "report_elapsed_s": output_summary.get("report_elapsed_s"),
+            "analysis_elapsed_s": output_summary.get("analysis_elapsed_s"),
+            "report_paths": output_summary.get("report_paths", {}),
             "runs": [
                 {
                     "run_index": result.run_index,
@@ -444,28 +484,48 @@ def run_analysis_for_run(run_dir: Path) -> int:
     return completed.returncode
 
 
-def generate_campaign_plots(
-    successful_run_dirs: list[Path], figures_dir: Path, max_plot_points: int | None
-) -> tuple[int, float]:
+def generate_campaign_outputs(
+    successful_run_dirs: list[Path],
+    summary_dir: Path,
+    max_plot_points: int | None,
+    campaign_metadata: dict[str, object],
+) -> tuple[int, dict[str, Any]]:
     root = Path(__file__).resolve().parents[1]
     python_root = root / "python"
     if str(python_root) not in sys.path:
         sys.path.insert(0, str(python_root))
     os.environ.setdefault("MPLBACKEND", "Agg")
 
-    from navkit_analysis.monte_carlo import plot_monte_carlo_aggregates
+    from navkit_analysis.monte_carlo import generate_monte_carlo_outputs
     import matplotlib.pyplot as plt
 
     started_s = time.perf_counter()
-    figures = plot_monte_carlo_aggregates(successful_run_dirs, figures_dir, max_plot_points)
-    for figure in figures:
+    output = generate_monte_carlo_outputs(
+        successful_run_dirs,
+        summary_dir,
+        max_plot_points,
+        campaign_metadata,
+        start_time_s=campaign_metadata.get("plot_start_time_s"),
+        end_time_s=campaign_metadata.get("plot_end_time_s"),
+    )
+    for figure in output.figures:
         plt.close(figure)
     elapsed_s = time.perf_counter() - started_s
-    return (0 if figures else 1), elapsed_s
+    summary = {
+        "load_elapsed_s": output.load_elapsed_s,
+        "aggregate_elapsed_s": output.aggregate_elapsed_s,
+        "plot_elapsed_s": output.plot_elapsed_s,
+        "report_elapsed_s": output.report_elapsed_s,
+        "analysis_elapsed_s": elapsed_s,
+        "report_paths": {key: str(path) for key, path in output.report_paths.items()},
+    }
+    return (0 if output.figures else 1), summary
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run a NavKit Monte Carlo campaign.")
+    parser = argparse.ArgumentParser(
+        description="Run a NavKit Monte Carlo campaign and generate aggregate plots/reports."
+    )
     parser.add_argument("config", type=Path, help="Monte Carlo campaign JSON config.")
     parser.add_argument(
         "--output-root",
@@ -503,6 +563,18 @@ def main() -> int:
         default=None,
         help="Override analysis.max_plot_points from the Monte Carlo JSON.",
     )
+    parser.add_argument(
+        "--start-time",
+        type=float,
+        default=None,
+        help="Only aggregate/plot samples at or after this time [s].",
+    )
+    parser.add_argument(
+        "--end-time",
+        type=float,
+        default=None,
+        help="Only aggregate/plot samples at or before this time [s].",
+    )
     parser.add_argument("--generator", default=DEFAULT_GENERATOR, help="CMake generator used.")
     parser.add_argument(
         "--navkit-config",
@@ -526,6 +598,8 @@ def main() -> int:
         start_index_override=args.start_index,
         parallel_jobs_override=args.parallel_jobs,
         max_plot_points_override=args.max_plot_points,
+        plot_start_time_s_override=args.start_time,
+        plot_end_time_s_override=args.end_time,
         navkit_config=args.navkit_config,
         generator=args.generator,
         build_dir=args.build_dir,
@@ -541,6 +615,8 @@ def main() -> int:
     print(f"Runs: {config.run_count} starting at {config.start_index}")
     print(f"Parallel jobs: {config.parallel_jobs}")
     print(f"Max plot points: {config.max_plot_points}")
+    print(f"Plot start time: {config.plot_start_time_s}")
+    print(f"Plot end time: {config.plot_end_time_s}")
     print(f"Seed paths: {seed_paths}")
 
     plans = build_run_plans(config, nominal_config)
@@ -569,25 +645,45 @@ def main() -> int:
         for result in sorted(results, key=lambda item: item.run_index)
         if result.status == "passed"
     ]
+    failed_count = sum(1 for result in results if result.status != "passed")
+    campaign_metadata: dict[str, object] = {
+        "campaign_name": config.campaign_name,
+        "run_count": len(results),
+        "passed_count": len(successful_run_dirs),
+        "failed_count": failed_count,
+        "plot_start_time_s": config.plot_start_time_s,
+        "plot_end_time_s": config.plot_end_time_s,
+    }
     plot_return_code = 1
-    plot_elapsed_s: float | None = None
+    output_summary: dict[str, Any] | None = None
     if successful_run_dirs:
-        plot_return_code, plot_elapsed_s = generate_campaign_plots(
+        plot_return_code, output_summary = generate_campaign_outputs(
             successful_run_dirs,
-            root_dir / "summary" / "figures",
+            root_dir / "summary",
             config.max_plot_points,
+            campaign_metadata,
         )
-    combined_elapsed_s = simulation_elapsed_s + (plot_elapsed_s if plot_elapsed_s is not None else 0.0)
+    plot_elapsed_s = output_summary.get("plot_elapsed_s") if output_summary is not None else None
+    report_elapsed_s = output_summary.get("report_elapsed_s") if output_summary is not None else None
+    analysis_elapsed_s = (
+        output_summary.get("analysis_elapsed_s") if output_summary is not None else None
+    )
+    combined_elapsed_s = simulation_elapsed_s + (
+        analysis_elapsed_s if isinstance(analysis_elapsed_s, float) else 0.0
+    )
     print("Monte Carlo run timing:")
     print(f"  simulation: {simulation_elapsed_s:.3f} s")
     if plot_elapsed_s is not None:
         print(f"  plotting:   {plot_elapsed_s:.3f} s")
     else:
         print("  plotting:   not run")
+    if report_elapsed_s is not None:
+        print(f"  reporting:  {report_elapsed_s:.3f} s")
+    else:
+        print("  reporting:  not run")
     print(f"  total:      {combined_elapsed_s:.3f} s")
-    write_campaign_manifest(config, results, plot_elapsed_s)
+    write_campaign_manifest(config, results, output_summary)
 
-    failed_count = sum(1 for result in results if result.status != "passed")
     if failed_count > 0:
         return 1
     return plot_return_code

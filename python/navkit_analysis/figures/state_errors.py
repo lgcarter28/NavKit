@@ -27,7 +27,7 @@ AXIS_COLORS = {
     "yaw": "green",
 }
 RAD_TO_DEG = 180.0 / math.pi
-RADPS_TO_MDEGPS = 1000.0 * RAD_TO_DEG
+RADPS_TO_DEGPHR = 3600.0 * RAD_TO_DEG
 MICRO_G_PER_MPS2 = 1.0e6 / 9.80665
 STATE_GROUPS = [
     (
@@ -48,7 +48,7 @@ STATE_GROUPS = [
     (
         "Gyro Bias Error",
         ["gyro_bias_b_x_radps", "gyro_bias_b_y_radps", "gyro_bias_b_z_radps"],
-        "Gyro Bias [mdeg/s]",
+        "Gyro Bias [deg/hr]",
     ),
     (
         "Accelerometer Bias Error",
@@ -75,7 +75,7 @@ NED_STATE_GROUPS = [
     (
         "Gyro Bias Error",
         ["gyro_bias_b_x_radps", "gyro_bias_b_y_radps", "gyro_bias_b_z_radps"],
-        "Gyro Bias [mdeg/s]",
+        "Gyro Bias [deg/hr]",
     ),
     (
         "Accelerometer Bias Error",
@@ -124,7 +124,7 @@ def _scale_for_label(label: str) -> float:
     if label.startswith("theta_") and label.endswith("_rad"):
         return RAD_TO_DEG
     if label.startswith("gyro_bias_") and label.endswith("_radps"):
-        return RADPS_TO_MDEGPS
+        return RADPS_TO_DEGPHR
     if label.startswith("accel_bias_") and label.endswith("_mps2"):
         return MICRO_G_PER_MPS2
     return 1.0
@@ -525,7 +525,7 @@ def plot_imu_bias_truth_errors(run: RunData, save: bool = True) -> list[plt.Figu
             run,
             labels=["gyro_bias_b_x_radps", "gyro_bias_b_y_radps", "gyro_bias_b_z_radps"],
             title=r"Gyro Bias Truth Error with $1\sigma$ and $3\sigma$ Bounds",
-            ylabel="Bias [mdeg/s]",
+            ylabel="Bias [deg/hr]",
             output_name="error_covariance_gyro_bias_body.png",
             save=save,
         ),

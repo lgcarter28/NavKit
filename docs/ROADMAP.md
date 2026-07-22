@@ -71,14 +71,26 @@ NavKit is currently in Phase 6: Monte Carlo and batch analysis. Phase 5 produced
 
 ## Active passes
 
-No active Phase 6 pass is currently queued. Select the next Monte Carlo pass from the Phase 6 follow-forward list below before executing more work.
+## Pass 6.3: Monte Carlo initialization support
 
-## Phase 6 follow-forward
+- [ ] Connect Monte Carlo execution to the Phase 5 advanced analysis/restart initialization path for deterministic seeded initial estimate errors and mid-trajectory restart studies.
+- [ ] Support deterministic seeded draws for initial estimate errors and simulator error terms without leaking simulator truth/error context into product-core code.
+- [ ] Add a separate simulation/analysis-only Monte Carlo initial-estimate-error path. This path should support deterministic seeds, explicit error vectors, and covariance-colored random draws in the selected `StateDef::Error` ordering so analysis runs can start mid-trajectory with statistically controlled estimator errors.
+- [ ] For Monte Carlo estimate-error initialization, distinguish between directly setting nominal estimates and sampling estimate errors relative to truth. For persistent estimated states such as IMU biases, the statistically consistent form is `estimated_state = true_state + sampled_estimate_error`, so the actual initial estimate error falls within the configured covariance.
+- [ ] Introduce an explicit app/sim-side reference context before implementing truth-relative non-PVA initialization. A future `InitialEstimateReference`-style object should carry truth kinematics plus truth sensor error/calibration states, such as IMU turn-on/in-run bias, without letting app-support initialization reach into simulator internals ad hoc.
 
-- [ ] Aggregate RMSE, NEES, NIS, failure counts, runtime, and resource summaries across campaign runs.
-- [ ] Generate comparison tables and reports across configurations.
-- [ ] Connect Monte Carlo execution to advanced analysis/restart initialization for deterministic seeded initial estimate errors and mid-trajectory restart studies.
+## Pass 6.4: Monte Carlo covariance matching and bias-analysis scenarios
+
+- [ ] Add matched-covariance Monte Carlo scenarios where simulator truth-error distributions and filter initial covariance are intentionally aligned for consistency analysis.
+- [ ] Add conservative-covariance scenarios where the filter initial covariance intentionally exceeds the actual simulated initial error distribution.
+- [ ] Add gyro/accelerometer bias-specific Monte Carlo plots and report metrics that make initial bias-estimate covariance mismatch easy to diagnose.
+- [ ] Revisit default gyro and accelerometer bias initial covariance values after matched/non-matched scenarios exist, rather than tuning from a single conservative run.
+
+## Pass 6.5: schema versioning and compatibility
+
 - [ ] Add Monte Carlo-specific schema/version metadata and compatibility rules for campaign manifests, aggregate reports, scenario-expanded runtime inputs, log schemas, and plot inputs.
+- [ ] Define compatibility expectations for config schemas, log schemas, plot inputs, and aggregate report formats so older analysis artifacts can either be read deliberately or rejected with clear diagnostics.
+- [ ] Document the migration/update policy for generated logs and reports before they become qualification evidence.
 
 ## Future phase details
 

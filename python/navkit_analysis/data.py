@@ -33,6 +33,41 @@ class RunData:
     truth_error: pd.DataFrame | None = None
 
 
+def _time_window(
+    frame: pd.DataFrame | None, start_time_s: float | None, end_time_s: float | None
+) -> pd.DataFrame | None:
+    if frame is None or "time_s" not in frame:
+        return frame
+    mask = pd.Series(True, index=frame.index)
+    if start_time_s is not None:
+        mask &= frame["time_s"] >= start_time_s
+    if end_time_s is not None:
+        mask &= frame["time_s"] <= end_time_s
+    return frame.loc[mask].reset_index(drop=True)
+
+
+def _trim_run_data(
+    run: RunData, start_time_s: float | None, end_time_s: float | None
+) -> RunData:
+    if start_time_s is None and end_time_s is None:
+        return run
+    return RunData(
+        run_dir=run.run_dir,
+        data_dir=run.data_dir,
+        figures_dir=run.figures_dir,
+        nav=_time_window(run.nav, start_time_s, end_time_s),
+        gnss_pos_update=_time_window(run.gnss_pos_update, start_time_s, end_time_s),
+        gnss_vel_update=_time_window(run.gnss_vel_update, start_time_s, end_time_s),
+        gnss_position_debug=_time_window(run.gnss_position_debug, start_time_s, end_time_s),
+        gnss_velocity_debug=_time_window(run.gnss_velocity_debug, start_time_s, end_time_s),
+        truth=_time_window(run.truth, start_time_s, end_time_s),
+        imu=_time_window(run.imu, start_time_s, end_time_s),
+        imu_debug=_time_window(run.imu_debug, start_time_s, end_time_s),
+        filter_correction=_time_window(run.filter_correction, start_time_s, end_time_s),
+        truth_error=_time_window(run.truth_error, start_time_s, end_time_s),
+    )
+
+
 def _read_optional_csv(path: Path) -> pd.DataFrame | None:
     if not path.exists():
         return None
@@ -269,7 +304,9 @@ def _attach_nav_covariance(
     return pd.concat([result, pd.DataFrame(interpolated_columns)], axis=1)
 
 
-def load_run(run_dir: Path) -> RunData:
+def load_run(
+    run_dir: Path, start_time_s: float | None = None, end_time_s: float | None = None
+) -> RunData:
     """Load standard NavKit run logs from a run directory."""
     run_dir, data_dir, figures_dir = _resolve_run_dirs(run_dir)
 
@@ -467,7 +504,7 @@ def load_run(run_dir: Path) -> RunData:
     truth_error = _derive_truth_error(nav, truth, imu)
     filter_correction = _attach_nav_covariance(filter_correction, nav)
 
-    return RunData(
+    run_data = RunData(
         run_dir=run_dir,
         data_dir=data_dir,
         figures_dir=figures_dir,
@@ -482,3 +519,4 @@ def load_run(run_dir: Path) -> RunData:
         filter_correction=filter_correction,
         truth_error=truth_error,
     )
+    return _trim_run_data(run_data, start_time_s, end_time_s)

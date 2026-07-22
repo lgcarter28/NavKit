@@ -683,10 +683,24 @@ that campaign explicitly analyzes them.
 Monte Carlo covariance figures are campaign-level products. They are broken out
 by state quantity and frame, with one subplot per axis. Each subplot shows faint
 individual run errors, the bold ensemble mean error, empirical ensemble
-`+/-3 sigma` bounds about zero, and the mean reported filter `+/-3 sigma` bounds
-about zero. `analysis.max_plot_points` decimates the common plotting time grid
-after loading/interpolation so large campaigns can stay visually useful without
-rendering every logged sample.
+`+/-3 sigma` bounds about the ensemble mean, and the mean reported filter
+`+/-3 sigma` bounds about zero. `analysis.max_plot_points` decimates the common
+plotting time grid after loading/interpolation so large campaigns can stay
+visually useful without rendering every logged sample.
+
+For human-facing analysis plots, gyro bias is displayed in `deg/hr`; the
+underlying CSV logs remain in canonical `rad/s`. Use `--start-time` and
+`--end-time` on `run_analysis.py`, `run_monte_carlo.py`, or
+`plot_monte_carlo.py` to regenerate zoomed/steady-state plots without changing
+the source logs. Use repeated `--plot <name>` arguments to open a focused subset
+of plots interactively after a run or campaign has already completed.
+
+Campaign analysis also writes machine-readable and human-readable aggregate
+reports under `summary/reports/`. The first-pass report set includes per-axis
+RMSE/coverage metrics, per-state-family NEES summaries, GNSS NIS summaries,
+per-run timing, and output-size/resource summaries. Use
+`tools/compare_monte_carlo.py` to build comparison CSV/Markdown tables from
+existing campaign report folders without re-running simulations.
 
 The Python build wrapper forwards the same selection:
 

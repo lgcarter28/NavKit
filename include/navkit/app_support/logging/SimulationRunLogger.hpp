@@ -20,6 +20,7 @@
 #include "navkit/sim/TruthSample.hpp"
 
 #include <Eigen/Dense>
+#include <cmath>
 #include <cstdio>
 
 namespace navkit::app_support
@@ -147,6 +148,11 @@ private:
     {
         using Nominal = typename StateDef::Nominal;
 
+        int hours = 0;
+        int minutes = 0;
+        core::Scalar_t seconds = 0.0;
+        split_time_hh_mm_ss(time_s, hours, minutes, seconds);
+
         const core::Vec3 p_e = filter.state().template segment<3>(Nominal::Pos::i);
         const core::Vec3 v_e = filter.state().template segment<3>(Nominal::Vel::i);
         const Eigen::Matrix<core::Scalar_t, 4, 1> q_b2e =
@@ -160,10 +166,12 @@ private:
         const core::Vec3 rpy_b2n_deg =
             core::math::rpy_rad_from_quaternion(q_b2n) * (180.0 / 3.14159265358979323846);
 
-        std::printf("t=%9.3f s | lat=%11.6f deg lon=%12.6f deg h=%9.2f m | "
+        std::printf("t=%02d:%02d:%06.3f | lat=%11.6f deg lon=%12.6f deg h=%9.2f m | "
                     "v_ned=[%9.3f %9.3f %9.3f] m/s | "
                     "rpy_b2n=[%8.3f %8.3f %8.3f] deg\n",
-                    time_s,
+                    hours,
+                    minutes,
+                    seconds,
                     p_lla_deg_m.x(),
                     p_lla_deg_m.y(),
                     p_lla_deg_m.z(),
@@ -173,6 +181,18 @@ private:
                     rpy_b2n_deg.x(),
                     rpy_b2n_deg.y(),
                     rpy_b2n_deg.z());
+    }
+
+    static void split_time_hh_mm_ss(const core::Time_t time_s,
+                                    int& hours,
+                                    int& minutes,
+                                    core::Scalar_t& seconds)
+    {
+        const core::Time_t nonnegative_time_s = time_s < 0.0 ? 0.0 : time_s;
+        const auto whole_seconds = static_cast<int>(std::floor(nonnegative_time_s));
+        hours = whole_seconds / 3600;
+        minutes = (whole_seconds % 3600) / 60;
+        seconds = nonnegative_time_s - static_cast<core::Time_t>((hours * 3600) + (minutes * 60));
     }
 
     Logger& m_logger;

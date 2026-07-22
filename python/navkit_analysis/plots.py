@@ -45,36 +45,67 @@ from navkit_analysis.figures import (
 from navkit_analysis.style import apply_style
 
 
-def plot_run(run_dir: Path, save: bool = True) -> list[plt.Figure]:
+def _plot_plan() -> dict[str, tuple]:
+    return {
+        "position_ecef_legacy": (plot_position_error_covariance,),
+        "gnss_position": (
+            plot_gnss_position_innovation,
+            plot_gnss_position_nis,
+            plot_gnss_position_histograms,
+            plot_gnss_position_debug,
+        ),
+        "gnss_velocity": (
+            plot_gnss_velocity_debug,
+            plot_gnss_velocity_innovation,
+            plot_gnss_velocity_nis,
+        ),
+        "filter_correction": (plot_filter_corrections,),
+        "dashboard_ecef": (plot_truth_errors,),
+        "dashboard_ned": (plot_truth_errors_ned_dashboard,),
+        "imu_increments": (plot_imu_increment_time_histories, plot_imu_increment_cumsums),
+        "imu_debug": (plot_imu_debug_terms,),
+        "imu_bias": (plot_imu_bias_truth_errors,),
+        "state_ecef": (plot_truth_errors_ecef,),
+        "state_ned": (plot_truth_errors_ned,),
+    }
+
+
+def _selected_plot_names(selected: list[str] | None) -> set[str]:
+    plan = _plot_plan()
+    if not selected:
+        return set(plan)
+    unknown = sorted(set(selected) - set(plan))
+    if unknown:
+        raise ValueError(f"unknown plot name(s): {unknown}; choices are {sorted(plan)}")
+    return set(selected)
+
+
+def plot_run(
+    run_dir: Path,
+    save: bool = True,
+    selected: list[str] | None = None,
+    start_time_s: float | None = None,
+    end_time_s: float | None = None,
+) -> list[plt.Figure]:
     """Create all standard figures for one NavKit run.
 
     Figure functions save outputs and return open figure objects. This function
     intentionally does not call ``plt.show()``; the caller owns figure lifetime.
     """
     apply_style()
-    run_data = load_run(run_dir)
+    run_data = load_run(run_dir, start_time_s=start_time_s, end_time_s=end_time_s)
+    selected_names = _selected_plot_names(selected)
 
-    maybe_figures = [
-        plot_position_error_covariance(run_data, save=save),
-        plot_gnss_position_innovation(run_data, save=save),
-        plot_gnss_position_nis(run_data, save=save),
-        plot_gnss_position_histograms(run_data, save=save),
-        plot_gnss_position_debug(run_data, save=save),
-        plot_gnss_velocity_debug(run_data, save=save),
-        plot_gnss_velocity_innovation(run_data, save=save),
-        plot_gnss_velocity_nis(run_data, save=save),
-        plot_filter_corrections(run_data, save=save),
-        plot_truth_errors(run_data, save=save),
-        plot_truth_errors_ned_dashboard(run_data, save=save),
-    ]
-
-    figures = [fig for fig in maybe_figures if fig is not None]
-    figures.extend(plot_imu_increment_time_histories(run_data, save=save))
-    figures.extend(plot_imu_increment_cumsums(run_data, save=save))
-    figures.extend(plot_imu_debug_terms(run_data, save=save))
-    figures.extend(plot_imu_bias_truth_errors(run_data, save=save))
-    figures.extend(plot_truth_errors_ecef(run_data, save=save))
-    figures.extend(plot_truth_errors_ned(run_data, save=save))
+    figures: list[plt.Figure] = []
+    for plot_name, functions in _plot_plan().items():
+        if plot_name not in selected_names:
+            continue
+        for function in functions:
+            result = function(run_data, save=save)
+            if isinstance(result, list):
+                figures.extend(result)
+            elif result is not None:
+                figures.append(result)
 
     return figures
 
@@ -98,13 +129,27 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Create figures without saving PNG files.",
     )
+    parser.add_argument(
+        "--plot",
+        action="append",
+        choices=sorted(_plot_plan()),
+        help="Generate only the selected plot group. May be provided multiple times.",
+    )
+    parser.add_argument("--start-time", type=float, default=None, help="Only plot data at/after this time [s].")
+    parser.add_argument("--end-time", type=float, default=None, help="Only plot data at/before this time [s].")
 
     args = parser.parse_args(argv)
 
     if not args.show:
         plt.rcParams["figure.max_open_warning"] = 0
 
-    figures = plot_run(args.run_dir, save=not args.no_save)
+    figures = plot_run(
+        args.run_dir,
+        save=not args.no_save,
+        selected=args.plot,
+        start_time_s=args.start_time,
+        end_time_s=args.end_time,
+    )
 
     if args.show:
         # Call show once after all figures have been created so the user can

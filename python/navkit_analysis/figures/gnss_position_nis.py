@@ -4,16 +4,15 @@
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
-from scipy.stats import chi2
 
 from navkit_analysis.data import RunData
 from navkit_analysis.figures.common import save_figure
+from navkit_analysis.statistics import (
+    chi_square_threshold,
+    chi_square_upper_tail_probability,
+    measurement_dof_from_innovations,
+)
 from navkit_analysis.style import BOUND_COLOR, RESIDUAL_COLOR, apply_nav_axes_style
-
-
-def _measurement_dof(updates) -> int:
-    """Infer measurement dimension from innovation columns."""
-    return len([col for col in updates.columns if col.startswith("nu_")])
 
 
 def plot_gnss_position_nis(run: RunData, save: bool = True) -> plt.Figure | None:
@@ -27,15 +26,15 @@ def plot_gnss_position_nis(run: RunData, save: bool = True) -> plt.Figure | None
     time_s = updates["time_s"]
     nis = updates["nis"]
 
-    dof = _measurement_dof(updates)
-    nis_95 = chi2.ppf(0.95, df=dof)
-    nis_99 = chi2.ppf(0.99, df=dof)
+    dof = measurement_dof_from_innovations(updates)
+    nis_95 = chi_square_threshold(0.95, dof)
+    nis_99 = chi_square_threshold(0.99, dof)
 
     # Upper-tail p-value:
     #   p = P(ChiSq_dof >= observed NIS)
     # For a statistically consistent filter, p-values should be Uniform(0, 1),
     # with expected value 0.5.
-    p_value = chi2.sf(nis, df=dof)
+    p_value = chi_square_upper_tail_probability(nis, dof)
     mean_p_value = p_value.mean()
 
     fig, axes = plt.subplots(
