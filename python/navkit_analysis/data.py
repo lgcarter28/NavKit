@@ -68,6 +68,13 @@ def _trim_run_data(
     )
 
 
+def trim_run_data(
+    run: RunData, start_time_s: float | None, end_time_s: float | None
+) -> RunData:
+    """Return one run limited to an optional inclusive time window."""
+    return _trim_run_data(run, start_time_s, end_time_s)
+
+
 def _read_optional_csv(path: Path) -> pd.DataFrame | None:
     if not path.exists():
         return None

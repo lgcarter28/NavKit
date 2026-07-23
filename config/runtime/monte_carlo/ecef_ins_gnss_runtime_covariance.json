@@ -1,4 +1,5 @@
 {
+  "schema": "navkit.monte_carlo_campaign.v1",
   "type": "monte_carlo_campaign",
   "campaign_name": "ecef_ins_gnss_runtime_covariance_mc",
   "nominal_config": "../navkit_sim/ecef_ins_gnss_runtime_covariance.json",
@@ -15,7 +16,9 @@
     "parallel_jobs": 1
   },
   "analysis": {
-    "max_plot_points": 1000
+    "max_plot_points": 1000,
+    "renderer": "plotly",
+    "package_analysis": true
   },
   "output": {
     "root": "output/monte_carlo",

@@ -9,9 +9,14 @@ import json
 from pathlib import Path
 from typing import Any
 
+from navkit_analysis.schema import MONTE_CARLO_REPORT_SCHEMA, validate_schema
+
 
 def load_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    parsed = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(parsed, dict):
+        raise ValueError(f"JSON artifact '{path}' must contain an object")
+    return parsed
 
 
 def campaign_dir_from_input(path: Path) -> Path:
@@ -94,6 +99,7 @@ def collect_campaign_rows(inputs: list[Path]) -> tuple[
             else report_path_from_campaign_dir(campaign_dir)
         )
         report = load_json(report_path)
+        validate_schema(report, MONTE_CARLO_REPORT_SCHEMA, str(report_path))
         name = campaign_name(campaign_dir, report)
         summary_rows.append(
             {

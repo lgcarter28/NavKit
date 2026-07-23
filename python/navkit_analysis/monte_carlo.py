@@ -12,7 +12,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.collections import LineCollection
 
 from navkit_analysis.data import (
     derive_truth_error_frame,
@@ -20,11 +19,14 @@ from navkit_analysis.data import (
     require_columns,
     resolve_run_dirs,
 )
+from navkit_analysis.plot_spec import PlotAxis, PlotSpec, PlotTrace
+from navkit_analysis.renderers import render_matplotlib, render_plotly
 from navkit_analysis.figures.state_errors import state_error_scale
+from navkit_analysis.schema import MONTE_CARLO_REPORT_SCHEMA
 from navkit_analysis.statistics import chi_square_threshold
-from navkit_analysis.style import apply_nav_axes_style, apply_style
+from navkit_analysis.style import apply_style
 
-REPORT_SCHEMA = "navkit.monte_carlo_report.v1"
+REPORT_SCHEMA = MONTE_CARLO_REPORT_SCHEMA
 
 
 @dataclass(frozen=True)
@@ -69,7 +71,7 @@ class MonteCarloRunFrames:
 class MonteCarloOutputSummary:
     """Summary of generated Monte Carlo campaign-level analysis artifacts."""
 
-    figures: list[plt.Figure]
+    figures: list[object]
     report_paths: dict[str, Path]
     load_elapsed_s: float
     aggregate_elapsed_s: float
@@ -494,84 +496,75 @@ def aggregate_monte_carlo_series(
     return series
 
 
-def plot_monte_carlo_series(series: MonteCarloSeries, figures_dir: Path) -> plt.Figure:
-    """Plot one Monte Carlo aggregate series with one subplot per axis."""
-    fig, axes = plt.subplots(
-        nrows=3,
-        ncols=1,
-        sharex=True,
-        figsize=(14.0, 9.0),
-        constrained_layout=True,
-    )
-    fig.suptitle(f"{series.title} ({series.run_count} runs)")
-
-    for axis_index, (ax, axis_name) in enumerate(zip(axes, series.axis_names)):
+def build_monte_carlo_plot_spec(series: MonteCarloSeries) -> PlotSpec:
+    """Prepare one Monte Carlo series once for static or interactive rendering."""
+    axes: list[PlotAxis] = []
+    for axis_index, axis_name in enumerate(series.axis_names):
         run_errors = series.scale * series.run_errors[:, :, axis_index]
         mean_error = series.scale * series.mean_error[:, axis_index]
         empirical_bound = 3.0 * series.scale * series.empirical_sigma[:, axis_index]
         filter_bound = 3.0 * series.scale * series.mean_filter_sigma[:, axis_index]
-
-        run_segments = [
-            np.column_stack((series.time_s, run_errors[run_index]))
-            for run_index in range(run_errors.shape[0])
-        ]
-        run_collection = LineCollection(
-            run_segments,
-            colors="tab:red",
-            alpha=0.40,
-            linewidths=0.9,
-            label="individual run error",
+        traces = (
+            PlotTrace(
+                x=series.time_s,
+                y=run_errors,
+                label="individual run error",
+                color="tab:red",
+                line_width=0.9,
+                opacity=0.40,
+            ),
+            PlotTrace(
+                x=series.time_s,
+                y=np.vstack((filter_bound, -filter_bound)),
+                label="mean filter ±3σ",
+                color="black",
+                line_width=1.5,
+            ),
+            PlotTrace(
+                x=series.time_s,
+                y=mean_error,
+                label="ensemble mean error",
+                color="tab:blue",
+                line_width=2.0,
+            ),
+            PlotTrace(
+                x=series.time_s,
+                y=np.vstack((mean_error + empirical_bound, mean_error - empirical_bound)),
+                label="empirical ±3σ",
+                color="tab:blue",
+                line_style="dash",
+                line_width=1.8,
+            ),
         )
-        ax.add_collection(run_collection)
-        ax.update_datalim(
-            np.column_stack((np.tile(series.time_s, run_errors.shape[0]), run_errors.ravel()))
+        axes.append(
+            PlotAxis(
+                title="",
+                y_label=f"{axis_name.title()} {series.ylabel}",
+                traces=traces,
+            )
         )
-        ax.autoscale_view()
-        ax.plot(
-            series.time_s,
-            mean_error,
-            color="tab:blue",
-            linewidth=2.0,
-            label="ensemble mean error",
-        )
-        ax.plot(
-            series.time_s,
-            mean_error + empirical_bound,
-            color="tab:blue",
-            linestyle="--",
-            label=r"empirical $3\sigma$",
-        )
-        ax.plot(series.time_s, mean_error - empirical_bound, color="tab:blue", linestyle="--")
-        ax.plot(
-            series.time_s,
-            filter_bound,
-            color="black",
-            linestyle="-",
-            label=r"mean filter $3\sigma$",
-        )
-        ax.plot(series.time_s, -filter_bound, color="black", linestyle="-")
-        ax.axhline(0.0, color="0.25", linewidth=0.8)
-        ax.set_ylabel(f"{axis_name.title()} {series.ylabel}")
-        handles, labels = ax.get_legend_handles_labels()
-        legend_order = [0, 3, 1, 2]
-        ax.legend(
-            [handles[index] for index in legend_order],
-            [labels[index] for index in legend_order],
-            loc="upper right",
-        )
-        apply_nav_axes_style(ax)
-
-    axes[-1].set_xlabel("Time [s]")
-    save_monte_carlo_figure(fig, figures_dir / series.output_name)
-    return fig
+    return PlotSpec(
+        title=f"{series.title} ({series.run_count} runs)",
+        x_label="Time [s]",
+        axes=tuple(axes),
+        output_name=series.output_name,
+        metadata={
+            "run_count": series.run_count,
+            "quantity_labels": series.labels,
+            "axis_names": series.axis_names,
+        },
+    )
 
 
-def save_monte_carlo_figure(fig: plt.Figure, out: Path) -> Path:
-    """Save a Monte Carlo figure with a faster report-oriented PNG path."""
-    out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, dpi=120, bbox_inches=None)
-    print(f"Wrote {out}")
-    return out
+def plot_monte_carlo_series(series: MonteCarloSeries, figures_dir: Path) -> plt.Figure:
+    """Render one aggregate series through the shared static plot-spec backend."""
+    spec = build_monte_carlo_plot_spec(series)
+    return render_matplotlib(spec, figures_dir / spec.output_name)
+
+
+def plot_monte_carlo_series_interactive(series: MonteCarloSeries, output_path: Path):
+    """Render one cached aggregate series as an interactive Plotly HTML document."""
+    return render_plotly(build_monte_carlo_plot_spec(series), output_path)
 
 
 def _quantity_name(series: MonteCarloSeries) -> str:
@@ -1000,6 +993,7 @@ def generate_monte_carlo_outputs(
     selected: list[str] | None = None,
     start_time_s: float | None = None,
     end_time_s: float | None = None,
+    renderer: str = "matplotlib",
 ) -> MonteCarloOutputSummary:
     """Generate campaign-level Monte Carlo figures and reports from run logs."""
     apply_style()
@@ -1014,9 +1008,25 @@ def generate_monte_carlo_outputs(
     aggregate_elapsed_s = time.perf_counter() - aggregate_started_s
 
     plot_started_s = time.perf_counter()
-    figures_dir = summary_dir / "figures"
-    figures_dir.mkdir(parents=True, exist_ok=True)
-    figures = [plot_monte_carlo_series(item, figures_dir) for item in series]
+    if renderer == "matplotlib":
+        figures_dir = summary_dir / "figures"
+        figures_dir.mkdir(parents=True, exist_ok=True)
+        figures = [plot_monte_carlo_series(item, figures_dir) for item in series]
+    elif renderer == "plotly":
+        figures_dir = summary_dir / "interactive_figures"
+        figures_dir.mkdir(parents=True, exist_ok=True)
+        figures = [
+            plot_monte_carlo_series_interactive(
+                item,
+                (
+                    figures_dir
+                    / item.output_name.removesuffix(".png").replace("monte_carlo_", "")
+                ).with_suffix(".html"),
+            )
+            for item in series
+        ]
+    else:
+        raise ValueError(f"unsupported Monte Carlo renderer '{renderer}'")
     plot_elapsed_s = time.perf_counter() - plot_started_s
 
     report_started_s = time.perf_counter()

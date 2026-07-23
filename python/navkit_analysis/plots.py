@@ -22,7 +22,7 @@ if __package__ is None or __package__ == "":
 
 import matplotlib.pyplot as plt
 
-from navkit_analysis.data import load_run
+from navkit_analysis.sources import load_analysis_run
 from navkit_analysis.figures import (
     plot_filter_corrections,
     plot_gnss_position_histograms,
@@ -81,19 +81,25 @@ def _selected_plot_names(selected: list[str] | None) -> set[str]:
 
 
 def plot_run(
-    run_dir: Path,
+    source: Path,
     save: bool = True,
     selected: list[str] | None = None,
     start_time_s: float | None = None,
     end_time_s: float | None = None,
+    run_id: str | None = None,
 ) -> list[plt.Figure]:
-    """Create all standard figures for one NavKit run.
+    """Create all standard figures from one CSV run directory or HDF5 bundle.
 
     Figure functions save outputs and return open figure objects. This function
     intentionally does not call ``plt.show()``; the caller owns figure lifetime.
     """
     apply_style()
-    run_data = load_run(run_dir, start_time_s=start_time_s, end_time_s=end_time_s)
+    run_data = load_analysis_run(
+        source,
+        run_id=run_id,
+        start_time_s=start_time_s,
+        end_time_s=end_time_s,
+    )
     selected_names = _selected_plot_names(selected)
 
     figures: list[plt.Figure] = []
@@ -118,7 +124,12 @@ def close_figures(figures: list[plt.Figure]) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Generate NavKit analysis plots.")
-    parser.add_argument("run_dir", type=Path, help="Run directory containing NavKit CSV logs.")
+    parser.add_argument("source", type=Path, help="Run CSV directory or an HDF5 analysis bundle.")
+    parser.add_argument(
+        "--run-id",
+        default=None,
+        help="Run identifier when the source is a multi-run HDF5 campaign bundle.",
+    )
     parser.add_argument(
         "--show",
         action="store_true",
@@ -144,11 +155,12 @@ def main(argv: list[str] | None = None) -> int:
         plt.rcParams["figure.max_open_warning"] = 0
 
     figures = plot_run(
-        args.run_dir,
+        args.source,
         save=not args.no_save,
         selected=args.plot,
         start_time_s=args.start_time,
         end_time_s=args.end_time,
+        run_id=args.run_id,
     )
 
     if args.show:

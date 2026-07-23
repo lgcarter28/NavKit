@@ -8,7 +8,6 @@ import concurrent.futures
 import copy
 import hashlib
 import json
-import os
 import subprocess
 import sys
 import time
@@ -19,10 +18,15 @@ from typing import Any
 from navkit_build_dirs import DEFAULT_GENERATOR
 from perf_artifacts import DEFAULT_NAVKIT_CONFIG
 from runtime_config import JsonObject, load_runtime_config
+from navkit_analysis.schema import (
+    MONTE_CARLO_CAMPAIGN_SCHEMA,
+    MONTE_CARLO_RUN_SCHEMA,
+    validate_schema,
+)
 
 
-CAMPAIGN_SCHEMA = "navkit.monte_carlo_campaign.v1"
-RUN_SCHEMA = "navkit.monte_carlo_run.v1"
+CAMPAIGN_SCHEMA = MONTE_CARLO_CAMPAIGN_SCHEMA
+RUN_SCHEMA = MONTE_CARLO_RUN_SCHEMA
 SUPPORTED_SEED_POLICY = "derive_all"
 UINT32_MASK = (1 << 32) - 1
 
@@ -39,10 +43,12 @@ class CampaignConfig:
     build_type: str
     parallel_jobs: int
     max_plot_points: int | None
+    analysis_renderer: str
     plot_start_time_s: float | None
     plot_end_time_s: float | None
     output_root: Path
     run_analysis: bool
+    package_analysis: bool
     navkit_config: str
     generator: str
     build_dir: Path | None
@@ -146,6 +152,7 @@ def load_campaign_config(
 ) -> CampaignConfig:
     raw = json.loads(campaign_path.read_text(encoding="utf-8"))
     root = require_object(raw, "root")
+    validate_schema(root, CAMPAIGN_SCHEMA, str(campaign_path))
 
     campaign_type = root.get("type", "monte_carlo_campaign")
     if campaign_type != "monte_carlo_campaign":
@@ -201,6 +208,9 @@ def load_campaign_config(
         raise ValueError("analysis.max_plot_points must be an integer when provided")
     if max_plot_points is not None and max_plot_points <= 1:
         raise ValueError("analysis.max_plot_points must be greater than one")
+    analysis_renderer = optional_string(analysis, "renderer", "plotly", "analysis")
+    if analysis_renderer not in {"matplotlib", "plotly"}:
+        raise ValueError("analysis.renderer must be either 'matplotlib' or 'plotly'")
     plot_start_time_s = (
         plot_start_time_s_override
         if plot_start_time_s_override is not None
@@ -223,6 +233,7 @@ def load_campaign_config(
         optional_string(output, "root", "output/monte_carlo", "output")
     )
     run_analysis = optional_bool(output, "run_analysis", False, "output")
+    package_analysis = optional_bool(analysis, "package_analysis", True, "analysis")
 
     return CampaignConfig(
         campaign_path=campaign_path,
@@ -235,10 +246,12 @@ def load_campaign_config(
         build_type=build_type,
         parallel_jobs=parallel_jobs,
         max_plot_points=max_plot_points,
+        analysis_renderer=analysis_renderer,
         plot_start_time_s=plot_start_time_s,
         plot_end_time_s=plot_end_time_s,
         output_root=output_root,
         run_analysis=run_analysis,
+        package_analysis=package_analysis,
         navkit_config=navkit_config,
         generator=generator,
         build_dir=build_dir,
@@ -424,8 +437,10 @@ def write_campaign_config(config: CampaignConfig, seed_paths: list[str]) -> None
             },
             "analysis": {
                 "max_plot_points": config.max_plot_points,
+                "renderer": config.analysis_renderer,
                 "start_time_s": config.plot_start_time_s,
                 "end_time_s": config.plot_end_time_s,
+                "package_analysis": config.package_analysis,
             },
             "output": {
                 "root": str(config.output_root),
@@ -457,6 +472,8 @@ def write_campaign_manifest(
             "plot_elapsed_s": output_summary.get("plot_elapsed_s"),
             "report_elapsed_s": output_summary.get("report_elapsed_s"),
             "analysis_elapsed_s": output_summary.get("analysis_elapsed_s"),
+            "bundle_elapsed_s": output_summary.get("bundle_elapsed_s"),
+            "bundle_path": output_summary.get("bundle_path"),
             "report_paths": output_summary.get("report_paths", {}),
             "runs": [
                 {
@@ -489,15 +506,13 @@ def generate_campaign_outputs(
     summary_dir: Path,
     max_plot_points: int | None,
     campaign_metadata: dict[str, object],
+    renderer: str,
 ) -> tuple[int, dict[str, Any]]:
     root = Path(__file__).resolve().parents[1]
     python_root = root / "python"
     if str(python_root) not in sys.path:
         sys.path.insert(0, str(python_root))
-    os.environ.setdefault("MPLBACKEND", "Agg")
-
     from navkit_analysis.monte_carlo import generate_monte_carlo_outputs
-    import matplotlib.pyplot as plt
 
     started_s = time.perf_counter()
     output = generate_monte_carlo_outputs(
@@ -507,9 +522,13 @@ def generate_campaign_outputs(
         campaign_metadata,
         start_time_s=campaign_metadata.get("plot_start_time_s"),
         end_time_s=campaign_metadata.get("plot_end_time_s"),
+        renderer=renderer,
     )
-    for figure in output.figures:
-        plt.close(figure)
+    if renderer == "matplotlib":
+        import matplotlib.pyplot as plt
+
+        for figure in output.figures:
+            plt.close(figure)
     elapsed_s = time.perf_counter() - started_s
     summary = {
         "load_elapsed_s": output.load_elapsed_s,
@@ -617,6 +636,8 @@ def main() -> int:
     print(f"Max plot points: {config.max_plot_points}")
     print(f"Plot start time: {config.plot_start_time_s}")
     print(f"Plot end time: {config.plot_end_time_s}")
+    print(f"Analysis renderer: {config.analysis_renderer}")
+    print(f"Package analysis bundle: {config.package_analysis}")
     print(f"Seed paths: {seed_paths}")
 
     plans = build_run_plans(config, nominal_config)
@@ -662,7 +683,21 @@ def main() -> int:
             root_dir / "summary",
             config.max_plot_points,
             campaign_metadata,
+            config.analysis_renderer,
         )
+    write_campaign_manifest(config, results, output_summary)
+    bundle_elapsed_s: float | None = None
+    bundle_path: Path | None = None
+    if successful_run_dirs and config.package_analysis:
+        from navkit_analysis.bundle import package_analysis
+
+        bundle_started_s = time.perf_counter()
+        bundle_path = package_analysis(
+            root_dir,
+            root_dir / "analysis_bundle.h5",
+            max_plot_points=config.max_plot_points,
+        )
+        bundle_elapsed_s = time.perf_counter() - bundle_started_s
     plot_elapsed_s = output_summary.get("plot_elapsed_s") if output_summary is not None else None
     report_elapsed_s = output_summary.get("report_elapsed_s") if output_summary is not None else None
     analysis_elapsed_s = (
@@ -670,7 +705,7 @@ def main() -> int:
     )
     combined_elapsed_s = simulation_elapsed_s + (
         analysis_elapsed_s if isinstance(analysis_elapsed_s, float) else 0.0
-    )
+    ) + (bundle_elapsed_s if bundle_elapsed_s is not None else 0.0)
     print("Monte Carlo run timing:")
     print(f"  simulation: {simulation_elapsed_s:.3f} s")
     if plot_elapsed_s is not None:
@@ -681,7 +716,14 @@ def main() -> int:
         print(f"  reporting:  {report_elapsed_s:.3f} s")
     else:
         print("  reporting:  not run")
+    if bundle_elapsed_s is not None:
+        print(f"  packaging:  {bundle_elapsed_s:.3f} s ({bundle_path})")
+    else:
+        print("  packaging:  not run")
     print(f"  total:      {combined_elapsed_s:.3f} s")
+    if output_summary is not None:
+        output_summary["bundle_elapsed_s"] = bundle_elapsed_s
+        output_summary["bundle_path"] = str(bundle_path) if bundle_path is not None else None
     write_campaign_manifest(config, results, output_summary)
 
     if failed_count > 0:

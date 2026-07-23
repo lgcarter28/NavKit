@@ -266,9 +266,11 @@ These scripts provide a consistent cross-platform workflow and abstract away pla
 | `run_sim.py` | Run a selected runtime scenario with the built simulation executable |
 | `run_analysis.py` | Generate plots and analysis from existing simulation logs |
 | `run_scenario.py` | Run a scenario, optionally override output location, and generate plots |
-| `run_monte_carlo.py` | Run a seeded Monte Carlo campaign and generate aggregate plots/reports |
+| `run_monte_carlo.py` | Run a seeded Monte Carlo campaign, package HDF5, and generate interactive aggregate plots/reports |
 | `compare_monte_carlo.py` | Compare existing Monte Carlo aggregate reports across campaigns |
 | `plot_monte_carlo.py` | Regenerate selected Monte Carlo aggregate plots from existing campaign logs |
+| `package_analysis.py` | Package an existing CSV run or campaign into a versioned HDF5 analysis bundle |
+| `plot_analysis.py` | Quickly inspect named CSV/HDF5 fields through the shared static or interactive plotting layer |
 | `timing_report.py` | Summarize a complete `navkit.timing.v1` timing artifact |
 | `resource_report.py` | Write and display coarse executable/library size reports for a build tree |
 | `format.py` | Run clang-format; also exposes clang-tidy for CI diagnostics |
@@ -580,6 +582,29 @@ Regenerate selected Monte Carlo aggregate plots from an existing campaign:
 ```bash
 python tools/plot_monte_carlo.py output/monte_carlo/ecef_ins_gnss_smoke_mc --plot attitude_ned --start-time 10 --show
 ```
+
+Package a completed run or campaign into its portable, versioned HDF5 analysis
+bundle. The normal Monte Carlo examples enable this automatically after their
+aggregate reports finish; this command is also useful for historical CSV output:
+
+```bash
+python tools/package_analysis.py output/monte_carlo/ecef_ins_gnss_smoke_mc
+python tools/package_analysis.py output/logs/ecef_ins_gnss_demo
+```
+
+Both CSV folders and bundles use the same analysis data contract. Regenerate a
+cached Monte Carlo aggregate as an interactive Plotly document, or inspect one
+arbitrary field without writing a one-off script:
+
+```bash
+python tools/plot_monte_carlo.py output/monte_carlo/ecef_ins_gnss_smoke_mc/analysis_bundle.h5 --plot attitude_ned --renderer plotly
+python tools/plot_analysis.py output/logs/ecef_ins_gnss_demo --table nav --y p_e_x_m --renderer plotly
+```
+
+Monte Carlo campaigns default to packaged HDF5 plus Plotly HTML for responsive
+inspection. Set `analysis.renderer` to `matplotlib` in the campaign JSON for
+static PNG/publication output. Both render the same domain-prepared plot specifications rather than maintaining duplicate
+error/covariance calculations.
 
 The Monte Carlo runner resolves the linked nominal runtime scenario into a
 normal effective JSON object for each run, derives deterministic run-local seeds

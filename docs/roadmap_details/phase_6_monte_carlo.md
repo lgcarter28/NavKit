@@ -36,3 +36,26 @@ Monte Carlo support comes immediately after Phase 5 because it is the gold-stand
 - [x] Enabled low-rate measurement-statistics logging in the runtime-covariance scenario used for Pass 6.2 validation so GNSS NIS metrics are populated.
 - [x] Documented the aggregate report layout, report interpretation, and comparison workflow.
 - [x] Validated the pass with a 100-run Release campaign from `config/runtime/monte_carlo/ecef_ins_gnss_runtime_covariance.json`; all 100 runs passed, aggregate figures/reports were generated, and the comparison utility was smoke-tested on the generated report.
+
+## Pass 6.3: schema versioning and compatibility
+
+- [x] Added central major-version compatibility validation for Monte Carlo campaign manifests, per-run manifests, aggregate reports, packed analysis bundles, and renderer-neutral plot specifications.
+- [x] Made incompatible schema families/major versions fail with explicit diagnostics; legacy raw CSV remains a deliberate, documented unversioned input path that is recorded when packaged.
+- [x] Kept scenario-expanded input JSON associated with its versioned Monte Carlo run manifest instead of adding a second runtime-parser-specific schema contract.
+- [x] Recorded source runtime inputs, simulation manifests, seeds, log schemas, units, frames, decimation, and truth/NED/covariance derivation assumptions in bundle metadata when available.
+- [x] Documented the compatibility and migration policy in `docs/ANALYSIS.md`: generated campaign/report/bundle artifacts require compatible schemas, while historical CSV can be packaged intentionally.
+
+## Pass 6.4: analysis bundle and interactive plotting infrastructure
+
+- [x] Preserved CSV/JSON as the portable raw desktop-simulation artifact and added optional offline HDF5 packaging without changing C++ logging.
+- [x] Added `tools/package_analysis.py` to package one run or an entire campaign into `navkit.analysis_bundle.v1` and enabled automatic packaging for the supplied Monte Carlo configs.
+- [x] Implemented reusable HDF5 layout with `/runs/<run_id>/data`, `/runs/<run_id>/derived`, and `/aggregate` groups. Per-run raw tables and truth-aligned errors are stored alongside campaign metadata.
+- [x] Cached Monte Carlo plot-ready time/error/covariance arrays, empirical covariance, and GNSS NIS plus state-family NEES samples in campaign bundles.
+- [x] Added shared CSV/HDF5 run loading, including matching time-window behavior for either source, so existing single-run static analysis can consume a packed bundle.
+- [x] Added shared `PlotSpec`/`PlotAxis`/`PlotTrace` preparation objects; Monte Carlo domain builders use them once while Matplotlib and Plotly renderers remain backend-specific drawing layers.
+- [x] Kept Matplotlib for publication-quality PNGs and added Plotly `Scattergl` HTML output for targeted interactive pan/zoom/hover inspection. `tools/plot_analysis.py` provides generic CSV/HDF5 quick-XY inspection.
+- [x] Refined Plotly Monte Carlo figures to keep individual histories visible, use one shared Unicode legend, and toggle the otherwise-disabled unified hover panel on demand.
+- [x] Made HDF5 bundle packaging and the full Plotly HTML aggregate-figure set the default campaign analysis artifacts; `analysis.renderer: "matplotlib"` remains the explicit static-PNG option.
+- [x] Added `docs/ANALYSIS.md`, updated setup/documentation maps, and kept direct C++ HDF5 logging explicitly out of scope in favor of future embedded binary telemetry plus Python conversion/repackaging.
+- [x] Validated a 500-run and a 1,000-run Release campaign from `config/runtime/monte_carlo/ecef_ins_gnss_runtime_covariance.json`; all requested run bundles, aggregate reports, static plots, and interactive plots completed successfully.
+- [x] Measured representative 1,000-run NED-position regeneration: raw CSV plus Matplotlib took 213.198 s; cached HDF5 plus Matplotlib took 10.275 s; cached HDF5 plus Plotly HTML took 16.868 s. The 1,000-run full-fidelity bundle was 2.32 GB and required 1,319.129 s to package, making raw-table retention the clear future optimization seam.

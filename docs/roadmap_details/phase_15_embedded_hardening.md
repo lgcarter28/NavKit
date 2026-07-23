@@ -52,5 +52,6 @@ This phase contains the remaining embedded/product-hardening work after status/e
 
 - [ ] Implement a fixed-capacity binary recorder/telemetry sink behind the Phase 15.6 contract, with explicit overflow/backpressure/drop accounting and no hidden allocation on the embedded-facing path.
 - [ ] Add desktop capture/replay and Python decoding/packaging utilities that ingest the binary records into the same shared analysis-data interface used by CSV and HDF5 inputs; preserve source schema, stream metadata, and loss/corruption diagnostics.
+- [ ] Add explicit analysis-bundle retention profiles for full raw tables, selected raw tables, and cached-derived/aggregate-only artifacts. Preserve provenance in every profile and benchmark packaging/reload/storage tradeoffs at 100-, 500-, and 1,000-run campaign scale before choosing defaults.
 - [ ] Add golden-byte compatibility tests, malformed/truncated/corrupt-record tests, endian/layout checks, decoder compatibility tests, and record round-trip coverage for the primary navigation, sensor, covariance, and profiling payloads.
 - [ ] Benchmark binary logging and telemetry throughput, storage footprint, CPU cost, and drop behavior against the existing desktop CSV/JSON path. Use that evidence to choose default logging paths per target profile rather than replacing CSV prematurely.

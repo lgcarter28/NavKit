@@ -15,7 +15,7 @@ NavKit is split by product boundary first, then by engineering domain.
 | IO support | `navkit::io` | `include/navkit/io` | Desktop logging, files, CSV, JSON, and run manifests |
 | Application support | `navkit::app_support` | `include/navkit/app_support` | Header-only executable support helpers for selected-config app composition, runtime JSON input/validation, emulator binding, trajectory, logging, initialization, and profile export |
 | Applications | app targets under `apps/` | `apps/` | Executable entry points that compose the libraries they need |
-| Analysis | Python package under `python/` | `python/navkit_analysis` | Offline plots and validation analysis |
+| Analysis | Python package under `python/` | `python/navkit_analysis` | Offline CSV/HDF5 analysis, plots, and validation |
 
 The root `CMakeLists.txt` is intentionally an orchestration layer. Header-only
 and interface target definitions live under `cmake/targets/`, while compiled
@@ -261,7 +261,9 @@ roadmap items, not current behavior.
   feeds them into the Navigator before GNSS measurement processing.
 - Simulation currently contains desktop-oriented support and may use runtime
   polymorphism where practical.
-- Python analysis is deliberately outside the embedded-facing C++ product core.
+- Python analysis is deliberately outside the embedded-facing C++ product core. It consumes
+  portable CSV/JSON run artifacts directly and can package them into versioned HDF5 bundles for
+  cached large-campaign analysis; C++ remains responsible only for raw desktop logs.
 
 ## Policy concepts and template boundaries
 

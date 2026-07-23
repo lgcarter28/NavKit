@@ -33,6 +33,8 @@ def run_dir_from_argv(argv: list[str]) -> Path:
 
 
 def run_name_from_dir(run_dir: Path) -> str:
+    if run_dir.is_file():
+        return run_dir.stem
     manifest = run_dir / "data" / "run_manifest.json"
     if not manifest.exists():
         manifest = run_dir / "run_manifest.json"
@@ -42,6 +44,13 @@ def run_name_from_dir(run_dir: Path) -> str:
             return data["run_name"]
 
     return run_dir.name
+
+
+def timing_path_from_source(source: Path) -> Path:
+    """Choose a writable timing artifact path for a CSV directory or HDF5 source."""
+    if source.is_file():
+        return source.parent / f"{source.stem}.timing.json"
+    return source / "data" / "timing.json"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -62,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
     command = [str(Path(__file__).name), *forwarded_argv]
 
     return_code, result = measure_call(plots_main, forwarded_argv)
-    timing_path = run_dir / "data" / "timing.json"
+    timing_path = timing_path_from_source(run_dir)
     timing_path.parent.mkdir(parents=True, exist_ok=True)
     command_name = "analysis"
     record = update_timing_artifact(

@@ -49,6 +49,12 @@ This project follows
 - Monte Carlo-focused runtime scenario logging that keeps low-rate truth, navigation estimate, and IMU truth-bias logs while disabling high-volume debug/correction/statistics outputs.
 - Monte Carlo aggregate report generation with per-axis RMSE/coverage, state-family NEES, GNSS NIS, run timing, output-size summaries, and a comparison utility for existing campaign reports.
 - Plotting controls for selected single-run/Monte Carlo plot groups and post-run time windows, plus gyro-bias plot/report scaling in `deg/hr`.
+- Versioned schema compatibility helpers for Monte Carlo campaign/run/report artifacts and future analysis inputs.
+- Optional HDF5 analysis-bundle packaging for raw CSV runs and Monte Carlo campaigns, including source metadata, per-run logs, cached truth-error products, and cached aggregate Monte Carlo series.
+- Shared CSV/HDF5 analysis-source loading plus renderer-neutral plot specifications with Matplotlib static and Plotly interactive renderers.
+- `tools/package_analysis.py` for HDF5 packaging, `tools/plot_analysis.py` for quick named-field inspection, and HDF5/Plotly support in `tools/plot_monte_carlo.py`.
+- Interactive Monte Carlo controls that keep individual-run histories visible, toggle the unified hover panel on demand, and retain one shared Unicode legend per figure.
+- Plotly interactive aggregate figures and HDF5 analysis-bundle packaging as the default Monte Carlo campaign analysis outputs, with Matplotlib retained as an explicit static-renderer choice.
 
 ### Changed
 

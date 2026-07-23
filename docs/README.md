@@ -9,6 +9,7 @@ This index identifies each document's role and authority.
 - [`CONFIGURATION.md`](CONFIGURATION.md): compile-time configuration mental model, domain config concepts, example config contracts, and selected-config workflow.
 - [`TESTING.md`](TESTING.md): testing layers, design-intent standards, expected-failure coverage, coverage posture, and runtime timing/resource artifacts.
 - [`PROFILING.md`](PROFILING.md): embedded profiling policies, fixed-capacity sinks, CSV export, and trace visualization workflow.
+- [`ANALYSIS.md`](ANALYSIS.md): offline CSV/HDF5 analysis artifacts, schema compatibility, bundle layout, and static/interactive plotting workflows.
 - [`ROADMAP.md`](ROADMAP.md): canonical current-state handoff, working roadmap, and active backlog.
 - [`roadmap_details/`](roadmap_details/README.md): preserved detailed phase history and expanded roadmap context.
 - [`NAMING_CONVENTIONS.md`](NAMING_CONVENTIONS.md): navigation variable, frame, and unit naming.
