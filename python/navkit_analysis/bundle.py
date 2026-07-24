@@ -14,7 +14,11 @@ import numpy as np
 import pandas as pd
 
 from navkit_analysis.data import RunData, load_run
-from navkit_analysis.schema import ANALYSIS_BUNDLE_SCHEMA, validate_schema
+from navkit_analysis.schema import (
+    ANALYSIS_BUNDLE_SCHEMA,
+    MONTE_CARLO_CAMPAIGN_SCHEMA,
+    validate_schema,
+)
 
 
 RUN_DATA_FIELDS = (
@@ -113,7 +117,8 @@ def _run_metadata(run_dir: Path) -> dict[str, object]:
     return metadata
 
 
-def _write_run(group: h5py.Group, run_id: str, run_dir: Path) -> None:
+def _write_run(group: h5py.Group, run_id: str, run_dir: Path) -> RunData:
+    """Write one run and return its already-loaded analysis data."""
     run = load_run(run_dir)
     run_group = group.create_group(run_id)
     _json_attr(run_group, "metadata", _run_metadata(run.run_dir))
@@ -127,6 +132,7 @@ def _write_run(group: h5py.Group, run_id: str, run_dir: Path) -> None:
         frame = getattr(run, field_name)
         if frame is not None:
             _write_frame(derived_group, field_name, frame)
+    return run
 
 
 def _run_ids_from_manifest(campaign_dir: Path) -> list[tuple[str, Path]]:
@@ -136,7 +142,7 @@ def _run_ids_from_manifest(campaign_dir: Path) -> list[tuple[str, Path]]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict):
         raise ValueError(f"campaign manifest '{manifest_path}' must be an object")
-    validate_schema(manifest, "navkit.monte_carlo_campaign.v1", str(manifest_path))
+    validate_schema(manifest, MONTE_CARLO_CAMPAIGN_SCHEMA, str(manifest_path))
     entries = manifest.get("runs")
     if not isinstance(entries, list):
         raise ValueError(f"campaign manifest '{manifest_path}' is missing its run list")
@@ -287,8 +293,9 @@ def package_analysis(
         bundle.attrs["schema"] = ANALYSIS_BUNDLE_SCHEMA
         _json_attr(bundle, "metadata", bundle_metadata)
         runs_group = bundle.create_group("runs")
+        run_data_by_id: dict[str, RunData] = {}
         for run_id, run_dir in run_items:
-            _write_run(runs_group, run_id, run_dir)
+            run_data_by_id[run_id] = _write_run(runs_group, run_id, run_dir)
         if campaign:
             aggregate_group = bundle.create_group("aggregate")
             from navkit_analysis.monte_carlo import load_successful_runs
@@ -301,6 +308,25 @@ def package_analysis(
                 max_plot_points,
             )
             _write_consistency_arrays(aggregate_group, monte_carlo_runs, run_dirs)
+            from navkit_analysis.consistency import (
+                build_marginal_nse_series,
+                build_nees_series,
+                build_nis_series,
+                load_nis_frames_from_run_dirs,
+                write_consistency_cache,
+            )
+
+            truth_error_frames = [
+                run_data_by_id[run_id].truth_error
+                for run_id, _ in run_items
+                if run_data_by_id[run_id].truth_error is not None
+            ]
+            write_consistency_cache(
+                aggregate_group,
+                build_nees_series(truth_error_frames, max_plot_points),
+                build_nis_series(load_nis_frames_from_run_dirs(run_dirs), max_plot_points),
+                build_marginal_nse_series(truth_error_frames, max_plot_points),
+            )
         else:
             bundle.create_group("aggregate")
     print(f"Wrote {output_path}")

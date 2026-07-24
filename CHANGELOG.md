@@ -52,12 +52,16 @@ This project follows
 - Versioned schema compatibility helpers for Monte Carlo campaign/run/report artifacts and future analysis inputs.
 - Optional HDF5 analysis-bundle packaging for raw CSV runs and Monte Carlo campaigns, including source metadata, per-run logs, cached truth-error products, and cached aggregate Monte Carlo series.
 - Shared CSV/HDF5 analysis-source loading plus renderer-neutral plot specifications with Matplotlib static and Plotly interactive renderers.
-- `tools/package_analysis.py` for HDF5 packaging, `tools/plot_analysis.py` for quick named-field inspection, and HDF5/Plotly support in `tools/plot_monte_carlo.py`.
+- `tools/package_analysis.py` for HDF5 packaging, `tools/plot_field.py` for quick named-field inspection, and HDF5/Plotly support in `tools/plot_monte_carlo.py`.
 - Interactive Monte Carlo controls that keep individual-run histories visible, toggle the unified hover panel on demand, and retain one shared Unicode legend per figure.
 - Plotly interactive aggregate figures and HDF5 analysis-bundle packaging as the default Monte Carlo campaign analysis outputs, with Matplotlib retained as an explicit static-renderer choice.
+- Cached joint Monte Carlo NEES/NIS histories in HDF5, with full-INS/PVA/navigation/IMU-bias consistency products, observation-family NIS, interactive time-linked PDF/CDF/QQ dashboards, and machine-readable consistency reports.
+- Per-state X/Y/Z marginal normalized-squared-error consistency dashboards, with heatmap-hover epoch selection, explicit click/type pinning, a control to resume hover-following, and browser-side snapshot export.
+- Empirical-CDF heatmaps in raw NEES/NIS space and dimension-independent PIT-space CDF-residual heatmaps, organized with the existing occurrence-density dashboards under a generated consistency-figure index.
 
 ### Changed
 
+- Renamed the single-run plotting tools to `plot_run.py` and `plot_field.py`, renamed the Monte Carlo per-run plotting option to `output.plot_individual_runs`, and advanced the campaign schema to `navkit.monte_carlo_campaign.v2`.
 - Reconciled README and setup documentation with the current implementation and build configuration.
 - Formatted console status timestamps as `HH:MM:SS.sss` while preserving raw `time_s` in CSV logs.
 - Updated the configured C++ language standard from C++20 to C++23.

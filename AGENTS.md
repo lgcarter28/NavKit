@@ -58,7 +58,7 @@ Concepts express capabilities; CRTP bases share implementation and are not manda
 - `NoOpPropagation` remains available for measurement-only products, and `EcefInsPropagation` is the first single-IMU ECEF INS propagation policy. It implements the current v1 strapdown/covariance-matrix construction path against the split-state default INS definition. `ImuProcessModelPlaceholder` may still exist as an older model placeholder, but it is not the active INS implementation path.
 - The reusable product-core CMake target is `navkit_core` with alias `navkit::core`. It is currently an `INTERFACE` target because the core is header-only/template-heavy. Desktop simulation support is built as the compiled `navkit_sim` target with alias `navkit::sim`, and desktop logging/file/JSON support is exposed through `navkit_io` with alias `navkit::io`. Executables remain applications under `apps/` and link against the libraries they need.
 - Runtime virtual dispatch is avoided in embedded-facing algorithms, but it is not globally prohibited: simulation infrastructure currently uses a virtual `SensorSimulatorBase` interface.
-- Python analysis is modularized under `python/navkit_analysis`; `tools/run_analysis.py` is the entry point.
+- Python analysis is modularized under `python/navkit_analysis`; `tools/plot_run.py` renders the standard single-run figure suite, while `tools/plot_field.py` provides ad hoc named-field inspection.
 
 ## Architecture and naming rules
 

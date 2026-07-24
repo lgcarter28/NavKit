@@ -13,7 +13,7 @@ failure behavior, and numerical expectations hard to misunderstand.
 | Numerical estimator tests | Verify update math, statistics, accepted/rejected behavior, and future propagation behavior. | GNSS position update, measurement statistics |
 | Environment/model tests | Verify policy capabilities and physics/model semantics at a stable tolerance. | planet/gravity policy tests |
 | Simulation and IO tests | Verify executable support code produces expected data contracts. | trajectory generation, CSV writer behavior |
-| End-to-end smoke tests | Verify the configured app/demo still runs and analysis can consume its logs. | `tools/run_sim.py`, `tools/run_analysis.py`, `tools/run_scenario.py` |
+| End-to-end smoke tests | Verify the configured app/demo still runs and analysis can consume its logs. | `tools/run_sim.py`, `tools/plot_run.py`, `tools/run_scenario.py` |
 
 ## Standards for new tests
 
@@ -81,7 +81,7 @@ For a local timing smoke pass:
 python tools/build.py --build-type Debug --skip-conan
 python tools/run_tests.py --build-type Debug
 python tools/run_scenario.py --build-type Debug --no-plot
-python tools/run_analysis.py output/logs/ecef_ins_gnss_demo
+python tools/plot_run.py output/logs/ecef_ins_gnss_demo
 python tools/timing_report.py output/logs/ecef_ins_gnss_demo/timing.json
 python tools/resource_report.py --build-type Debug --output output/logs/ecef_ins_gnss_demo/resources-debug-local.json
 ```

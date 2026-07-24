@@ -1,5 +1,5 @@
 {
-  "schema": "navkit.monte_carlo_campaign.v1",
+  "schema": "navkit.monte_carlo_campaign.v2",
   "type": "monte_carlo_campaign",
   "campaign_name": "ecef_ins_gnss_smoke_mc",
   "nominal_config": "../navkit_sim/ecef_ins_gnss_monte_carlo.json",
@@ -22,6 +22,6 @@
   },
   "output": {
     "root": "output/monte_carlo",
-    "run_analysis": false
+    "plot_individual_runs": false
   }
 }

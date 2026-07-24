@@ -13,7 +13,7 @@ deliberate error rather than a best-effort parse.
 
 | Artifact | Current schema |
 | --- | --- |
-| Monte Carlo campaign config/manifest | `navkit.monte_carlo_campaign.v1` |
+| Monte Carlo campaign config/manifest | `navkit.monte_carlo_campaign.v2` |
 | Per-run Monte Carlo manifest | `navkit.monte_carlo_run.v1` |
 | Aggregate Monte Carlo report | `navkit.monte_carlo_report.v1` |
 | HDF5 analysis bundle | `navkit.analysis_bundle.v1` |
@@ -35,6 +35,7 @@ analysis_bundle.h5
   /runs/<run_id>/data/<table>/<column>
   /runs/<run_id>/derived/<table>/<column>
   /aggregate/monte_carlo_series/<quantity>/<array>
+  /aggregate/consistency/series/<nees|nis>/<group>/<array>
 ```
 
 `data` contains the raw analysis tables needed by current plotting. `derived`
@@ -44,11 +45,176 @@ metadata records source runtime configs/manifests when available, seeds,
 compile-time metadata carried by the source logs, units/frame conventions, plot
 decimation, and the truth/NED/covariance derivation assumptions.
 
+Campaign bundles also cache time-indexed joint consistency histories. The NEES
+cache contains full INS (15 DOF), PVA (9 DOF), position, velocity, attitude,
+combined IMU bias, gyro bias, and accelerometer bias products. Each product is
+calculated from the selected full covariance submatrix, preserving relevant
+cross-correlation terms. NIS remains separate by observation family and
+dimension (currently GNSS position and velocity, each 3 DOF); NavKit does not
+form a meaningless heterogeneous "whole-filter NIS."
+
+The bundle also caches marginal per-axis normalized squared-error histories for
+position, velocity, attitude, gyro bias, and accelerometer bias. Those are
+explicit 1-DOF drill-down diagnostics; they intentionally do not replace the
+joint NEES products, which retain covariance cross terms.
+
 HDF5 is an offline analysis artifact, not an embedded logging format. Future
 targets should emit an embedded-appropriate NavKit binary stream and use Python
 to decode/repackage it into this analysis layer.
 
-## Workflow
+## Choosing the right tool
+
+The analysis tools form layers. Use the highest-level command that matches the
+job:
+
+| Tool | Use it when |
+| --- | --- |
+| `run_scenario.py` | Run one scenario and immediately generate its standard analysis |
+| `run_sim.py` | Run only the C++ simulation |
+| `plot_run.py` | Render the standard domain-aware suite for an existing single run |
+| `run_monte_carlo.py` | Execute, package, report, and plot a seeded campaign |
+| `plot_monte_carlo.py` | Regenerate selected aggregate campaign figures |
+| `plot_consistency.py` | Generate or refresh joint NEES/NIS dashboards and reports |
+| `package_analysis.py` | Convert existing CSV run/campaign output into HDF5 |
+| `plot_field.py` | Quickly inspect arbitrary named CSV/HDF5 fields |
+| `compare_monte_carlo.py` | Compare existing campaign reports without replaying runs |
+
+`run_scenario.py` and `run_monte_carlo.py` are the normal entry points.
+Lower-level tools are useful when simulation is already complete or when
+iterating on analysis without paying simulation cost again.
+
+## Single-run workflow
+
+Run the default scenario and its standard analysis:
+
+```powershell
+python tools/run_scenario.py --build-type Debug
+```
+
+For realistic-duration simulations, use Release and select both the runtime
+input and output location explicitly:
+
+```powershell
+python tools/run_scenario.py --build-type Release `
+  --config config/runtime/navkit_sim/ecef_ins_gnss_runtime_covariance.json `
+  --output-dir output/logs/my_case
+```
+
+`run_scenario.py` writes `effective_runtime_config.json` when applying a run
+name or output override, executes the ordinary simulator, then invokes
+`plot_run.py`. Add `--no-plot` to retain the one-command scenario setup
+while skipping post-processing.
+
+Use the lower-level runner when no analysis should run:
+
+```powershell
+python tools/run_sim.py --build-type Release `
+  --config config/runtime/navkit_sim/ecef_ins_gnss.json
+```
+
+Analyze existing logs without rerunning the simulation:
+
+```powershell
+python tools/plot_run.py output/logs/ecef_ins_gnss_demo
+python tools/plot_run.py output/logs/ecef_ins_gnss_demo `
+  --plot state_ned --start-time 10 --show
+```
+
+Logging is configured independently of simulator update rates in the runtime
+scenario's `logging` object. An enabled log must provide `rate_hz` or `dt_s`;
+disabled high-rate/debug products should use `"enabled": false`. This is
+particularly important for long simulations and Monte Carlo campaigns, where
+unnecessary CSV I/O can dominate runtime.
+
+Typical single-run output is:
+
+```text
+output/logs/<run_name>/
+  effective_runtime_config.json
+  run_manifest.json
+  timing.json
+  data/
+    *.csv
+    *.meta.json
+  figures/
+    *.png
+```
+
+The exact products depend on compile-time log-product selection and the runtime
+`logging` configuration.
+
+## Monte Carlo workflow
+
+Run a campaign from its JSON configuration:
+
+```powershell
+python tools/run_monte_carlo.py `
+  config/runtime/monte_carlo/ecef_ins_gnss_smoke.json `
+  --build-type Release
+```
+
+Override common campaign controls without editing the JSON:
+
+```powershell
+python tools/run_monte_carlo.py `
+  config/runtime/monte_carlo/ecef_ins_gnss_smoke.json `
+  --build-type Release `
+  --run-count 100 `
+  --output-root output/monte_carlo_scratch `
+  --max-plot-points 1000
+```
+
+The campaign runner resolves the linked nominal scenario, derives deterministic
+run-local seeds from the master seed, writes each replayable
+`input.effective.json`, executes the normal simulation binary, builds aggregate
+reports, packages HDF5, and generates interactive Plotly HTML by default.
+Campaign scenarios should use lean logging rates and disable products not
+needed by aggregate analysis.
+
+Typical campaign output is:
+
+```text
+output/monte_carlo/<campaign_name>/
+  campaign_config.effective.json
+  campaign_manifest.json
+  analysis_bundle.h5
+  runs/
+    run_000000/
+      input.effective.json
+      run_manifest.json
+      data/
+  summary/
+    figures/
+    consistency_figures/
+    reports/
+      monte_carlo_summary.json
+      monte_carlo_report.md
+      state_axis_metrics.csv
+      state_group_metrics.csv
+      nis_metrics.csv
+      run_timing.csv
+      output_sizes.csv
+```
+
+Replay one campaign member by passing its effective input to `run_sim.py` or
+`run_scenario.py`. Regenerate selected aggregates without rerunning:
+
+```powershell
+python tools/plot_monte_carlo.py `
+  output/monte_carlo/ecef_ins_gnss_smoke_mc `
+  --plot attitude_ned --start-time 10 --show
+```
+
+Compare completed reports without reopening every run CSV:
+
+```powershell
+python tools/compare_monte_carlo.py `
+  output/monte_carlo/campaign_a `
+  output/monte_carlo/campaign_b `
+  --output-dir output/monte_carlo_comparison
+```
+
+## Packaging and inspecting HDF5
 
 Package an existing run or campaign:
 
@@ -66,7 +232,7 @@ Use the normal static plotting path on either a CSV directory or a single-run
 bundle:
 
 ```powershell
-python tools/run_analysis.py output/logs/ecef_ins_gnss_demo
+python tools/plot_run.py output/logs/ecef_ins_gnss_demo
 python -m navkit_analysis.plots output/logs/ecef_ins_gnss_demo/data/analysis_bundle.h5
 ```
 
@@ -77,12 +243,27 @@ python tools/plot_monte_carlo.py output/monte_carlo/ecef_ins_gnss_smoke_mc --plo
 python tools/plot_monte_carlo.py output/monte_carlo/ecef_ins_gnss_smoke_mc/analysis_bundle.h5 --plot attitude_ned --renderer plotly
 ```
 
+Generate the joint NEES/NIS consistency dashboards and reports from an existing
+campaign bundle. Use `--refresh-cache` only after changing the source run data
+or when packaging an older bundle that lacks the cache:
+
+```powershell
+python tools/plot_consistency.py output/monte_carlo/ecef_ins_gnss_smoke_mc/analysis_bundle.h5
+python tools/plot_consistency.py output/monte_carlo/ecef_ins_gnss_smoke_mc/analysis_bundle.h5 --refresh-cache --max-plot-points 1000
+```
+
 For quick exploration, select arbitrary named fields without creating a custom
 script:
 
 ```powershell
-python tools/plot_analysis.py output/logs/ecef_ins_gnss_demo --table nav --y p_e_x_m --renderer plotly
+python tools/plot_field.py output/logs/ecef_ins_gnss_demo --table nav --y p_e_x_m --renderer plotly
 ```
+
+Use HDF5 for repeated analysis of large campaigns. It avoids reopening hundreds
+or thousands of CSV files and stores derived truth-aligned errors and
+consistency histories alongside provenance metadata. Retain raw run folders
+until the campaign has been validated; the bundle is a derived analysis cache,
+not the embedded source log.
 
 ## Plotting architecture
 
@@ -99,6 +280,228 @@ with the expensive unified hover panel disabled. Use the right-side **Toggle
 hover details** control when a full time-slice readout is useful; the permanent
 legend intentionally contains only the shared aggregate semantics.
 
+Use Plotly for responsive browser pan, zoom, hover, epoch selection, and HTML
+sharing. Use Matplotlib when producing static publication figures. Both
+renderers consume the same prepared domain data; switching renderers does not
+duplicate error, covariance, scaling, or frame-transform calculations.
+
+## Cache refresh and performance
+
+Normal plotting should reuse `analysis_bundle.h5`. Use `--refresh-cache` only
+after source run data changes, consistency derivations change, or an older
+bundle lacks the required cache:
+
+```powershell
+python tools/plot_consistency.py `
+  output/monte_carlo/ecef_ins_gnss_smoke_mc/analysis_bundle.h5 `
+  --refresh-cache --max-plot-points 1000
+```
+
+`--max-plot-points` controls browser and renderer density; it does not change
+the underlying statistical calculations. For large campaigns:
+
+1. Build and execute simulation in Release.
+2. Disable unnecessary runtime logs.
+3. Package once.
+4. Iterate on plots from HDF5.
+5. Increase plot-point density only when the current diagnostic needs it.
+
+Timing for simulation, packaging, reporting, and plotting is printed by the
+campaign workflow and retained in campaign artifacts where applicable.
+
+## Monte Carlo consistency evidence
+
+`tools/run_monte_carlo.py` now packages and renders consistency evidence after
+the normal aggregate analysis. The generated `summary/consistency_figures/`
+directory contains focused full-INS, navigation, IMU-bias, and GNSS dashboards.
+Each left panel is a time-indexed ensemble-density heatmap with the mean
+statistic and a 95-percent confidence interval for the mean. Each right panel
+starts at the final epoch, then follows heatmap hover to update the across-run
+histogram; the black curve is the expected chi-square probability density. The
+dashboard adds a persistent vertical marker and **Download snapshot** control
+for review artifacts. Click a heatmap or type an `Epoch [s]` value to pin it,
+then use **Follow heatmap** to resume live hover selection. The mutually
+exclusive **PDF**, **CDF**, and **QQ** controls switch every right panel between
+the histogram/chi-square density comparison, empirical/chi-square cumulative
+distribution comparison, and observed-versus-expected quantile comparison.
+The QQ points should follow the identity line when the selected epoch is
+consistent. Separate position, velocity,
+attitude, gyro-bias, and accelerometer-bias axis dashboards expose the X/Y/Z
+marginal normalized-squared-error drill-down alongside the joint products.
+
+The report directory contains JSON, CSV, and Markdown summaries. Mean NEES/NIS
+confidence bounds correctly use `N * dof` chi-square degrees of freedom for an
+ensemble of `N` independent runs, then normalize by `N`. Joint 1/2/3-sigma
+coverage means the fraction of samples inside the corresponding multi-variate
+chi-square ellipsoid; it is distinct from the secondary per-axis scalar
+coverage. Every selected epoch uses one sample per run for its PDF, CDF, and QQ
+views. Do not pool samples across time for a hypothesis-test interpretation
+because successive estimator epochs are correlated.
+
+The two black dashed heatmap curves are the lower and upper limits of the
+two-sided 95-percent confidence interval for the ensemble mean—not duplicate
+thresholds. The white curve is the observed ensemble mean. Heatmap color uses
+`log(1 + count)` so both dense and sparse portions of the selected-epoch
+distribution remain visible.
+
+The dashboard right column uses a shared title above its first row and a shared
+statistic label below its last row. Use **PDF** for density shape, **CDF** for
+threshold and exceedance interpretation, and **QQ** for tail and
+distribution-shape diagnosis. Hovering follows the selected heatmap epoch;
+clicking or entering an epoch freezes it, and **Follow heatmap** resumes hover
+selection.
+
 This keeps error calculation, covariance bounds, decimation, state scaling, and
 frame transforms out of renderer implementations. Add new domain plot builders
 first; add renderer features only when they apply generally to prepared traces.
+
+## Mathematical interpretation of consistency heatmaps
+
+The consistency output is organized under:
+
+```text
+summary/consistency_figures/
+  index.html
+  density/
+  empirical_cdf/
+  cdf_probability_residual/
+```
+
+Every directory contains the same joint NEES, observation-family NIS, and
+marginal axis dashboard groupings. Only the left time-history representation
+changes. The right selected-epoch PDF/CDF/QQ controls remain available in every
+diagnostic family.
+
+### NEES and NIS reference distributions
+
+For state error `e_i(t)` and its covariance `P_i(t)`, the normalized estimation
+error squared is:
+
+```text
+NEES_i(t) = e_i(t)^T P_i(t)^(-1) e_i(t)
+```
+
+For a consistent state group with dimension `d`:
+
+```text
+NEES_i(t) ~ chi-square(d)
+```
+
+For innovation `nu_i(t)` and innovation covariance `S_i(t)`, the normalized
+innovation squared is:
+
+```text
+NIS_i(t) = nu_i(t)^T S_i(t)^(-1) nu_i(t)
+NIS_i(t) ~ chi-square(m)
+```
+
+Here, `m` is the effective measurement dimension. NIS products remain
+separated by observation family and effective measurement dimension.
+
+### Occurrence-density heatmap
+
+The occurrence-density view uses time on the horizontal axis, raw NEES/NIS on
+the vertical axis, and `log(1 + n[j,k])` as color. Here, `n[j,k]` is the number
+of Monte Carlo samples in statistic bin `j` at epoch `k`. The white curve is
+the ensemble mean. For `N` independent runs, the two black dashed curves are
+the two-sided 95-percent consistency interval for that mean:
+
+```text
+chi-square-quantile(N*d, 0.025) / N
+    <= mean_NEES(t) <=
+chi-square-quantile(N*d, 0.975) / N
+```
+
+Both sides are meaningful: exceeding the upper limit indicates covariance that
+is too small relative to observed errors, while falling below the lower limit
+indicates covariance that is overly conservative relative to observed errors.
+These curves bound the ensemble mean, not 95 percent of the heatmap samples.
+
+### Empirical-CDF heatmap in raw statistic space
+
+At each epoch, define the empirical CDF over the `N` Monte Carlo samples:
+
+```text
+ECDF_t(z) = count(x_i(t) <= z) / N
+```
+
+Here, `x_i(t)` is the applicable NEES or NIS statistic. This diagnostic uses:
+
+- horizontal axis: time;
+- vertical axis: raw NEES/NIS threshold `z`;
+- color: empirical cumulative probability `ECDF_t(z)`.
+
+The ECDF is calculated directly from the samples; its statistical definition
+does not depend on histogram bins. It is evaluated on a finite vertical grid
+only for rendering. Horizontal reference lines show the chi-square quantiles
+for probabilities `0.6827`, `0.95`, and `0.99`, using the applicable state or
+measurement dimension. These make familiar containment levels visible without
+overlaying the entire theoretical CDF on the heatmap.
+
+### CDF probability-space residual heatmap
+
+Raw NEES/NIS magnitudes cannot be compared directly across products with
+different dimensions. Transform every statistic through its expected
+chi-square CDF:
+
+```text
+u_i(t) = chi-square-CDF(x_i(t), d)
+```
+
+This is the probability integral transform (PIT). Under consistency, `u_i(t)`
+is uniformly distributed from zero to one, regardless of `d`. Let
+`ECDF_u,t(p)` be the empirical CDF of the transformed samples. The plotted
+residual is:
+
+```text
+R_t(p) = ECDF_u,t(p) - p
+```
+
+The normalized diagnostic uses:
+
+- horizontal axis: time;
+- vertical axis: CDF probability `p` from zero to one;
+- color: empirical-minus-expected cumulative probability `R_t(p)`;
+- expected result: zero everywhere.
+
+A positive residual means more samples fall below that theoretical percentile
+than expected; a negative residual means fewer do. The sign therefore
+distinguishes where probability mass has moved and should not be discarded by
+converting the result into a two-sided scalar test p-value. Horizontal
+probability references at 0.6827, 0.95, and 0.99 provide common landmarks across
+all state and observation dimensions.
+
+Here, `u = F(x)` is a CDF probability or PIT value. It is not the conventional
+upper-tail hypothesis-test p-value `1 - F(x)`. Keeping that terminology
+distinct avoids reversing the interpretation of large and small values.
+
+### Selected-epoch PDF, CDF, and QQ views
+
+The linked right panels retain the raw selected-epoch samples:
+
+- **PDF** compares empirical density against the chi-square density.
+- **CDF** compares the empirical and theoretical cumulative distributions.
+- **QQ** plots observed quantiles against theoretical chi-square quantiles; a
+  calibrated distribution follows the identity line.
+
+These panels explain the distribution shape behind a time-local heatmap
+feature. They always use one sample per run at the selected epoch. Pooling
+successive estimator epochs would violate the independence assumption because
+time-adjacent filter statistics are correlated.
+
+The mathematical material in this section may move into a standalone LaTeX
+consistency-analysis reference when the validation workflow expands beyond the
+current NEES/NIS products.
+
+## Troubleshooting
+
+- If a plot appears stale, confirm the HDF5 and HTML modification times, then
+  use `--refresh-cache` only if the source-derived cache is stale.
+- If an expected table is missing, inspect the run's logging configuration and
+  `*.meta.json`; analysis cannot reconstruct a product that was not logged.
+- If interactive HTML becomes sluggish, reduce `--max-plot-points` before
+  reducing campaign run count. Individual histories remain available in HDF5.
+- If NEES/NIS is unavailable, confirm that the required covariance,
+  truth/error, innovation, and innovation-covariance products were logged.
+- If a campaign run must be reproduced, use its `input.effective.json`; do not
+  manually recreate its derived seeds.

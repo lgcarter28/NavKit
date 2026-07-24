@@ -264,13 +264,14 @@ These scripts provide a consistent cross-platform workflow and abstract away pla
 | `build.py` | Configure, build, and rebuild NavKit using Conan and CMake |
 | `run_tests.py` | Execute the complete unit test suite |
 | `run_sim.py` | Run a selected runtime scenario with the built simulation executable |
-| `run_analysis.py` | Generate plots and analysis from existing simulation logs |
+| `plot_run.py` | Generate the standard domain-aware plots from existing single-run logs |
 | `run_scenario.py` | Run a scenario, optionally override output location, and generate plots |
 | `run_monte_carlo.py` | Run a seeded Monte Carlo campaign, package HDF5, and generate interactive aggregate plots/reports |
 | `compare_monte_carlo.py` | Compare existing Monte Carlo aggregate reports across campaigns |
 | `plot_monte_carlo.py` | Regenerate selected Monte Carlo aggregate plots from existing campaign logs |
+| `plot_consistency.py` | Generate or refresh joint NEES/NIS dashboards and reports from a campaign HDF5 bundle |
 | `package_analysis.py` | Package an existing CSV run or campaign into a versioned HDF5 analysis bundle |
-| `plot_analysis.py` | Quickly inspect named CSV/HDF5 fields through the shared static or interactive plotting layer |
+| `plot_field.py` | Quickly inspect named CSV/HDF5 fields through the shared static or interactive plotting layer |
 | `timing_report.py` | Summarize a complete `navkit.timing.v1` timing artifact |
 | `resource_report.py` | Write and display coarse executable/library size reports for a build tree |
 | `format.py` | Run clang-format; also exposes clang-tidy for CI diagnostics |
@@ -529,215 +530,38 @@ ctest --test-dir build/release/apps/navkit_sim/EcefInsGnss --output-on-failure -
 
 ## Run a Simulation Scenario
 
-Run the default stationary ECEF INS/GNSS-position scenario and generate plots:
+After building, run the default scenario and generate its standard analysis:
 
 ```bash
 python tools/run_scenario.py --build-type Debug
 ```
 
-Run a specific runtime input and place all outputs under a chosen run folder:
+For numerically intensive simulation and plotting, prefer a Release build. A
+single command can select the runtime input and output directory:
 
 ```bash
 python tools/run_scenario.py --build-type Release --config config/runtime/navkit_sim/ecef_ins_gnss_runtime_covariance.json --output-dir output/logs/my_case
 ```
 
-`run_scenario.py` writes an `effective_runtime_config.json` into the selected
-output directory when `--output-dir` or `--run-name` overrides are provided,
-then runs the simulation and invokes `run_analysis.py` on that folder. Add
-`--no-plot` when only the C++ simulation should run.
-
-For sim-only workflows, use the lower-level runner:
+Use `run_sim.py` when only the C++ simulation should run:
 
 ```bash
 python tools/run_sim.py --build-type Debug --config config/runtime/navkit_sim/ecef_ins_gnss.json
 ```
 
-Run a small Monte Carlo campaign from a campaign JSON config:
+Run a Monte Carlo campaign with:
 
 ```bash
 python tools/run_monte_carlo.py config/runtime/monte_carlo/ecef_ins_gnss_smoke.json --build-type Release
 ```
 
-Run a larger campaign without editing the smoke config:
+Single-run logs normally live under `output/logs/<run_name>/`; Monte Carlo
+campaigns normally live under `output/monte_carlo/<campaign_name>/`.
 
-```bash
-python tools/run_monte_carlo.py config/runtime/monte_carlo/ecef_ins_gnss_smoke.json --build-type Release --run-count 100 --max-plot-points 1000
-```
-
-Override the campaign output root without editing the JSON:
-
-```bash
-python tools/run_monte_carlo.py config/runtime/monte_carlo/ecef_ins_gnss_smoke.json --output-root output/monte_carlo_scratch
-```
-
-Regenerate only one or two plots from an existing single run and open them
-interactively:
-
-```bash
-python tools/run_analysis.py output/logs/ecef_ins_gnss_demo --plot state_ned --start-time 10 --show
-```
-
-Regenerate selected Monte Carlo aggregate plots from an existing campaign:
-
-```bash
-python tools/plot_monte_carlo.py output/monte_carlo/ecef_ins_gnss_smoke_mc --plot attitude_ned --start-time 10 --show
-```
-
-Package a completed run or campaign into its portable, versioned HDF5 analysis
-bundle. The normal Monte Carlo examples enable this automatically after their
-aggregate reports finish; this command is also useful for historical CSV output:
-
-```bash
-python tools/package_analysis.py output/monte_carlo/ecef_ins_gnss_smoke_mc
-python tools/package_analysis.py output/logs/ecef_ins_gnss_demo
-```
-
-Both CSV folders and bundles use the same analysis data contract. Regenerate a
-cached Monte Carlo aggregate as an interactive Plotly document, or inspect one
-arbitrary field without writing a one-off script:
-
-```bash
-python tools/plot_monte_carlo.py output/monte_carlo/ecef_ins_gnss_smoke_mc/analysis_bundle.h5 --plot attitude_ned --renderer plotly
-python tools/plot_analysis.py output/logs/ecef_ins_gnss_demo --table nav --y p_e_x_m --renderer plotly
-```
-
-Monte Carlo campaigns default to packaged HDF5 plus Plotly HTML for responsive
-inspection. Set `analysis.renderer` to `matplotlib` in the campaign JSON for
-static PNG/publication output. Both render the same domain-prepared plot specifications rather than maintaining duplicate
-error/covariance calculations.
-
-The Monte Carlo runner resolves the linked nominal runtime scenario into a
-normal effective JSON object for each run, derives deterministic run-local seeds
-from the campaign master seed, runs the ordinary simulation executable, and
-writes replayable per-run `input.effective.json` files. Any generated run can
-therefore be replayed with `run_sim.py` or `run_scenario.py` by pointing at that
-effective config. Monte Carlo campaign configs should point at lean runtime
-scenarios such as `config/runtime/navkit_sim/ecef_ins_gnss_monte_carlo.json`,
-which use minimal low-rate logs appropriate for aggregate covariance plots.
-
-Or manually, after building:
-
-Windows Debug:
-
-```powershell
-build\\debug\\apps\\navkit_sim\\EcefInsGnss\apps\navkit_sim\navkit_sim.exe config\runtime\navkit_sim\ecef_ins_gnss.json
-```
-
-Windows Release:
-
-```powershell
-build\\release\\apps\\navkit_sim\\EcefInsGnss\apps\navkit_sim\navkit_sim.exe config\runtime\navkit_sim\ecef_ins_gnss.json
-```
-
-Linux Debug:
-
-```bash
-build/debug/apps/navkit_sim/EcefInsGnss/apps/navkit_sim/navkit_sim config/runtime/navkit_sim/ecef_ins_gnss.json
-```
-
-The simulation generates logs under:
-
-```text
-output/logs/<run_name>/
-```
-
-Monte Carlo campaigns generate outputs under:
-
-```text
-output/monte_carlo/<campaign_name>/
-  campaign_config.effective.json
-  campaign_manifest.json
-  runs/
-    run_000000/
-      input.effective.json
-      run_manifest.json
-      data/
-  summary/
-    figures/
-    reports/
-      monte_carlo_summary.json
-      monte_carlo_report.md
-      state_axis_metrics.csv
-      state_group_metrics.csv
-      nis_metrics.csv
-      run_timing.csv
-      output_sizes.csv
-```
-
-Existing campaign reports can be compared without re-reading every run log:
-
-```bash
-python tools/compare_monte_carlo.py output/monte_carlo/campaign_a output/monte_carlo/campaign_b --output-dir output/monte_carlo_comparison
-```
-
-Expected outputs:
-
-```text
-truth.csv
-truth.meta.json
-
-gnss.csv
-gnss.meta.json
-
-nav.csv
-nav.meta.json
-
-run_manifest.json
-timing.json
-```
-
-CSV is used for time-history logs. JSON is used for runtime input bundles,
-per-log metadata, the hierarchical run manifest, and lightweight workflow
-timing artifacts. Runtime input bundles such as
-`config/runtime/navkit_sim/ecef_ins_gnss.json` are executable inputs, not
-NavKit library compile-time configuration. The selected app validates the
-runtime JSON before running; for the stationary GNSS app, that means required
-`trajectory`, `imu`, `gnss`, and `pva_initialization` sections must exist,
-unsupported `baro` or disabled `transfer_alignment` sections are rejected, and
-common vector/numeric fields must have the expected shape. Runtime sections
-that describe update cadence may specify either `rate_hz` or `dt_s`, but not
-both. The optional `logging` section uses the same cadence shape for independent
-console, truth, nav, and measurement-statistics output rates, so simulation
-system rates do not force file or console logging rates. The current stationary
-GNSS initializer uses `"type": "pva_random_error"` with nested `pva_error_cov`
-and `pva_error_frame` fields to keep startup PVA error generation in app support
-while product-core code consumes only typed PVA navigation initialization data.
-Initialization error keys encode the authored frame and units. For example,
-`p_n_m`, `v_n_mps`, and `rotvec_b2n_rad` author relative errors in the local
-NED frame, while `p_e_m`, `v_e_mps`, and `rotvec_b2e_rad` author them directly
-in ECEF for explicit error examples. PVA initialization covariance describes
-only the random startup-message error draw; full Kalman filter initial
-covariance is configured separately through the optional `filter_initialization`
-section. The `imu` section selects the simulator runtime mode, such as
-`"type": "ideal"` or a configured error model, while the app compile-time config
-selects which IMU simulator type is compiled in.
-
----
-
-## Plot Results
-
-Example:
-
-```bash
-python tools/run_analysis.py output/logs/ecef_ins_gnss_demo
-```
-
-Or, to display an interactive browser of the figures:
-```bash
-python tools/run_analysis.py output/logs/ecef_ins_gnss_demo --show
-```
-
-Future plotting utilities will include:
-
-- Truth vs estimate
-- Position error
-- 3-sigma covariance bounds
-- Innovation history
-- NEES
-- NIS
-- Monte Carlo statistics
-
-The analysis package is intentionally separated from the embedded navigation library to allow richer offline validation, visualization, Monte Carlo analysis, and future report generation without impacting embedded flight software.
+For the complete analysis workflow—including tool selection, output layouts,
+HDF5 packaging, Monte Carlo replay, Plotly/Matplotlib rendering, NEES/NIS
+interpretation, and cache refresh behavior—see
+[`ANALYSIS.md`](ANALYSIS.md).
 
 ---
 
@@ -753,7 +577,7 @@ For the default stationary GNSS workflow:
 
 ```bash
 python tools/run_sim.py --build-type Debug
-python tools/run_analysis.py output/logs/ecef_ins_gnss_demo
+python tools/plot_run.py output/logs/ecef_ins_gnss_demo
 ```
 
 Both commands update `timing.json` and print a compact timing summary for the

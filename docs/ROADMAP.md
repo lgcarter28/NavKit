@@ -46,6 +46,7 @@ Detailed historical phase notes are preserved under `docs/roadmap_details/`. Thi
 - [x] Offline analysis produces ECEF/NED error/covariance plots, dashboard plots, filter-correction plots, GNSS debug plots, IMU increment/debug/error plots, innovation plots, NIS/p-value plots, and histograms.
 - [x] `tools/run_scenario.py` provides a one-liner sim-plus-plot workflow.
 - [x] `tools/run_monte_carlo.py` provides a seeded campaign workflow with replayable generated run configs and first-pass aggregate covariance plots.
+- [x] Versioned Monte Carlo HDF5 bundles cache time-indexed joint NEES/NIS and marginal per-axis series and support interactive consistency dashboards plus machine-readable reports.
 - [x] LaTeX algorithm references exist for ECEF navigator v1 and IMU emulator v1.
 - [x] Setup, configuration, architecture, naming, founding, license, changelog, copyright, profiling, and roadmap documentation exists.
 - [x] Compile-time and runtime tests cover the current policy, config, simulation, logging, and initialization seams.
@@ -71,7 +72,7 @@ NavKit is currently in Phase 6: Monte Carlo and batch analysis. Phase 5 produced
 
 ## Active passes
 
-## Pass 6.5: Monte Carlo initialization support
+## Pass 6.6: Monte Carlo initialization support
 
 - [ ] Connect Monte Carlo execution to the Phase 5 advanced analysis/restart initialization path for deterministic seeded initial estimate errors and mid-trajectory restart studies.
 - [ ] Support deterministic seeded draws for initial estimate errors and simulator error terms without leaking simulator truth/error context into product-core code.
@@ -79,7 +80,7 @@ NavKit is currently in Phase 6: Monte Carlo and batch analysis. Phase 5 produced
 - [ ] For Monte Carlo estimate-error initialization, distinguish between directly setting nominal estimates and sampling estimate errors relative to truth. For persistent estimated states such as IMU biases, the statistically consistent form is `estimated_state = true_state + sampled_estimate_error`, so the actual initial estimate error falls within the configured covariance.
 - [ ] Introduce an explicit app/sim-side reference context before implementing truth-relative non-PVA initialization. A future `InitialEstimateReference`-style object should carry truth kinematics plus truth sensor error/calibration states, such as IMU turn-on/in-run bias, without letting app-support initialization reach into simulator internals ad hoc.
 
-## Pass 6.6: Monte Carlo covariance matching and bias-analysis scenarios
+## Pass 6.7: Monte Carlo covariance matching and bias-analysis scenarios
 
 - [ ] Add matched-covariance Monte Carlo scenarios where simulator truth-error distributions and filter initial covariance are intentionally aligned for consistency analysis.
 - [ ] Add conservative-covariance scenarios where the filter initial covariance intentionally exceeds the actual simulated initial error distribution.

@@ -637,6 +637,7 @@ Example:
 
 ```json
 {
+  "schema": "navkit.monte_carlo_campaign.v2",
   "type": "monte_carlo_campaign",
   "campaign_name": "ecef_ins_gnss_smoke_mc",
   "nominal_config": "../navkit_sim/ecef_ins_gnss_monte_carlo.json",
@@ -657,7 +658,7 @@ Example:
   },
   "output": {
     "root": "output/monte_carlo",
-    "run_analysis": false
+    "plot_individual_runs": false
   }
 }
 ```
@@ -670,6 +671,12 @@ resolved effective runtime config and replaces it with a deterministic value
 derived from `master_seed`, `run_index`, and the JSON-pointer path to that seed.
 The derived seed map is written to each run manifest so a generated
 `input.effective.json` file is directly replayable.
+
+`output.plot_individual_runs` controls whether the standard `plot_run.py`
+single-run suite is rendered separately for every successful campaign member.
+Leave it `false` for normal Monte Carlo work; aggregate and consistency outputs
+are generated independently, and plotting every member adds substantial I/O
+and rendering cost.
 
 Monte Carlo scenarios should inline a lean run-level `logging` block in the
 nominal runtime scenario, as in
@@ -690,7 +697,7 @@ visually useful without rendering every logged sample.
 
 For human-facing analysis plots, gyro bias is displayed in `deg/hr`; the
 underlying CSV logs remain in canonical `rad/s`. Use `--start-time` and
-`--end-time` on `run_analysis.py`, `run_monte_carlo.py`, or
+`--end-time` on `plot_run.py`, `run_monte_carlo.py`, or
 `plot_monte_carlo.py` to regenerate zoomed/steady-state plots without changing
 the source logs. Use repeated `--plot <name>` arguments to open a focused subset
 of plots interactively after a run or campaign has already completed.

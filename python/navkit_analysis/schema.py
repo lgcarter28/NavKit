@@ -10,7 +10,7 @@ from typing import Mapping
 
 
 ANALYSIS_BUNDLE_SCHEMA = "navkit.analysis_bundle.v1"
-MONTE_CARLO_CAMPAIGN_SCHEMA = "navkit.monte_carlo_campaign.v1"
+MONTE_CARLO_CAMPAIGN_SCHEMA = "navkit.monte_carlo_campaign.v2"
 MONTE_CARLO_REPORT_SCHEMA = "navkit.monte_carlo_report.v1"
 MONTE_CARLO_RUN_SCHEMA = "navkit.monte_carlo_run.v1"
 PLOT_SPEC_SCHEMA = "navkit.plot_spec.v1"

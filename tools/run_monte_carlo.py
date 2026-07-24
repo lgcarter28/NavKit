@@ -47,7 +47,7 @@ class CampaignConfig:
     plot_start_time_s: float | None
     plot_end_time_s: float | None
     output_root: Path
-    run_analysis: bool
+    plot_individual_runs: bool
     package_analysis: bool
     navkit_config: str
     generator: str
@@ -229,10 +229,15 @@ def load_campaign_config(
         raise ValueError("analysis.end_time_s must be greater than analysis.start_time_s")
 
     output = require_object(root.get("output", {}), "output")
+    if "run_analysis" in output:
+        raise ValueError(
+            "output.run_analysis was removed in navkit.monte_carlo_campaign.v2; "
+            "use output.plot_individual_runs"
+        )
     output_root = output_root_override or Path(
         optional_string(output, "root", "output/monte_carlo", "output")
     )
-    run_analysis = optional_bool(output, "run_analysis", False, "output")
+    plot_individual_runs = optional_bool(output, "plot_individual_runs", False, "output")
     package_analysis = optional_bool(analysis, "package_analysis", True, "analysis")
 
     return CampaignConfig(
@@ -250,7 +255,7 @@ def load_campaign_config(
         plot_start_time_s=plot_start_time_s,
         plot_end_time_s=plot_end_time_s,
         output_root=output_root,
-        run_analysis=run_analysis,
+        plot_individual_runs=plot_individual_runs,
         package_analysis=package_analysis,
         navkit_config=navkit_config,
         generator=generator,
@@ -445,7 +450,7 @@ def write_campaign_config(config: CampaignConfig, seed_paths: list[str]) -> None
             "output": {
                 "root": str(config.output_root),
                 "campaign_dir": str(root_dir),
-                "run_analysis": config.run_analysis,
+                "plot_individual_runs": config.plot_individual_runs,
             },
         },
     )
@@ -492,12 +497,12 @@ def write_campaign_manifest(
     )
 
 
-def run_analysis_for_run(run_dir: Path) -> int:
+def plot_individual_run(run_dir: Path) -> int:
     tools_dir = Path(__file__).resolve().parent
-    command = [sys.executable, str(tools_dir / "run_analysis.py"), str(run_dir)]
+    command = [sys.executable, str(tools_dir / "plot_run.py"), str(run_dir)]
     completed = subprocess.run(command, check=False, capture_output=True, text=True)
-    (run_dir / "analysis_stdout.txt").write_text(completed.stdout, encoding="utf-8")
-    (run_dir / "analysis_stderr.txt").write_text(completed.stderr, encoding="utf-8")
+    (run_dir / "plot_stdout.txt").write_text(completed.stdout, encoding="utf-8")
+    (run_dir / "plot_stderr.txt").write_text(completed.stderr, encoding="utf-8")
     return completed.returncode
 
 
@@ -654,12 +659,12 @@ def main() -> int:
             )
     simulation_elapsed_s = time.perf_counter() - simulation_started_s
 
-    if config.run_analysis:
+    if config.plot_individual_runs:
         for result in results:
             if result.status == "passed":
-                analysis_return_code = run_analysis_for_run(result.run_dir)
-                if analysis_return_code != 0:
-                    print(f"{result.run_name}: analysis failed with return {analysis_return_code}")
+                plot_return_code = plot_individual_run(result.run_dir)
+                if plot_return_code != 0:
+                    print(f"{result.run_name}: plotting failed with return {plot_return_code}")
 
     successful_run_dirs = [
         result.run_dir
@@ -688,8 +693,10 @@ def main() -> int:
     write_campaign_manifest(config, results, output_summary)
     bundle_elapsed_s: float | None = None
     bundle_path: Path | None = None
+    consistency_summary: dict[str, object] | None = None
     if successful_run_dirs and config.package_analysis:
         from navkit_analysis.bundle import package_analysis
+        from navkit_analysis.consistency import generate_consistency_outputs
 
         bundle_started_s = time.perf_counter()
         bundle_path = package_analysis(
@@ -698,6 +705,11 @@ def main() -> int:
             max_plot_points=config.max_plot_points,
         )
         bundle_elapsed_s = time.perf_counter() - bundle_started_s
+        consistency_summary = generate_consistency_outputs(
+            bundle_path,
+            root_dir / "summary",
+            max_plot_points=config.max_plot_points,
+        )
     plot_elapsed_s = output_summary.get("plot_elapsed_s") if output_summary is not None else None
     report_elapsed_s = output_summary.get("report_elapsed_s") if output_summary is not None else None
     analysis_elapsed_s = (
@@ -705,7 +717,9 @@ def main() -> int:
     )
     combined_elapsed_s = simulation_elapsed_s + (
         analysis_elapsed_s if isinstance(analysis_elapsed_s, float) else 0.0
-    ) + (bundle_elapsed_s if bundle_elapsed_s is not None else 0.0)
+    ) + (bundle_elapsed_s if bundle_elapsed_s is not None else 0.0) + (
+        float(consistency_summary["total_elapsed_s"]) if consistency_summary is not None else 0.0
+    )
     print("Monte Carlo run timing:")
     print(f"  simulation: {simulation_elapsed_s:.3f} s")
     if plot_elapsed_s is not None:
@@ -720,10 +734,20 @@ def main() -> int:
         print(f"  packaging:  {bundle_elapsed_s:.3f} s ({bundle_path})")
     else:
         print("  packaging:  not run")
+    if consistency_summary is not None:
+        print(
+            f"  consistency: {float(consistency_summary['total_elapsed_s']):.3f} s "
+            f"({consistency_summary['nees_group_count']} NEES, "
+            f"{consistency_summary['nis_group_count']} NIS, "
+            f"{consistency_summary['marginal_group_count']} marginal)"
+        )
+    else:
+        print("  consistency: not run")
     print(f"  total:      {combined_elapsed_s:.3f} s")
     if output_summary is not None:
         output_summary["bundle_elapsed_s"] = bundle_elapsed_s
         output_summary["bundle_path"] = str(bundle_path) if bundle_path is not None else None
+        output_summary["consistency"] = consistency_summary
     write_campaign_manifest(config, results, output_summary)
 
     if failed_count > 0:

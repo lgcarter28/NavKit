@@ -73,14 +73,14 @@ def main(argv: list[str] | None = None) -> int:
     return_code, result = measure_call(plots_main, forwarded_argv)
     timing_path = timing_path_from_source(run_dir)
     timing_path.parent.mkdir(parents=True, exist_ok=True)
-    command_name = "analysis"
+    command_name = "plot_run"
     record = update_timing_artifact(
         timing_path,
         run_name=run_name_from_dir(run_dir),
         command_name=command_name,
         command=command,
         result=result,
-        tool_version="run_analysis.py",
+        tool_version="plot_run.py",
     )
     if show_timing_report:
         print()

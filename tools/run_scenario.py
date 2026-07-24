@@ -58,12 +58,12 @@ def main() -> int:
     parser.add_argument(
         "--no-plot",
         action="store_true",
-        help="Only run the sim; do not invoke run_analysis.py.",
+        help="Only run the sim; do not invoke plot_run.py.",
     )
     parser.add_argument(
         "--show",
         action="store_true",
-        help="Forward --show to run_analysis.py when plots are enabled.",
+        help="Forward --show to plot_run.py when plots are enabled.",
     )
     parser.add_argument(
         "--no-profile-report",
@@ -111,10 +111,10 @@ def main() -> int:
     if sim_result.returncode != 0 or args.no_plot:
         return sim_result.returncode
 
-    analysis_command = [sys.executable, str(tools_dir / "run_analysis.py"), str(output_dir)]
+    plot_command = [sys.executable, str(tools_dir / "plot_run.py"), str(output_dir)]
     if args.show:
-        analysis_command.append("--show")
-    return subprocess.run(analysis_command, check=False).returncode
+        plot_command.append("--show")
+    return subprocess.run(plot_command, check=False).returncode
 
 
 if __name__ == "__main__":
