@@ -14,6 +14,10 @@ This project follows
 
 ### Added
 
+- Matched and deliberately conservative HG1700 Monte Carlo covariance scenarios
+  plus initial gyro/accelerometer bias covariance-matching report metrics.
+- Uncertainty-normalized Monte Carlo CDF-residual consistency dashboards with
+  pointwise finite-campaign sampling uncertainty.
 - A canonical current-state handoff and master roadmap.
 - Repository-wide agent guidance and documentation indexes.
 - Cross-platform environment bootstrap tooling and Linux/Windows GitHub Actions CI.
@@ -60,6 +64,13 @@ This project follows
 - Empirical-CDF heatmaps in raw NEES/NIS space and dimension-independent PIT-space CDF-residual heatmaps, organized with the existing occurrence-density dashboards under a generated consistency-figure index.
 
 ### Changed
+
+- Aligned the default compile-time IMU-bias initial covariance with the
+  moderate conservative runtime default instead of the previous oversized
+  gyro-bias covariance.
+- Consistency-dashboard colorbars now derive their placement from the Plotly
+  subplot domains and use a narrower vertical title to avoid overlapping the
+  heatmaps or selected-epoch distributions.
 
 - Renamed the single-run plotting tools to `plot_run.py` and `plot_field.py`, renamed the Monte Carlo per-run plotting option to `output.plot_individual_runs`, and advanced the campaign schema to `navkit.monte_carlo_campaign.v2`.
 - Reconciled README and setup documentation with the current implementation and build configuration.

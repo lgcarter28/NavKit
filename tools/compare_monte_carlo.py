@@ -85,10 +85,12 @@ def collect_campaign_rows(inputs: list[Path]) -> tuple[
     list[dict[str, Any]],
     list[dict[str, Any]],
     list[dict[str, Any]],
+    list[dict[str, Any]],
 ]:
     summary_rows: list[dict[str, Any]] = []
     axis_rows: list[dict[str, Any]] = []
     group_rows: list[dict[str, Any]] = []
+    bias_initialization_rows: list[dict[str, Any]] = []
     nis_rows: list[dict[str, Any]] = []
 
     for input_path in inputs:
@@ -135,14 +137,27 @@ def collect_campaign_rows(inputs: list[Path]) -> tuple[
         for row in report.get("state_group_metrics", []):
             if isinstance(row, dict):
                 group_rows.append({"campaign": name, **row})
+        for row in report.get("bias_initialization_metrics", []):
+            if isinstance(row, dict):
+                bias_initialization_rows.append({"campaign": name, **row})
         for row in report.get("nis_metrics", []):
             if isinstance(row, dict):
                 nis_rows.append({"campaign": name, **row})
 
-    return summary_rows, axis_rows, group_rows, nis_rows
+    return (
+        summary_rows,
+        axis_rows,
+        group_rows,
+        bias_initialization_rows,
+        nis_rows,
+    )
 
 
-def write_markdown_report(output_dir: Path, summary_rows: list[dict[str, Any]]) -> Path:
+def write_markdown_report(
+    output_dir: Path,
+    summary_rows: list[dict[str, Any]],
+    bias_initialization_rows: list[dict[str, Any]],
+) -> Path:
     path = output_dir / "monte_carlo_comparison.md"
     lines = [
         "# Monte Carlo Campaign Comparison",
@@ -160,6 +175,25 @@ def write_markdown_report(output_dir: Path, summary_rows: list[dict[str, Any]]) 
             f"{markdown_value(row['runner_elapsed_mean_s'], 4)} | "
             f"{markdown_value(row['output_bytes_mean'], 4)} |"
         )
+    if bias_initialization_rows:
+        lines.extend(
+            [
+                "",
+                "## Initial IMU-bias covariance matching",
+                "",
+                "| Campaign | Quantity | Axis | Empirical/filter sigma | Filter 3 sigma coverage |",
+                "| --- | --- | --- | ---: | ---: |",
+            ]
+        )
+        for row in bias_initialization_rows:
+            lines.append(
+                "| "
+                f"{row['campaign']} | "
+                f"{row['quantity']} | "
+                f"{row['axis']} | "
+                f"{markdown_value(row['initial_empirical_to_filter_sigma_ratio'])} | "
+                f"{markdown_value(row['initial_filter_3sigma_coverage'])} |"
+            )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
 
@@ -182,13 +216,27 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    summary_rows, axis_rows, group_rows, nis_rows = collect_campaign_rows(args.campaign)
+    (
+        summary_rows,
+        axis_rows,
+        group_rows,
+        bias_initialization_rows,
+        nis_rows,
+    ) = collect_campaign_rows(args.campaign)
     output_dir = args.output_dir
     write_csv(output_dir / "campaign_summary.csv", summary_rows)
     write_csv(output_dir / "state_axis_metrics.csv", axis_rows)
     write_csv(output_dir / "state_group_metrics.csv", group_rows)
+    write_csv(
+        output_dir / "bias_initialization_metrics.csv",
+        bias_initialization_rows,
+    )
     write_csv(output_dir / "nis_metrics.csv", nis_rows)
-    report_path = write_markdown_report(output_dir, summary_rows)
+    report_path = write_markdown_report(
+        output_dir,
+        summary_rows,
+        bias_initialization_rows,
+    )
     print(f"Wrote Monte Carlo comparison report: {report_path}")
     return 0
 

@@ -660,6 +660,58 @@ def _state_axis_metric_rows(series_items: list[MonteCarloSeries]) -> list[dict[s
     return rows
 
 
+def _bias_initialization_metric_rows(
+    series_items: list[MonteCarloSeries],
+) -> list[dict[str, object]]:
+    """Summarize initial bias-error dispersion against the filter covariance."""
+    rows: list[dict[str, object]] = []
+    for series in series_items:
+        quantity = _quantity_name(series)
+        if quantity not in {"gyro_bias_body", "accel_bias_body"}:
+            continue
+        for axis_index, axis_name in enumerate(series.axis_names):
+            initial_errors = series.scale * series.run_errors[:, 0, axis_index]
+            initial_errors = initial_errors[np.isfinite(initial_errors)]
+            initial_filter_sigma = float(
+                series.scale * series.mean_filter_sigma[0, axis_index]
+            )
+            initial_empirical_sigma = (
+                float(np.std(initial_errors, ddof=1))
+                if initial_errors.size > 1
+                else None
+            )
+            sigma_ratio = (
+                initial_empirical_sigma / initial_filter_sigma
+                if initial_empirical_sigma is not None and initial_filter_sigma > 0.0
+                else None
+            )
+            filter_3sigma_coverage = (
+                float(np.mean(np.abs(initial_errors) <= 3.0 * initial_filter_sigma))
+                if initial_errors.size > 0
+                else None
+            )
+            rows.append(
+                {
+                    "quantity": quantity,
+                    "axis": axis_name,
+                    "unit": series.ylabel,
+                    "run_count": int(initial_errors.size),
+                    "initial_time_s": float(series.time_s[0]),
+                    "initial_mean_error": _safe_mean(initial_errors),
+                    "initial_rmse": (
+                        float(np.sqrt(np.mean(np.square(initial_errors))))
+                        if initial_errors.size > 0
+                        else None
+                    ),
+                    "initial_empirical_sigma": initial_empirical_sigma,
+                    "initial_filter_sigma": initial_filter_sigma,
+                    "initial_empirical_to_filter_sigma_ratio": sigma_ratio,
+                    "initial_filter_3sigma_coverage": filter_3sigma_coverage,
+                }
+            )
+    return rows
+
+
 def _group_nees_from_frame(frame: pd.DataFrame, labels: tuple[str, str, str]) -> np.ndarray | None:
     covariance = _covariance_series(frame, list(labels))
     if covariance is None:
@@ -874,6 +926,7 @@ def write_monte_carlo_reports(
     metadata = campaign_metadata or {}
     state_axis_metrics = _state_axis_metric_rows(series_items)
     state_group_metrics = _state_group_metric_rows(runs, series_items)
+    bias_initialization_metrics = _bias_initialization_metric_rows(series_items)
     nis_metrics = _nis_metric_rows(run_dirs)
     run_timing = _run_timing_rows(run_dirs)
     output_sizes = _output_size_rows(run_dirs)
@@ -906,6 +959,7 @@ def write_monte_carlo_reports(
         "successful_aggregate_count": len(run_dirs),
         "state_axis_metrics": state_axis_metrics,
         "state_group_metrics": state_group_metrics,
+        "bias_initialization_metrics": bias_initialization_metrics,
         "nis_metrics": nis_metrics,
         "timing_summary": {
             "runner_elapsed_s": _summary_stats(runner_elapsed),
@@ -926,6 +980,10 @@ def write_monte_carlo_reports(
         ),
         "state_group_metrics_csv": _write_csv(
             reports_dir / "state_group_metrics.csv", state_group_metrics
+        ),
+        "bias_initialization_metrics_csv": _write_csv(
+            reports_dir / "bias_initialization_metrics.csv",
+            bias_initialization_metrics,
         ),
         "nis_metrics_csv": _write_csv(reports_dir / "nis_metrics.csv", nis_metrics),
         "run_timing_csv": _write_csv(reports_dir / "run_timing.csv", run_timing),
@@ -961,6 +1019,24 @@ def write_monte_carlo_reports(
             f"{_markdown_optional_float(row['final_empirical_3sigma'])} | "
             f"{_markdown_optional_float(row['final_mean_filter_3sigma'])} | "
             f"{_markdown_optional_float(row['filter_3sigma_coverage'], 4)} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Initial IMU-bias covariance matching",
+            "",
+            "| Quantity | Axis | Initial empirical sigma | Initial filter sigma | Empirical/filter sigma | Filter 3 sigma coverage |",
+            "| --- | --- | ---: | ---: | ---: | ---: |",
+        ]
+    )
+    for row in bias_initialization_metrics:
+        lines.append(
+            "| "
+            f"{row['quantity']} | {row['axis']} | "
+            f"{_markdown_optional_float(row['initial_empirical_sigma'])} | "
+            f"{_markdown_optional_float(row['initial_filter_sigma'])} | "
+            f"{_markdown_optional_float(row['initial_empirical_to_filter_sigma_ratio'])} | "
+            f"{_markdown_optional_float(row['initial_filter_3sigma_coverage'], 4)} |"
         )
     lines.extend(
         [

@@ -458,6 +458,23 @@ or:
 If `initial_covariance` is absent, app-support uses the immutable compile-time
 `NavKit::InitialCovariance::initial_covariance`.
 
+Monte Carlo covariance matching uses this separation deliberately. The
+statistics used to generate simulator truth errors remain in the simulator and
+PVA-initialization components, while `filter_initialization.initial_covariance`
+states what the estimator believes. The supplied HG1700 components demonstrate
+both cases:
+
+- `hg1700_matched_initial_covariance.json` matches the PVA initialization-error
+  covariance and HG1700 turn-on bias covariance.
+- `hg1700_conservative_initial_covariance.json` uses larger PVA and bias
+  covariance without changing the simulated truth-error distributions.
+
+The corresponding `ecef_ins_gnss_covariance_matched.json` and
+`ecef_ins_gnss_covariance_conservative.json` scenarios differ only in the
+selected filter-initialization component. This makes covariance-belief
+sensitivity explicit and prevents a nominal scenario from silently rewriting
+simulator statistics.
+
 For INS-style scenarios, runtime JSON may also use a mixed structured form that
 keeps the PVA block frame-aware while leaving the remaining error-state terms
 generic and order-based:

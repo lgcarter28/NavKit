@@ -1,0 +1,27 @@
+{
+  "schema": "navkit.monte_carlo_campaign.v2",
+  "type": "monte_carlo_campaign",
+  "campaign_name": "ecef_ins_gnss_covariance_conservative_mc",
+  "nominal_config": "../navkit_sim/ecef_ins_gnss_covariance_conservative.json",
+  "runs": {
+    "count": 100,
+    "start_index": 0
+  },
+  "randomization": {
+    "master_seed": 123456789,
+    "seed_policy": "derive_all"
+  },
+  "execution": {
+    "build_type": "Release",
+    "parallel_jobs": 1
+  },
+  "analysis": {
+    "max_plot_points": 1000,
+    "renderer": "plotly",
+    "package_analysis": true
+  },
+  "output": {
+    "root": "output/monte_carlo",
+    "plot_individual_runs": false
+  }
+}

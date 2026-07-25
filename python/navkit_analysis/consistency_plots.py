@@ -12,6 +12,7 @@ from typing import Sequence
 
 import numpy as np
 import plotly.graph_objects as go
+from plotly.colors import sample_colorscale
 from plotly.subplots import make_subplots
 from scipy.stats import chi2
 
@@ -72,12 +73,53 @@ MARGINAL_DASHBOARD_DEFINITIONS = (
 HEATMAP_DENSITY = "density"
 HEATMAP_EMPIRICAL_CDF = "empirical_cdf"
 HEATMAP_CDF_PROBABILITY_RESIDUAL = "cdf_probability_residual"
+HEATMAP_CDF_PROBABILITY_RESIDUAL_UNCERTAINTY = (
+    "cdf_probability_residual_uncertainty"
+)
 HEATMAP_MODES = (
     HEATMAP_DENSITY,
     HEATMAP_EMPIRICAL_CDF,
     HEATMAP_CDF_PROBABILITY_RESIDUAL,
+    HEATMAP_CDF_PROBABILITY_RESIDUAL_UNCERTAINTY,
 )
 REFERENCE_PROBABILITIES = (0.6827, 0.95, 0.99)
+RAW_CDF_RESIDUAL_LOGISTIC_A = -1.0
+RAW_CDF_RESIDUAL_LOGISTIC_K = 1.0
+RAW_CDF_RESIDUAL_LOGISTIC_B = 20.0
+RAW_CDF_RESIDUAL_LOGISTIC_Q = 1.0
+RAW_CDF_RESIDUAL_LOGISTIC_M = 0.0
+RAW_CDF_RESIDUAL_LOGISTIC_NU = 1.0
+RAW_CDF_RESIDUAL_COLOR_STOP_COUNT = 129
+
+
+def _raw_cdf_residual_logistic(residuals: np.ndarray) -> np.ndarray:
+    """Apply the symmetric generalized-logistic color transfer to residuals."""
+    denominator = np.power(
+        1.0
+        + RAW_CDF_RESIDUAL_LOGISTIC_Q
+        * np.exp(
+            -RAW_CDF_RESIDUAL_LOGISTIC_B
+            * (residuals - RAW_CDF_RESIDUAL_LOGISTIC_M)
+        ),
+        1.0 / RAW_CDF_RESIDUAL_LOGISTIC_NU,
+    )
+    return RAW_CDF_RESIDUAL_LOGISTIC_A + (
+        RAW_CDF_RESIDUAL_LOGISTIC_K - RAW_CDF_RESIDUAL_LOGISTIC_A
+    ) / denominator
+
+
+def _raw_cdf_residual_colorscale() -> list[tuple[float, str]]:
+    """Return a symmetric logistic color transfer in raw residual coordinates."""
+    residuals = np.linspace(-1.0, 1.0, RAW_CDF_RESIDUAL_COLOR_STOP_COUNT)
+    transformed_residuals = _raw_cdf_residual_logistic(residuals)
+    palette_coordinates = (
+        transformed_residuals - RAW_CDF_RESIDUAL_LOGISTIC_A
+    ) / (
+        RAW_CDF_RESIDUAL_LOGISTIC_K - RAW_CDF_RESIDUAL_LOGISTIC_A
+    )
+    raw_coordinates = 0.5 * (residuals + 1.0)
+    colors = sample_colorscale("RdBu_r", palette_coordinates.tolist())
+    return list(zip(raw_coordinates.tolist(), colors, strict=True))
 
 
 def _kind_label(kind: str) -> str:
@@ -176,6 +218,32 @@ def _cdf_probability_residual_grid(
         ) / transformed.size
         residual[:, index] = empirical_cdf - probability_grid
     return probability_grid, residual
+
+
+def _cdf_probability_residual_uncertainty_grid(
+    series: ConsistencySeries,
+    point_count: int = 128,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Normalize PIT-space CDF residuals by pointwise sampling uncertainty."""
+    probability_grid, residual = _cdf_probability_residual_grid(
+        series,
+        point_count,
+    )
+    standardized_residual = np.full_like(residual, np.nan)
+    for index in range(series.values.shape[1]):
+        sample_count = int(np.count_nonzero(np.isfinite(series.values[:, index])))
+        if sample_count == 0:
+            continue
+        standard_error = np.sqrt(
+            probability_grid * (1.0 - probability_grid) / sample_count
+        )
+        np.divide(
+            residual[:, index],
+            standard_error,
+            out=standardized_residual[:, index],
+            where=standard_error > 0.0,
+        )
+    return probability_grid, standardized_residual
 
 
 def _dashboard_payload(series_items: Sequence[ConsistencySeries]) -> str:
@@ -424,16 +492,29 @@ def _heatmap_data(
         )
     if mode == HEATMAP_CDF_PROBABILITY_RESIDUAL:
         y_values, z_values = _cdf_probability_residual_grid(series)
-        finite = np.abs(z_values[np.isfinite(z_values)])
-        limit = max(float(finite.max(initial=0.0)), 0.02)
+        return (
+            y_values,
+            z_values,
+            _raw_cdf_residual_colorscale(),
+            "Empirical CDF - expected",
+            "CDF probability: %{y:.4f}<br>CDF residual: %{z:+.4f}",
+            -1.0,
+            1.0,
+            0.0,
+        )
+    if mode == HEATMAP_CDF_PROBABILITY_RESIDUAL_UNCERTAINTY:
+        y_values, z_values = _cdf_probability_residual_uncertainty_grid(series)
         return (
             y_values,
             z_values,
             "RdBu_r",
-            "Empirical CDF - expected",
-            "CDF probability: %{y:.4f}<br>CDF residual: %{z:+.4f}",
-            -limit,
-            limit,
+            "CDF residual / pointwise SE",
+            (
+                "CDF probability: %{y:.4f}<br>"
+                "Standardized CDF residual: %{z:+.3f} SE"
+            ),
+            -5.0,
+            5.0,
             0.0,
         )
     raise ValueError(f"unsupported consistency heatmap mode '{mode}'")
@@ -447,6 +528,8 @@ def _dashboard_title(title: str, mode: str) -> str:
         return f"{title} - Empirical CDF"
     if mode == HEATMAP_CDF_PROBABILITY_RESIDUAL:
         return f"{title} - CDF Probability-Space Residual"
+    if mode == HEATMAP_CDF_PROBABILITY_RESIDUAL_UNCERTAINTY:
+        return f"{title} - CDF Residual Statistical Uncertainty"
     raise ValueError(f"unsupported consistency heatmap mode '{mode}'")
 
 
@@ -563,6 +646,9 @@ def write_consistency_dashboard(
             )
         ],
     )
+    left_domain = figure.layout.xaxis.domain
+    right_domain = figure.layout.xaxis2.domain
+    colorbar_x = 0.5 * (left_domain[1] + right_domain[0])
     distribution_trace_indices: list[dict[str, list[int]]] = []
     row_axis_indices: list[int] = []
     right_axis_indices: list[int] = []
@@ -581,12 +667,15 @@ def write_consistency_dashboard(
                 zmax=zmax,
                 zmid=zmid,
                 colorbar={
-                    "title": colorbar_title,
-                    "x": 0.665,
+                    "title": {
+                        "text": colorbar_title,
+                        "side": "right",
+                    },
+                    "x": colorbar_x,
                     "xanchor": "center",
                     "y": 0.5,
                     "len": 0.90,
-                    "thickness": 14,
+                    "thickness": 10,
                 }
                 if row == 1
                 else None,
@@ -702,7 +791,11 @@ def write_consistency_dashboard(
         kind_label = _kind_label(series.kind)
         left_y_title = (
             "CDF probability"
-            if heatmap_mode == HEATMAP_CDF_PROBABILITY_RESIDUAL
+            if heatmap_mode
+            in (
+                HEATMAP_CDF_PROBABILITY_RESIDUAL,
+                HEATMAP_CDF_PROBABILITY_RESIDUAL_UNCERTAINTY,
+            )
             else f"{kind_label} [{series.dof} DOF]"
         )
         figure.update_yaxes(title_text=left_y_title, row=row, col=1)
@@ -783,15 +876,21 @@ def write_consistency_dashboards(
     nis_series: Sequence[ConsistencySeries],
     marginal_series: Sequence[ConsistencySeries],
     figures_dir: Path,
+    *,
+    heatmap_modes: Sequence[str] = HEATMAP_MODES,
+    write_index: bool = True,
 ) -> dict[str, Path]:
     """Write the complete joint and marginal consistency dashboard set."""
+    unsupported_modes = set(heatmap_modes).difference(HEATMAP_MODES)
+    if unsupported_modes:
+        raise ValueError(f"unsupported consistency heatmap modes: {sorted(unsupported_modes)}")
     figures_dir.mkdir(parents=True, exist_ok=True)
     for stale_path in figures_dir.glob("consistency_*.html"):
         stale_path.unlink()
     by_name = {series.name: series for series in (*nees_series, *nis_series)}
     paths: dict[str, Path] = {}
     marginal_by_name = {series.name: series for series in marginal_series}
-    for heatmap_mode in HEATMAP_MODES:
+    for heatmap_mode in heatmap_modes:
         mode_dir = figures_dir / heatmap_mode
         for name, title, group_names in DASHBOARD_DEFINITIONS:
             selected = [by_name[group_name] for group_name in group_names if group_name in by_name]
@@ -819,9 +918,12 @@ def write_consistency_dashboards(
                 path,
                 heatmap_mode=heatmap_mode,
             )
+    if not write_index:
+        return paths
+
     index_path = figures_dir / "index.html"
     sections: list[str] = []
-    for heatmap_mode in HEATMAP_MODES:
+    for heatmap_mode in heatmap_modes:
         links = [
             f'<li><a href="{path.relative_to(figures_dir).as_posix()}">{name}</a></li>'
             for key, path in paths.items()
@@ -837,8 +939,8 @@ def write_consistency_dashboards(
         "<style>body{font-family:Arial,sans-serif;max-width:960px;margin:32px auto;"
         "padding:0 20px}li{margin:7px 0}</style></head><body>"
         "<h1>NavKit Consistency Dashboards</h1>"
-        "<p>Choose an occurrence-density, empirical-CDF, or normalized "
-        "CDF-residual diagnostic.</p>"
+        "<p>Choose an occurrence-density, empirical-CDF, raw CDF-residual, "
+        "or uncertainty-normalized CDF-residual diagnostic.</p>"
         f"{''.join(sections)}</body></html>",
         encoding="utf-8",
     )

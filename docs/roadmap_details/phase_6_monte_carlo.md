@@ -72,3 +72,20 @@ Monte Carlo support comes immediately after Phase 5 because it is the gold-stand
 - [x] Preserved NIS by observation family and measurement dimension; no heterogeneous whole-filter NIS is synthesized.
 - [x] Added matching empirical-CDF heatmaps in raw NEES/NIS space and normalized PIT-space CDF-residual heatmaps for every joint, observation-family, and marginal dashboard. Preserved the selected-epoch PDF/CDF/QQ drill-downs and organized all consistency HTML under diagnostic-family subdirectories with a generated index.
 - [x] Validated directly against the existing 1,000-run HDF5 campaign without re-running the simulation. The original consistency cache refresh took 133.490 s; after adding all three diagnostic modes, representative cached dashboard/report regeneration took between 58.712 s and 68.418 s and produced 8 NEES groups, 2 NIS groups, 15 marginal groups, 27 interactive dashboards, one generated dashboard index, and four report artifacts.
+
+## Pass 6.6: pointwise statistical uncertainty for CDF residuals
+
+- [x] Preserved the existing raw probability-space CDF-residual dashboards and added a distinct uncertainty-normalized diagnostic family.
+- [x] Normalized each pointwise empirical-CDF residual by its finite-ensemble binomial standard error, leaving the zero-variance probability endpoints undefined instead of inventing a numerical fallback.
+- [x] Added explicit mathematical interpretation and limitations: the result is pointwise evidence measured in standard-error units, not a simultaneous confidence band over probability and time.
+- [x] Positioned consistency-dashboard colorbars from the actual Plotly subplot domains so they remain centered in the inter-column gap rather than overlapping the distribution panels.
+- [x] Verified the new grid numerically with synthetic samples and generated a structural HTML smoke dashboard without changing the existing raw residual products.
+
+## Pass 6.7: Monte Carlo covariance matching and bias-analysis scenarios
+
+- [x] Added matched-covariance Monte Carlo scenarios where HG1700 simulator turn-on-bias distributions and filter initial bias covariance are intentionally aligned.
+- [x] Added conservative-covariance scenarios where the filter initial bias variance is ten times the actual simulated turn-on-bias variance while all other scenario components remain fixed.
+- [x] Added first-epoch gyro/accelerometer bias metrics for empirical sigma, filter sigma, their ratio, mean error, RMSE, and filter three-sigma coverage to JSON, CSV, Markdown, and cross-campaign comparison outputs.
+- [x] Retained the dedicated body gyro-bias and accelerometer-bias Monte Carlo error/covariance plots as the visual companion to the new numerical matching metrics.
+- [x] Revisited the default bias covariance: the compile-time default now agrees with the moderate conservative runtime default instead of retaining the formerly oversized gyro-bias variance.
+- [x] Validated both controlled scenarios with 100-run Release campaigns. Matched empirical/filter sigma ratios were 0.97--1.06 for gyro and 0.99--1.11 for accelerometer; conservative ratios were 0.31--0.35 across all six axes, agreeing with the designed value of `1 / sqrt(10)`.

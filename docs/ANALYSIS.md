@@ -191,6 +191,7 @@ output/monte_carlo/<campaign_name>/
       monte_carlo_report.md
       state_axis_metrics.csv
       state_group_metrics.csv
+      bias_initialization_metrics.csv
       nis_metrics.csv
       run_timing.csv
       output_sizes.csv
@@ -213,6 +214,33 @@ python tools/compare_monte_carlo.py `
   output/monte_carlo/campaign_b `
   --output-dir output/monte_carlo_comparison
 ```
+
+Two supplied campaigns isolate initial-covariance matching:
+
+```powershell
+python tools/run_monte_carlo.py `
+  config/runtime/monte_carlo/ecef_ins_gnss_covariance_matched.json `
+  --build-type Release
+
+python tools/run_monte_carlo.py `
+  config/runtime/monte_carlo/ecef_ins_gnss_covariance_conservative.json `
+  --build-type Release
+```
+
+Both campaigns use the same PVA-error, HG1700, process-noise, bias-dynamics,
+and GNSS components. The matched campaign makes the filter's initial PVA and
+IMU-bias covariance equal to the distributions that generate those initial
+truth errors. The conservative campaign increases only the filter's initial
+covariance. Compare their `bias_initialization_metrics.csv` files or pass both
+campaign directories to `tools/compare_monte_carlo.py`.
+
+The bias-initialization report records, per body axis, the initial empirical
+error sigma, initial mean filter sigma, their ratio, and initial filter
+three-sigma coverage. A ratio near one is expected for a sufficiently large
+matched campaign. A ratio below one is expected when filter covariance is
+deliberately conservative. The existing gyro- and accelerometer-bias
+error/covariance figures provide the time-history companion to these
+initial-epoch metrics.
 
 ## Packaging and inspecting HDF5
 
@@ -365,6 +393,7 @@ summary/consistency_figures/
   density/
   empirical_cdf/
   cdf_probability_residual/
+  cdf_probability_residual_uncertainty/
 ```
 
 Every directory contains the same joint NEES, observation-family NIS, and
@@ -471,9 +500,57 @@ converting the result into a two-sided scalar test p-value. Horizontal
 probability references at 0.6827, 0.95, and 0.99 provide common landmarks across
 all state and observation dimensions.
 
+The raw residual colorbar remains literally fixed from `-1` to `+1`, matching
+the possible range of `R_t(p)`. Its pigment uses one symmetric generalized
+logistic transfer function:
+
+```text
+Y(r) = A + (K - A) / (1 + Q * exp(-B * (r - M)))^(1 / nu)
+```
+
+The current symmetric visualization settings are `A=-1`, `K=+1`, `Q=1`,
+`B=20`, `M=0`, and `nu=1`. `Y(r)` selects pigment while the displayed heatmap
+value remains the raw residual `r`. Thus ordinary residuals near zero remain
+visible without changing plotted values, hover values, or colorbar labels.
+Color intensity is deliberately nonlinear, but every displayed residual value
+stays in raw probability units. The uncertainty-normalized dashboard remains
+the separate diagnostic for pointwise statistical significance.
+
 Here, `u = F(x)` is a CDF probability or PIT value. It is not the conventional
 upper-tail hypothesis-test p-value `1 - F(x)`. Keeping that terminology
 distinct avoids reversing the interpretation of large and small values.
+
+### CDF-residual statistical-uncertainty heatmap
+
+The raw CDF-residual view measures the magnitude of the distribution mismatch.
+Its companion uncertainty-normalized view answers whether that mismatch is
+large relative to the finite number of independent Monte Carlo runs available
+at the epoch. For `N_t` finite samples, the pointwise sampling standard error
+of the empirical CDF at probability `p` is:
+
+```text
+SE_t(p) = sqrt(p * (1 - p) / N_t)
+```
+
+The uncertainty-normalized residual is:
+
+```text
+Z_t(p) = R_t(p) / SE_t(p)
+```
+
+The dashboard preserves time and CDF probability on the horizontal and
+vertical axes. Color is the signed residual in pointwise standard-error units,
+clipped visually at `+/-5` while hover text retains the calculated value.
+Positive and negative signs retain the same probability-mass interpretation as
+the raw residual. The endpoints `p = 0` and `p = 1` have zero binomial variance
+and are intentionally left blank in the standardized view.
+
+These are pointwise uncertainty units, not independent hypothesis-test results
+for every heatmap pixel. Probability levels within an epoch share the same
+empirical sample, and successive estimator epochs are temporally correlated.
+A future simultaneous-inference layer may add DKW or campaign-bootstrap
+envelopes, but naive multiple-testing claims across the entire heatmap would
+not be valid.
 
 ### Selected-epoch PDF, CDF, and QQ views
 

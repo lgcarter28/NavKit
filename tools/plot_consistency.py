@@ -40,6 +40,15 @@ def main() -> int:
         default=None,
         help="Limit the cached selectable time grid when refreshing the cache.",
     )
+    parser.add_argument(
+        "--heatmap-mode",
+        action="append",
+        default=None,
+        help=(
+            "Regenerate only one heatmap mode; may be supplied multiple times. "
+            "The dashboard index is preserved for a selective refresh."
+        ),
+    )
     args = parser.parse_args()
     if args.max_plot_points is not None and args.max_plot_points <= 1:
         parser.error("--max-plot-points must be greater than one")
@@ -48,6 +57,14 @@ def main() -> int:
 
     add_python_package_to_path()
     from navkit_analysis.consistency import generate_consistency_outputs
+    from navkit_analysis.consistency_plots import HEATMAP_MODES
+
+    if args.heatmap_mode is not None:
+        unsupported_modes = set(args.heatmap_mode).difference(HEATMAP_MODES)
+        if unsupported_modes:
+            parser.error(
+                f"unsupported --heatmap-mode values: {sorted(unsupported_modes)}"
+            )
 
     output_dir = args.output_dir or args.bundle.parent / "summary"
     summary = generate_consistency_outputs(
@@ -55,6 +72,7 @@ def main() -> int:
         output_dir,
         refresh_cache=args.refresh_cache,
         max_plot_points=args.max_plot_points,
+        heatmap_modes=args.heatmap_mode,
     )
     print("Consistency analysis timing:")
     print(f"  cache:   {float(summary['cache_elapsed_s']):.3f} s")

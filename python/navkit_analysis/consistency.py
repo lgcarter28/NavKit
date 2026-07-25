@@ -751,6 +751,7 @@ def generate_consistency_outputs(
     *,
     refresh_cache: bool = False,
     max_plot_points: int | None = None,
+    heatmap_modes: Sequence[str] | None = None,
 ) -> dict[str, object]:
     """Generate cached joint-consistency dashboards and reports for one campaign bundle."""
     started_s = time.perf_counter()
@@ -775,7 +776,7 @@ def generate_consistency_outputs(
             )
     cache_elapsed_s = time.perf_counter() - cache_started_s
 
-    from navkit_analysis.consistency_plots import write_consistency_dashboards
+    from navkit_analysis.consistency_plots import HEATMAP_MODES, write_consistency_dashboards
 
     plot_started_s = time.perf_counter()
     figure_paths = write_consistency_dashboards(
@@ -783,6 +784,8 @@ def generate_consistency_outputs(
         nis_series,
         marginal_series,
         summary_dir / "consistency_figures",
+        heatmap_modes=heatmap_modes or HEATMAP_MODES,
+        write_index=heatmap_modes is None,
     )
     plot_elapsed_s = time.perf_counter() - plot_started_s
     report_started_s = time.perf_counter()
