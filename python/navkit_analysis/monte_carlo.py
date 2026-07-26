@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import csv
+import concurrent.futures
 import json
 import time
 from dataclasses import dataclass
@@ -227,7 +228,11 @@ def _required_imu_columns() -> list[str]:
     ]
 
 
-def load_monte_carlo_run_frames(run_dir: Path) -> MonteCarloRunFrames:
+def load_monte_carlo_run_frames(
+    run_dir: Path,
+    *,
+    ned_transform_cache: dict[tuple[bytes, bytes], np.ndarray] | None = None,
+) -> MonteCarloRunFrames:
     """Load only the logs needed for Monte Carlo aggregate covariance plots."""
     _, data_dir, _ = resolve_run_dirs(run_dir)
 
@@ -262,16 +267,44 @@ def load_monte_carlo_run_frames(run_dir: Path) -> MonteCarloRunFrames:
     if ecef is None:
         raise ValueError(f"could not derive truth-error frame for {run_dir}")
 
+    ecef_time_s = ecef["time_s"].to_numpy(dtype=float)
+    truth_positions = _interp_truth_position(truth, ecef_time_s)
+    cache_key = (
+        np.ascontiguousarray(ecef_time_s).tobytes(),
+        np.ascontiguousarray(truth_positions).tobytes(),
+    )
+    ecef_to_ned = (
+        ned_transform_cache.get(cache_key)
+        if ned_transform_cache is not None
+        else None
+    )
+    if ecef_to_ned is None:
+        ecef_to_ned = _ecef_to_ned_matrices(truth_positions)
+        if ned_transform_cache is not None:
+            ned_transform_cache[cache_key] = ecef_to_ned
+
     return MonteCarloRunFrames(
         run_dir=run_dir,
         ecef=ecef,
-        ned=build_monte_carlo_ned_frame(ecef, truth),
+        ned=build_monte_carlo_ned_frame(
+            ecef,
+            truth,
+            truth_positions=truth_positions,
+            ecef_to_ned=ecef_to_ned,
+        ),
     )
 
 
 def load_successful_runs(run_dirs: list[Path]) -> list[MonteCarloRunFrames]:
     """Load minimal run data for successful Monte Carlo runs."""
-    return [load_monte_carlo_run_frames(run_dir) for run_dir in run_dirs]
+    ned_transform_cache: dict[tuple[bytes, bytes], np.ndarray] = {}
+    return [
+        load_monte_carlo_run_frames(
+            run_dir,
+            ned_transform_cache=ned_transform_cache,
+        )
+        for run_dir in run_dirs
+    ]
 
 
 def _ecef_to_ned_matrices(p_e: np.ndarray) -> np.ndarray:
@@ -328,7 +361,7 @@ def _interp_truth_position(truth: pd.DataFrame, time_s: np.ndarray) -> np.ndarra
 def _add_ned_group(
     *,
     source: pd.DataFrame,
-    truth_positions: np.ndarray,
+    ecef_to_ned: np.ndarray,
     source_labels: list[str],
     target_labels: tuple[str, str, str],
     target: pd.DataFrame,
@@ -342,10 +375,9 @@ def _add_ned_group(
         return False
 
     errors_e = source[error_columns].to_numpy()
-    C_e2n = _ecef_to_ned_matrices(truth_positions)
-    ned_errors = np.einsum("tij,tj->ti", C_e2n, errors_e)
-    CP = np.matmul(C_e2n, covariance_e)
-    covariance_n = np.matmul(CP, np.swapaxes(C_e2n, 1, 2))
+    ned_errors = np.einsum("tij,tj->ti", ecef_to_ned, errors_e)
+    CP = np.matmul(ecef_to_ned, covariance_e)
+    covariance_n = np.matmul(CP, np.swapaxes(ecef_to_ned, 1, 2))
     ned_sigmas = np.sqrt(np.diagonal(covariance_n, axis1=1, axis2=2))
 
     for index, target_label in enumerate(target_labels):
@@ -355,31 +387,44 @@ def _add_ned_group(
 
 
 def build_monte_carlo_ned_frame(
-    ecef: pd.DataFrame, truth: pd.DataFrame
+    ecef: pd.DataFrame,
+    truth: pd.DataFrame,
+    *,
+    truth_positions: np.ndarray | None = None,
+    ecef_to_ned: np.ndarray | None = None,
 ) -> pd.DataFrame | None:
     """Build the NED/local-level truth-error frame needed by MC plots."""
     time_s = ecef["time_s"].to_numpy()
-    truth_positions = _interp_truth_position(truth, time_s)
+    resolved_truth_positions = (
+        truth_positions
+        if truth_positions is not None
+        else _interp_truth_position(truth, time_s)
+    )
+    resolved_ecef_to_ned = (
+        ecef_to_ned
+        if ecef_to_ned is not None
+        else _ecef_to_ned_matrices(resolved_truth_positions)
+    )
     target = pd.DataFrame({"time_s": ecef["time_s"]})
 
     groups_added = [
         _add_ned_group(
             source=ecef,
-            truth_positions=truth_positions,
+            ecef_to_ned=resolved_ecef_to_ned,
             source_labels=["p_e_x_m", "p_e_y_m", "p_e_z_m"],
             target_labels=("p_n_m", "p_e_m", "p_d_m"),
             target=target,
         ),
         _add_ned_group(
             source=ecef,
-            truth_positions=truth_positions,
+            ecef_to_ned=resolved_ecef_to_ned,
             source_labels=["v_e_x_mps", "v_e_y_mps", "v_e_z_mps"],
             target_labels=("v_n_mps", "v_e_mps", "v_d_mps"),
             target=target,
         ),
         _add_ned_group(
             source=ecef,
-            truth_positions=truth_positions,
+            ecef_to_ned=resolved_ecef_to_ned,
             source_labels=["theta_b2e_x_rad", "theta_b2e_y_rad", "theta_b2e_z_rad"],
             target_labels=("theta_roll_rad", "theta_pitch_rad", "theta_yaw_rad"),
             target=target,
@@ -1070,6 +1115,7 @@ def generate_monte_carlo_outputs(
     start_time_s: float | None = None,
     end_time_s: float | None = None,
     renderer: str = "matplotlib",
+    parallel_jobs: int = 1,
 ) -> MonteCarloOutputSummary:
     """Generate campaign-level Monte Carlo figures and reports from run logs."""
     apply_style()
@@ -1084,6 +1130,8 @@ def generate_monte_carlo_outputs(
     aggregate_elapsed_s = time.perf_counter() - aggregate_started_s
 
     plot_started_s = time.perf_counter()
+    if parallel_jobs <= 0:
+        raise ValueError("parallel_jobs must be positive")
     if renderer == "matplotlib":
         figures_dir = summary_dir / "figures"
         figures_dir.mkdir(parents=True, exist_ok=True)
@@ -1091,16 +1139,17 @@ def generate_monte_carlo_outputs(
     elif renderer == "plotly":
         figures_dir = summary_dir / "interactive_figures"
         figures_dir.mkdir(parents=True, exist_ok=True)
-        figures = [
-            plot_monte_carlo_series_interactive(
-                item,
-                (
-                    figures_dir
-                    / item.output_name.removesuffix(".png").replace("monte_carlo_", "")
-                ).with_suffix(".html"),
-            )
-            for item in series
-        ]
+        def render_one(item: MonteCarloSeries):
+            output_path = (
+                figures_dir / item.output_name.removesuffix(".png").replace("monte_carlo_", "")
+            ).with_suffix(".html")
+            return plot_monte_carlo_series_interactive(item, output_path)
+
+        if parallel_jobs == 1 or len(series) <= 1:
+            figures = [render_one(item) for item in series]
+        else:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=parallel_jobs) as executor:
+                figures = list(executor.map(render_one, series))
     else:
         raise ValueError(f"unsupported Monte Carlo renderer '{renderer}'")
     plot_elapsed_s = time.perf_counter() - plot_started_s

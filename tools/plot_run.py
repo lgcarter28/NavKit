@@ -8,7 +8,7 @@ import os
 import sys
 from pathlib import Path
 
-from perf_artifacts import (
+from internal.perf_artifacts import (
     measure_call,
     print_command_timing,
     update_timing_artifact,

@@ -9,7 +9,6 @@ import csv
 import json
 import time
 from dataclasses import dataclass
-from itertools import chain
 from pathlib import Path
 from typing import Iterable, Iterator, Sequence
 
@@ -18,6 +17,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import chi2
 
+from navkit_analysis.analysis_performance import StageTimer
 from navkit_analysis.schema import ANALYSIS_BUNDLE_SCHEMA, validate_schema
 
 
@@ -27,6 +27,7 @@ SIGMA_COVERAGE_LEVELS = (
     ("2sigma", 0.954499736103642),
     ("3sigma", 0.997300203936740),
 )
+CONSISTENCY_SERIES_KINDS = ("nees", "nis", "marginal")
 
 
 @dataclass(frozen=True)
@@ -276,36 +277,69 @@ def _interpolate_history(time_s: np.ndarray, values: np.ndarray, target_time_s: 
     return np.interp(target_time_s, time_s[finite], values[finite], left=np.nan, right=np.nan)
 
 
-def build_nees_series(
+def build_truth_error_consistency_series(
     frames: Iterable[pd.DataFrame],
     max_points: int | None = None,
-) -> list[ConsistencySeries]:
-    """Build the full hierarchy of joint NEES samples from truth-error frames."""
-    iterator = iter(frames)
-    try:
-        first_frame = next(iterator)
-    except StopIteration:
-        return []
+    *,
+    include_nees: bool = True,
+    include_marginal: bool = True,
+) -> tuple[list[ConsistencySeries], list[ConsistencySeries]]:
+    """Build requested NEES and marginal products in one truth-error frame pass."""
+    frame_list = list(frames)
+    if not frame_list:
+        return [], []
+    first_frame = frame_list[0]
     if "time_s" not in first_frame:
         raise ValueError("truth-error frame is missing time_s")
     time_s = _select_time_grid(first_frame["time_s"].to_numpy(dtype=float), max_points)
-    histories: dict[str, list[np.ndarray]] = {group.name: [] for group in NEES_GROUPS}
-    for frame in chain((first_frame,), iterator):
+    nees_histories: dict[str, list[np.ndarray]] = (
+        {group.name: [] for group in NEES_GROUPS} if include_nees else {}
+    )
+    marginal_histories: dict[str, list[np.ndarray]] = (
+        {
+            f"{group_name}_{axis}": []
+            for group_name, _, labels in MARGINAL_NSE_GROUPS
+            for axis, _ in enumerate(labels)
+        }
+        if include_marginal
+        else {}
+    )
+    for frame in frame_list:
         if "time_s" not in frame:
             raise ValueError("truth-error frame is missing time_s")
         source_time_s = frame["time_s"].to_numpy(dtype=float)
-        for group in NEES_GROUPS:
-            values = nees_from_frame(frame, group.labels)
-            if values is None:
-                histories[group.name].append(np.full(time_s.shape, np.nan, dtype=float))
-            else:
-                histories[group.name].append(_interpolate_history(source_time_s, values, time_s))
+        if include_nees:
+            for group in NEES_GROUPS:
+                values = nees_from_frame(frame, group.labels)
+                if values is None:
+                    nees_histories[group.name].append(
+                        np.full(time_s.shape, np.nan, dtype=float)
+                    )
+                else:
+                    nees_histories[group.name].append(
+                        _interpolate_history(source_time_s, values, time_s)
+                    )
+        if include_marginal:
+            for group_name, _, labels in MARGINAL_NSE_GROUPS:
+                for axis, label in enumerate(labels):
+                    name = f"{group_name}_{axis}"
+                    values = marginal_nse_from_frame(frame, label)
+                    if values is None:
+                        marginal_histories[name].append(
+                            np.full(time_s.shape, np.nan, dtype=float)
+                        )
+                    else:
+                        marginal_histories[name].append(
+                            _interpolate_history(source_time_s, values, time_s)
+                        )
 
-    series: list[ConsistencySeries] = []
-    for group in NEES_GROUPS:
-        values = np.stack(histories[group.name], axis=0)
-        if np.isfinite(values).any():
-            series.append(
+    nees_series: list[ConsistencySeries] = []
+    if include_nees:
+        for group in NEES_GROUPS:
+            values = np.stack(nees_histories[group.name], axis=0)
+            if not np.isfinite(values).any():
+                continue
+            nees_series.append(
                 ConsistencySeries(
                     name=group.name,
                     title=group.title,
@@ -315,47 +349,16 @@ def build_nees_series(
                     values=values,
                 )
             )
-    return series
 
-
-def build_marginal_nse_series(
-    frames: Iterable[pd.DataFrame],
-    max_points: int | None = None,
-) -> list[ConsistencySeries]:
-    """Build 1-DOF per-axis normalized squared-error drill-down series."""
-    iterator = iter(frames)
-    try:
-        first_frame = next(iterator)
-    except StopIteration:
-        return []
-    if "time_s" not in first_frame:
-        raise ValueError("truth-error frame is missing time_s")
-    time_s = _select_time_grid(first_frame["time_s"].to_numpy(dtype=float), max_points)
-    histories = {
-        f"{group_name}_{axis}": []
-        for group_name, _, labels in MARGINAL_NSE_GROUPS
-        for axis, _ in enumerate(labels)
-    }
-    for frame in chain((first_frame,), iterator):
-        if "time_s" not in frame:
-            raise ValueError("truth-error frame is missing time_s")
-        source_time_s = frame["time_s"].to_numpy(dtype=float)
-        for group_name, _, labels in MARGINAL_NSE_GROUPS:
+    marginal_series: list[ConsistencySeries] = []
+    if include_marginal:
+        for group_name, group_title, labels in MARGINAL_NSE_GROUPS:
             for axis, label in enumerate(labels):
                 name = f"{group_name}_{axis}"
-                values = marginal_nse_from_frame(frame, label)
-                if values is None:
-                    histories[name].append(np.full(time_s.shape, np.nan, dtype=float))
-                else:
-                    histories[name].append(_interpolate_history(source_time_s, values, time_s))
-
-    series: list[ConsistencySeries] = []
-    for group_name, group_title, labels in MARGINAL_NSE_GROUPS:
-        for axis, label in enumerate(labels):
-            name = f"{group_name}_{axis}"
-            values = np.stack(histories[name], axis=0)
-            if np.isfinite(values).any():
-                series.append(
+                values = np.stack(marginal_histories[name], axis=0)
+                if not np.isfinite(values).any():
+                    continue
+                marginal_series.append(
                     ConsistencySeries(
                         name=name,
                         title=f"{group_title}: {'XYZ'[axis]} Axis",
@@ -365,7 +368,33 @@ def build_marginal_nse_series(
                         values=values,
                     )
                 )
-    return series
+    return nees_series, marginal_series
+
+
+def build_nees_series(
+    frames: Iterable[pd.DataFrame],
+    max_points: int | None = None,
+) -> list[ConsistencySeries]:
+    """Build the full hierarchy of joint NEES samples from truth-error frames."""
+    nees_series, _ = build_truth_error_consistency_series(
+        frames,
+        max_points,
+        include_marginal=False,
+    )
+    return nees_series
+
+
+def build_marginal_nse_series(
+    frames: Iterable[pd.DataFrame],
+    max_points: int | None = None,
+) -> list[ConsistencySeries]:
+    """Build 1-DOF per-axis normalized squared-error drill-down series."""
+    _, marginal_series = build_truth_error_consistency_series(
+        frames,
+        max_points,
+        include_nees=False,
+    )
+    return marginal_series
 
 
 def _interpolate_nearest(
@@ -453,16 +482,50 @@ def load_nis_frames_from_run_dirs(run_dirs: Sequence[Path]) -> dict[str, list[pd
     return frames
 
 
-def _write_series_group(parent: h5py.Group, series: ConsistencySeries) -> None:
+def _series_dataset_options(
+    values: np.ndarray,
+    compression: str,
+) -> dict[str, object]:
+    """Return explicit chunking suited to full-history and epoch-slice reads."""
+    if values.ndim == 1:
+        chunks: tuple[int, ...] = (min(len(values), 256),)
+    elif values.ndim == 2:
+        chunks = (min(values.shape[0], 64), min(values.shape[1], 256))
+    else:
+        raise ValueError("consistency cache values must be one- or two-dimensional")
+    options: dict[str, object] = {"chunks": chunks}
+    if compression != "none":
+        options["compression"] = compression
+        options["shuffle"] = True
+    return options
+
+
+def _write_series_group(
+    parent: h5py.Group,
+    series: ConsistencySeries,
+    compression: str,
+) -> None:
     group = parent.create_group(series.name)
     group.attrs["title"] = series.title
     group.attrs["kind"] = series.kind
     group.attrs["labels"] = json.dumps(series.labels)
     group.attrs["dof"] = series.dof
-    group.create_dataset("time_s", data=series.time_s, compression="lzf", shuffle=True)
-    group.create_dataset("values", data=series.values, compression="lzf", shuffle=True)
+    group.create_dataset(
+        "time_s",
+        data=series.time_s,
+        **_series_dataset_options(series.time_s, compression),
+    )
+    group.create_dataset(
+        "values",
+        data=series.values,
+        **_series_dataset_options(series.values, compression),
+    )
     if series.accepted is not None:
-        group.create_dataset("accepted", data=series.accepted, compression="lzf", shuffle=True)
+        group.create_dataset(
+            "accepted",
+            data=series.accepted,
+            **_series_dataset_options(series.accepted, compression),
+        )
 
 
 def write_consistency_cache(
@@ -470,21 +533,29 @@ def write_consistency_cache(
     nees_series: Sequence[ConsistencySeries],
     nis_series: Sequence[ConsistencySeries],
     marginal_series: Sequence[ConsistencySeries],
+    *,
+    selected_kinds: Sequence[str] = CONSISTENCY_SERIES_KINDS,
+    compression: str = "lzf",
 ) -> None:
-    """Write time-indexed consistency series into a campaign analysis bundle."""
+    """Write selected consistency families without replacing unrelated cached data."""
+    invalid_kinds = set(selected_kinds).difference(CONSISTENCY_SERIES_KINDS)
+    if invalid_kinds:
+        raise ValueError(f"unsupported consistency series kinds: {sorted(invalid_kinds)}")
+    if compression not in {"lzf", "gzip", "none"}:
+        raise ValueError("consistency cache compression must be 'lzf', 'gzip', or 'none'")
     consistency_group = aggregate_group.require_group("consistency")
-    if "series" in consistency_group:
-        del consistency_group["series"]
-    series_group = consistency_group.create_group("series")
-    nees_group = series_group.create_group("nees")
-    nis_group = series_group.create_group("nis")
-    marginal_group = series_group.create_group("marginal")
-    for series in nees_series:
-        _write_series_group(nees_group, series)
-    for series in nis_series:
-        _write_series_group(nis_group, series)
-    for series in marginal_series:
-        _write_series_group(marginal_group, series)
+    series_group = consistency_group.require_group("series")
+    grouped_series = {
+        "nees": nees_series,
+        "nis": nis_series,
+        "marginal": marginal_series,
+    }
+    for kind in selected_kinds:
+        if kind in series_group:
+            del series_group[kind]
+        destination = series_group.create_group(kind)
+        for series in grouped_series[kind]:
+            _write_series_group(destination, series, compression)
 
 
 def _read_frame_columns(group: h5py.Group, columns: Sequence[str]) -> pd.DataFrame:
@@ -492,6 +563,22 @@ def _read_frame_columns(group: h5py.Group, columns: Sequence[str]) -> pd.DataFra
     if missing:
         raise ValueError(f"bundle frame is missing required columns: {', '.join(missing)}")
     return pd.DataFrame({column: group[column][()] for column in columns}, columns=columns)
+
+
+def _bundle_storage_compression(bundle: h5py.File) -> str:
+    """Read the selected numeric HDF5 compression without importing bundle writers."""
+    encoded_metadata = bundle.attrs.get("metadata")
+    if isinstance(encoded_metadata, bytes):
+        encoded_metadata = encoded_metadata.decode("utf-8")
+    if not isinstance(encoded_metadata, str):
+        return "lzf"
+    try:
+        metadata = json.loads(encoded_metadata)
+    except json.JSONDecodeError:
+        return "lzf"
+    storage = metadata.get("storage", {}) if isinstance(metadata, dict) else {}
+    compression = storage.get("compression", "lzf") if isinstance(storage, dict) else "lzf"
+    return compression if compression in {"lzf", "gzip", "none"} else "lzf"
 
 
 def _nees_required_columns() -> tuple[str, ...]:
@@ -543,29 +630,87 @@ def _iter_bundle_nis_frames(
 def refresh_consistency_cache(
     bundle_path: Path,
     max_points: int | None = None,
+    *,
+    selected_kinds: Sequence[str] = CONSISTENCY_SERIES_KINDS,
 ) -> tuple[list[ConsistencySeries], list[ConsistencySeries], list[ConsistencySeries]]:
-    """Build or replace a campaign bundle's time-indexed NEES/NIS cache in place."""
+    """Build requested time-indexed consistency families in one owner process."""
+    invalid_kinds = set(selected_kinds).difference(CONSISTENCY_SERIES_KINDS)
+    if invalid_kinds:
+        raise ValueError(f"unsupported consistency series kinds: {sorted(invalid_kinds)}")
+    selected = set(selected_kinds)
+    timer = StageTimer()
+    nees_series: list[ConsistencySeries] = []
+    nis_series: list[ConsistencySeries] = []
+    marginal_series: list[ConsistencySeries] = []
     with h5py.File(bundle_path, "r") as bundle:
         schema = bundle.attrs.get("schema")
         if isinstance(schema, bytes):
             schema = schema.decode("utf-8")
         validate_schema({"schema": schema}, ANALYSIS_BUNDLE_SCHEMA, str(bundle_path))
-        nees_series = build_nees_series(_iter_bundle_truth_error_frames(bundle), max_points)
-        marginal_series = build_marginal_nse_series(
-            _iter_bundle_truth_error_frames(bundle),
-            max_points,
-        )
-        nis_series = build_nis_series(
-            {
-                group.name: list(_iter_bundle_nis_frames(bundle, group.source))
-                for group in NIS_GROUPS
-            },
-            max_points,
-        )
+        if {"nees", "marginal"}.intersection(selected):
+            truth_error_frames = list(_iter_bundle_truth_error_frames(bundle))
+            timer.mark("truth_error_frame_load")
+            nees_series, marginal_series = build_truth_error_consistency_series(
+                truth_error_frames,
+                max_points,
+                include_nees="nees" in selected,
+                include_marginal="marginal" in selected,
+            )
+            timer.mark("truth_error_nees_derivation")
+        if "nis" in selected:
+            nis_series = build_nis_series(
+                {
+                    group.name: list(_iter_bundle_nis_frames(bundle, group.source))
+                    for group in NIS_GROUPS
+                },
+                max_points,
+            )
+            timer.mark("nis_frame_load_and_derivation")
+    if "truth_error_frame_load" not in timer.snapshot():
+        timer.mark("truth_error_frame_load")
+    if "truth_error_nees_derivation" not in timer.snapshot():
+        timer.mark("truth_error_nees_derivation")
+    if "nis_frame_load_and_derivation" not in timer.snapshot():
+        timer.mark("nis_frame_load_and_derivation")
     with h5py.File(bundle_path, "r+") as bundle:
         aggregate_group = bundle.require_group("aggregate")
-        write_consistency_cache(aggregate_group, nees_series, nis_series, marginal_series)
+        compression = _bundle_storage_compression(bundle)
+        write_consistency_cache(
+            aggregate_group,
+            nees_series,
+            nis_series,
+            marginal_series,
+            selected_kinds=selected_kinds,
+            compression=compression,
+        )
+        timer.mark("hdf5_cache_write")
+        consistency_group = aggregate_group.require_group("consistency")
+        consistency_group.attrs["cache_performance"] = json.dumps(
+            {
+                "selected_kinds": sorted(selected),
+                "stages": timer.snapshot(),
+            },
+            sort_keys=True,
+        )
     return nees_series, nis_series, marginal_series
+
+
+def consistency_cache_performance(bundle_path: Path) -> dict[str, object]:
+    """Return persisted named-stage timing from the most recent cache refresh."""
+    with h5py.File(bundle_path, "r") as bundle:
+        consistency_group = bundle.get("aggregate/consistency")
+        if not isinstance(consistency_group, h5py.Group):
+            return {}
+        encoded = consistency_group.attrs.get("cache_performance")
+        if isinstance(encoded, bytes):
+            encoded = encoded.decode("utf-8")
+        if not isinstance(encoded, str):
+            return {}
+        try:
+            value = json.loads(encoded)
+        except json.JSONDecodeError:
+            return {}
+        return value if isinstance(value, dict) else {}
 
 
 def load_consistency_cache(
@@ -752,9 +897,46 @@ def generate_consistency_outputs(
     refresh_cache: bool = False,
     max_plot_points: int | None = None,
     heatmap_modes: Sequence[str] | None = None,
+    parallel_jobs: int = 1,
+    force: bool = False,
 ) -> dict[str, object]:
     """Generate cached joint-consistency dashboards and reports for one campaign bundle."""
+    from navkit_analysis.analysis_cache import (
+        cache_fingerprint,
+        cached_output_paths,
+        write_cache_marker,
+    )
+    from navkit_analysis.bundle import bundle_metadata
+    from navkit_analysis.consistency_plots import HEATMAP_MODES, write_consistency_dashboards
+
     started_s = time.perf_counter()
+    selected_modes = tuple(heatmap_modes or HEATMAP_MODES)
+    cache_inputs = {
+        "bundle_fingerprint": bundle_metadata(bundle_path).get("package_fingerprint"),
+        "max_plot_points": max_plot_points,
+        "heatmap_modes": selected_modes,
+    }
+    artifact_fingerprint = cache_fingerprint("consistency_dashboards", cache_inputs)
+    artifact_marker = summary_dir / ".consistency_artifact_cache.json"
+    cached_paths = (
+        None
+        if refresh_cache or force
+        else cached_output_paths(artifact_marker, artifact_fingerprint)
+    )
+    if cached_paths is not None:
+        nees_series, nis_series, marginal_series = load_consistency_cache(bundle_path)
+        return {
+            "cache_elapsed_s": 0.0,
+            "plot_elapsed_s": 0.0,
+            "report_elapsed_s": 0.0,
+            "total_elapsed_s": time.perf_counter() - started_s,
+            "figure_paths": {path.stem: str(path) for path in cached_paths},
+            "report_paths": {},
+            "nees_group_count": len(nees_series),
+            "nis_group_count": len(nis_series),
+            "marginal_group_count": len(marginal_series),
+            "reused": True,
+        }
     cache_started_s = time.perf_counter()
     if refresh_cache:
         nees_series, nis_series, marginal_series = refresh_consistency_cache(
@@ -776,16 +958,15 @@ def generate_consistency_outputs(
             )
     cache_elapsed_s = time.perf_counter() - cache_started_s
 
-    from navkit_analysis.consistency_plots import HEATMAP_MODES, write_consistency_dashboards
-
     plot_started_s = time.perf_counter()
     figure_paths = write_consistency_dashboards(
         nees_series,
         nis_series,
         marginal_series,
         summary_dir / "consistency_figures",
-        heatmap_modes=heatmap_modes or HEATMAP_MODES,
+        heatmap_modes=selected_modes,
         write_index=heatmap_modes is None,
+        parallel_jobs=parallel_jobs,
     )
     plot_elapsed_s = time.perf_counter() - plot_started_s
     report_started_s = time.perf_counter()
@@ -793,6 +974,14 @@ def generate_consistency_outputs(
         bundle_path,
         summary_dir / "consistency_reports",
         [*nees_series, *nis_series],
+    )
+    output_paths = [*figure_paths.values(), *report_paths.values()]
+    write_cache_marker(
+        artifact_marker,
+        kind="consistency_dashboards",
+        fingerprint=artifact_fingerprint,
+        inputs=cache_inputs,
+        outputs=output_paths,
     )
     report_elapsed_s = time.perf_counter() - report_started_s
     return {

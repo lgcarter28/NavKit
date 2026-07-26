@@ -36,9 +36,10 @@ This project follows
 - First-pass `FilterPolicy`, `SensorCollectionPolicy`, `UpdatePolicy`, and `NavigatorUpdatePolicy` concepts for Navigator orchestration boundaries.
 - Measurement-statistics regression tests for accepted and rejected measurement updates.
 - Design-intent testing guide plus focused coverage for ring-buffer overflow policies, sensor FIFO/noise behavior, CSV writer output/failure behavior, and stationary trajectory semantics.
-- Linux-oriented coverage reporting through `tools/coverage.py` and a CI coverage artifact.
-- Lightweight timing artifacts for stationary simulation and analysis runs, plus coarse Debug/Release executable/library size reports through `tools/resource_report.py`.
-- Human-readable timing summaries through `tools/timing_report.py` and documented `navkit.timing.v1` artifact schema fields.
+- Linux-oriented coverage reporting through `tools/quality/coverage.py` and a CI coverage artifact.
+- Lightweight timing artifacts for stationary simulation and analysis runs, plus coarse Debug/Release executable/library size reports through `tools/profile/resource_report.py`.
+- Human-readable timing summaries through `tools/profile/timing_report.py` and documented `navkit.timing.v1` artifact schema fields.
+- Stable public tooling under `tools/`, profiling diagnostics under `tools/profile/`, and internal support/verification helpers under `tools/internal/`, including controlled HDF5-backed Monte Carlo analysis-scaling benchmarks.
 - Product-core embedded profiling vocabulary with enum profile points, fixed timing records, visualization metadata fields, clock/sink/profiler concepts, `NullProfiler`, `ScopedProfiler`, and deterministic concept/runtime tests.
 - Coarse embedded profiling integration points for `KalmanFilter::observation_update` and `Navigator::process_measurements`, both defaulting to `NullProfiler`.
 - Runtime-input validation for the selected stationary GNSS app composition, including required scenario sections, unsupported sensor/emulator sections, and numeric/vector shape checks.
@@ -71,6 +72,8 @@ This project follows
 - Cached joint Monte Carlo NEES/NIS histories in HDF5, with full-INS/PVA/navigation/IMU-bias consistency products, observation-family NIS, interactive time-linked PDF/CDF/QQ dashboards, and machine-readable consistency reports.
 - Per-state X/Y/Z marginal normalized-squared-error consistency dashboards, with heatmap-hover epoch selection, explicit click/type pinning, a control to resume hover-following, and browser-side snapshot export.
 - Empirical-CDF heatmaps in raw NEES/NIS space and dimension-independent PIT-space CDF-residual heatmaps, organized with the existing occurrence-density dashboards under a generated consistency-figure index.
+- Analysis-performance evidence and cache-safe desktop scaling: explicit full/derived-only HDF5 bundle modes, configurable chunked compression, package/figure/dashboard fingerprints, campaign performance reports, selected artifact controls, and opt-in parallel Plotly rendering with serial/parallel equivalence verification.
+- Demand-driven HDF5 consistency-cache preparation through `tools/prepare_analysis.py`, named cache-stage timing, shared Monte Carlo NED transforms, and empirical-CDF reference strips in interactive consistency dashboards.
 
 ### Changed
 

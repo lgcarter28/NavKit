@@ -9,9 +9,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-from navkit_build_dirs import DEFAULT_GENERATOR, repo_root_from_tools_file, resolve_build_dir
-from navkit_conan_env import run_with_optional_conan_env
-from perf_artifacts import DEFAULT_NAVKIT_CONFIG
+TOOLS_ROOT = Path(__file__).resolve().parents[1]
+if str(TOOLS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TOOLS_ROOT))
+
+from internal.navkit_build_dirs import DEFAULT_GENERATOR, resolve_build_dir
+from internal.navkit_conan_env import run_with_optional_conan_env
+from internal.perf_artifacts import DEFAULT_NAVKIT_CONFIG
 
 # Directories to ignore
 EXCLUDE_DIRS = {
@@ -49,8 +53,8 @@ TIDY_SOURCE_EXTENSIONS = {
 
 def repo_root() -> Path:
     script = Path(__file__).resolve()
-    if script.parent.name == "tools":
-        return repo_root_from_tools_file(__file__)
+    if script.parent.name == "quality":
+        return script.parents[2]
     return Path.cwd().resolve()
 
 

@@ -68,21 +68,11 @@ These are preserved at high level so the roadmap stays readable. Detailed pass-b
 
 ## Current phase
 
-Phase 6: Monte Carlo and batch analysis is temporarily reopened for one bounded desktop-analysis scaling pass. Phase 5 produced the first working ECEF INS/GNSS baseline; Phase 6 turned that single-run product into repeatable statistical evidence. Phase 7 trajectory-provider expansion remains the next product-algorithm phase.
+Phase 6: Monte Carlo and batch analysis is complete. Phase 5 produced the first working ECEF INS/GNSS baseline; Phase 6 turned that single-run product into repeatable statistical evidence with scalable offline analysis. Phase 7 trajectory-provider expansion is next.
 
 ## Active passes
 
-## Pass 6.9: analysis performance characterization and low-risk scaling
-
-- [ ] Record per-stage desktop-analysis timings and throughput for CSV/HDF5 load, per-run derivation, aggregate reduction, HDF5 write/compression, each renderer, report generation, and campaign totals.
-- [ ] Record campaign scale and resource evidence: run/sample counts, raw-input and bundle sizes, retained-table mode, and practical process-memory observations where portable.
-- [ ] Ensure each selected artifact loads and derives only the data/columns it needs; preserve the existing lean Monte Carlo logging defaults.
-- [ ] Add explicit artifact-selection controls for bundle packaging, raw-table retention, aggregate plot families, consistency dashboard families, and static versus interactive rendering.
-- [ ] Add deterministic cache fingerprints over source manifests/log inputs, schema versions, time window, decimation, and rendering settings so unchanged packages and figures can be safely reused.
-- [ ] Evaluate HDF5 chunking/compression and introduce a documented `full` versus `derived_only` bundle mode before adding data-pipeline concurrency.
-- [ ] Add opt-in `analysis.parallel_jobs` only for independent post-bundle figure/dashboard rendering, defaulting to one worker and preserving deterministic output names.
-- [ ] Keep HDF5 final writes, aggregate merging, manifests, and reports single-owner. Defer worker-shard HDF5 writing and parallel CSV/derivation until profiling demonstrates that their benefit exceeds IPC, memory, and refactoring complexity.
-- [ ] Add serial-versus-parallel equivalence coverage before any parallel analysis mode can become the default.
+- No active pass is scheduled. Start Phase 7 only after its first pass is promoted from the detailed roadmap.
 
 ## Future phase details
 

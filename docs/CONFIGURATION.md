@@ -764,7 +764,14 @@ Example:
     "parallel_jobs": 1
   },
   "analysis": {
-    "max_plot_points": 1000
+    "max_plot_points": 1000,
+    "renderer": "plotly",
+    "package_analysis": true,
+    "bundle_mode": "full",
+    "bundle_compression": "lzf",
+    "aggregate_plots": true,
+    "consistency_dashboards": true,
+    "parallel_jobs": 1
   },
   "output": {
     "root": "output/monte_carlo",
@@ -787,6 +794,24 @@ single-run suite is rendered separately for every successful campaign member.
 Leave it `false` for normal Monte Carlo work; aggregate and consistency outputs
 are generated independently, and plotting every member adds substantial I/O
 and rendering cost.
+
+`analysis.aggregate_plots` accepts `true`, `false`, or an array of named
+aggregate plot families such as `"position_ned"` and `"gyro_bias_body"`.
+`analysis.consistency_dashboards` independently controls the bundled NEES/NIS
+dashboard family; `analysis.consistency_heatmap_modes`, when present, selects
+only named dashboard modes. `analysis.renderer` selects Plotly HTML or
+Matplotlib PNG rendering without changing any domain derivation.
+
+`analysis.bundle_mode` is either `"full"` (retain selected raw tables plus
+derived values) or `"derived_only"` (retain reusable derived run errors,
+campaign aggregates, and consistency cache only). Use `full` when a bundle must
+support later arbitrary raw-table inspection; use `derived_only` for a validated
+large campaign where repeated aggregate analysis is the goal. Numeric datasets
+use `analysis.bundle_compression` of `"lzf"` (fast default), `"gzip"` (smaller,
+slower), or `"none"`. `analysis.parallel_jobs` defaults to one and may render
+independent Plotly aggregate figures and consistency dashboards concurrently
+only after all CSV/HDF5 loading and shared derivation are complete. HDF5 writes,
+aggregate merging, manifests, and reports remain single-owner.
 
 Monte Carlo scenarios should inline a lean run-level `logging` block in the
 nominal runtime scenario, as in
@@ -816,8 +841,8 @@ Campaign analysis also writes machine-readable and human-readable aggregate
 reports under `summary/reports/`. The first-pass report set includes per-axis
 RMSE/coverage metrics, per-state-family NEES summaries, GNSS NIS summaries,
 per-run timing, and output-size/resource summaries. Use
-`tools/compare_monte_carlo.py` to build comparison CSV/Markdown tables from
-existing campaign report folders without re-running simulations.
+the internal repository comparison helper to build comparison CSV/Markdown
+tables from existing campaign report folders without re-running simulations.
 
 The Python build wrapper forwards the same selection:
 

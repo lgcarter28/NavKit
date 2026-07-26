@@ -62,8 +62,8 @@ KNOWN_COPYRIGHT_MARKERS = (
 
 def repo_root() -> Path:
     script = Path(__file__).resolve()
-    if script.parent.name == "tools":
-        return script.parent.parent
+    if script.parent.name == "quality":
+        return script.parents[2]
     return Path.cwd().resolve()
 
 

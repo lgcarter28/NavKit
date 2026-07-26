@@ -255,7 +255,7 @@ pip install -e python
 
 ## Repository Tooling
 
-NavKit provides a collection of Python utilities under `tools/` that serve as the primary developer interface to the project.
+NavKit provides a collection of Python utilities under `tools/` that serve as the primary developer interface to the project. Stable workflow commands remain at the `tools/` root; focused profiling utilities live under `tools/profile/`, quality gates live under `tools/quality/`, and repository-only implementation helpers live under `tools/internal/`.
 
 These scripts provide a consistent cross-platform workflow and abstract away platform-specific differences between Windows and Linux.
 
@@ -267,16 +267,16 @@ These scripts provide a consistent cross-platform workflow and abstract away pla
 | `plot_run.py` | Generate the standard domain-aware plots from existing single-run logs |
 | `run_scenario.py` | Run a scenario, optionally override output location, and generate plots |
 | `run_monte_carlo.py` | Run a seeded Monte Carlo campaign, package HDF5, and generate interactive aggregate plots/reports |
-| `compare_monte_carlo.py` | Compare existing Monte Carlo aggregate reports across campaigns |
 | `plot_monte_carlo.py` | Regenerate selected Monte Carlo aggregate plots from existing campaign logs |
 | `plot_consistency.py` | Generate or refresh joint NEES/NIS dashboards and reports from a campaign HDF5 bundle |
 | `package_analysis.py` | Package an existing CSV run or campaign into a versioned HDF5 analysis bundle |
 | `plot_field.py` | Quickly inspect named CSV/HDF5 fields through the shared static or interactive plotting layer |
-| `timing_report.py` | Summarize a complete `navkit.timing.v1` timing artifact |
-| `resource_report.py` | Write and display coarse executable/library size reports for a build tree |
-| `format.py` | Run clang-format; also exposes clang-tidy for CI diagnostics |
-| `coverage.py` | Generate Linux/GCC-style coverage reports with gcovr |
-| `copyright.py` | Insert or verify copyright headers |
+| `profile/timing_report.py` | Summarize a complete `navkit.timing.v1` timing artifact |
+| `profile/resource_report.py` | Write and display coarse executable/library size reports for a build tree |
+| `profile/benchmark_analysis_scaling.py` | Compare identical HDF5 analysis workloads across Plotly worker counts |
+| `quality/format.py` | Run clang-format; also exposes clang-tidy for CI diagnostics |
+| `quality/coverage.py` | Generate Linux/GCC-style coverage reports with gcovr |
+| `quality/copyright.py` | Insert or verify copyright headers |
 
 For normal development, prefer these Python wrappers over invoking Conan, CMake, or CTest directly.
 
@@ -591,7 +591,7 @@ output needs to stay quiet.
 To view the timing artifact as a compact terminal report:
 
 ```bash
-python tools/timing_report.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/data/timing.json
+python tools/profile/timing_report.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/data/timing.json
 ```
 
 Build, test, simulation, and analysis wrappers update the default timing
@@ -614,7 +614,7 @@ terminal output should stay quiet.
 To write a coarse executable/library size report for a build tree:
 
 ```bash
-python tools/resource_report.py --build-type Debug --output output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/resources-debug-local.json
+python tools/profile/resource_report.py --build-type Debug --output output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/resources-debug-local.json
 ```
 
 `build.py` writes and displays the same coarse artifact-size report by default
@@ -625,7 +625,7 @@ For a Release size snapshot:
 
 ```bash
 python tools/build.py --build-type Release --clean --without-tests
-python tools/resource_report.py --build-type Release --output output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/resources-release-local.json
+python tools/profile/resource_report.py --build-type Release --output output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/resources-release-local.json
 ```
 
 These files are intended for trend review and future Monte Carlo summaries.
@@ -641,25 +641,25 @@ NavKit uses repository-wide formatting and copyright tools.
 Insert or update copyright headers:
 
 ```bash
-python tools/copyright.py --write
+python tools/quality/copyright.py --write
 ```
 
 Verify all source files contain the required copyright header:
 
 ```bash
-python tools/copyright.py --check
+python tools/quality/copyright.py --check
 ```
 
 Format all source files:
 
 ```bash
-python tools/format.py
+python tools/quality/format.py
 ```
 
 Check formatting without modifying files:
 
 ```bash
-python tools/format.py --check
+python tools/quality/format.py --check
 ```
 
 Formatting behavior is controlled by:
@@ -730,14 +730,14 @@ than the Visual Studio generator. `tools/bootstrap.py` installs the Python
 `ninja` package as a convenient fallback, but using the Visual Studio Build
 Tools Ninja component is also fine.
 
-CI also generates a Linux coverage artifact with `tools/coverage.py`. Local
+CI also generates a Linux coverage artifact with `tools/quality/coverage.py`. Local
 development does not require coverage reporting; use it only when reviewing
 coverage gaps or debugging the coverage lane.
 
 Build, test, simulation, and analysis wrappers write a lightweight
 `timing.json` artifact under `output/logs/<run_name>/` during normal use. CI
 uploads those logs along with Debug and Release resource-size reports produced by
-`tools/resource_report.py`. These artifacts are trend evidence only; wall-clock
+`tools/profile/resource_report.py`. These artifacts are trend evidence only; wall-clock
 timing and hosted-runner binary sizes are intentionally not pass/fail gates.
 
 ---
@@ -812,11 +812,11 @@ git pull
 
 activate virtual environment
 
-python tools/copyright.py --write
-python tools/format.py
+python tools/quality/copyright.py --write
+python tools/quality/format.py
 
-python tools/copyright.py --check
-python tools/format.py --check
+python tools/quality/copyright.py --check
+python tools/quality/format.py --check
 
 python tools/build.py --build-type Debug --build-only
 

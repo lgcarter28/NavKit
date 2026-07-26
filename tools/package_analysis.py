@@ -41,6 +41,23 @@ def main() -> int:
         default=1000,
         help="Maximum cached points for Monte Carlo aggregate plot products.",
     )
+    parser.add_argument(
+        "--bundle-mode",
+        choices=["full", "derived_only"],
+        default="full",
+        help="Store all selected raw tables or only reusable derived/aggregate campaign products.",
+    )
+    parser.add_argument(
+        "--compression",
+        choices=["lzf", "gzip", "none"],
+        default="lzf",
+        help="Numeric HDF5 dataset compression; lzf favors repeated interactive analysis.",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Rebuild even when the input-manifest and packaging settings match the current bundle.",
+    )
     args = parser.parse_args()
     if args.max_plot_points <= 1:
         raise ValueError("--max-plot-points must be greater than one")
@@ -51,7 +68,14 @@ def main() -> int:
     source = args.source.resolve()
     output = (args.output or default_output_path(source)).resolve()
     started_s = time.perf_counter()
-    package_analysis(source, output, max_plot_points=args.max_plot_points)
+    package_analysis(
+        source,
+        output,
+        max_plot_points=args.max_plot_points,
+        bundle_mode=args.bundle_mode,
+        compression=args.compression,
+        force=args.force,
+    )
     print(f"Analysis bundle packaging: {time.perf_counter() - started_s:.3f} s")
     return 0
 

@@ -7,13 +7,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Mapping
+from typing import Literal, Mapping
 
 import h5py
 import numpy as np
 import pandas as pd
 
 from navkit_analysis.data import RunData, load_run
+from navkit_analysis.analysis_cache import cache_fingerprint
+from navkit_analysis.analysis_performance import StageTimer, input_manifest_digest, tree_size_bytes
 from navkit_analysis.schema import (
     ANALYSIS_BUNDLE_SCHEMA,
     MONTE_CARLO_CAMPAIGN_SCHEMA,
@@ -33,6 +35,23 @@ RUN_DATA_FIELDS = (
     "filter_correction",
 )
 RUN_DERIVED_FIELDS = ("truth_error",)
+BundleMode = Literal["full", "derived_only"]
+CompressionMode = Literal["lzf", "gzip", "none"]
+
+
+def _validate_bundle_options(bundle_mode: BundleMode, compression: CompressionMode) -> None:
+    """Validate public storage choices before a bundle is opened for writing."""
+    if bundle_mode not in {"full", "derived_only"}:
+        raise ValueError("bundle_mode must be either 'full' or 'derived_only'")
+    if compression not in {"lzf", "gzip", "none"}:
+        raise ValueError("compression must be 'lzf', 'gzip', or 'none'")
+
+
+def _dataset_options(compression: CompressionMode) -> dict[str, object]:
+    """Return the shared, explicit HDF5 layout for numeric analysis arrays."""
+    if compression == "none":
+        return {"chunks": True}
+    return {"chunks": True, "compression": compression, "shuffle": True}
 
 
 def _json_attr(group: h5py.Group | h5py.File, name: str, value: Mapping[str, object]) -> None:
@@ -53,7 +72,12 @@ def _read_json_attr(group: h5py.Group | h5py.File, name: str) -> dict[str, objec
     return parsed
 
 
-def _write_frame(parent: h5py.Group, name: str, frame: pd.DataFrame) -> None:
+def _write_frame(
+    parent: h5py.Group,
+    name: str,
+    frame: pd.DataFrame,
+    compression: CompressionMode,
+) -> None:
     group = parent.create_group(name)
     group.attrs["columns"] = json.dumps(list(frame.columns))
     group.attrs["row_count"] = len(frame)
@@ -66,8 +90,7 @@ def _write_frame(parent: h5py.Group, name: str, frame: pd.DataFrame) -> None:
             group.create_dataset(
                 column,
                 data=values,
-                compression="lzf",
-                shuffle=True,
+                **_dataset_options(compression),
             )
 
 
@@ -117,21 +140,28 @@ def _run_metadata(run_dir: Path) -> dict[str, object]:
     return metadata
 
 
-def _write_run(group: h5py.Group, run_id: str, run_dir: Path) -> RunData:
+def _write_run(
+    group: h5py.Group,
+    run_id: str,
+    run_dir: Path,
+    bundle_mode: BundleMode,
+    compression: CompressionMode,
+) -> RunData:
     """Write one run and return its already-loaded analysis data."""
     run = load_run(run_dir)
     run_group = group.create_group(run_id)
     _json_attr(run_group, "metadata", _run_metadata(run.run_dir))
     data_group = run_group.create_group("data")
     derived_group = run_group.create_group("derived")
-    for field_name in RUN_DATA_FIELDS:
-        frame = getattr(run, field_name)
-        if frame is not None:
-            _write_frame(data_group, field_name, frame)
+    if bundle_mode == "full":
+        for field_name in RUN_DATA_FIELDS:
+            frame = getattr(run, field_name)
+            if frame is not None:
+                _write_frame(data_group, field_name, frame, compression)
     for field_name in RUN_DERIVED_FIELDS:
         frame = getattr(run, field_name)
         if frame is not None:
-            _write_frame(derived_group, field_name, frame)
+            _write_frame(derived_group, field_name, frame, compression)
     return run
 
 
@@ -179,6 +209,7 @@ def _write_monte_carlo_series(
     aggregate_group: h5py.Group,
     runs: list[object],
     max_plot_points: int | None,
+    compression: CompressionMode,
 ) -> None:
     from navkit_analysis.monte_carlo import aggregate_monte_carlo_series
 
@@ -200,7 +231,7 @@ def _write_monte_carlo_series(
             ("empirical_sigma", series.empirical_sigma),
             ("mean_filter_sigma", series.mean_filter_sigma),
         ):
-            group.create_dataset(dataset_name, data=values, compression="lzf", shuffle=True)
+            group.create_dataset(dataset_name, data=values, **_dataset_options(compression))
         centered_errors = series.run_errors - series.mean_error[None, :, :]
         denominator = max(series.run_count - 1, 1)
         empirical_covariance = np.einsum(
@@ -209,57 +240,8 @@ def _write_monte_carlo_series(
         group.create_dataset(
             "empirical_covariance",
             data=empirical_covariance,
-            compression="lzf",
-            shuffle=True,
+            **_dataset_options(compression),
         )
-
-
-def _write_consistency_arrays(
-    aggregate_group: h5py.Group,
-    runs: list[object],
-    run_dirs: list[Path],
-) -> None:
-    """Cache NIS/NEES samples that otherwise require repeated raw-CSV scans."""
-    from navkit_analysis.monte_carlo import ECEF_GROUPS, _group_nees_from_frame
-
-    consistency_group = aggregate_group.create_group("consistency")
-    nees_group = consistency_group.create_group("nees")
-    for group in ECEF_GROUPS:
-        values = [
-            nees
-            for run in runs
-            if (nees := _group_nees_from_frame(run.ecef, group.labels)) is not None
-        ]
-        if values:
-            nees_group.create_dataset(
-                group.output_name.removesuffix(".png"),
-                data=np.concatenate(values),
-                compression="lzf",
-                shuffle=True,
-            )
-    nis_group = consistency_group.create_group("nis")
-    for output_name, csv_name in (
-        ("gnss_position", "gnss_pos_update.csv"),
-        ("gnss_velocity", "gnss_vel_update.csv"),
-    ):
-        values: list[np.ndarray] = []
-        for run_dir in run_dirs:
-            source = run_dir / "data" / csv_name
-            if not source.exists():
-                continue
-            frame = pd.read_csv(source, usecols=lambda column: column in {"nis", "accepted"})
-            if "nis" in frame:
-                nis = pd.to_numeric(frame["nis"], errors="coerce").to_numpy(dtype=float)
-                finite_nis = nis[np.isfinite(nis)]
-                if finite_nis.size > 0:
-                    values.append(finite_nis)
-        if values:
-            nis_group.create_dataset(
-                output_name,
-                data=np.concatenate(values).astype(np.float64, copy=False),
-                compression="lzf",
-                shuffle=True,
-            )
 
 
 def package_analysis(
@@ -267,13 +249,36 @@ def package_analysis(
     output_path: Path,
     *,
     max_plot_points: int | None = None,
+    bundle_mode: BundleMode = "full",
+    compression: CompressionMode = "lzf",
+    force: bool = False,
 ) -> Path:
     """Package one CSV run or campaign into a versioned HDF5 analysis bundle."""
+    _validate_bundle_options(bundle_mode, compression)
     source = source.resolve()
     output_path = output_path.resolve()
+    timer = StageTimer()
+    source_manifest = input_manifest_digest(source, (output_path,))
+    timer.mark("source_manifest_hash")
+    package_inputs: dict[str, object] = {
+        "analysis_bundle_schema": ANALYSIS_BUNDLE_SCHEMA,
+        "source_manifest": source_manifest["sha256"],
+        "max_plot_points": max_plot_points,
+        "bundle_mode": bundle_mode,
+        "compression": compression,
+    }
+    package_fingerprint = cache_fingerprint("analysis_bundle", package_inputs)
+    if output_path.is_file() and not force:
+        try:
+            existing_metadata = bundle_metadata(output_path)
+            if existing_metadata.get("package_fingerprint") == package_fingerprint:
+                print(f"Reused {output_path} (matching package fingerprint)")
+                return output_path
+        except (OSError, ValueError):
+            pass
     run_items = _run_ids_from_manifest(source)
     campaign = (source / "campaign_manifest.json").exists()
-    bundle_metadata: dict[str, object] = {
+    metadata: dict[str, object] = {
         "schema": ANALYSIS_BUNDLE_SCHEMA,
         "source_kind": "monte_carlo_campaign" if campaign else "single_run",
         "source_path": str(source),
@@ -284,18 +289,41 @@ def package_analysis(
             "plot_decimation": "uniform index sampling on the first successful run time grid",
         },
         "max_plot_points": max_plot_points,
+        "storage": {
+            "bundle_mode": bundle_mode,
+            "compression": compression,
+            "chunking": "HDF5 automatic chunks for every numeric dataset",
+        },
+        "input_manifest": source_manifest,
+        "package_fingerprint": package_fingerprint,
     }
     if campaign:
-        bundle_metadata.update(_campaign_metadata(source))
+        metadata.update(_campaign_metadata(source))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(output_path, "w") as bundle:
         bundle.attrs["schema"] = ANALYSIS_BUNDLE_SCHEMA
-        _json_attr(bundle, "metadata", bundle_metadata)
+        _json_attr(bundle, "metadata", metadata)
         runs_group = bundle.create_group("runs")
         run_data_by_id: dict[str, RunData] = {}
         for run_id, run_dir in run_items:
-            run_data_by_id[run_id] = _write_run(runs_group, run_id, run_dir)
+            run_data_by_id[run_id] = _write_run(
+                runs_group,
+                run_id,
+                run_dir,
+                bundle_mode,
+                compression,
+            )
+        metadata["run_sample_counts"] = {
+            "run_count": len(run_data_by_id),
+            "nav_rows": sum(len(run.nav) for run in run_data_by_id.values()),
+            "truth_error_rows": sum(
+                len(run.truth_error)
+                for run in run_data_by_id.values()
+                if run.truth_error is not None
+            ),
+        }
+        timer.mark("per_run_load_and_write")
         if campaign:
             aggregate_group = bundle.create_group("aggregate")
             from navkit_analysis.monte_carlo import load_successful_runs
@@ -306,29 +334,26 @@ def package_analysis(
                 aggregate_group,
                 monte_carlo_runs,
                 max_plot_points,
+                compression,
             )
-            _write_consistency_arrays(aggregate_group, monte_carlo_runs, run_dirs)
-            from navkit_analysis.consistency import (
-                build_marginal_nse_series,
-                build_nees_series,
-                build_nis_series,
-                load_nis_frames_from_run_dirs,
-                write_consistency_cache,
-            )
-
-            truth_error_frames = [
-                run_data_by_id[run_id].truth_error
-                for run_id, _ in run_items
-                if run_data_by_id[run_id].truth_error is not None
-            ]
-            write_consistency_cache(
-                aggregate_group,
-                build_nees_series(truth_error_frames, max_plot_points),
-                build_nis_series(load_nis_frames_from_run_dirs(run_dirs), max_plot_points),
-                build_marginal_nse_series(truth_error_frames, max_plot_points),
-            )
+            timer.mark("aggregate_reduction_and_write")
         else:
             bundle.create_group("aggregate")
+        bundle.flush()
+        timer.mark("hdf5_final_flush")
+        metadata["performance"] = {
+            "stages": timer.snapshot(),
+            "source_bytes": source_manifest["total_bytes"],
+        }
+        _json_attr(bundle, "metadata", metadata)
+    with h5py.File(output_path, "r+") as bundle:
+        stored_metadata = _read_json_attr(bundle, "metadata")
+        performance = stored_metadata.get("performance", {})
+        if not isinstance(performance, dict):
+            performance = {}
+        performance["bundle_bytes"] = tree_size_bytes(output_path)
+        stored_metadata["performance"] = performance
+        _json_attr(bundle, "metadata", stored_metadata)
     print(f"Wrote {output_path}")
     return output_path
 
@@ -400,6 +425,10 @@ def load_run_from_bundle(path: Path, run_id: str | None = None) -> RunData:
 def load_monte_carlo_series_from_bundle(
     path: Path,
     selected: set[str] | None = None,
+    *,
+    start_time_s: float | None = None,
+    end_time_s: float | None = None,
+    max_plot_points: int | None = None,
 ) -> list[object]:
     """Load selected cached aggregate series from a campaign bundle."""
     from navkit_analysis.monte_carlo import MonteCarloSeries
@@ -425,15 +454,26 @@ def load_monte_carlo_series_from_bundle(
                 continue
             labels = tuple(json.loads(group.attrs["labels"]))
             axis_names = tuple(json.loads(group.attrs["axis_names"]))
+            time_s = group["time_s"][()]
+            indices = np.flatnonzero(
+                (time_s >= start_time_s if start_time_s is not None else np.ones(time_s.size, dtype=bool))
+                & (time_s <= end_time_s if end_time_s is not None else np.ones(time_s.size, dtype=bool))
+            )
+            if indices.size == 0:
+                continue
+            if max_plot_points is not None and indices.size > max_plot_points:
+                indices = indices[
+                    np.linspace(0, indices.size - 1, max_plot_points, dtype=int)
+                ]
             series_items.append(
                 MonteCarloSeries(
-                    time_s=group["time_s"][()],
+                    time_s=time_s[indices],
                     labels=labels,
                     axis_names=axis_names,
-                    run_errors=group["run_errors"][()],
-                    mean_error=group["mean_error"][()],
-                    empirical_sigma=group["empirical_sigma"][()],
-                    mean_filter_sigma=group["mean_filter_sigma"][()],
+                    run_errors=group["run_errors"][:, indices, :],
+                    mean_error=group["mean_error"][indices],
+                    empirical_sigma=group["empirical_sigma"][indices],
+                    mean_filter_sigma=group["mean_filter_sigma"][indices],
                     scale=float(group.attrs["scale"]),
                     title=str(group.attrs["title"]),
                     ylabel=str(group.attrs["ylabel"]),

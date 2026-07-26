@@ -9,14 +9,14 @@ import platform
 import subprocess
 from pathlib import Path
 
-from navkit_build_dirs import DEFAULT_GENERATOR, resolve_build_dir
-from perf_artifacts import (
+from internal.navkit_build_dirs import DEFAULT_GENERATOR, resolve_build_dir
+from internal.perf_artifacts import (
     DEFAULT_NAVKIT_CONFIG,
     measure_call,
     print_command_timing,
     update_timing_artifact,
 )
-from profile_report import (
+from profile.profile_report import (
     default_profile_run_manifest_path,
     load_build_manifest as load_profile_build_manifest,
     load_profile_csv,
@@ -26,7 +26,7 @@ from profile_report import (
     summarize,
     write_chrome_trace,
 )
-from runtime_config import (
+from internal.runtime_config import (
     apply_runtime_overrides,
     load_runtime_config,
     runtime_output_dir,

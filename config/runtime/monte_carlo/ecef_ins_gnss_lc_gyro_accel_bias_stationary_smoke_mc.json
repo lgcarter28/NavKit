@@ -6,6 +6,15 @@
   "runs": { "count": 3, "start_index": 0 },
   "randomization": { "master_seed": 123456789, "seed_policy": "derive_all" },
   "execution": { "build_type": "Release", "parallel_jobs": 1 },
-  "analysis": { "max_plot_points": 1000, "renderer": "plotly", "package_analysis": true },
+  "analysis": {
+    "max_plot_points": 1000,
+    "renderer": "plotly",
+    "package_analysis": true,
+    "bundle_mode": "full",
+    "bundle_compression": "lzf",
+    "aggregate_plots": true,
+    "consistency_dashboards": true,
+    "parallel_jobs": 1
+  },
   "output": { "root": "output/monte_carlo", "plot_individual_runs": false }
 }

@@ -15,9 +15,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from navkit_build_dirs import DEFAULT_GENERATOR
-from perf_artifacts import DEFAULT_NAVKIT_CONFIG
-from runtime_config import JsonObject, load_runtime_config
+from internal.navkit_build_dirs import DEFAULT_GENERATOR
+from internal.perf_artifacts import DEFAULT_NAVKIT_CONFIG
+from internal.runtime_config import JsonObject, load_runtime_config
 from navkit_analysis.schema import (
     MONTE_CARLO_CAMPAIGN_SCHEMA,
     MONTE_CARLO_RUN_SCHEMA,
@@ -49,6 +49,12 @@ class CampaignConfig:
     output_root: Path
     plot_individual_runs: bool
     package_analysis: bool
+    bundle_mode: str
+    bundle_compression: str
+    aggregate_plots: tuple[str, ...] | None
+    consistency_dashboards: bool
+    consistency_heatmap_modes: tuple[str, ...] | None
+    analysis_parallel_jobs: int
     navkit_config: str
     generator: str
     build_dir: Path | None
@@ -126,6 +132,28 @@ def optional_float(value: dict[str, Any], key: str, path: str) -> float | None:
     if not isinstance(item, int | float):
         raise ValueError(f"expected '{path}.{key}' to be a number")
     return float(item)
+
+
+def optional_plot_selection(value: dict[str, Any], key: str, path: str) -> tuple[str, ...] | None:
+    """Parse a boolean or explicit aggregate-plot selector without silent defaults."""
+    item = value.get(key, True)
+    if isinstance(item, bool):
+        return None if item else ()
+    if not isinstance(item, list) or not all(isinstance(name, str) for name in item):
+        raise ValueError(f"expected '{path}.{key}' to be a boolean or array of strings")
+    return tuple(item)
+
+
+def optional_string_selection(
+    value: dict[str, Any], key: str, path: str
+) -> tuple[str, ...] | None:
+    """Parse an optional explicit string-array selector."""
+    item = value.get(key)
+    if item is None:
+        return None
+    if not isinstance(item, list) or not all(isinstance(name, str) for name in item):
+        raise ValueError(f"expected '{path}.{key}' to be an array of strings")
+    return tuple(item)
 
 
 def resolve_relative_to_config(config_path: Path, candidate: str) -> Path:
@@ -239,6 +267,36 @@ def load_campaign_config(
     )
     plot_individual_runs = optional_bool(output, "plot_individual_runs", False, "output")
     package_analysis = optional_bool(analysis, "package_analysis", True, "analysis")
+    bundle_mode = optional_string(analysis, "bundle_mode", "full", "analysis")
+    if bundle_mode not in {"full", "derived_only"}:
+        raise ValueError("analysis.bundle_mode must be 'full' or 'derived_only'")
+    bundle_compression = optional_string(analysis, "bundle_compression", "lzf", "analysis")
+    if bundle_compression not in {"lzf", "gzip", "none"}:
+        raise ValueError("analysis.bundle_compression must be 'lzf', 'gzip', or 'none'")
+    aggregate_plots = optional_plot_selection(analysis, "aggregate_plots", "analysis")
+    if aggregate_plots:
+        from navkit_analysis.monte_carlo import monte_carlo_plot_names
+
+        unsupported_plots = set(aggregate_plots).difference(monte_carlo_plot_names())
+        if unsupported_plots:
+            raise ValueError(
+                f"analysis.aggregate_plots contains unsupported names: {sorted(unsupported_plots)}"
+            )
+    consistency_dashboards = optional_bool(analysis, "consistency_dashboards", True, "analysis")
+    consistency_heatmap_modes = optional_string_selection(
+        analysis, "consistency_heatmap_modes", "analysis"
+    )
+    if consistency_heatmap_modes is not None:
+        from navkit_analysis.consistency_plots import HEATMAP_MODES
+
+        unsupported_modes = set(consistency_heatmap_modes).difference(HEATMAP_MODES)
+        if unsupported_modes:
+            raise ValueError(
+                f"analysis.consistency_heatmap_modes contains unsupported names: {sorted(unsupported_modes)}"
+            )
+    analysis_parallel_jobs = optional_int(analysis, "parallel_jobs", 1, "analysis")
+    if analysis_parallel_jobs <= 0:
+        raise ValueError("analysis.parallel_jobs must be positive")
 
     return CampaignConfig(
         campaign_path=campaign_path,
@@ -257,6 +315,12 @@ def load_campaign_config(
         output_root=output_root,
         plot_individual_runs=plot_individual_runs,
         package_analysis=package_analysis,
+        bundle_mode=bundle_mode,
+        bundle_compression=bundle_compression,
+        aggregate_plots=aggregate_plots,
+        consistency_dashboards=consistency_dashboards,
+        consistency_heatmap_modes=consistency_heatmap_modes,
+        analysis_parallel_jobs=analysis_parallel_jobs,
         navkit_config=navkit_config,
         generator=generator,
         build_dir=build_dir,
@@ -446,6 +510,16 @@ def write_campaign_config(config: CampaignConfig, seed_paths: list[str]) -> None
                 "start_time_s": config.plot_start_time_s,
                 "end_time_s": config.plot_end_time_s,
                 "package_analysis": config.package_analysis,
+                "bundle_mode": config.bundle_mode,
+                "bundle_compression": config.bundle_compression,
+                "aggregate_plots": list(config.aggregate_plots)
+                if config.aggregate_plots is not None
+                else "all",
+                "consistency_dashboards": config.consistency_dashboards,
+                "consistency_heatmap_modes": list(config.consistency_heatmap_modes)
+                if config.consistency_heatmap_modes is not None
+                else "all",
+                "parallel_jobs": config.analysis_parallel_jobs,
             },
             "output": {
                 "root": str(config.output_root),
@@ -512,6 +586,8 @@ def generate_campaign_outputs(
     max_plot_points: int | None,
     campaign_metadata: dict[str, object],
     renderer: str,
+    selected: list[str] | None,
+    parallel_jobs: int,
 ) -> tuple[int, dict[str, Any]]:
     root = Path(__file__).resolve().parents[1]
     python_root = root / "python"
@@ -528,6 +604,8 @@ def generate_campaign_outputs(
         start_time_s=campaign_metadata.get("plot_start_time_s"),
         end_time_s=campaign_metadata.get("plot_end_time_s"),
         renderer=renderer,
+        selected=selected,
+        parallel_jobs=parallel_jobs,
     )
     if renderer == "matplotlib":
         import matplotlib.pyplot as plt
@@ -542,6 +620,7 @@ def generate_campaign_outputs(
         "report_elapsed_s": output.report_elapsed_s,
         "analysis_elapsed_s": elapsed_s,
         "report_paths": {key: str(path) for key, path in output.report_paths.items()},
+        "figure_count": len(output.figures),
     }
     return (0 if output.figures else 1), summary
 
@@ -643,6 +722,11 @@ def main() -> int:
     print(f"Plot end time: {config.plot_end_time_s}")
     print(f"Analysis renderer: {config.analysis_renderer}")
     print(f"Package analysis bundle: {config.package_analysis}")
+    print(f"Bundle mode: {config.bundle_mode}")
+    print(f"Bundle compression: {config.bundle_compression}")
+    print(f"Aggregate plots: {config.aggregate_plots or 'all'}")
+    print(f"Consistency dashboards: {config.consistency_dashboards}")
+    print(f"Analysis parallel jobs: {config.analysis_parallel_jobs}")
     print(f"Seed paths: {seed_paths}")
 
     plans = build_run_plans(config, nominal_config)
@@ -689,7 +773,11 @@ def main() -> int:
             config.max_plot_points,
             campaign_metadata,
             config.analysis_renderer,
+            list(config.aggregate_plots) if config.aggregate_plots is not None else None,
+            config.analysis_parallel_jobs,
         )
+    # The packager discovers campaign members through this manifest. Write the
+    # initial version before packaging, then rewrite it with bundle evidence.
     write_campaign_manifest(config, results, output_summary)
     bundle_elapsed_s: float | None = None
     bundle_path: Path | None = None
@@ -703,13 +791,49 @@ def main() -> int:
             root_dir,
             root_dir / "analysis_bundle.h5",
             max_plot_points=config.max_plot_points,
+            bundle_mode=config.bundle_mode,
+            compression=config.bundle_compression,
         )
         bundle_elapsed_s = time.perf_counter() - bundle_started_s
-        consistency_summary = generate_consistency_outputs(
-            bundle_path,
-            root_dir / "summary",
-            max_plot_points=config.max_plot_points,
+        if config.consistency_dashboards:
+            consistency_summary = generate_consistency_outputs(
+                bundle_path,
+                root_dir / "summary",
+                max_plot_points=config.max_plot_points,
+                heatmap_modes=config.consistency_heatmap_modes,
+                parallel_jobs=config.analysis_parallel_jobs,
+            )
+    from navkit_analysis.analysis_performance import process_memory_bytes, tree_size_bytes
+    from navkit_analysis.bundle import bundle_metadata
+
+    analysis_performance: dict[str, object] = {
+        "campaign_name": config.campaign_name,
+        "run_count": len(results),
+        "successful_run_count": len(successful_run_dirs),
+        "raw_run_data_bytes": tree_size_bytes(root_dir / "runs"),
+        "bundle_bytes": tree_size_bytes(bundle_path) if bundle_path is not None else None,
+        "process_memory_bytes": process_memory_bytes(),
+        "simulation_elapsed_s": simulation_elapsed_s,
+        "aggregate_analysis": output_summary or {},
+        "consistency_analysis": consistency_summary or {},
+    }
+    if bundle_elapsed_s is not None and bundle_elapsed_s > 0.0:
+        analysis_performance["raw_input_throughput_mibps"] = (
+            tree_size_bytes(root_dir / "runs") / (1024.0 * 1024.0 * bundle_elapsed_s)
         )
+    if bundle_path is not None:
+        metadata = bundle_metadata(bundle_path)
+        bundle_performance = metadata.get("performance")
+        if isinstance(bundle_performance, dict):
+            analysis_performance["bundle_packaging"] = bundle_performance
+        storage = metadata.get("storage")
+        if isinstance(storage, dict):
+            analysis_performance["bundle_storage"] = storage
+        sample_counts = metadata.get("run_sample_counts")
+        if isinstance(sample_counts, dict):
+            analysis_performance["sample_counts"] = sample_counts
+    performance_path = root_dir / "summary" / "analysis_performance.json"
+    write_json(performance_path, analysis_performance)
     plot_elapsed_s = output_summary.get("plot_elapsed_s") if output_summary is not None else None
     report_elapsed_s = output_summary.get("report_elapsed_s") if output_summary is not None else None
     analysis_elapsed_s = (
@@ -748,6 +872,7 @@ def main() -> int:
         output_summary["bundle_elapsed_s"] = bundle_elapsed_s
         output_summary["bundle_path"] = str(bundle_path) if bundle_path is not None else None
         output_summary["consistency"] = consistency_summary
+        output_summary["analysis_performance_path"] = str(performance_path)
     write_campaign_manifest(config, results, output_summary)
 
     if failed_count > 0:

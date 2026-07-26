@@ -140,10 +140,10 @@ python tools/build.py --build-type Debug --clean
 Normal edit/build/test cycle:
 
 ```text
-python tools/copyright.py --write
-python tools/format.py
-python tools/copyright.py --check
-python tools/format.py --check
+python tools/quality/copyright.py --write
+python tools/quality/format.py
+python tools/quality/copyright.py --check
+python tools/quality/format.py --check
 python tools/build.py --build-type Debug --build-only
 python tools/run_tests.py --build-type Debug
 ```

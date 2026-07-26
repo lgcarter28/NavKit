@@ -4,10 +4,15 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
-from navkit_build_dirs import DEFAULT_GENERATOR, resolve_build_dir
-from perf_artifacts import (
+TOOLS_ROOT = Path(__file__).resolve().parents[1]
+if str(TOOLS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TOOLS_ROOT))
+
+from internal.navkit_build_dirs import DEFAULT_GENERATOR, resolve_build_dir
+from internal.perf_artifacts import (
     DEFAULT_NAVKIT_CONFIG,
     default_resource_report_path,
     load_resource_report,
@@ -26,7 +31,7 @@ def main() -> int:
     parser.add_argument("--no-display", action="store_true")
     args = parser.parse_args()
 
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[2]
     build_dir = resolve_build_dir(
         root, args.build_type, args.navkit_config, args.build_dir, generator=args.generator
     )

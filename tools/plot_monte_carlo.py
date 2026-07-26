@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import os
 import sys
@@ -64,7 +65,12 @@ def main() -> int:
         plot_monte_carlo_series,
         plot_monte_carlo_series_interactive,
     )
-    from navkit_analysis.bundle import is_analysis_bundle, load_monte_carlo_series_from_bundle
+    from navkit_analysis.analysis_cache import cache_fingerprint, cache_is_current, write_cache_marker
+    from navkit_analysis.bundle import (
+        bundle_metadata,
+        is_analysis_bundle,
+        load_monte_carlo_series_from_bundle,
+    )
     import matplotlib.pyplot as plt
 
     parser = argparse.ArgumentParser(
@@ -106,7 +112,20 @@ def main() -> int:
         default="matplotlib",
         help="Use static Matplotlib PNGs or interactive Plotly HTML output.",
     )
+    parser.add_argument(
+        "--parallel-jobs",
+        type=int,
+        default=1,
+        help="Render independent Plotly aggregate figures with this many threads.",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Regenerate selected figures even when their cache fingerprint matches.",
+    )
     args = parser.parse_args()
+    if args.parallel_jobs <= 0:
+        parser.error("--parallel-jobs must be positive")
 
     if not args.show:
         plt.rcParams["figure.max_open_warning"] = 0
@@ -117,10 +136,37 @@ def main() -> int:
             campaign_source.parent / ("interactive_figures" if args.renderer == "plotly" else "figures")
         )
         selected = set(args.plot or monte_carlo_plot_names())
-        for series in load_monte_carlo_series_from_bundle(campaign_source, selected):
+        series_items = load_monte_carlo_series_from_bundle(
+            campaign_source,
+            selected,
+            start_time_s=args.start_time,
+            end_time_s=args.end_time,
+            max_plot_points=args.max_plot_points,
+        )
+        output_paths = [
+            (
+                output_dir
+                / series.output_name.removesuffix(".png").replace("monte_carlo_", "")
+            ).with_suffix(".html" if args.renderer == "plotly" else ".png")
+            for series in series_items
+        ]
+        cache_inputs = {
+            "bundle_fingerprint": bundle_metadata(campaign_source).get("package_fingerprint"),
+            "renderer": args.renderer,
+            "selected": sorted(selected),
+            "start_time_s": args.start_time,
+            "end_time_s": args.end_time,
+            "max_plot_points": args.max_plot_points,
+        }
+        marker_path = output_dir / ".aggregate_plot_cache.json"
+        fingerprint = cache_fingerprint("monte_carlo_aggregate_figures", cache_inputs)
+        if not args.force and cache_is_current(marker_path, fingerprint, output_paths):
+            print(f"Reused aggregate figures in {output_dir} (matching plot fingerprint)")
+            return 0
+
+        def render_one(series):
             if args.renderer == "matplotlib":
-                plot_monte_carlo_series(series, output_dir)
-                continue
+                return plot_monte_carlo_series(series, output_dir)
             output_path = output_dir / series.output_name.removesuffix(".png").replace(
                 "monte_carlo_", ""
             )
@@ -128,6 +174,21 @@ def main() -> int:
             figure = plot_monte_carlo_series_interactive(series, output_path)
             if args.show:
                 figure.show()
+            return figure
+
+        if args.renderer == "plotly" and args.parallel_jobs > 1 and len(series_items) > 1:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=args.parallel_jobs) as executor:
+                list(executor.map(render_one, series_items))
+        else:
+            for series in series_items:
+                render_one(series)
+        write_cache_marker(
+            marker_path,
+            kind="monte_carlo_aggregate_figures",
+            fingerprint=fingerprint,
+            inputs=cache_inputs,
+            outputs=output_paths,
+        )
         return 0
 
     if args.renderer == "plotly":

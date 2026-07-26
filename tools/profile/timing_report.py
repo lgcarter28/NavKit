@@ -4,9 +4,14 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
-from perf_artifacts import DEFAULT_TIMING_PATH, load_timing_artifact, print_timing_report
+TOOLS_ROOT = Path(__file__).resolve().parents[1]
+if str(TOOLS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TOOLS_ROOT))
+
+from internal.perf_artifacts import DEFAULT_TIMING_PATH, load_timing_artifact, print_timing_report
 
 
 def main() -> int:

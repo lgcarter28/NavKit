@@ -35,7 +35,7 @@ analysis_bundle.h5
   /runs/<run_id>/data/<table>/<column>
   /runs/<run_id>/derived/<table>/<column>
   /aggregate/monte_carlo_series/<quantity>/<array>
-  /aggregate/consistency/series/<nees|nis>/<group>/<array>
+  /aggregate/consistency/series/<nees|nis|marginal>/<group>/<array>  (when prepared)
 ```
 
 `data` contains the raw analysis tables needed by current plotting. `derived`
@@ -45,7 +45,8 @@ metadata records source runtime configs/manifests when available, seeds,
 compile-time metadata carried by the source logs, units/frame conventions, plot
 decimation, and the truth/NED/covariance derivation assumptions.
 
-Campaign bundles also cache time-indexed joint consistency histories. The NEES
+The prepare workflow materializes time-indexed joint consistency histories on
+demand. The NEES
 cache contains full INS (15 DOF), PVA (9 DOF), position, velocity, attitude,
 combined IMU bias, gyro bias, and accelerometer bias products. Each product is
 calculated from the selected full covariance submatrix, preserving relevant
@@ -76,8 +77,9 @@ job:
 | `plot_monte_carlo.py` | Regenerate selected aggregate campaign figures |
 | `plot_consistency.py` | Generate or refresh joint NEES/NIS dashboards and reports |
 | `package_analysis.py` | Convert existing CSV run/campaign output into HDF5 |
+| `prepare_analysis.py` | Build selected reusable HDF5 consistency-cache families without rendering figures |
 | `plot_field.py` | Quickly inspect arbitrary named CSV/HDF5 fields |
-| `compare_monte_carlo.py` | Compare existing campaign reports without replaying runs |
+| `profile/benchmark_analysis_scaling.py` | Measure identical HDF5-backed plotting workloads at multiple Plotly worker counts |
 
 `run_scenario.py` and `run_monte_carlo.py` are the normal entry points.
 Lower-level tools are useful when simulation is already complete or when
@@ -207,15 +209,6 @@ python tools/plot_monte_carlo.py `
   --plot attitude_ned --start-time 10 --show
 ```
 
-Compare completed reports without reopening every run CSV:
-
-```powershell
-python tools/compare_monte_carlo.py `
-  output/monte_carlo/campaign_a `
-  output/monte_carlo/campaign_b `
-  --output-dir output/monte_carlo_comparison
-```
-
 Two supplied campaigns isolate initial-covariance matching:
 
 ```powershell
@@ -232,8 +225,7 @@ Both campaigns use the same PVA-error, HG1700, process-noise, bias-dynamics,
 and GNSS components. The matched campaign makes the filter's initial PVA and
 IMU-bias covariance equal to the distributions that generate those initial
 truth errors. The conservative campaign increases only the filter's initial
-covariance. Compare their `bias_initialization_metrics.csv` files or pass both
-campaign directories to `tools/compare_monte_carlo.py`.
+covariance. Compare their `bias_initialization_metrics.csv` files directly.
 
 The bias-initialization report records, per body axis, the initial empirical
 error sigma, initial mean filter sigma, their ratio, and initial filter
@@ -250,6 +242,18 @@ Package an existing run or campaign:
 ```powershell
 python tools/package_analysis.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal
 python tools/package_analysis.py output/monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_stationary_smoke_mc
+python tools/package_analysis.py output/monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_stationary_smoke_mc --bundle-mode derived_only --compression lzf
+```
+
+Prepare the expensive consistency cache once, without producing figures. This
+accepts either a CSV run/campaign directory or an existing HDF5 bundle. Repeat
+`--series-kind` to prepare only the family needed for the next investigation;
+omit it to prepare the full NEES/NIS/marginal set.
+
+```powershell
+python tools/prepare_analysis.py <campaign>/analysis_bundle.h5
+python tools/prepare_analysis.py <campaign>/analysis_bundle.h5 --series-kind nees
+python tools/prepare_analysis.py <campaign> --bundle-mode derived_only --compression lzf
 ```
 
 Monte Carlo campaigns package HDF5 and generate Plotly interactive aggregate
@@ -294,6 +298,18 @@ consistency histories alongside provenance metadata. Retain raw run folders
 until the campaign has been validated; the bundle is a derived analysis cache,
 not the embedded source log.
 
+`full` bundles retain each selected raw log table and the derived tables needed
+by current analysis. `derived_only` bundles retain the truth-aligned error
+tables and aggregate covariance series without duplicating raw CSV tables.
+Consistency families are materialized on demand by `prepare_analysis.py` or the
+consistency renderer, so campaigns that only need aggregate error/covariance
+plots do not pay the NEES/NIS cache cost. Numeric datasets are explicitly
+chunked and use fast `lzf`
+compression by default; `gzip` trades packaging/load time for a smaller bundle,
+and `none` is useful only for controlled storage experiments. The bundle
+metadata records the selected mode, compression, source-input manifest digest,
+and packaging-stage timing evidence.
+
 ## Plotting architecture
 
 Domain data preparation produces shared `PlotSpec`, `PlotAxis`, and `PlotTrace`
@@ -316,7 +332,8 @@ duplicate error, covariance, scaling, or frame-transform calculations.
 
 ## Cache refresh and performance
 
-Normal plotting should reuse `analysis_bundle.h5`. Use `--refresh-cache` only
+Normal plotting should reuse `analysis_bundle.h5`. Use `prepare_analysis.py`
+to materialize a cache ahead of renderer iteration. Use `--refresh-cache` only
 after source run data changes, consistency derivations change, or an older
 bundle lacks the required cache:
 
@@ -335,8 +352,87 @@ the underlying statistical calculations. For large campaigns:
 4. Iterate on plots from HDF5.
 5. Increase plot-point density only when the current diagnostic needs it.
 
+The prepare command records named cache stages in the bundle itself and prints
+them for quick diagnosis: truth-error frame loading, NEES/marginal derivation,
+NIS loading/derivation, and the single-owner HDF5 cache write. It builds
+truth-error products in one frame scan, reuses the selected campaign time grid,
+and writes each requested family incrementally with explicit chunk shapes.
+The Monte Carlo NED aggregate path likewise reuses a campaign transform when
+runs share the same truth/time grid.
+
 Timing for simulation, packaging, reporting, and plotting is printed by the
 campaign workflow and retained in campaign artifacts where applicable.
+
+Each Monte Carlo campaign additionally writes
+`summary/analysis_performance.json`. It records run/sample scale, raw and HDF5
+storage sizes, retained-table mode, optional portable process-memory observation,
+and independent timing for loading, aggregate reduction, rendering, reporting,
+and HDF5 packaging. Package and figure cache fingerprints include the relevant
+source manifest, schema, bundle settings, selected artifacts, renderer, time
+window, and decimation settings. Matching artifacts are safely reused unless a
+tool receives `--force`. `plot_consistency.py --force` regenerates selected
+dashboard/report artifacts while reusing the packed HDF5 consistency cache;
+`--refresh-cache` is reserved for recomputing that cache from per-run data.
+
+For large validated campaigns, first package once, then render only the desired
+families from the bundle:
+
+```powershell
+python tools/plot_monte_carlo.py <campaign>/analysis_bundle.h5 `
+  --renderer plotly --plot position_ned --parallel-jobs 2
+python tools/plot_consistency.py <campaign>/analysis_bundle.h5 `
+  --heatmap-mode cdf_probability_residual --parallel-jobs 2
+```
+
+Parallel jobs apply only to independent post-bundle Plotly rendering and default
+to one. Their input data and output names are deterministic; HDF5 writes,
+aggregate reduction, reports, and manifests remain serial. Use serial mode for
+a baseline before comparing a parallel rendering run; the generated artifacts
+must retain the same cache fingerprints and rendered Plotly data.
+
+## Analysis scaling benchmark
+
+Use the profiling benchmark to compare the same HDF5-backed aggregate and
+consistency plotting workload with one, two, and four Plotly workers. It does
+not rerun simulations or mutate source campaigns; it writes isolated output
+under the selected benchmark root and records machine-readable wall-clock
+results.
+
+```powershell
+python tools/profile/benchmark_analysis_scaling.py `
+  --bundle phase_6_500=output/phase_6_500/ecef_ins_gnss_runtime_covariance_mc/analysis_bundle.h5 `
+  --bundle phase_6_1000=output/phase_6_1000/ecef_ins_gnss_runtime_covariance_mc/analysis_bundle.h5 `
+  --workers 1 --workers 2 --workers 4
+```
+
+The report is written to
+`output/analysis_benchmarks/phase_6_9_scaling/analysis_scaling_benchmark.json`.
+It records aggregate Plotly rendering, consistency-dashboard rendering, and
+combined elapsed time for every campaign/worker pair. HDF5 reduction and
+writing remain single-owner stages and are intentionally excluded.
+
+The controlled Phase 6 baseline copied each source bundle, built its consistency
+cache once, then rendered identical fresh outputs at each worker count. Cache
+warmup is therefore reported separately from repeat-analysis performance:
+
+| Campaign | 1 worker | 2 workers | 4 workers | Best repeated result |
+| --- | ---: | ---: | ---: | --- |
+| 500 runs | 91.925 s | 85.378 s | 81.308 s | 4 workers, 11.5% faster than serial |
+| 1,000 runs | 139.339 s | 133.100 s | 115.942 s | 4 workers, 16.8% faster than serial |
+
+On this machine, four workers are the best tested Plotly setting for complete
+repeated analysis. The gain is intentionally modest because HDF5 loading,
+data preparation, report writing, and parts of HTML serialization remain
+serial. First-use consistency-cache construction is a separate one-time cost:
+104.133 s for the 500-run bundle and 209.189 s for the 1,000-run bundle.
+
+After the cache-preparation pass, controlled cold-cache refreshes of the same
+copied bundles took 40.484 s for 500 runs and 75.145 s for 1,000 runs. The
+largest remaining cost is reading packaged truth-error tables (22.180 s and
+38.122 s respectively), followed by NEES/marginal derivation (13.814 s and
+27.933 s). This is a deterministic single-owner path; parallel cache writes
+remain intentionally out of scope until a future profile isolates a safe
+independent CPU-bound stage.
 
 ## Monte Carlo consistency evidence
 
@@ -357,6 +453,13 @@ The QQ points should follow the identity line when the selected epoch is
 consistent. Separate position, velocity,
 attitude, gyro-bias, and accelerometer-bias axis dashboards expose the X/Y/Z
 marginal normalized-squared-error drill-down alongside the joint products.
+
+Empirical-CDF heatmap dashboards add a slim reference strip immediately right
+of each measured heatmap. It shows the calibrated chi-square expectation at
+the same statistic threshold (`F_chi-square(x)`), making the ideal vertical
+slice visually comparable without covering the measured time history. The
+residual heatmaps intentionally omit this strip because their expected value is
+trivially zero everywhere.
 
 The report directory contains JSON, CSV, and Markdown summaries. Mean NEES/NIS
 confidence bounds correctly use `N * dof` chi-square degrees of freedom for an

@@ -94,10 +94,10 @@ Concepts express capabilities; CRTP bases share implementation and are not manda
 After editing source, apply all source mutations before collecting build/test evidence:
 
 ```powershell
-python tools/copyright.py --write
-python tools/format.py
-python tools/copyright.py --check
-python tools/format.py --check
+python tools/quality/copyright.py --write
+python tools/quality/format.py
+python tools/quality/copyright.py --check
+python tools/quality/format.py --check
 ```
 
 Only after those commands pass should the final build and tests run. CI uses check-only commands and must never modify source.
@@ -131,7 +131,7 @@ python tools/run_scenario.py --build-type Debug --show
 
 Simulation logs belong under `output/logs/<run_name>/`. The analysis package is deliberately separate from the embedded C++ library.
 
-Use `python tools/format.py` to apply formatting. Do not include clang-tidy in the normal local agentic workflow; it is intentionally a CI-only gate because Eigen-heavy translation units make local runs slow. Run `python tools/format.py --tidy` locally only when the user explicitly asks for clang-tidy or when diagnosing a clang-tidy CI failure. CI runs `python tools/format.py --check --tidy --tidy-warnings-as-errors` on the Linux Debug compilation database. Do not apply automatic tidy fixes broadly without reviewing their scope.
+Use `python tools/quality/format.py` to apply formatting. Do not include clang-tidy in the normal local agentic workflow; it is intentionally a CI-only gate because Eigen-heavy translation units make local runs slow. Run `python tools/quality/format.py --tidy` locally only when the user explicitly asks for clang-tidy or when diagnosing a clang-tidy CI failure. CI runs `python tools/quality/format.py --check --tidy --tidy-warnings-as-errors` on the Linux Debug compilation database. Do not apply automatic tidy fixes broadly without reviewing their scope.
 
 NavKit-owned C++ targets use warning/profile settings from `cmake/NavKitWarnings.cmake`. CI enables `NAVKIT_WARNINGS_AS_ERRORS`; local builds may opt in with `python tools/build.py --warnings-as-errors`. Release builds use the embedded-oriented optimization profile in `NavKitWarnings.cmake`; verify Release builds when touching compiler flags, optimization settings, or performance-sensitive code.
 

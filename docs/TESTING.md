@@ -46,7 +46,7 @@ coverage. To reproduce the CI coverage path on a machine with compatible
 tooling:
 
 ```bash
-python tools/coverage.py --html
+python tools/quality/coverage.py --html
 ```
 
 Coverage reports are written under `build/coverage/coverage/`. Treat the report
@@ -70,7 +70,7 @@ locally only when reviewing coverage gaps or debugging the CI coverage lane.
 
 Simulation and analysis smoke tests write lightweight timing data to
 `output/logs/<run_name>/timing.json`. CI also preserves coarse Debug and Release
-executable/library size reports from `tools/resource_report.py` with the
+executable/library size reports from `tools/profile/resource_report.py` with the
 stationary GNSS logs. These artifacts are intended for trend review and future
 Monte Carlo summaries; they are not pass/fail tests because local machines and
 hosted runners vary too much for wall-clock thresholds to be meaningful yet.
@@ -82,8 +82,8 @@ python tools/build.py --build-type Debug --skip-conan
 python tools/run_tests.py --build-type Debug
 python tools/run_scenario.py --build-type Debug --no-plot
 python tools/plot_run.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal
-python tools/timing_report.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/data/timing.json
-python tools/resource_report.py --build-type Debug --output output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/resources-debug-local.json
+python tools/profile/timing_report.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/data/timing.json
+python tools/profile/resource_report.py --build-type Debug --output output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/resources-debug-local.json
 ```
 
 Build, test, simulation, and analysis wrappers update the default timing

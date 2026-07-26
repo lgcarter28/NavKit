@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+import concurrent.futures
 from pathlib import Path
 from typing import Sequence
 
@@ -633,22 +634,30 @@ def write_consistency_dashboard(
     rows = len(series_items)
     figure = make_subplots(
         rows=rows,
-        cols=2,
-        column_widths=(0.68, 0.32),
-        horizontal_spacing=0.07,
+        cols=4,
+        # The expected empirical-CDF strip is the heatmap's reference edge, so
+        # it deliberately touches the measured heatmap.  A separate blank
+        # spacer keeps the selected-epoch distribution visually independent.
+        # Reserve a generous central lane for the shared colorbar and its
+        # title.  The substantial panels remain near the outer page edges;
+        # only the thin reference strip sits directly against the heatmap.
+        column_widths=(0.58, 0.012, 0.10, 0.308),
+        horizontal_spacing=0.0,
         vertical_spacing=0.08,
         subplot_titles=[
             title
             for row, series in enumerate(series_items)
             for title in (
                 series.title,
+                "",
+                "",
                 "Frozen epoch distribution" if row == 0 else "",
             )
         ],
     )
-    left_domain = figure.layout.xaxis.domain
-    right_domain = figure.layout.xaxis2.domain
-    colorbar_x = 0.5 * (left_domain[1] + right_domain[0])
+    reference_domain = figure.layout.xaxis2.domain
+    right_domain = figure.layout.xaxis4.domain
+    colorbar_x = 0.5 * (reference_domain[1] + right_domain[0])
     distribution_trace_indices: list[dict[str, list[int]]] = []
     row_axis_indices: list[int] = []
     right_axis_indices: list[int] = []
@@ -686,6 +695,66 @@ def write_consistency_dashboard(
             row=row,
             col=1,
         )
+        left_axis_index = 4 * row - 3
+        if heatmap_mode == HEATMAP_EMPIRICAL_CDF:
+            expected_cdf = chi2.cdf(heatmap_y, series.dof)
+            figure.add_trace(
+                go.Heatmap(
+                    x=(0.0,),
+                    y=heatmap_y,
+                    z=expected_cdf[:, None],
+                    colorscale=colorscale,
+                    zmin=0.0,
+                    zmax=1.0,
+                    showscale=False,
+                    hovertemplate=(
+                        "Statistic threshold: %{y:.3f}<br>"
+                        "Expected CDF: %{z:.4f}<extra></extra>"
+                    ),
+                    name="expected chi-square CDF",
+                    showlegend=False,
+                ),
+                row=row,
+                col=2,
+            )
+            figure.update_yaxes(
+                matches=_axis_ref(left_axis_index, "y"),
+                showticklabels=False,
+                fixedrange=True,
+                row=row,
+                col=2,
+            )
+            figure.update_xaxes(
+                visible=False,
+                fixedrange=True,
+                row=row,
+                col=2,
+            )
+        else:
+            figure.update_xaxes(
+                visible=False,
+                fixedrange=True,
+                row=row,
+                col=2,
+            )
+            figure.update_yaxes(
+                visible=False,
+                fixedrange=True,
+                row=row,
+                col=2,
+            )
+        figure.update_xaxes(
+            visible=False,
+            fixedrange=True,
+            row=row,
+            col=3,
+        )
+        figure.update_yaxes(
+            visible=False,
+            fixedrange=True,
+            row=row,
+            col=3,
+        )
         _add_left_reference_traces(figure, series, row, heatmap_mode)
         initial_index = len(series.time_s) - 1
         initial_values = series.values[:, initial_index]
@@ -702,7 +771,7 @@ def write_consistency_dashboard(
                 showlegend=False,
             ),
             row=row,
-            col=2,
+            col=4,
         )
         histogram_trace_index = len(figure.data) - 1
         x_pdf = np.linspace(edges[0], edges[-1], 256)
@@ -716,7 +785,7 @@ def write_consistency_dashboard(
                 showlegend=False,
             ),
             row=row,
-            col=2,
+            col=4,
         )
         pdf_trace_index = len(figure.data) - 1
         probabilities = (np.arange(1, len(initial_values) + 1) - 0.5) / len(initial_values)
@@ -731,7 +800,7 @@ def write_consistency_dashboard(
                 visible=False,
             ),
             row=row,
-            col=2,
+            col=4,
         )
         empirical_cdf_trace_index = len(figure.data) - 1
         figure.add_trace(
@@ -745,7 +814,7 @@ def write_consistency_dashboard(
                 visible=False,
             ),
             row=row,
-            col=2,
+            col=4,
         )
         chi_square_cdf_trace_index = len(figure.data) - 1
         expected_quantiles = chi2.ppf(probabilities, series.dof)
@@ -760,7 +829,7 @@ def write_consistency_dashboard(
                 visible=False,
             ),
             row=row,
-            col=2,
+            col=4,
         )
         qq_trace_index = len(figure.data) - 1
         diagonal_upper = max(float(expected_quantiles[-1]), float(initial_values.max()))
@@ -775,7 +844,7 @@ def write_consistency_dashboard(
                 visible=False,
             ),
             row=row,
-            col=2,
+            col=4,
         )
         qq_identity_trace_index = len(figure.data) - 1
         distribution_trace_indices.append(
@@ -785,9 +854,8 @@ def write_consistency_dashboard(
                 "qq": [qq_trace_index, qq_identity_trace_index],
             }
         )
-        left_axis_index = 2 * row - 1
         row_axis_indices.append(left_axis_index)
-        right_axis_indices.append(2 * row)
+        right_axis_indices.append(4 * row)
         kind_label = _kind_label(series.kind)
         left_y_title = (
             "CDF probability"
@@ -800,8 +868,8 @@ def write_consistency_dashboard(
         )
         figure.update_yaxes(title_text=left_y_title, row=row, col=1)
         figure.update_xaxes(title_text="Time [s]" if row == rows else None, row=row, col=1)
-        figure.update_xaxes(title_text=kind_label if row == rows else None, row=row, col=2)
-        figure.update_yaxes(title_text="Density", row=row, col=2)
+        figure.update_xaxes(title_text=kind_label if row == rows else None, row=row, col=4)
+        figure.update_yaxes(title_text="Density", row=row, col=4)
 
     for row in range(2, rows + 1):
         figure.update_xaxes(matches="x", row=row, col=1)
@@ -879,17 +947,21 @@ def write_consistency_dashboards(
     *,
     heatmap_modes: Sequence[str] = HEATMAP_MODES,
     write_index: bool = True,
+    parallel_jobs: int = 1,
 ) -> dict[str, Path]:
     """Write the complete joint and marginal consistency dashboard set."""
     unsupported_modes = set(heatmap_modes).difference(HEATMAP_MODES)
     if unsupported_modes:
         raise ValueError(f"unsupported consistency heatmap modes: {sorted(unsupported_modes)}")
+    if parallel_jobs <= 0:
+        raise ValueError("parallel_jobs must be positive")
     figures_dir.mkdir(parents=True, exist_ok=True)
     for stale_path in figures_dir.glob("consistency_*.html"):
         stale_path.unlink()
     by_name = {series.name: series for series in (*nees_series, *nis_series)}
     paths: dict[str, Path] = {}
     marginal_by_name = {series.name: series for series in marginal_series}
+    jobs: list[tuple[str, str, Sequence[ConsistencySeries], Path, str]] = []
     for heatmap_mode in heatmap_modes:
         mode_dir = figures_dir / heatmap_mode
         for name, title, group_names in DASHBOARD_DEFINITIONS:
@@ -897,12 +969,7 @@ def write_consistency_dashboards(
             if not selected:
                 continue
             path = mode_dir / f"consistency_{name}.html"
-            paths[f"{heatmap_mode}/{name}"] = write_consistency_dashboard(
-                title,
-                selected,
-                path,
-                heatmap_mode=heatmap_mode,
-            )
+            jobs.append((f"{heatmap_mode}/{name}", title, selected, path, heatmap_mode))
         for name, title, group_names in MARGINAL_DASHBOARD_DEFINITIONS:
             selected = [
                 marginal_by_name[group_name]
@@ -912,12 +979,23 @@ def write_consistency_dashboards(
             if not selected:
                 continue
             path = mode_dir / f"consistency_{name}.html"
-            paths[f"{heatmap_mode}/{name}"] = write_consistency_dashboard(
-                title,
-                selected,
-                path,
-                heatmap_mode=heatmap_mode,
-            )
+            jobs.append((f"{heatmap_mode}/{name}", title, selected, path, heatmap_mode))
+
+    def render_one(job: tuple[str, str, Sequence[ConsistencySeries], Path, str]) -> tuple[str, Path]:
+        key, title, selected, path, heatmap_mode = job
+        return key, write_consistency_dashboard(
+            title,
+            selected,
+            path,
+            heatmap_mode=heatmap_mode,
+        )
+
+    if parallel_jobs == 1 or len(jobs) <= 1:
+        rendered = [render_one(job) for job in jobs]
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=parallel_jobs) as executor:
+            rendered = list(executor.map(render_one, jobs))
+    paths.update(rendered)
     if not write_index:
         return paths
 

@@ -8,9 +8,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from navkit_build_dirs import DEFAULT_GENERATOR
-from perf_artifacts import DEFAULT_NAVKIT_CONFIG
-from runtime_config import (
+from internal.navkit_build_dirs import DEFAULT_GENERATOR
+from internal.perf_artifacts import DEFAULT_NAVKIT_CONFIG
+from internal.runtime_config import (
     apply_runtime_overrides,
     load_runtime_config,
     runtime_output_dir,

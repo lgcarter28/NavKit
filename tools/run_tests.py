@@ -10,8 +10,8 @@ import sys
 import time
 from pathlib import Path
 
-from navkit_build_dirs import DEFAULT_GENERATOR, resolve_build_dir
-from perf_artifacts import (
+from internal.navkit_build_dirs import DEFAULT_GENERATOR, resolve_build_dir
+from internal.perf_artifacts import (
     DEFAULT_NAVKIT_CONFIG,
     DEFAULT_RUN_NAME,
     DEFAULT_TIMING_PATH,

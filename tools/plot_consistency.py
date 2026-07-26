@@ -49,9 +49,22 @@ def main() -> int:
             "The dashboard index is preserved for a selective refresh."
         ),
     )
+    parser.add_argument(
+        "--parallel-jobs",
+        type=int,
+        default=1,
+        help="Render independent Plotly dashboards with this many threads after loading the bundle.",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Regenerate selected dashboard/report artifacts even when their cache matches.",
+    )
     args = parser.parse_args()
     if args.max_plot_points is not None and args.max_plot_points <= 1:
         parser.error("--max-plot-points must be greater than one")
+    if args.parallel_jobs <= 0:
+        parser.error("--parallel-jobs must be positive")
     if not args.bundle.is_file():
         parser.error(f"bundle does not exist: {args.bundle}")
 
@@ -73,6 +86,8 @@ def main() -> int:
         refresh_cache=args.refresh_cache,
         max_plot_points=args.max_plot_points,
         heatmap_modes=args.heatmap_mode,
+        parallel_jobs=args.parallel_jobs,
+        force=args.force,
     )
     print("Consistency analysis timing:")
     print(f"  cache:   {float(summary['cache_elapsed_s']):.3f} s")

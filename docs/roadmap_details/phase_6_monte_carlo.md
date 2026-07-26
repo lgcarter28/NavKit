@@ -1,6 +1,6 @@
 # Phase 6 - Monte Carlo and Batch Analysis
 
-**Status:** completed pass history plus the active Pass 6.9 follow-forward. Current active Phase 6 pass ownership lives in `docs/ROADMAP.md`; completed pass detail is preserved here after verification.
+**Status:** completed. Current active pass ownership lives in `docs/ROADMAP.md`; completed pass detail is preserved here after verification.
 
 Monte Carlo support comes immediately after Phase 5 because it is the gold-standard workflow for navigation analysis and will turn the current single-run scenario tooling into repeatable statistical evidence.
 
@@ -32,7 +32,7 @@ Monte Carlo support comes immediately after Phase 5 because it is the gold-stand
 - [x] Aggregated GNSS position/velocity NIS summaries when measurement-statistics logs are enabled.
 - [x] Added run timing and output-size/resource summaries across campaign runs.
 - [x] Extended campaign manifests with plot/report/analysis timing and paths to generated report artifacts.
-- [x] Added a lightweight `tools/compare_monte_carlo.py` utility that builds comparison CSV/Markdown tables from existing campaign report folders without re-reading raw run logs.
+- [x] Added a lightweight internal comparison utility that builds comparison CSV/Markdown tables from existing campaign report folders without re-reading raw run logs.
 - [x] Enabled low-rate measurement-statistics logging in the runtime-covariance scenario used for Pass 6.2 validation so GNSS NIS metrics are populated.
 - [x] Documented the aggregate report layout, report interpretation, and comparison workflow.
 - [x] Validated the pass with a 100-run Release campaign from the current runtime-covariance-override campaign; all 100 runs passed, aggregate figures/reports were generated, and the comparison utility was smoke-tested on the generated report.
@@ -104,7 +104,22 @@ Monte Carlo support comes immediately after Phase 5 because it is the gold-stand
 
 ## Pass 6.9: analysis performance characterization and low-risk scaling
 
-- [ ] Characterize desktop analysis with stage-level timing, scale, storage, and practical memory evidence before adding broad concurrency.
-- [ ] Reduce unnecessary input loading, add safe artifact/cache selection, and evaluate HDF5 chunking/compression plus `full` versus `derived_only` bundle retention.
-- [ ] Add opt-in parallel rendering only for independent post-bundle figures/dashboards; retain a single HDF5 writer and serial aggregate/report ownership.
-- [ ] Add serial-versus-parallel equivalence evidence before any parallel analysis path becomes the default.
+- [x] Added `summary/analysis_performance.json` with campaign scale, raw/HDF5 storage, retained-table mode, portable process-memory observations, simulation totals, and per-stage aggregate, report, consistency, and package timing evidence.
+- [x] Preserved lean Monte Carlo source loading, made package/aggregate/dashboard selection explicit, and added `full` versus `derived_only` HDF5 retention with explicit numeric chunking plus `lzf`, `gzip`, or uncompressed storage.
+- [x] Added deterministic source-manifest and settings fingerprints for package reuse, aggregate-figure reuse, and consistency-dashboard reuse; package metadata records the effective storage and derivation settings.
+- [x] Added opt-in `analysis.parallel_jobs` for independent post-bundle Plotly aggregate figures and consistency dashboards. HDF5 writes, aggregate reduction, manifests, and reports remain single-owner/serial.
+- [x] Added an internal analysis-equivalence verifier, which renders selected aggregate plots serially and in parallel, normalizes Plotly's intentional random div ID, and requires matching rendered content. The three-run Release smoke campaign and this equivalence check both passed.
+- [x] Reorganized tooling into stable public commands at `tools/`, explicit profiling diagnostics under `tools/profile/`, and repository-only support/verification helpers under `tools/internal/`.
+- [x] Added a controlled HDF5-backed 500/1,000-run Plotly scaling benchmark. It creates benchmark-owned copied/warmed bundles to avoid source mutation and Windows HDF5 locks, then measures aggregate and forced consistency-dashboard rendering independently at one, two, and four workers.
+- [x] Added `plot_consistency.py --force` so renderer changes can regenerate dashboard/report artifacts without unnecessarily recomputing the HDF5 statistical cache.
+- [x] Measured complete warmed repeated-analysis workloads: 500 runs completed in 91.925 s, 85.378 s, and 81.308 s at one, two, and four workers; 1,000 runs completed in 139.339 s, 133.100 s, and 115.942 s. Four workers was the best tested setting, improving the full workload by 11.5% and 16.8% over serial respectively; one-time consistency-cache construction remained distinct at 104.133 s and 209.189 s.
+
+## Pass 6.10: cache-preparation optimization and CDF reference cues
+
+- [x] Added a slim expected-reference strip to each interactive empirical-CDF heatmap. It renders the ideal `F(p) = p` vertical slice beside the measured heatmap and is intentionally absent from CDF-residual products.
+- [x] Profiled named cache-preparation stages: truth-error loading, NEES/marginal derivation, NIS loading/derivation, and the single-owner HDF5 write.
+- [x] Reused campaign-wide ECEF-to-NED transforms when runs share the same truth/time grid, reused selected time grids, and derived NEES plus marginal series from one truth-error frame scan without changing numerical products.
+- [x] Made consistency-cache materialization demand-driven: package creation retains raw/derived data and aggregate series, while selected NEES, NIS, and marginal cache families are materialized only by the prepare or consistency-plot workflow that needs them.
+- [x] Tuned derived HDF5 writes with explicit bounded chunk shapes and LZF compression while retaining deterministic, serial ownership of bundle writes.
+- [x] Added `tools/prepare_analysis.py` for explicit cache-only preparation from either a CSV run/campaign directory or an existing bundle, including selected series families and named timing evidence.
+- [x] Re-measured cold preparation and warmed rendering. Full cache preparation fell from 104.133 s to 40.484 s for 500 runs (61.1% faster) and from 209.189 s to 75.145 s for 1,000 runs (64.1% faster). Warmed four-worker consistency rendering remained 36.393 s for 500 and 53.684 s for 1,000 runs; HDF5 source reading is now the dominant remaining cold-cache cost, so no brittle cache-construction concurrency was added.

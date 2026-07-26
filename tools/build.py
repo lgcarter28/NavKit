@@ -12,12 +12,12 @@ import sys
 import time
 from pathlib import Path
 
-from navkit_build_dirs import DEFAULT_GENERATOR
-from navkit_build_dirs import default_install_dir
-from navkit_build_dirs import repo_root_from_tools_file
-from navkit_build_dirs import resolve_build_dir as resolve_config_build_dir
-from navkit_conan_env import run_with_optional_conan_env
-from perf_artifacts import (
+from internal.navkit_build_dirs import DEFAULT_GENERATOR
+from internal.navkit_build_dirs import default_install_dir
+from internal.navkit_build_dirs import repo_root_from_tools_file
+from internal.navkit_build_dirs import resolve_build_dir as resolve_config_build_dir
+from internal.navkit_conan_env import run_with_optional_conan_env
+from internal.perf_artifacts import (
     DEFAULT_NAVKIT_CONFIG,
     DEFAULT_RUN_NAME,
     DEFAULT_TIMING_PATH,

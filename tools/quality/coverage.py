@@ -9,11 +9,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-from navkit_build_dirs import default_build_dir
+TOOLS_ROOT = Path(__file__).resolve().parents[1]
+if str(TOOLS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TOOLS_ROOT))
+
+from internal.navkit_build_dirs import default_build_dir
 
 
 def repo_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return Path(__file__).resolve().parents[2]
 
 
 def run(cmd: list[str], cwd: Path) -> None:

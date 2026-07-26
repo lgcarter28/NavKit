@@ -36,10 +36,10 @@ jobs:
         run: python tools/bootstrap.py
 
       - name: Check copyright headers
-        run: .venv/bin/python tools/copyright.py --check
+        run: .venv/bin/python tools/quality/copyright.py --check
 
       - name: Check formatting
-        run: .venv/bin/python tools/format.py --check
+        run: .venv/bin/python tools/quality/format.py --check
 
   build-test:
     name: Build and test (${{ matrix.os }})
@@ -83,11 +83,11 @@ jobs:
         run: ${{ matrix.python }} tools/build.py --build-type Debug --clean --warnings-as-errors --timing-output output/logs/stationary_gnss_demo/timing.json
 
       - name: Record Debug artifact sizes
-        run: ${{ matrix.python }} tools/resource_report.py --build-type Debug --output output/logs/stationary_gnss_demo/resources-debug-${{ runner.os }}.json
+        run: ${{ matrix.python }} tools/profile/resource_report.py --build-type Debug --output output/logs/stationary_gnss_demo/resources-debug-${{ runner.os }}.json
 
       - name: Run clang-tidy
         if: runner.os == 'Linux'
-        run: ${{ matrix.python }} tools/format.py --check --tidy --tidy-warnings-as-errors
+        run: ${{ matrix.python }} tools/quality/format.py --check --tidy --tidy-warnings-as-errors
 
       - name: Run unit tests
         run: ${{ matrix.python }} tools/run_tests.py --build-type Debug --timing-output output/logs/stationary_gnss_demo/timing.json
@@ -104,7 +104,7 @@ jobs:
         run: ${{ matrix.python }} tools/build.py --build-type Release --clean --without-tests --warnings-as-errors --timing-output output/logs/stationary_gnss_demo/timing.json
 
       - name: Record Release artifact sizes
-        run: ${{ matrix.python }} tools/resource_report.py --build-type Release --output output/logs/stationary_gnss_demo/resources-release-${{ runner.os }}.json
+        run: ${{ matrix.python }} tools/profile/resource_report.py --build-type Release --output output/logs/stationary_gnss_demo/resources-release-${{ runner.os }}.json
 
       - name: Upload timing and resource artifacts
         if: always()
@@ -143,7 +143,7 @@ jobs:
         run: python tools/bootstrap.py
 
       - name: Generate coverage report
-        run: .venv/bin/python tools/coverage.py --html
+        run: .venv/bin/python tools/quality/coverage.py --html
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
