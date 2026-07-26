@@ -9,6 +9,10 @@ Estimator validation follows Monte Carlo and trajectory expansion so the validat
 - [ ] Establish named numerical baseline scenarios and metric thresholds.
 - [ ] Add a regression command/check for the default ECEF INS/GNSS simulation and analysis pipeline.
 - [ ] Add skip-first-N/time-window options for transient exclusion.
+- [ ] Add deterministic truth-reconstruction regressions after Phase 7 queryable truth interpolation is available. Use static trajectories long enough to expose cadence/interpolation defects, generate ideal synthetic measurements, interpolate truth to navigator-log timestamps, and compare ECEF position, velocity, and attitude with explicit numerical integration tolerances rather than bitwise equality.
+  - [ ] Free-inertial reconstruction: truth initial PVA plus ideal IMU increments, with GNSS disabled.
+  - [ ] GNSS-aided reconstruction: truth initial PVA plus ideal IMU and truth GNSS position/velocity measurements.
+  - [ ] Execute both cases for every supported selected product/scenario configuration; preserve the existing perfect/truth-reconstruction scenarios as their runtime inputs.
 
 ## Pass 8.2: innovation and covariance consistency
 

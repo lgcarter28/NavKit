@@ -32,18 +32,39 @@ This phase expands truth generation and scheduling after Monte Carlo exists, so 
 
 ## Pass 7.3: trajectory source abstraction
 
-- [ ] Add a trajectory-source abstraction so generated trajectories and CSV/playback trajectories feed the same downstream hooks. Do not create a separate playback driver unless the shared trajectory-provider path cannot express the required replay behavior.
-- [ ] Add queryable/interpolated truth sampling so consumers can request truth at arbitrary timestamps without forcing all downstream processing to run at the trajectory generation rate. Keep truth generation/system rate separate from truth logging rate, and use this seam to schedule IMU emulation at a rate distinct from truth generation.
-- [ ] Add richer trajectory initial-condition parsing and documentation for ECEF and local-level position, velocity, attitude, and angular-rate conventions.
+- [x] Added `sim::TruthTrajectory` as the shared generated/CSV source contract. The simulation app consumes it directly, so CSV playback follows the normal initialization, IMU, emulator, Navigator, and logging path without a dedicated playback driver.
+- [x] Added bounded arbitrary-time truth queries: ECEF position, velocity, and angular rate interpolate linearly while quaternion attitude uses SLERP. The IMU runtime now requests truth at its own exact rational sample timestamps, independent of native truth cadence; source logging remains separately cadence-gated.
+- [x] Completed and documented richer trajectory source conventions. Stationary initialization accepts ECEF/local-level position, velocity, quaternion/RPY/DCM attitude, and angular-rate forms. `w_nb_b_radps` now applies `w_ib_b = C_e2b w_ie_e + C_n2b w_en_n + w_nb_b`, including local transport rate; CSV sources accept strict ECEF PVA/quaternion rows and optionally supplied body IMU rates.
 
-## Pass 7.4: scenario trajectory expansion
+## Pass 7.4: planned-time application loop and streaming trajectory sources
+
+- [ ] Add a separately configured rational application cadence. The application owns planned simulation time and configuration validation must reject an application rate that cannot meet the fastest required consumer deadline.
+- [ ] Replace the eager-only simulation trajectory boundary with a narrow simulation-runtime virtual source contract: `initialize`, `advance_to(const Timestamp&)`, bounded `query(const Timestamp&, TruthSample&)`, and completion/status access. Virtual dispatch is an explicit simulation/application exception; embedded-facing product-core code remains static/policy based.
+- [ ] Provide stationary generation and CSV playback as concrete source implementations. Each source owns its internal integration/source rate and enough retained history for bounded interpolation; consumers request their exact time of validity rather than assuming clean-rate multiples.
+- [ ] Reuse `RationalSchedule` for both consumer gates and the master planned-time cursor. Keep `due(t)` for consumption, add `next(t)` for producer scheduling, and define reset/initialize semantics so the first produced time is strictly after the selected epoch without duplicate ticker arithmetic.
+- [ ] Add simulation and real-time clock implementations with the same `wait_until(const Timestamp&)` signature. A simulation clock immediately adopts the planned timestamp; a real-time/HWIL clock waits to its mapped physical deadline and later reports lateness through the status/error contract.
+- [ ] Split synthetic emulator work into `prepare` and `publish` phases with explicit typed prepared payloads. Preparation may query truth, draw/update synthetic stochastic state, and build outputs ahead of the deadline, but may not mutate Navigator-visible queues. Publication occurs after the clock deadline and is the sole point measurements enter Navigator buffers and logging. Hardware inputs remain a separate asynchronous/post-deadline capability.
+- [ ] Implement and test the planned loop contract:
+
+  ```text
+  scheduler.next(t_curr)
+  trajectory.advance_to(t_curr)
+  emulators.prepare(trajectory, t_curr, prepared_updates)
+  clock.wait_until(t_curr)
+  emulators.publish(prepared_updates, navigator, logger)
+  navigator.update()
+  ```
+
+- [ ] Update architecture/configuration documentation and add deterministic tests for exact app-time progression, query bounds/interpolation, no early publication, and simulated versus real-time clock boundary behavior.
+
+## Pass 7.5: scenario trajectory expansion
 
 - [ ] Add a simple ballistic trajectory: stationary launch-pad initialization, optional transfer-alignment window, initial heading/pitch definition, and a simple axial body-x boost profile before ballistic/coast behavior. Keep this intentionally simple before adding aero or guidance complexity.
 - [ ] Add a constant-altitude, constant-speed trajectory on the curved Earth rather than flat-Earth kinematics.
 - [ ] Add calibration-maneuver trajectories: horizontal S-turn, vertical S-turn, and bank-left/bank-right excitation for observability and calibration studies.
 - [ ] Add a basic waypoint trajectory with simple bank-to-turn behavior once coordinate, attitude, and trajectory-source contracts are stable.
 
-## Pass 7.5: reusable trajectory math cleanup
+## Pass 7.6: reusable trajectory math cleanup
 
 - [ ] Move remaining reusable Earth-rate, triad-calibration, frame-transform, and trajectory-provider conversion helpers into their owning core math/frames/environment locations instead of leaving them buried in trajectory or simulator code. Concrete examples to sweep include `earth_rate_e_radps`, `nonorthogonality_matrix`, `misalignment_matrix`, and the frame-transform helpers currently living in trajectory/simulator implementation files.
 - [ ] Define and test the minimum coordinate operations needed by PCPF/ECEF mechanization, local-vertical measurements, NED plots, and future local-level mechanizations.

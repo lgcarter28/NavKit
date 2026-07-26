@@ -14,6 +14,10 @@ This project follows
 
 ### Added
 
+- Shared `TruthTrajectory` source storage/querying for generated and CSV ECEF
+  truth, exact-cadence IMU truth sampling with interpolation, CSV playback
+  through the normal simulation app path, and full local-level transport-rate
+  handling for `w_nb_b_radps` trajectory initialization.
 - Product-core versioned timestamp, duration, time-scale, and rational-rate
   vocabulary; exact multi-rate simulation/logging schedules; and focused
   600 Hz, duration-borrow, and incommensurate-rate regression coverage.

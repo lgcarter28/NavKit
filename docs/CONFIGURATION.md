@@ -326,6 +326,42 @@ either form to a rational samples-per-second representation for phase-stable
 scheduling. Prefer `rate_hz` for rates such as 600 Hz whose period has a
 repeating decimal representation; retain `dt_s` only when the period is the
 more natural scenario input.
+
+### Trajectory sources and timing
+
+The `trajectory` component selects one source that feeds the same typed truth
+contract used by initialization, IMU emulation, sensor emulation, logging, and
+the Navigator. There is no separate playback application or driver.
+
+- `"type": "stationary"` generates native-rate ECEF truth from the configured
+  duration, cadence, initial position/velocity/attitude, and optional angular
+  rate.
+- `"type": "csv"` loads `csv_path`, resolved relative to the main scenario
+  JSON file. A v1 CSV source uses monotonic `time_s` and strictly increasing
+  rows. It must provide `p_e_x_m`, `p_e_y_m`, `p_e_z_m`, `v_e_x_mps`,
+  `v_e_y_mps`, `v_e_z_mps`, and scalar-first `q_b2e_w`, `q_b2e_x`,
+  `q_b2e_y`, `q_b2e_z`. It may also provide all three
+  `w_ib_b_{x,y,z}_radps` columns; otherwise NavKit derives the angular rate
+  from adjacent truth attitudes and Earth rate.
+
+Truth remains queryable between native source samples. Position, velocity, and
+angular rate interpolate linearly; body-to-ECEF quaternion attitude uses SLERP.
+The IMU runtime requests truth at its own exact rational timestamps, so a 600 Hz
+IMU can consume a 1000 Hz source without phase drift or a separate playback
+loop. The source never extrapolates beyond its first or last sample.
+
+Stationary-source initial conditions accept ECEF or local-level conventions.
+For a body rate supplied relative to NED, NavKit uses the complete convention
+instead of treating it as ECEF-relative:
+
+```text
+w_ib_b = C_e2b w_ie_e + C_n2b w_en_n + w_nb_b
+```
+
+Here `w_ie_e` is Earth rate resolved in ECEF and `w_en_n` is local transport
+rate resolved in NED. All angular-rate fields use rad/s and their full frame
+meaning is encoded in the JSON key.
+
 Compile-time product choices such as selected state definitions, fixed buffer
 sizes, covariance cadence, and initial-covariance policy slices belong in the
 selected compile-time config. Reusable embedded-library defaults may live inside

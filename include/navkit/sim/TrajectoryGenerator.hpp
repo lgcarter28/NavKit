@@ -5,7 +5,7 @@
 
 #include "navkit/core/math/Types.hpp"
 #include "navkit/core/time/RationalRate.hpp"
-#include "navkit/sim/TruthSample.hpp"
+#include "navkit/sim/TruthTrajectory.hpp"
 
 #include <vector>
 
@@ -32,7 +32,7 @@ struct StationaryTrajectoryConfig
 class TrajectoryGenerator
 {
 public:
-    static std::vector<TruthSample> stationary(const StationaryTrajectoryConfig& cfg);
+    static TruthTrajectory stationary(const StationaryTrajectoryConfig& cfg);
 };
 
 } // namespace navkit::sim

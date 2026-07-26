@@ -54,12 +54,12 @@ pva_initialization_type_from_json(const nlohmann::json& initialization)
 [[nodiscard]] inline PvaInitialization base_pva_initialization(const TrajectoryRun& trajectory)
 {
     PvaInitialization pva_init;
-    if (trajectory.truth_samples.empty()) {
+    if (trajectory.truth.empty()) {
         core::estimation::pos_e_m(pva_init.pva) = trajectory.initial_position_e_m;
         return pva_init;
     }
 
-    const navkit::sim::TruthSample& truth = trajectory.truth_samples.front();
+    const navkit::sim::TruthSample& truth = trajectory.truth.first();
     pva_init.t = truth.t;
     core::estimation::pos_e_m(pva_init.pva) = truth.p_e;
     core::estimation::vel_e_mps(pva_init.pva) = truth.v_e;

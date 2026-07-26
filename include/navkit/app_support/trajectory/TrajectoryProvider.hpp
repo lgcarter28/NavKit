@@ -9,17 +9,24 @@
 #include "navkit/core/config/Types.hpp"
 #include "navkit/core/environment/RotatingPlanetKinematics.hpp"
 #include "navkit/core/environment/planet/Wgs84.hpp"
+#include "navkit/core/frames/LocalLevel.hpp"
 #include "navkit/core/math/Quaternion.hpp"
 #include "navkit/core/math/Types.hpp"
+#include "navkit/core/time/Duration.hpp"
 #include "navkit/sim/TrajectoryGenerator.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 #include <cmath>
+#include <exception>
+#include <filesystem>
+#include <fstream>
 #include <nlohmann/json.hpp>
+#include <sstream>
 #include <string>
-#include <vector>
+#include <unordered_map>
+#include <utility>
 
 namespace navkit::app_support
 {
@@ -30,11 +37,18 @@ struct TrajectoryRun
     core::Vec3 initial_velocity_e_mps{};
     Eigen::Quaternion<core::Scalar_t> initial_q_b2e{Eigen::Quaternion<core::Scalar_t>::Identity()};
     core::Vec3 initial_w_ib_b_radps{core::Vec3::Zero()};
-    std::vector<sim::TruthSample> truth_samples{};
+    sim::TruthTrajectory truth{};
 };
 
 namespace detail
 {
+
+struct GeodeticPosition
+{
+    core::Scalar_t lat_rad{};
+    core::Scalar_t lon_rad{};
+    core::Scalar_t h_m{};
+};
 
 [[nodiscard]] inline core::Scalar_t deg_to_rad(const core::Scalar_t deg)
 {
@@ -96,20 +110,62 @@ inline void require_numeric_array_value(const nlohmann::json& value, const std::
                           sin_lat};
 }
 
+[[nodiscard]] inline GeodeticPosition geodetic_from_ecef_m(const core::Vec3& p_e_m)
+{
+    using Planet = core::environment::Wgs84;
+
+    const core::Scalar_t radial_distance_m = std::hypot(p_e_m.x(), p_e_m.y());
+    if (radial_distance_m <= 1.0e-9 && std::abs(p_e_m.z()) <= 1.0e-9) {
+        throw_runtime_config_error("trajectory ECEF position must not be the Earth center");
+    }
+
+    GeodeticPosition geodetic{};
+    geodetic.lon_rad = std::atan2(p_e_m.y(), p_e_m.x());
+    geodetic.lat_rad = std::atan2(p_e_m.z(), radial_distance_m * (1.0 - Planet::e2));
+    for (int iteration = 0; iteration < 8; ++iteration) {
+        const core::Scalar_t sin_lat = std::sin(geodetic.lat_rad);
+        const core::Scalar_t prime_vertical_radius_m =
+            Planet::a_m / std::sqrt(1.0 - (Planet::e2 * sin_lat * sin_lat));
+        geodetic.h_m = (radial_distance_m / std::cos(geodetic.lat_rad)) - prime_vertical_radius_m;
+        geodetic.lat_rad =
+            std::atan2(p_e_m.z(),
+                       radial_distance_m * (1.0 - ((Planet::e2 * prime_vertical_radius_m) /
+                                                   (prime_vertical_radius_m + geodetic.h_m))));
+    }
+    return geodetic;
+}
+
 [[nodiscard]] inline Eigen::Matrix<core::Scalar_t, 3, 3> ecef_to_ned_matrix(const core::Vec3& p_e_m)
 {
-    const core::Scalar_t lon_rad = std::atan2(p_e_m.y(), p_e_m.x());
-    const core::Scalar_t hyp_m = std::hypot(p_e_m.x(), p_e_m.y());
-    const core::Scalar_t lat_rad = std::atan2(p_e_m.z(), hyp_m);
-    const core::Scalar_t sin_lat = std::sin(lat_rad);
-    const core::Scalar_t cos_lat = std::cos(lat_rad);
-    const core::Scalar_t sin_lon = std::sin(lon_rad);
-    const core::Scalar_t cos_lon = std::cos(lon_rad);
+    const GeodeticPosition geodetic = geodetic_from_ecef_m(p_e_m);
+    const core::Scalar_t sin_lat = std::sin(geodetic.lat_rad);
+    const core::Scalar_t cos_lat = std::cos(geodetic.lat_rad);
+    const core::Scalar_t sin_lon = std::sin(geodetic.lon_rad);
+    const core::Scalar_t cos_lon = std::cos(geodetic.lon_rad);
 
     Eigen::Matrix<core::Scalar_t, 3, 3> C_e2n;
     C_e2n << -sin_lat * cos_lon, -sin_lat * sin_lon, cos_lat, -sin_lon, cos_lon, 0.0,
         -cos_lat * cos_lon, -cos_lat * sin_lon, -sin_lat;
     return C_e2n;
+}
+
+[[nodiscard]] inline core::Vec3 transport_rate_en_n_radps(const core::Vec3& p_e_m,
+                                                          const core::Vec3& v_e_mps)
+{
+    using Planet = core::environment::Wgs84;
+
+    const GeodeticPosition geodetic = geodetic_from_ecef_m(p_e_m);
+    const core::Scalar_t sin_lat = std::sin(geodetic.lat_rad);
+    const core::Scalar_t denominator = 1.0 - (Planet::e2 * sin_lat * sin_lat);
+    const core::Scalar_t prime_vertical_radius_m = Planet::a_m / std::sqrt(denominator);
+    const core::Scalar_t meridian_radius_m =
+        Planet::a_m * (1.0 - Planet::e2) / (denominator * std::sqrt(denominator));
+    const core::Vec3 v_n_mps = ecef_to_ned_matrix(p_e_m) * v_e_mps;
+
+    return core::Vec3{v_n_mps.y() / (prime_vertical_radius_m + geodetic.h_m),
+                      -v_n_mps.x() / (meridian_radius_m + geodetic.h_m),
+                      -(v_n_mps.y() * std::tan(geodetic.lat_rad)) /
+                          (prime_vertical_radius_m + geodetic.h_m)};
 }
 
 [[nodiscard]] inline Eigen::Quaternion<core::Scalar_t>
@@ -207,6 +263,8 @@ attitude_b2e_from_json(const nlohmann::json& trajectory, const core::Vec3& p_e_m
 
 [[nodiscard]] inline core::Vec3
 angular_rate_ib_b_from_json(const nlohmann::json& trajectory,
+                            const core::Vec3& p_e_m,
+                            const core::Vec3& v_e_mps,
                             const Eigen::Quaternion<core::Scalar_t>& q_b2e)
 {
     require_exactly_one_if_any(
@@ -221,9 +279,166 @@ angular_rate_ib_b_from_json(const nlohmann::json& trajectory,
         return vec3_from_json<core::Vec3>(trajectory.at("w_eb_b_radps")) + earth_rate_b;
     }
     if (trajectory.contains("w_nb_b_radps")) {
-        return vec3_from_json<core::Vec3>(trajectory.at("w_nb_b_radps")) + earth_rate_b;
+        const Eigen::Quaternion<core::Scalar_t> q_e2n{ecef_to_ned_matrix(p_e_m)};
+        const Eigen::Quaternion<core::Scalar_t> q_b2n =
+            core::math::normalized_with_positive_scalar(q_e2n * q_b2e);
+        const core::Vec3 transport_rate_b =
+            q_b2n.conjugate() * transport_rate_en_n_radps(p_e_m, v_e_mps);
+        return earth_rate_b + transport_rate_b +
+               vec3_from_json<core::Vec3>(trajectory.at("w_nb_b_radps"));
     }
     return earth_rate_b;
+}
+
+[[nodiscard]] inline std::vector<std::string> csv_columns_from_line(const std::string& line)
+{
+    std::vector<std::string> columns{};
+    std::stringstream stream(line);
+    std::string column{};
+    while (std::getline(stream, column, ',')) {
+        columns.push_back(column);
+    }
+    return columns;
+}
+
+[[nodiscard]] inline core::Scalar_t
+csv_scalar_at(const std::vector<std::string>& values,
+              const std::unordered_map<std::string, std::size_t>& columns,
+              const std::string& name)
+{
+    const std::unordered_map<std::string, std::size_t>::const_iterator iter = columns.find(name);
+    if (iter == columns.end() || iter->second >= values.size()) {
+        throw_runtime_config_error("trajectory CSV is missing required column '" + name + "'");
+    }
+    try {
+        return std::stod(values.at(iter->second));
+    }
+    catch (const std::exception&) {
+        throw_runtime_config_error("trajectory CSV column '" + name + "' must be numeric");
+    }
+}
+
+[[nodiscard]] inline bool
+csv_has_columns(const std::unordered_map<std::string, std::size_t>& columns,
+                const std::initializer_list<std::string>& names)
+{
+    for (const std::string& name : names) {
+        if (!columns.contains(name)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+inline void populate_missing_angular_rates(std::vector<sim::TruthSample>& samples)
+{
+    if (samples.empty()) {
+        return;
+    }
+    if (samples.size() == 1U) {
+        samples.front().w_ib_b_radps =
+            samples.front().q_b2e.conjugate() *
+            core::environment::planet_rate_fixed_radps<core::environment::Wgs84>();
+        return;
+    }
+    for (std::size_t index = 0U; index < samples.size(); ++index) {
+        const std::size_t first_index = index + 1U < samples.size() ? index : index - 1U;
+        const std::size_t second_index = index + 1U < samples.size() ? index + 1U : index;
+        if (first_index == second_index) {
+            samples.at(index).w_ib_b_radps =
+                samples.at(index).q_b2e.conjugate() *
+                core::environment::planet_rate_fixed_radps<core::environment::Wgs84>();
+            continue;
+        }
+
+        const sim::TruthSample& first = samples.at(first_index);
+        const sim::TruthSample& second = samples.at(second_index);
+        core::Duration duration{};
+        if (!core::elapsed_time(second.t, first.t, duration)) {
+            throw_runtime_config_error("trajectory CSV timestamps must be strictly increasing");
+        }
+        const core::Time_t dt_s = core::duration_seconds(duration);
+        const Eigen::Quaternion<core::Scalar_t> q_mid =
+            core::math::normalized_with_positive_scalar(first.q_b2e.slerp(0.5, second.q_b2e));
+        const Eigen::Quaternion<core::Scalar_t> q_body_relative =
+            first.q_b2e.conjugate() * second.q_b2e;
+        samples.at(index).w_ib_b_radps =
+            (core::math::rotvec_rad_from_quaternion(q_body_relative) / dt_s) +
+            (q_mid.conjugate() *
+             core::environment::planet_rate_fixed_radps<core::environment::Wgs84>());
+    }
+}
+
+[[nodiscard]] inline sim::TruthTrajectory
+truth_trajectory_from_csv(const std::filesystem::path& path)
+{
+    std::ifstream stream(path);
+    if (!stream) {
+        throw_runtime_config_error("failed to open trajectory CSV '" + path.string() + "'");
+    }
+
+    std::string header_line{};
+    if (!std::getline(stream, header_line)) {
+        throw_runtime_config_error("trajectory CSV must contain a header row");
+    }
+    const std::vector<std::string> header = csv_columns_from_line(header_line);
+    std::unordered_map<std::string, std::size_t> columns{};
+    for (std::size_t index = 0U; index < header.size(); ++index) {
+        columns.emplace(header.at(index), index);
+    }
+
+    const std::initializer_list<std::string> angular_rate_columns{
+        "w_ib_b_x_radps", "w_ib_b_y_radps", "w_ib_b_z_radps"};
+    const bool angular_rates_present = csv_has_columns(columns, angular_rate_columns);
+    int angular_rate_column_count = 0;
+    for (const std::string& name : angular_rate_columns) {
+        if (columns.contains(name)) {
+            ++angular_rate_column_count;
+        }
+    }
+    if (angular_rate_column_count != 0 && angular_rate_column_count != 3) {
+        throw_runtime_config_error(
+            "trajectory CSV must provide all or none of the w_ib_b_*_radps columns");
+    }
+    std::vector<sim::TruthSample> samples{};
+    std::string line{};
+    while (std::getline(stream, line)) {
+        if (line.empty()) {
+            continue;
+        }
+        const std::vector<std::string> values = csv_columns_from_line(line);
+        sim::TruthSample sample{};
+        if (!core::timestamp_from_seconds(
+                csv_scalar_at(values, columns, "time_s"), core::TimeScale::Monotonic, sample.t)) {
+            throw_runtime_config_error("trajectory CSV time_s must be finite and nonnegative");
+        }
+        sample.p_e << csv_scalar_at(values, columns, "p_e_x_m"),
+            csv_scalar_at(values, columns, "p_e_y_m"), csv_scalar_at(values, columns, "p_e_z_m");
+        sample.v_e << csv_scalar_at(values, columns, "v_e_x_mps"),
+            csv_scalar_at(values, columns, "v_e_y_mps"),
+            csv_scalar_at(values, columns, "v_e_z_mps");
+        sample.q_b2e = core::math::normalized_with_positive_scalar(
+            Eigen::Quaternion<core::Scalar_t>{csv_scalar_at(values, columns, "q_b2e_w"),
+                                              csv_scalar_at(values, columns, "q_b2e_x"),
+                                              csv_scalar_at(values, columns, "q_b2e_y"),
+                                              csv_scalar_at(values, columns, "q_b2e_z")});
+        if (angular_rates_present) {
+            sample.w_ib_b_radps << csv_scalar_at(values, columns, "w_ib_b_x_radps"),
+                csv_scalar_at(values, columns, "w_ib_b_y_radps"),
+                csv_scalar_at(values, columns, "w_ib_b_z_radps");
+        }
+        if (!samples.empty() && !core::timestamp_less(samples.back().t, sample.t)) {
+            throw_runtime_config_error("trajectory CSV timestamps must be strictly increasing");
+        }
+        samples.push_back(sample);
+    }
+    if (samples.empty()) {
+        throw_runtime_config_error("trajectory CSV must contain at least one sample");
+    }
+    if (!angular_rates_present) {
+        populate_missing_angular_rates(samples);
+    }
+    return sim::TruthTrajectory{std::move(samples)};
 }
 
 } // namespace detail
@@ -238,18 +453,33 @@ stationary_trajectory_config_from_json(const nlohmann::json& cfg)
     traj_cfg.p_e = detail::position_e_m_from_json(trajectory_config);
     traj_cfg.v_e = detail::velocity_e_mps_from_json(trajectory_config, traj_cfg.p_e);
     traj_cfg.q_b2e = detail::attitude_b2e_from_json(trajectory_config, traj_cfg.p_e);
-    traj_cfg.w_ib_b_radps = detail::angular_rate_ib_b_from_json(trajectory_config, traj_cfg.q_b2e);
+    traj_cfg.w_ib_b_radps = detail::angular_rate_ib_b_from_json(
+        trajectory_config, traj_cfg.p_e, traj_cfg.v_e, traj_cfg.q_b2e);
     return traj_cfg;
 }
 
-inline TrajectoryRun trajectory_run_from_json(const nlohmann::json& cfg)
+inline TrajectoryRun trajectory_run_from_json(const nlohmann::json& cfg,
+                                              const std::filesystem::path& source_base_dir = {})
 {
+    const nlohmann::json& trajectory_config = cfg.at("trajectory");
+    const std::string type = trajectory_config.value("type", "stationary");
+    if (type == "csv") {
+        const std::filesystem::path csv_path =
+            source_base_dir / trajectory_config.at("csv_path").get<std::string>();
+        sim::TruthTrajectory truth = detail::truth_trajectory_from_csv(csv_path);
+        return {.initial_position_e_m = truth.first().p_e,
+                .initial_velocity_e_mps = truth.first().v_e,
+                .initial_q_b2e = truth.first().q_b2e,
+                .initial_w_ib_b_radps = truth.first().w_ib_b_radps,
+                .truth = std::move(truth)};
+    }
+
     const sim::StationaryTrajectoryConfig traj_cfg = stationary_trajectory_config_from_json(cfg);
     return {.initial_position_e_m = traj_cfg.p_e,
             .initial_velocity_e_mps = traj_cfg.v_e,
             .initial_q_b2e = traj_cfg.q_b2e,
             .initial_w_ib_b_radps = traj_cfg.w_ib_b_radps,
-            .truth_samples = sim::TrajectoryGenerator::stationary(traj_cfg)};
+            .truth = sim::TrajectoryGenerator::stationary(traj_cfg)};
 }
 
 } // namespace navkit::app_support

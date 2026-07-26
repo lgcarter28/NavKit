@@ -72,18 +72,30 @@ Phase 7: trajectory-provider and timebase expansion is active. Phase 6 establish
 
 ## Next pass
 
-## Pass 7.3: trajectory source abstraction
+## Pass 7.4: planned-time application loop and streaming trajectory sources
 
-- [ ] Add a trajectory-source abstraction so generated trajectories and CSV/playback trajectories feed the same downstream hooks. Do not create a separate playback driver unless the shared trajectory-provider path cannot express the required replay behavior.
-- [ ] Add queryable/interpolated truth sampling so consumers can request truth at arbitrary timestamps without forcing all downstream processing to run at the trajectory generation rate. Keep truth generation/system rate separate from truth logging rate, and use this seam to schedule IMU emulation at a rate distinct from truth generation.
-- [ ] Add richer trajectory initial-condition parsing and documentation for ECEF and local-level position, velocity, attitude, and angular-rate conventions.
+- [ ] Make the simulation application an embedded-facing planned-time orchestrator. Add a separately configurable rational application rate and reject configurations whose application cadence cannot meet the fastest required consumer deadline.
+- [ ] Evolve the simulation-only trajectory boundary from an eagerly synthesized container into a narrow virtual streaming source contract: initialize, `advance_to(t)`, bounded `query(t, sample)`, and completion/status access. Keep virtual dispatch confined to app/simulation infrastructure; product-core navigation remains static/policy composed.
+- [ ] Implement stationary generation and CSV playback behind that common source contract. Let each source own its internal resolution and retained query history; consumers query exact timestamps and never depend on a source cadence being an integer multiple of their own.
+- [ ] Extend `RationalSchedule` rather than introducing a duplicated ticker: retain consumer `due(t)` semantics and add a producer `next(t)` path with exact sample-index timing. Clearly define initialization/reset ownership and ensure the first `next()` timestamp is strictly after the epoch.
+- [ ] Add simulation and real-time clock policies with a common `wait_until(const Timestamp&)` contract. The simulated clock immediately adopts planned time; the real-time/HWIL clock waits to the mapped wall-clock deadline and exposes failure/lateness through the future status seam.
+- [ ] Split emulator runtime work into typed two-phase operations. `prepare(source, t, prepared_updates)` may query truth and advance synthetic stochastic state before the deadline but must not mutate Navigator-visible buffers; `publish(prepared_updates, navigator, logger)` makes data observable only after `wait_until(t)`. Keep real hardware acquisition as a distinct post-deadline/asynchronous path rather than pretending it can be precomputed.
+- [ ] Drive the app loop with the explicit ownership sequence: obtain `t_curr` from the application scheduler; `trajectory.advance_to(t_curr)`; prepare synthetic emulator updates; `clock.wait_until(t_curr)`; publish prepared updates; then call `navigator.update()`.
+- [ ] Document the master-clock, source-resolution, preparation/publication, SWIL, and HWIL contracts in architecture/configuration documentation. Add deterministic timing tests for exact planned timestamps, no early publication, source query bounds/interpolation, and simulation-clock versus real-time-clock boundary behavior.
+
+## Pass 7.5: scenario trajectory expansion
+
+- [ ] Add a simple ballistic trajectory: stationary launch-pad initialization, optional transfer-alignment window, initial heading/pitch definition, and a simple axial body-x boost profile before ballistic/coast behavior. Keep this intentionally simple before adding aero or guidance complexity.
+- [ ] Add a constant-altitude, constant-speed trajectory on the curved Earth rather than flat-Earth kinematics.
+- [ ] Add calibration-maneuver trajectories: horizontal S-turn, vertical S-turn, and bank-left/bank-right excitation for observability and calibration studies.
+- [ ] Add a basic waypoint trajectory with simple bank-to-turn behavior once coordinate, attitude, and trajectory-source contracts are stable.
 
 ## Future phase details
 
 Future backlog unrelated to the current Phase 6 Monte Carlo scope lives in dedicated detail files:
 
 - [`phase_6_monte_carlo.md`](roadmap_details/phase_6_monte_carlo.md): current Phase 6 completed-pass history and follow-forward detail.
-- [`phase_7_trajectory_provider.md`](roadmap_details/phase_7_trajectory_provider.md): trajectory provider, timebase, scenario, and reusable navigation-math expansion.
+- [`phase_7_trajectory_provider.md`](roadmap_details/phase_7_trajectory_provider.md): trajectory provider, timebase, planned-time orchestration, scenario, and reusable navigation-math expansion.
 - [`phase_8_estimator_validation.md`](roadmap_details/phase_8_estimator_validation.md): estimator validation, consistency metrics, and repeatable reports.
 - [`phase_9_status_error_handling.md`](roadmap_details/phase_9_status_error_handling.md): robust status/error handling before the later high-complexity phases.
 - [`phase_10_sensor_model_cleanup.md`](roadmap_details/phase_10_sensor_model_cleanup.md): loosely coupled GNSS cleanup, altimeter/pressure models, pitot tube, magnetometer aiding, and sensor scheduling.

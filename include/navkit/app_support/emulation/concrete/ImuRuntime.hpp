@@ -5,6 +5,7 @@
 
 #include "navkit/app_support/emulation/concrete/ImuRuntimeConfig.hpp"
 #include "navkit/app_support/initialization/InitialTruthReference.hpp"
+#include "navkit/app_support/runtime/RuntimeRate.hpp"
 #include "navkit/core/estimation/navigator/ImuIncrement.hpp"
 #include "navkit/core/estimation/state/Segment.hpp"
 #include "navkit/sim/ImuSimulatorPolicy.hpp"
@@ -37,7 +38,13 @@ class ImuRuntime
 public:
     explicit ImuRuntime(const nlohmann::json& cfg)
         : m_simulator(imu_simulator_config_from_json(cfg))
+        , m_rate(rational_rate_from_required_runtime_rate(cfg.at("imu"), "imu"))
     {}
+
+    [[nodiscard]] const core::RationalRate& rate() const
+    {
+        return m_rate;
+    }
 
     template<typename Navigator>
     [[nodiscard]] bool process(Navigator& navigator, const navkit::sim::TruthSample& sample)
@@ -114,6 +121,7 @@ public:
 
 private:
     ImuSimulator m_simulator;
+    core::RationalRate m_rate{};
     core::Vec3 m_truth_delta_theta_sum{core::Vec3::Zero()};
     core::Vec3 m_truth_delta_v_sum{core::Vec3::Zero()};
     core::Vec3 m_measured_delta_theta_sum{core::Vec3::Zero()};

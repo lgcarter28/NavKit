@@ -2,6 +2,7 @@
 # All Rights Reserved.
 
 add_library(navkit_sim
+    TruthTrajectory.cpp
     BaroSimulator.cpp
     TrajectoryGenerator.cpp
     GnssSimulator.cpp

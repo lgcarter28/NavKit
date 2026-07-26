@@ -226,6 +226,16 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts the documented input shape")
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
 }
 
+TEST_CASE("ECEF INS GNSS runtime validator accepts a CSV trajectory source")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("trajectory") = {{"type", "csv"}, {"csv_path", "truth/example.csv"}};
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+
+    cfg.at("trajectory").erase("csv_path");
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+}
+
 TEST_CASE("ECEF INS GNSS runtime validator accepts GNSS full covariance")
 {
     auto cfg = valid_ecef_ins_gnss_runtime_config();
@@ -671,6 +681,25 @@ TEST_CASE("ECEF INS GNSS runtime validator keeps numeric tuning runtime-configur
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
 }
 
+TEST_CASE("Trajectory w_nb_b initialization includes Earth and local transport rates")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("trajectory") = {{"type", "stationary"},
+                            {"duration_s", 1.0},
+                            {"rate_hz", 1.0},
+                            {"p_lla_deg_m", {0.0, 0.0, 0.0}},
+                            {"v_n_mps", {0.0, 100.0, 0.0}},
+                            {"rpy_b2n_rad", {0.0, 0.0, 0.0}},
+                            {"w_nb_b_radps", {0.0, 0.0, 0.0}}};
+
+    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
+    const core::Scalar_t expected_x_radps =
+        core::environment::Wgs84::omega_rad_s + (100.0 / core::environment::Wgs84::a_m);
+    CHECK(trajectory.initial_w_ib_b_radps.x() == doctest::Approx(expected_x_radps));
+    CHECK(trajectory.initial_w_ib_b_radps.y() == doctest::Approx(0.0));
+    CHECK(trajectory.initial_w_ib_b_radps.z() == doctest::Approx(0.0));
+}
+
 TEST_CASE("Explicit PVA initialization provider applies configured errors")
 {
     const nlohmann::json cfg = explicit_pva_runtime_config();
@@ -687,9 +716,8 @@ TEST_CASE("Explicit PVA initialization provider applies configured errors")
     CHECK(core::estimation::pos_e_m(pva_init.pva)(1) == doctest::Approx(-15.0));
     CHECK(core::estimation::pos_e_m(pva_init.pva)(2) == doctest::Approx(25.0));
     CHECK(core::estimation::vel_e_mps(pva_init.pva).isZero());
-    CHECK(
-        core::estimation::rpy_b2e_rad(pva_init.pva)
-            .isApprox(core::math::rpy_rad_from_quaternion(trajectory.truth_samples.front().q_b2e)));
+    CHECK(core::estimation::rpy_b2e_rad(pva_init.pva)
+              .isApprox(core::math::rpy_rad_from_quaternion(trajectory.truth.first().q_b2e)));
 }
 
 TEST_CASE("Direct PVA initialization provider uses configured values")
@@ -904,7 +932,7 @@ TEST_CASE("NavInitialization maps into the configured Navigator filter state")
     const PvaInitialization nav_init =
         PvaExplicitInitializationProvider::initialize(cfg, trajectory);
     const Eigen::Quaternion<core::Scalar_t> expected_q_b2e =
-        trajectory.truth_samples.front().q_b2e.normalized();
+        trajectory.truth.first().q_b2e.normalized();
 
     auto navigator = std::make_unique<NavKit::Navigator>();
     initialize_navigator<NavKit>(nav_init, cfg, *navigator);
@@ -971,7 +999,7 @@ TEST_CASE("Initial estimate error applies against the simulation truth reference
     const PvaInitialization pva_init =
         PvaExplicitInitializationProvider::initialize(cfg, trajectory);
     InitialTruthReference<StateDef> reference{};
-    populate_initial_pva_from_truth<StateDef>(trajectory.truth_samples.front(), reference);
+    populate_initial_pva_from_truth<StateDef>(trajectory.truth.first(), reference);
     core::estimation::segment<typename Nominal::GyroB>(reference.truth_state) =
         core::Vec3{0.01, 0.02, 0.03};
     core::estimation::segment<typename Nominal::AccB>(reference.truth_state) =

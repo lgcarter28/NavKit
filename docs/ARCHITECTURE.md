@@ -142,9 +142,11 @@ between them.
 
 Simulation cadence uses `core::RationalRate` and a 64-bit sample index rather
 than repeated floating-point additions. Runtime JSON still accepts one of
-`rate_hz` or `dt_s`, then canonicalizes it once. The current event gate acts on
-the first producer sample at or after a due timestamp. Pass 7.3 will add
-queryable/interpolated truth for consumers requiring an exact arbitrary time.
+`rate_hz` or `dt_s`, then canonicalizes it once. `sim::TruthTrajectory` is the
+shared generated/CSV source contract: it retains native samples and answers
+in-range arbitrary-time queries with linear ECEF state interpolation and
+quaternion SLERP. The IMU runtime therefore requests exact source truth at its
+own cadence rather than relying on the first producer sample after a due time.
 
 The time vocabulary is split by dependency: `TimeTypes.hpp`, `Timestamp.hpp`,
 `Duration.hpp`, `RationalRate.hpp`, and `RationalSchedule.hpp`. `Time.hpp` is a

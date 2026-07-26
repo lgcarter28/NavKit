@@ -11,19 +11,19 @@
 namespace navkit::sim
 {
 
-std::vector<TruthSample> TrajectoryGenerator::stationary(const StationaryTrajectoryConfig& cfg)
+TruthTrajectory TrajectoryGenerator::stationary(const StationaryTrajectoryConfig& cfg)
 {
     std::vector<TruthSample> samples;
     if (!core::timestamp_is_valid(cfg.t_epoch) || !core::rational_rate_is_valid(cfg.rate) ||
         cfg.duration_s < 0.0) {
-        return samples;
+        return TruthTrajectory{};
     }
 
     core::SampleIndex sample_index = 0U;
     while (true) {
         core::Timestamp t{};
         if (!core::timestamp_at_sample_index(cfg.t_epoch, cfg.rate, sample_index, t)) {
-            return {};
+            return TruthTrajectory{};
         }
         core::Duration elapsed{};
         if (!core::elapsed_time(t, cfg.t_epoch, elapsed) ||
@@ -38,12 +38,12 @@ std::vector<TruthSample> TrajectoryGenerator::stationary(const StationaryTraject
         s.w_ib_b_radps = cfg.w_ib_b_radps;
         samples.push_back(s);
         if (sample_index == std::numeric_limits<core::SampleIndex>::max()) {
-            return {};
+            return TruthTrajectory{};
         }
         ++sample_index;
     }
 
-    return samples;
+    return TruthTrajectory{std::move(samples)};
 }
 
 } // namespace navkit::sim

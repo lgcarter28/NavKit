@@ -88,53 +88,58 @@ void validate_runtime_config(const nlohmann::json& cfg)
 
     const auto& trajectory = detail::require_object(cfg, "trajectory");
     detail::require_optional_string(trajectory, "type");
-    if (const auto type_iter = trajectory.find("type");
-        type_iter != trajectory.end() && type_iter->get<std::string>() != "stationary") {
-        detail::throw_runtime_config_error(
-            "trajectory.type must be 'stationary' for the current navkit_sim trajectory provider");
+    const std::string trajectory_type = trajectory.value("type", "stationary");
+    if (trajectory_type == "csv") {
+        detail::require_string(trajectory, "csv_path");
     }
-    detail::require_positive_number(trajectory, "duration_s");
-    validate_runtime_rate(trajectory, "trajectory");
-    if (!trajectory.contains("dt_s") && !trajectory.contains("rate_hz")) {
-        detail::throw_runtime_config_error("trajectory must specify one of 'dt_s' or 'rate_hz'");
+    else if (trajectory_type == "stationary") {
+        detail::require_positive_number(trajectory, "duration_s");
+        validate_runtime_rate(trajectory, "trajectory");
+        if (!trajectory.contains("dt_s") && !trajectory.contains("rate_hz")) {
+            detail::throw_runtime_config_error(
+                "trajectory must specify one of 'dt_s' or 'rate_hz'");
+        }
+        detail::require_optional_vec3(trajectory, "p_e_m");
+        detail::require_optional_vec3(trajectory, "p_lla_deg_m");
+        detail::require_optional_vec3(trajectory, "v_e_mps");
+        detail::require_optional_vec3(trajectory, "v_n_mps");
+        detail::require_optional_numeric_array(trajectory, "q_b2e", 4U);
+        detail::require_optional_vec3(trajectory, "rpy_b2e_rad");
+        detail::require_optional_numeric_array(trajectory, "dcm_b2e", 9U);
+        detail::require_optional_numeric_array(trajectory, "q_b2n", 4U);
+        detail::require_optional_vec3(trajectory, "rpy_b2n_rad");
+        detail::require_optional_numeric_array(trajectory, "dcm_b2n", 9U);
+        detail::require_optional_vec3(trajectory, "w_ib_b_radps");
+        detail::require_optional_vec3(trajectory, "w_eb_b_radps");
+        detail::require_optional_vec3(trajectory, "w_nb_b_radps");
+        const int position_count =
+            (trajectory.contains("p_e_m") ? 1 : 0) + (trajectory.contains("p_lla_deg_m") ? 1 : 0);
+        if (position_count != 1) {
+            detail::throw_runtime_config_error(
+                "trajectory must specify exactly one of 'p_e_m' or 'p_lla_deg_m'");
+        }
+        if (trajectory.contains("v_e_mps") && trajectory.contains("v_n_mps")) {
+            detail::throw_runtime_config_error(
+                "trajectory must specify only one of 'v_e_mps' or 'v_n_mps'");
+        }
+        const int attitude_count =
+            (trajectory.contains("q_b2e") ? 1 : 0) + (trajectory.contains("rpy_b2e_rad") ? 1 : 0) +
+            (trajectory.contains("dcm_b2e") ? 1 : 0) + (trajectory.contains("q_b2n") ? 1 : 0) +
+            (trajectory.contains("rpy_b2n_rad") ? 1 : 0) + (trajectory.contains("dcm_b2n") ? 1 : 0);
+        if (attitude_count > 1) {
+            detail::throw_runtime_config_error(
+                "trajectory must specify at most one attitude convention");
+        }
+        const int angular_rate_count = (trajectory.contains("w_ib_b_radps") ? 1 : 0) +
+                                       (trajectory.contains("w_eb_b_radps") ? 1 : 0) +
+                                       (trajectory.contains("w_nb_b_radps") ? 1 : 0);
+        if (angular_rate_count > 1) {
+            detail::throw_runtime_config_error(
+                "trajectory must specify at most one angular-rate convention");
+        }
     }
-    detail::require_optional_vec3(trajectory, "p_e_m");
-    detail::require_optional_vec3(trajectory, "p_lla_deg_m");
-    detail::require_optional_vec3(trajectory, "v_e_mps");
-    detail::require_optional_vec3(trajectory, "v_n_mps");
-    detail::require_optional_numeric_array(trajectory, "q_b2e", 4U);
-    detail::require_optional_vec3(trajectory, "rpy_b2e_rad");
-    detail::require_optional_numeric_array(trajectory, "dcm_b2e", 9U);
-    detail::require_optional_numeric_array(trajectory, "q_b2n", 4U);
-    detail::require_optional_vec3(trajectory, "rpy_b2n_rad");
-    detail::require_optional_numeric_array(trajectory, "dcm_b2n", 9U);
-    detail::require_optional_vec3(trajectory, "w_ib_b_radps");
-    detail::require_optional_vec3(trajectory, "w_eb_b_radps");
-    detail::require_optional_vec3(trajectory, "w_nb_b_radps");
-    const int position_count =
-        (trajectory.contains("p_e_m") ? 1 : 0) + (trajectory.contains("p_lla_deg_m") ? 1 : 0);
-    if (position_count != 1) {
-        detail::throw_runtime_config_error(
-            "trajectory must specify exactly one of 'p_e_m' or 'p_lla_deg_m'");
-    }
-    if (trajectory.contains("v_e_mps") && trajectory.contains("v_n_mps")) {
-        detail::throw_runtime_config_error(
-            "trajectory must specify only one of 'v_e_mps' or 'v_n_mps'");
-    }
-    const int attitude_count =
-        (trajectory.contains("q_b2e") ? 1 : 0) + (trajectory.contains("rpy_b2e_rad") ? 1 : 0) +
-        (trajectory.contains("dcm_b2e") ? 1 : 0) + (trajectory.contains("q_b2n") ? 1 : 0) +
-        (trajectory.contains("rpy_b2n_rad") ? 1 : 0) + (trajectory.contains("dcm_b2n") ? 1 : 0);
-    if (attitude_count > 1) {
-        detail::throw_runtime_config_error(
-            "trajectory must specify at most one attitude convention");
-    }
-    const int angular_rate_count = (trajectory.contains("w_ib_b_radps") ? 1 : 0) +
-                                   (trajectory.contains("w_eb_b_radps") ? 1 : 0) +
-                                   (trajectory.contains("w_nb_b_radps") ? 1 : 0);
-    if (angular_rate_count > 1) {
-        detail::throw_runtime_config_error(
-            "trajectory must specify at most one angular-rate convention");
+    else {
+        detail::throw_runtime_config_error("trajectory.type must be 'stationary' or 'csv'");
     }
 
     detail::validate_emulator_runtime_config<EmulatorBindings>(
