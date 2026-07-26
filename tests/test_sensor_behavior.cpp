@@ -29,7 +29,11 @@ struct MeasurementDrivenNoisePolicy
 SensorTestMeasurement make_measurement(const double time_s, const double x_m)
 {
     SensorTestMeasurement measurement{};
-    measurement.time = time_s;
+    const bool timestamp_valid =
+        timestamp_from_seconds(time_s, TimeScale::Monotonic, measurement.t);
+    if (!timestamp_valid) {
+        return {};
+    }
     measurement.z << x_m, x_m + 1.0, x_m + 2.0;
     return measurement;
 }
@@ -48,11 +52,11 @@ TEST_CASE("Sensor preserves FIFO measurement order")
     SensorTestMeasurement out{};
     CHECK(sensor.has_measurement());
     CHECK(sensor.pop(out));
-    CHECK(out.time == doctest::Approx(1.0));
+    CHECK(timestamp_seconds(out.t) == doctest::Approx(1.0));
     CHECK(out.z(0) == doctest::Approx(10.0));
 
     CHECK(sensor.pop(out));
-    CHECK(out.time == doctest::Approx(2.0));
+    CHECK(timestamp_seconds(out.t) == doctest::Approx(2.0));
     CHECK(out.z(0) == doctest::Approx(20.0));
 
     CHECK_FALSE(sensor.pop(out));
@@ -62,7 +66,7 @@ TEST_CASE("Sensor preserves FIFO measurement order")
 TEST_CASE("Sensor noise policy can update context from the measurement sample")
 {
     Sensor<0U, SensorTestModel, 1, MeasurementDrivenNoisePolicy> sensor;
-    auto measurement = make_measurement(1.0, 10.0);
+    SensorTestMeasurement measurement = make_measurement(1.0, 10.0);
 
     sensor.update_observation_context(measurement);
 

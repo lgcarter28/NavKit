@@ -25,13 +25,13 @@ struct LoggingSchedule
     bool imu_debug_enabled{false};
     bool filter_correction_enabled{false};
 
-    core::Time_t console_dt_s{0.0};
-    core::Time_t truth_dt_s{0.0};
-    core::Time_t nav_dt_s{0.0};
-    core::Time_t measurement_statistics_dt_s{0.0};
-    core::Time_t imu_dt_s{0.0};
-    core::Time_t imu_debug_dt_s{0.0};
-    core::Time_t filter_correction_dt_s{0.0};
+    core::RationalRate console_rate{};
+    core::RationalRate truth_rate{};
+    core::RationalRate nav_rate{};
+    core::RationalRate measurement_statistics_rate{};
+    core::RationalRate imu_rate{};
+    core::RationalRate imu_debug_rate{};
+    core::RationalRate filter_correction_rate{};
 };
 
 struct RunSettings
@@ -87,14 +87,14 @@ inline void validate_logging_runtime_config(const nlohmann::json& cfg)
     return detail::require_object(logging, key).at("enabled").get<bool>();
 }
 
-[[nodiscard]] inline core::Time_t logging_dt_s_from_json(const nlohmann::json& logging,
-                                                         const char* key)
+[[nodiscard]] inline core::RationalRate logging_rate_from_json(const nlohmann::json& logging,
+                                                               const char* key)
 {
     const auto& logging_object = detail::require_object(logging, key);
     if (!logging_object.at("enabled").get<bool>()) {
-        return 0.0;
+        return {};
     }
-    return dt_s_from_required_runtime_rate(logging_object, key);
+    return rational_rate_from_required_runtime_rate(logging_object, key);
 }
 
 inline RunSettings run_settings_from_json(const nlohmann::json& cfg)
@@ -116,14 +116,14 @@ inline RunSettings run_settings_from_json(const nlohmann::json& cfg)
     logging.filter_correction_enabled =
         logging_enabled_from_json(logging_json, "filter_correction");
 
-    logging.console_dt_s = logging_dt_s_from_json(logging_json, "console");
-    logging.truth_dt_s = logging_dt_s_from_json(logging_json, "truth");
-    logging.nav_dt_s = logging_dt_s_from_json(logging_json, "nav_estimate");
-    logging.measurement_statistics_dt_s =
-        logging_dt_s_from_json(logging_json, "measurement_statistics");
-    logging.imu_dt_s = logging_dt_s_from_json(logging_json, "imu");
-    logging.imu_debug_dt_s = logging_dt_s_from_json(logging_json, "imu_debug");
-    logging.filter_correction_dt_s = logging_dt_s_from_json(logging_json, "filter_correction");
+    logging.console_rate = logging_rate_from_json(logging_json, "console");
+    logging.truth_rate = logging_rate_from_json(logging_json, "truth");
+    logging.nav_rate = logging_rate_from_json(logging_json, "nav_estimate");
+    logging.measurement_statistics_rate =
+        logging_rate_from_json(logging_json, "measurement_statistics");
+    logging.imu_rate = logging_rate_from_json(logging_json, "imu");
+    logging.imu_debug_rate = logging_rate_from_json(logging_json, "imu_debug");
+    logging.filter_correction_rate = logging_rate_from_json(logging_json, "filter_correction");
 
     return {.run_name = run_name,
             .output_dir = output_dir,

@@ -55,8 +55,11 @@ using NoisyPropagation =
 
 [[nodiscard]] sim::TruthSample stationary_sample(const Time_t time_s)
 {
-    sim::TruthSample sample;
-    sample.time = time_s;
+    sim::TruthSample sample{};
+    const bool timestamp_valid = timestamp_from_seconds(time_s, TimeScale::Monotonic, sample.t);
+    if (!timestamp_valid) {
+        return {};
+    }
     sample.p_e = Vec3{Wgs84::a_m, 0.0, 0.0};
     sample.v_e.setZero();
     sample.q_b2e.setIdentity();
@@ -90,8 +93,8 @@ TEST_CASE("Rotation-vector quaternion helper round-trips small attitude correcti
     static_assert(PropagationPolicy<NoisyPropagation, InsGyroAccelBiasStateDef>);
 
     const Vec3 phi{0.01, -0.02, 0.03};
-    const auto q = navkit::core::math::quaternion_from_rotvec_rad(phi);
-    const auto recovered = navkit::core::math::rotvec_rad_from_quaternion(q);
+    const Eigen::Quaternion<Scalar_t> q = navkit::core::math::quaternion_from_rotvec_rad(phi);
+    const Vec3 recovered = navkit::core::math::rotvec_rad_from_quaternion(q);
 
     CHECK(recovered.isApprox(phi, 1.0e-12));
 }
@@ -103,10 +106,11 @@ TEST_CASE("Two-sample coning and sculling compensation applies cross terms")
     const Vec3 delta_v_1{0.0, 0.0, 1.0};
     const Vec3 delta_v_2{0.0, 1.0, 0.0};
 
-    const auto compensated = coning_sculling_two_sample(theta_1, delta_v_1, theta_2, delta_v_2);
+    const ConingSculling compensated =
+        coning_sculling_two_sample(theta_1, delta_v_1, theta_2, delta_v_2);
 
-    const auto expected_theta = theta_1 + theta_2 + ((2.0 / 3.0) * theta_1.cross(theta_2));
-    const auto expected_delta_v =
+    const Vec3 expected_theta = theta_1 + theta_2 + ((2.0 / 3.0) * theta_1.cross(theta_2));
+    const Vec3 expected_delta_v =
         delta_v_1 + delta_v_2 + (0.5 * (theta_1 + theta_2).cross(delta_v_1 + delta_v_2)) +
         ((2.0 / 3.0) * ((theta_1.cross(delta_v_2)) + (delta_v_1.cross(theta_2))));
 
@@ -124,7 +128,7 @@ TEST_CASE("Ideal stationary ECEF IMU increment preserves nominal PVA")
     StationaryPropagation propagation;
     REQUIRE(propagation.process_imu_increment<InsGyroAccelBiasStateDef>(increment, filter.state()));
 
-    const auto& state = filter.state();
+    const StationaryFilter::State_t& state = filter.state();
     CHECK(segment<NominalStateDef::Pos>(state).isApprox(Vec3{Wgs84::a_m, 0.0, 0.0}, 1.0e-8));
     CHECK(segment<NominalStateDef::Vel>(state).isZero(1.0e-10));
     CHECK(segment<NominalStateDef::AttQuat>(state).isApprox(
@@ -149,7 +153,7 @@ TEST_CASE("Ideal stationary ECEF IMU increments keep pure strapdown bounded at 1
             propagation.process_imu_increment<InsGyroAccelBiasStateDef>(increment, filter.state()));
     }
 
-    const auto& state = filter.state();
+    const StationaryFilter::State_t& state = filter.state();
     CHECK(segment<NominalStateDef::Pos>(state).isApprox(Vec3{Wgs84::a_m, 0.0, 0.0}, 1.0e-3));
     CHECK(segment<NominalStateDef::Vel>(state).isZero(1.0e-6));
     CHECK(segment<NominalStateDef::AttQuat>(state).isApprox(
@@ -171,7 +175,7 @@ TEST_CASE("ECEF INS covariance prediction remains symmetric and process-noise dr
     REQUIRE(propagation.process_imu_increment<InsGyroAccelBiasStateDef>(increment, filter.state()));
     filter.propagate_covariance(phi, qd);
 
-    const auto& covariance = filter.covariance();
+    const StationaryFilter::P_t& covariance = filter.covariance();
     CHECK(covariance.isApprox(covariance.transpose(), 1.0e-15));
     CHECK(covariance(ErrorStateDef::Vel::i, ErrorStateDef::Vel::i) > 0.0);
     CHECK(covariance(ErrorStateDef::AttRotVec::i, ErrorStateDef::AttRotVec::i) > 0.0);

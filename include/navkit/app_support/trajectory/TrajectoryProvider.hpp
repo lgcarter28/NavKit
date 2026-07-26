@@ -234,7 +234,7 @@ stationary_trajectory_config_from_json(const nlohmann::json& cfg)
     const nlohmann::json& trajectory_config = cfg.at("trajectory");
     sim::StationaryTrajectoryConfig traj_cfg;
     traj_cfg.duration_s = trajectory_config.at("duration_s").get<core::Time_t>();
-    traj_cfg.dt_s = dt_s_from_required_runtime_rate(trajectory_config, "trajectory");
+    traj_cfg.rate = rational_rate_from_required_runtime_rate(trajectory_config, "trajectory");
     traj_cfg.p_e = detail::position_e_m_from_json(trajectory_config);
     traj_cfg.v_e = detail::velocity_e_mps_from_json(trajectory_config, traj_cfg.p_e);
     traj_cfg.q_b2e = detail::attitude_b2e_from_json(trajectory_config, traj_cfg.p_e);

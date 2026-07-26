@@ -29,6 +29,18 @@ using NavigatorPolicySensors = std::tuple<NavigatorPolicySensor>;
 using NavigatorPolicyPropagation = NoOpPropagation;
 using NavigatorPolicyUpdate = UpdatePostFilter<NavigatorPolicyFilter>;
 
+[[nodiscard]] ImuIncrement imu_increment_at(const Time_t time_s, const Time_t dt_s)
+{
+    ImuIncrement increment{};
+    const bool timestamp_valid = timestamp_from_seconds(time_s, TimeScale::Monotonic, increment.t);
+    if (!timestamp_valid) {
+        return {};
+    }
+
+    increment.dt_s = dt_s;
+    return increment;
+}
+
 struct MissingFilterLifecycle
 {};
 
@@ -251,7 +263,7 @@ struct RecordingPropagation : PropagationPolicyTestBase
     static inline int imu_pair_call_count{0};
     static inline int covariance_increment_call_count{0};
     static inline int covariance_pair_call_count{0};
-    static inline double last_imu_time_s{0.0};
+    static inline Timestamp t_last_imu{};
     static inline RuntimeConfig_t last_runtime_config{};
 
     static void reset()
@@ -260,7 +272,7 @@ struct RecordingPropagation : PropagationPolicyTestBase
         imu_pair_call_count = 0;
         covariance_increment_call_count = 0;
         covariance_pair_call_count = 0;
-        last_imu_time_s = 0.0;
+        t_last_imu = {};
         last_runtime_config = {};
     }
 
@@ -269,7 +281,7 @@ struct RecordingPropagation : PropagationPolicyTestBase
     {
         static_cast<void>(state);
         ++imu_increment_call_count;
-        last_imu_time_s = increment.time_s;
+        t_last_imu = increment.t;
         return increment.dt_s > 0.0;
     }
 
@@ -280,7 +292,7 @@ struct RecordingPropagation : PropagationPolicyTestBase
     {
         static_cast<void>(state);
         ++imu_pair_call_count;
-        last_imu_time_s = second.time_s;
+        t_last_imu = second.t;
         return first.dt_s > 0.0 && second.dt_s > 0.0;
     }
 
@@ -414,7 +426,7 @@ TEST_CASE("Navigator covariance stage drains pending covariance steps")
     RecordingPropagation::reset();
     Nav navigator;
 
-    CHECK(navigator.push_imu(ImuIncrement{.time_s = 1.0, .dt_s = 1.0}));
+    CHECK(navigator.push_imu(imu_increment_at(1.0, 1.0)));
     CHECK(navigator.process_strapdown_integration());
     CHECK(navigator.pending_covariance_step_count() == 1U);
     CHECK(navigator.propagate_covariance());
@@ -435,7 +447,7 @@ TEST_CASE("Navigator propagation owns selected runtime covariance construction c
         navkit::core::Vec3::Constant(0.25);
     navigator.propagation().set_runtime_config(runtime_config);
 
-    CHECK(navigator.push_imu(ImuIncrement{.time_s = 1.0, .dt_s = 1.0}));
+    CHECK(navigator.push_imu(imu_increment_at(1.0, 1.0)));
     CHECK(navigator.process_strapdown_integration());
 
     CHECK(RecordingPropagation::covariance_increment_call_count == 1);
@@ -468,14 +480,14 @@ TEST_CASE("Navigator defers covariance propagation until the configured medium-r
     RecordingPropagation::reset();
     Nav navigator;
 
-    CHECK(navigator.push_imu(ImuIncrement{.time_s = 0.25, .dt_s = 0.25}));
+    CHECK(navigator.push_imu(imu_increment_at(0.25, 0.25)));
     CHECK(navigator.update());
 
     CHECK(navigator.pending_covariance_step_count() == 1U);
     CHECK(navigator.pending_covariance_dt_s() == doctest::Approx(0.25));
     CHECK(navigator.covariance_history_size() == 0U);
 
-    CHECK(navigator.push_imu(ImuIncrement{.time_s = 1.0, .dt_s = 0.75}));
+    CHECK(navigator.push_imu(imu_increment_at(1.0, 0.75)));
     CHECK(navigator.update());
 
     CHECK(navigator.pending_covariance_step_count() == 0U);
@@ -490,9 +502,9 @@ TEST_CASE("Navigator consumes queued IMU increments through propagation policy")
     RecordingPropagation::reset();
     Nav navigator;
 
-    CHECK(navigator.push_imu(ImuIncrement{.time_s = 1.0, .dt_s = 1.0}));
-    CHECK(navigator.push_imu(ImuIncrement{.time_s = 2.0, .dt_s = 1.0}));
-    CHECK(navigator.push_imu(ImuIncrement{.time_s = 3.0, .dt_s = 1.0}));
+    CHECK(navigator.push_imu(imu_increment_at(1.0, 1.0)));
+    CHECK(navigator.push_imu(imu_increment_at(2.0, 1.0)));
+    CHECK(navigator.push_imu(imu_increment_at(3.0, 1.0)));
     CHECK(navigator.imu_buffer_size() == 3U);
 
     CHECK(navigator.process_strapdown_integration());
@@ -504,7 +516,7 @@ TEST_CASE("Navigator consumes queued IMU increments through propagation policy")
     CHECK(RecordingPropagation::imu_increment_call_count == 1);
     CHECK(RecordingPropagation::covariance_pair_call_count == 1);
     CHECK(RecordingPropagation::covariance_increment_call_count == 1);
-    CHECK(RecordingPropagation::last_imu_time_s == doctest::Approx(3.0));
+    CHECK(timestamp_seconds(RecordingPropagation::t_last_imu) == doctest::Approx(3.0));
 }
 
 TEST_CASE("Navigator reports IMU propagation failure")
@@ -514,7 +526,7 @@ TEST_CASE("Navigator reports IMU propagation failure")
     RecordingPropagation::reset();
     Nav navigator;
 
-    CHECK(navigator.push_imu(ImuIncrement{.time_s = 1.0, .dt_s = 0.0}));
+    CHECK(navigator.push_imu(imu_increment_at(1.0, 0.0)));
 
     CHECK_FALSE(navigator.process_strapdown_integration());
     CHECK_FALSE(navigator.last_propagation_success());
@@ -528,7 +540,7 @@ TEST_CASE("Navigator update orchestrates strapdown and covariance propagation be
     RecordingPropagation::reset();
     Nav navigator;
 
-    CHECK(navigator.push_imu(ImuIncrement{.time_s = 1.0, .dt_s = 1.0}));
+    CHECK(navigator.push_imu(imu_increment_at(1.0, 1.0)));
     navigator.update();
 
     CHECK(RecordingPropagation::imu_increment_call_count == 1);

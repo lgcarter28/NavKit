@@ -19,6 +19,7 @@ add_executable(navkit_tests
     test_sensor_behavior.cpp
     test_segment.cpp
     test_state_def_policy.cpp
+    test_time.cpp
     test_units_frames.cpp
     test_csv_writer.cpp
     test_ecef_ins_propagation.cpp

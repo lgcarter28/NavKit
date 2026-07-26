@@ -4,6 +4,7 @@
 #pragma once
 
 #include "navkit/core/config/Types.hpp"
+#include "navkit/core/time/Timestamp.hpp"
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
@@ -16,7 +17,7 @@ using navkit::core::Time_t;
 
 struct TruthSample
 {
-    Time_t time{0.0};
+    core::Timestamp t{};
     Eigen::Matrix<Scalar_t, 3, 1> p_e{Eigen::Matrix<Scalar_t, 3, 1>::Zero()};
     Eigen::Matrix<Scalar_t, 3, 1> v_e{Eigen::Matrix<Scalar_t, 3, 1>::Zero()};
     // Body-to-ECEF attitude. Applying q_b2e to a body-resolved vector resolves it in ECEF.

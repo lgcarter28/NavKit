@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "navkit/core/time/Timestamp.hpp"
 #include "navkit/io/CsvWriter.hpp"
 #include "navkit/io/log_payloads/GnssMeasurementLogPayload.hpp"
 
@@ -36,7 +37,7 @@ public:
     void log(const GnssVelocityLogPayload& payload)
     {
         const core::estimation::Measurement<3>& meas = payload.measurement;
-        m_csv.write_row(meas.time, meas.z.x(), meas.z.y(), meas.z.z());
+        m_csv.write_row(core::timestamp_seconds(meas.t), meas.z.x(), meas.z.y(), meas.z.z());
     }
 
     void flush()

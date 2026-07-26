@@ -68,7 +68,7 @@ void initialize_navigator(
             InitializerConfig::CovarianceFloor::covariance_floor,
             core::estimation::pos_e_m(pva_init.pva));
     const NavInitialization<StateDef> nav_init{
-        .time_s = pva_init.time_s,
+        .t = pva_init.t,
         .pva = pva_init.pva,
         .covariance = initial_covariance,
     };

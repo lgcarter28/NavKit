@@ -682,7 +682,7 @@ TEST_CASE("Explicit PVA initialization provider applies configured errors")
     const PvaInitialization pva_init =
         PvaExplicitInitializationProvider::initialize(cfg, trajectory);
 
-    CHECK(pva_init.time_s == doctest::Approx(0.0));
+    CHECK(core::timestamp_seconds(pva_init.t) == doctest::Approx(0.0));
     CHECK(core::estimation::pos_e_m(pva_init.pva)(0) == doctest::Approx(6378137.0 - 10.0));
     CHECK(core::estimation::pos_e_m(pva_init.pva)(1) == doctest::Approx(-15.0));
     CHECK(core::estimation::pos_e_m(pva_init.pva)(2) == doctest::Approx(25.0));
@@ -708,7 +708,7 @@ TEST_CASE("Direct PVA initialization provider uses configured values")
 
     const PvaInitialization pva_init = PvaDirectInitializationProvider::initialize(cfg, trajectory);
 
-    CHECK(pva_init.time_s == doctest::Approx(12.5));
+    CHECK(core::timestamp_seconds(pva_init.t) == doctest::Approx(12.5));
     CHECK(core::estimation::pos_e_m(pva_init.pva).isApprox(core::Vec3{1.0, 2.0, 3.0}));
     CHECK(core::estimation::vel_e_mps(pva_init.pva).isApprox(core::Vec3{4.0, 5.0, 6.0}));
     CHECK(core::estimation::rpy_b2e_rad(pva_init.pva).isApprox(core::Vec3{0.1, 0.2, 0.3}));

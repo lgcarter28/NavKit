@@ -320,6 +320,12 @@ App-support code validates, translates, and orchestrates selected configuration;
 it should not author product or scenario defaults. Scenario-specific values such
 as run name, output directory, logging cadence, simulator seeds, simulator noise
 levels, trajectory duration, and trajectory cadence belong in runtime JSON.
+
+Cadence accepts exactly one of `rate_hz` or `dt_s`. The parser canonicalizes
+either form to a rational samples-per-second representation for phase-stable
+scheduling. Prefer `rate_hz` for rates such as 600 Hz whose period has a
+repeating decimal representation; retain `dt_s` only when the period is the
+more natural scenario input.
 Compile-time product choices such as selected state definitions, fixed buffer
 sizes, covariance cadence, and initial-covariance policy slices belong in the
 selected compile-time config. Reusable embedded-library defaults may live inside

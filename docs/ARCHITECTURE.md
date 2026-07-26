@@ -34,6 +34,7 @@ src/app_support/CMakeLists.txt   navkit_app_support / navkit::app_support
 include/navkit/
   core/
     config/
+    time/
     containers/
     estimation/
       state/
@@ -119,6 +120,37 @@ Shared compile-time product-core configuration vocabulary lives under
 domain that consumes them; for example, estimator sensor-buffer and
 measurement-statistics configuration concepts currently live under the
 `navkit::core::estimation` namespace.
+
+## Time and scheduling boundaries
+
+`core::Time_t` remains the scalar-seconds type used by physical equations,
+mechanization, and covariance math. Public time-bearing messages instead use
+`core::Timestamp`: a versioned, explicitly scaled absolute time point with
+`Seconds s` and normalized `Nanoseconds ns` fields. Its wire
+version is the first field so telemetry/transport code can deserialize the
+format before interpreting the remaining fields. Timestamp serialization must
+write fields explicitly; the C++ struct layout is not a wire format.
+
+`core::Duration` is a non-negative elapsed interval with the same `s`/`ns`
+storage convention. Boundaries validate time
+version, scale, ordering, and nanoseconds with integer second/nanosecond
+subtraction; only the resulting duration is explicitly converted to `Time_t`.
+Navigation code must not derive an interval by subtracting scalarized absolute
+timestamps. `TimeScale` identifies `Monotonic`, `Utc`, `Gps`, or `Tai`; the
+current Navigator requires matching scales and does not silently transform
+between them.
+
+Simulation cadence uses `core::RationalRate` and a 64-bit sample index rather
+than repeated floating-point additions. Runtime JSON still accepts one of
+`rate_hz` or `dt_s`, then canonicalizes it once. The current event gate acts on
+the first producer sample at or after a due timestamp. Pass 7.3 will add
+queryable/interpolated truth for consumers requiring an exact arbitrary time.
+
+The time vocabulary is split by dependency: `TimeTypes.hpp`, `Timestamp.hpp`,
+`Duration.hpp`, `RationalRate.hpp`, and `RationalSchedule.hpp`. `Time.hpp` is a
+convenience umbrella, while production headers include the narrowest dependency
+they use. `SignedDuration` remains deferred until a real latency/replay or
+timestamp-offset boundary requires signed intervals.
 
 The public config API include boundary is intentionally narrow.
 `include/navkit/api/config/ConfigApi.hpp` collects shared product-graph

@@ -6,6 +6,7 @@
 #include "navkit/core/config/Types.hpp"
 #include "navkit/core/estimation/navigator/ImuIncrement.hpp"
 #include "navkit/core/math/Types.hpp"
+#include "navkit/core/time/Duration.hpp"
 #include "navkit/sim/RandomDraw.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
@@ -62,7 +63,7 @@ struct ImuSimulatorConfig
 
 struct ImuInterval
 {
-    Time_t time_s{0.0};
+    core::Timestamp t{};
     Time_t dt_s{0.0};
     Vec3 omega_ib_b_radps{Vec3::Zero()};
     Vec3 specific_force_ib_b_mps2{Vec3::Zero()};

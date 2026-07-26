@@ -20,18 +20,19 @@ GnssSimulator::GnssSimulator(const GnssSimulatorConfig& cfg)
 
 bool GnssSimulator::should_generate(const TruthSample& truth) const
 {
-    if (m_cfg.dt_s <= 0.0) {
-        return false;
+    if (!m_schedule_initialized) {
+        if (!m_schedule.reset(truth.t, m_cfg.rate)) {
+            return false;
+        }
+        m_schedule_initialized = true;
     }
-    const auto nearest_index = std::round(truth.time / m_cfg.dt_s);
-    const auto nearest_time = nearest_index * m_cfg.dt_s;
-    return std::abs(truth.time - nearest_time) <= (0.5e-9 + (1.0e-9 * std::abs(nearest_time)));
+    return m_schedule.due(truth.t);
 }
 
 Measurement<3> GnssSimulator::generate_position(const TruthSample& truth)
 {
     Measurement<3> meas;
-    meas.time = truth.time;
+    meas.t = truth.t;
     meas.z = truth.p_e + (truth.q_b2e * m_cfg.p_b_ant_b_m);
     if (m_cfg.noise_enabled) {
         meas.z += draw_normal_cov<3>(position_cov_e_m2(truth), m_rng);
@@ -42,7 +43,7 @@ Measurement<3> GnssSimulator::generate_position(const TruthSample& truth)
 Measurement<3> GnssSimulator::generate_velocity(const TruthSample& truth)
 {
     Measurement<3> meas;
-    meas.time = truth.time;
+    meas.t = truth.t;
     const Vec3 omega_ie_b =
         truth.q_b2e.conjugate() *
         navkit::core::environment::planet_rate_fixed_radps<navkit::core::environment::Wgs84>();

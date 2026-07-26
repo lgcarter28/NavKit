@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "navkit/core/time/Timestamp.hpp"
 #include "navkit/io/CsvWriter.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
@@ -36,7 +37,7 @@ public:
 
     void log(const sim::TruthSample& sample)
     {
-        m_csv.write_row(sample.time,
+        m_csv.write_row(core::timestamp_seconds(sample.t),
                         sample.p_e.x(),
                         sample.p_e.y(),
                         sample.p_e.z(),

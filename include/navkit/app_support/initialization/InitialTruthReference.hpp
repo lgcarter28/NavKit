@@ -3,10 +3,10 @@
 
 #pragma once
 
-#include "navkit/core/config/Types.hpp"
 #include "navkit/core/estimation/state/Segment.hpp"
 #include "navkit/core/estimation/state/State.hpp"
 #include "navkit/core/estimation/state/StateDefPolicy.hpp"
+#include "navkit/core/time/Timestamp.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
 #include <tuple>
@@ -22,7 +22,7 @@ namespace navkit::app_support
 template<navkit::core::estimation::StateSpaceDefPolicy StateDef>
 struct InitialTruthReference
 {
-    core::Time_t time_s{0.0};
+    core::Timestamp t{};
     navkit::core::estimation::NominalState<StateDef> truth_state{
         navkit::core::estimation::NominalState<StateDef>::Zero()};
 };
@@ -33,7 +33,7 @@ inline void populate_initial_pva_from_truth(const navkit::sim::TruthSample& trut
 {
     using Nominal = typename StateDef::Nominal;
 
-    reference.time_s = truth.time;
+    reference.t = truth.t;
     navkit::core::estimation::segment<typename Nominal::Pos>(reference.truth_state) = truth.p_e;
     navkit::core::estimation::segment<typename Nominal::Vel>(reference.truth_state) = truth.v_e;
     if constexpr (requires { typename Nominal::AttQuat; }) {

@@ -158,7 +158,7 @@ inline sim::GnssSimulatorConfig gnss_runtime_config_from_json(const nlohmann::js
 {
     const nlohmann::json& gnss_config = cfg.at(std::string(runtime_key));
     sim::GnssSimulatorConfig gnss_cfg;
-    gnss_cfg.dt_s = dt_s_from_required_runtime_rate(gnss_config, runtime_key);
+    gnss_cfg.rate = rational_rate_from_required_runtime_rate(gnss_config, runtime_key);
     const nlohmann::json& position_cov = gnss_config.at("position_cov");
     const nlohmann::json& velocity_cov = gnss_config.at("velocity_cov");
     gnss_cfg.position_covariance_frame = gnss_covariance_frame_from_json(position_cov);
@@ -268,7 +268,7 @@ struct GnssEmulator
             const core::Vec3 truth_p_e_m = sample.p_e + (sample.q_b2e * gnss_cfg.p_b_ant_b_m);
             const core::Mat3 R_e_m2 = runtime.position_cov_e_m2(sample);
             logger.log(navkit::io::GnssPositionDebugLogPayload{
-                .time_s = measurement.time,
+                .time_s = core::timestamp_seconds(measurement.t),
                 .truth_p_e_m = truth_p_e_m,
                 .measured_p_e_m = measurement.z,
                 .sigma_p_e_m = R_e_m2.diagonal().cwiseSqrt(),
@@ -366,7 +366,7 @@ struct GnssVelocityEmulator
             const core::Mat3 R_e_m2ps2 = runtime.velocity_cov_e_m2ps2(sample);
             const core::Vec3 sigma_v_e_mps = R_e_m2ps2.diagonal().cwiseSqrt();
             logger.log(navkit::io::GnssVelocityDebugLogPayload{
-                .time_s = measurement.time,
+                .time_s = core::timestamp_seconds(measurement.t),
                 .truth_v_e_mps = truth_v_e_mps,
                 .measured_v_e_mps = measurement.z,
                 .sigma_v_e_mps = sigma_v_e_mps,

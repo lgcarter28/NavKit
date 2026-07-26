@@ -75,6 +75,10 @@ public:
 
         Logger logger(run_settings.data_dir, run_settings.run_name, cfg);
         SimulationRunLogger<Config> run_logger(logger, run_settings);
+        if (!run_logger.initialize(trajectory.truth_samples.front().t)) {
+            std::printf("Simulation run logger initialization failed\n");
+            return 5;
+        }
         Emulators::configure(navigator, logger, cfg);
 
         for (const auto& sample : trajectory.truth_samples) {
@@ -82,7 +86,7 @@ public:
             ImuRuntimeSample imu_sample{};
             if (!imu_runtime.process(sample, navigator, imu_sample)) {
                 std::printf("IMU runtime failure at t=%f: %s\n",
-                            sample.time,
+                            core::timestamp_seconds(sample.t),
                             imu_runtime.last_error().data());
                 return 2;
             }
@@ -90,10 +94,11 @@ public:
             Emulators::process(navigator, logger, emulator_runtimes, sample);
 
             if (!navigator.update()) {
-                std::printf("Navigator propagation failed at t=%f\n", sample.time);
+                std::printf("Navigator propagation failed at t=%f\n",
+                            core::timestamp_seconds(sample.t));
                 return 4;
             }
-            run_logger.log_filter_if_due(sample.time, filter);
+            run_logger.log_filter_if_due(sample.t, filter);
         }
 
         logger.close();

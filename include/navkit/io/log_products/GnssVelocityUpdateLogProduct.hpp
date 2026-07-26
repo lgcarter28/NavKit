@@ -38,7 +38,7 @@ public:
         static_assert(Statistics::K_t::ColsAtCompileTime == M,
                       "GNSS velocity update K columns must match the measurement dimension.");
 
-        std::vector<double> row = {stats.time,
+        std::vector<double> row = {core::timestamp_seconds(stats.t),
                                    stats.accepted ? 1.0 : 0.0,
                                    stats.nis,
                                    stats.innovation(0),

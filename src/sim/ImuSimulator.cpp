@@ -34,7 +34,7 @@ ImuIncrement
 ImuSimulator<OutputConingScullingCompensated>::increment_from_interval(const ImuInterval& interval)
 {
     ImuIncrement increment{};
-    increment.time_s = interval.time_s;
+    increment.t = interval.t;
     increment.dt_s = interval.dt_s;
     increment.delta_theta_ib_b_rad = interval.omega_ib_b_radps * interval.dt_s;
     increment.delta_v_ib_b_mps = interval.specific_force_ib_b_mps2 * interval.dt_s;
@@ -56,7 +56,13 @@ bool ImuSimulator<OutputConingScullingCompensated>::interval_from_truth_ecef(
     ImuInterval& interval,
     ImuIntervalDebug& debug)
 {
-    const Time_t dt_s = current.time - previous.time;
+    core::Duration duration{};
+    if (!core::elapsed_time(current.t, previous.t, duration)) {
+        interval = {};
+        debug = {};
+        return false;
+    }
+    const Time_t dt_s = core::duration_seconds(duration);
     if (dt_s <= 0.0) {
         interval = {};
         debug = {};
@@ -84,7 +90,7 @@ bool ImuSimulator<OutputConingScullingCompensated>::interval_from_truth_ecef(
     const Vec3 specific_force_b = q_mid.conjugate() * specific_force_e;
 
     interval = {};
-    interval.time_s = current.time;
+    interval.t = current.t;
     interval.dt_s = dt_s;
     interval.omega_ib_b_radps = delta_theta_ib_b / dt_s;
     interval.specific_force_ib_b_mps2 = specific_force_b;
@@ -208,7 +214,7 @@ bool ImuSimulator<OutputConingScullingCompensated>::generate(const TruthSample& 
         m_cfg.accel.limit);
 
     increment = {};
-    increment.time_s = interval.time_s;
+    increment.t = interval.t;
     increment.dt_s = interval.dt_s;
     increment.delta_theta_ib_b_rad =
         quantize(raw_gyro_radps * interval.dt_s, m_cfg.gyro.quantization);

@@ -19,6 +19,8 @@ namespace navkit::sim::test
 namespace
 {
 
+using navkit::core::TimeScale;
+using navkit::core::Timestamp;
 using navkit::core::Vec3;
 using navkit::core::environment::J2;
 using navkit::core::environment::Wgs84;
@@ -26,8 +28,12 @@ using DefaultImuSimulator = ImuSimulator<>;
 
 [[nodiscard]] TruthSample stationary_sample(navkit::core::Time_t time_s)
 {
-    TruthSample sample;
-    sample.time = time_s;
+    TruthSample sample{};
+    const bool timestamp_valid =
+        navkit::core::timestamp_from_seconds(time_s, TimeScale::Monotonic, sample.t);
+    if (!timestamp_valid) {
+        return {};
+    }
     sample.p_e = Vec3{Wgs84::a_m, 0.0, 0.0};
     sample.v_e.setZero();
     sample.q_b2e.setIdentity();
@@ -67,7 +73,7 @@ TEST_CASE("IMU increment sample defaults to zero")
 {
     const navkit::core::estimation::ImuIncrement increment;
 
-    CHECK(increment.time_s == doctest::Approx(0.0));
+    CHECK(increment.t == Timestamp{});
     CHECK(increment.dt_s == doctest::Approx(0.0));
     CHECK(increment.delta_theta_ib_b_rad.isZero());
     CHECK(increment.delta_v_ib_b_mps.isZero());
@@ -75,15 +81,15 @@ TEST_CASE("IMU increment sample defaults to zero")
 
 TEST_CASE("Ideal stationary ECEF IMU truth includes Earth-rate gyro and specific force")
 {
-    const auto previous = stationary_sample(0.0);
-    const auto current = stationary_sample(1.0);
+    const TruthSample previous = stationary_sample(0.0);
+    const TruthSample current = stationary_sample(1.0);
 
     ImuInterval interval;
     REQUIRE(DefaultImuSimulator::interval_from_truth_ecef(previous, current, interval));
-    const auto gravity_e = J2<Wgs84>::acceleration(previous.p_e);
+    const Vec3 gravity_e = J2<Wgs84>::acceleration(previous.p_e);
     const ImuIncrement truth = DefaultImuSimulator::increment_from_interval(interval);
 
-    CHECK(interval.time_s == doctest::Approx(1.0));
+    CHECK(navkit::core::timestamp_seconds(interval.t) == doctest::Approx(1.0));
     CHECK(interval.dt_s == doctest::Approx(1.0));
     CHECK(truth.delta_theta_ib_b_rad.x() == doctest::Approx(0.0));
     CHECK(truth.delta_theta_ib_b_rad.y() == doctest::Approx(0.0));
@@ -94,8 +100,8 @@ TEST_CASE("Ideal stationary ECEF IMU truth includes Earth-rate gyro and specific
 
 TEST_CASE("Ideal gyro truth combines ECEF attitude delta with Earth rotation")
 {
-    auto previous = stationary_sample(0.0);
-    auto current = stationary_sample(2.0);
+    TruthSample previous = stationary_sample(0.0);
+    TruthSample current = stationary_sample(2.0);
     current.q_b2e = Eigen::AngleAxisd(0.1, Vec3::UnitZ());
 
     ImuInterval interval;
@@ -109,12 +115,12 @@ TEST_CASE("Ideal gyro truth combines ECEF attitude delta with Earth rotation")
 
 TEST_CASE("Ideal IMU truth interval rejects non-increasing timestamps without throwing")
 {
-    const auto previous = stationary_sample(1.0);
-    const auto current = stationary_sample(1.0);
+    const TruthSample previous = stationary_sample(1.0);
+    const TruthSample current = stationary_sample(1.0);
     ImuInterval interval;
 
     CHECK_FALSE(DefaultImuSimulator::interval_from_truth_ecef(previous, current, interval));
-    CHECK(interval.time_s == doctest::Approx(0.0));
+    CHECK(interval.t == Timestamp{});
     CHECK(interval.dt_s == doctest::Approx(0.0));
     CHECK(interval.omega_ib_b_radps.isZero());
     CHECK(interval.specific_force_ib_b_mps2.isZero());
@@ -126,7 +132,7 @@ TEST_CASE("IMU triad calibration applies scale, nonorthogonality, and misalignme
     config.scale_factor = Vec3{0.1, 0.0, 0.0};
     config.nonorthogonality = Vec3{0.2, 0.3, 0.0};
 
-    const auto output = DefaultImuSimulator::calibration_matrix_apply(Vec3{1.0, 0.0, 0.0}, config);
+    const Vec3 output = DefaultImuSimulator::calibration_matrix_apply(Vec3{1.0, 0.0, 0.0}, config);
 
     CHECK(output.x() == doctest::Approx(1.1));
     CHECK(output.y() == doctest::Approx(0.2));
@@ -142,15 +148,15 @@ TEST_CASE("IMU simulator applies deterministic bias and quantization to raw incr
 
     DefaultImuSimulator simulator(config);
 
-    const auto previous = stationary_sample(0.0);
-    const auto current = stationary_sample(1.0);
+    const TruthSample previous = stationary_sample(0.0);
+    const TruthSample current = stationary_sample(1.0);
     ImuInterval interval;
     REQUIRE(DefaultImuSimulator::interval_from_truth_ecef(previous, current, interval));
     const ImuIncrement truth = DefaultImuSimulator::increment_from_interval(interval);
     ImuIncrement raw;
     REQUIRE(simulator.generate(previous, current, raw));
 
-    CHECK(raw.time_s == doctest::Approx(current.time));
+    CHECK(raw.t == current.t);
     CHECK(raw.dt_s == doctest::Approx(1.0));
     CHECK(raw.delta_theta_ib_b_rad.x() == doctest::Approx(0.3));
     CHECK(raw.delta_theta_ib_b_rad.z() == doctest::Approx(truth.delta_theta_ib_b_rad.z()));
@@ -174,7 +180,7 @@ TEST_CASE("IMU simulator stateful generation consumes consecutive samples")
         stationary_sample(0.0), stationary_sample(0.25), interval));
     const ImuIncrement truth = DefaultImuSimulator::increment_from_interval(interval);
 
-    CHECK(increment.time_s == doctest::Approx(0.25));
+    CHECK(navkit::core::timestamp_seconds(increment.t) == doctest::Approx(0.25));
     CHECK(increment.dt_s == doctest::Approx(0.25));
     CHECK(increment.delta_theta_ib_b_rad.x() == doctest::Approx(0.0));
     CHECK(increment.delta_theta_ib_b_rad.y() == doctest::Approx(0.0));

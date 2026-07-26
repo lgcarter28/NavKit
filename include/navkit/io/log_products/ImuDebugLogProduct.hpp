@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "navkit/core/time/Timestamp.hpp"
 #include "navkit/io/CsvWriter.hpp"
 #include "navkit/io/log_payloads/ImuDebugLogPayload.hpp"
 
@@ -54,7 +55,7 @@ public:
         const navkit::sim::ImuInterval& interval = payload.debug.interval;
         const navkit::core::estimation::ImuIncrement& truth = payload.truth;
         const navkit::core::estimation::ImuIncrement& measured = payload.measured;
-        m_csv.write_row(interval.time_s,
+        m_csv.write_row(core::timestamp_seconds(interval.t),
                         interval.dt_s,
                         interval.omega_ib_b_radps.x(),
                         interval.omega_ib_b_radps.y(),

@@ -20,7 +20,7 @@ TEST_CASE("Navigator compiles and processes GNSS sensor")
 
     Nav nav;
     Sensor::Measurement_t meas;
-    meas.time = 0.0;
+    meas.t = {};
     meas.z << 1.0, 2.0, 3.0;
     CHECK(nav.template sensor<0>().push(meas));
     nav.update();

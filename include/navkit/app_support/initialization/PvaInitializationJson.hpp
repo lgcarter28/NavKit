@@ -59,8 +59,8 @@ pva_initialization_type_from_json(const nlohmann::json& initialization)
         return pva_init;
     }
 
-    const auto& truth = trajectory.truth_samples.front();
-    pva_init.time_s = truth.time;
+    const navkit::sim::TruthSample& truth = trajectory.truth_samples.front();
+    pva_init.t = truth.t;
     core::estimation::pos_e_m(pva_init.pva) = truth.p_e;
     core::estimation::vel_e_mps(pva_init.pva) = truth.v_e;
     core::estimation::rpy_b2e_rad(pva_init.pva) = core::math::rpy_rad_from_quaternion(truth.q_b2e);
@@ -116,7 +116,10 @@ inline void validate_pva_direct_shape(const nlohmann::json& initialization)
 
     PvaInitialization pva_init;
     if (pva.contains("time_s")) {
-        pva_init.time_s = pva.at("time_s").get<core::Time_t>();
+        if (!core::timestamp_from_seconds(
+                pva.at("time_s").get<core::Time_t>(), core::TimeScale::Monotonic, pva_init.t)) {
+            throw_runtime_config_error("pva_initialization.pva.time_s cannot form a timestamp");
+        }
     }
     core::estimation::pos_e_m(pva_init.pva) = required_vec3_from_object(pva, "p_e_m");
     core::estimation::vel_e_mps(pva_init.pva) = required_vec3_from_object(pva, "v_e_mps");

@@ -42,7 +42,7 @@ public:
         navkit::core::containers::RingBuffer<ImuIncrement, Propagation_t::imu_buffer_capacity>;
     struct CovarianceStep
     {
-        Time_t time_s{0.0};
+        Timestamp t{};
         Time_t dt_s{0.0};
         typename Filter_t::P_t phi{Filter_t::P_t::Identity()};
         typename Filter_t::P_t qd{Filter_t::P_t::Zero()};
@@ -194,7 +194,7 @@ private:
     {
         const auto state_before = m_filter.state();
         CovarianceStep step{};
-        step.time_s = increment.time_s;
+        step.t = increment.t;
         step.dt_s = increment.dt_s;
         if (!m_propagation.template covariance_step_from_increment<StateDef_t>(
                 state_before, increment, step.phi, step.qd)) {
@@ -212,7 +212,7 @@ private:
     {
         const auto state_before = m_filter.state();
         CovarianceStep step{};
-        step.time_s = second.time_s;
+        step.t = second.t;
         step.dt_s = first.dt_s + second.dt_s;
         if (!m_propagation.template covariance_step_from_increment_pair<StateDef_t>(
                 state_before, first, second, step.phi, step.qd)) {
@@ -239,7 +239,7 @@ private:
         m_pending_covariance_step.qd =
             0.5 * (m_pending_covariance_step.qd + m_pending_covariance_step.qd.transpose());
         m_pending_covariance_step.phi = step.phi * m_pending_covariance_step.phi;
-        m_pending_covariance_step.time_s = step.time_s;
+        m_pending_covariance_step.t = step.t;
         m_pending_covariance_step.dt_s += step.dt_s;
     }
 

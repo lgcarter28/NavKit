@@ -14,6 +14,12 @@ This project follows
 
 ### Added
 
+- Product-core versioned timestamp, duration, time-scale, and rational-rate
+  vocabulary; exact multi-rate simulation/logging schedules; and focused
+  600 Hz, duration-borrow, and incommensurate-rate regression coverage.
+- Minimal time-vocabulary headers (`TimeTypes`, `Timestamp`, `Duration`,
+  `RationalRate`, and `RationalSchedule`), with `Time.hpp` retained only as a
+  convenience umbrella and public timestamp fields standardized as `t/s/ns`.
 - Product-family variant directories for compile-time NavKit and simulation-app
   selections, plus ownership-based compile-time component directories.
 - Reusable `EcefInsGnssLc<...>` product composition with explicit concrete

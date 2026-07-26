@@ -13,6 +13,7 @@
 #include "navkit/core/frames/LocalLevel.hpp"
 #include "navkit/core/math/Quaternion.hpp"
 #include "navkit/core/math/Types.hpp"
+#include "navkit/core/time/RationalSchedule.hpp"
 #include "navkit/io/log_payloads/FilterCorrectionLogPayload.hpp"
 #include "navkit/io/log_payloads/ImuDebugLogPayload.hpp"
 #include "navkit/io/log_payloads/ImuIncrementLogPayload.hpp"
@@ -40,12 +41,44 @@ public:
         , m_run_settings(run_settings)
     {}
 
+    [[nodiscard]] bool initialize(const core::Timestamp& t_epoch)
+    {
+        if (m_run_settings.logging.console_enabled &&
+            !m_console_schedule.initialize(t_epoch, m_run_settings.logging.console_rate)) {
+            return false;
+        }
+        if (m_run_settings.logging.truth_enabled &&
+            !m_truth_schedule.initialize(t_epoch, m_run_settings.logging.truth_rate)) {
+            return false;
+        }
+        if (m_run_settings.logging.nav_enabled &&
+            !m_nav_schedule.initialize(t_epoch, m_run_settings.logging.nav_rate)) {
+            return false;
+        }
+        if (m_run_settings.logging.measurement_statistics_enabled &&
+            !m_measurement_statistics_schedule.initialize(
+                t_epoch, m_run_settings.logging.measurement_statistics_rate)) {
+            return false;
+        }
+        if (m_run_settings.logging.imu_enabled &&
+            !m_imu_schedule.initialize(t_epoch, m_run_settings.logging.imu_rate)) {
+            return false;
+        }
+        if (m_run_settings.logging.imu_debug_enabled &&
+            !m_imu_debug_schedule.initialize(t_epoch, m_run_settings.logging.imu_debug_rate)) {
+            return false;
+        }
+        if (m_run_settings.logging.filter_correction_enabled &&
+            !m_filter_correction_schedule.initialize(
+                t_epoch, m_run_settings.logging.filter_correction_rate)) {
+            return false;
+        }
+        return true;
+    }
+
     void log_truth_if_due(const sim::TruthSample& sample)
     {
-        if (should_log_at(sample.time,
-                          m_run_settings.logging.truth_enabled,
-                          m_run_settings.logging.truth_dt_s,
-                          m_next_truth_log_s)) {
+        if (m_run_settings.logging.truth_enabled && m_truth_schedule.due(sample.t)) {
             m_logger.log(sample);
         }
     }
@@ -55,10 +88,7 @@ public:
         if (!imu_sample.generated) {
             return;
         }
-        if (should_log_at(sample.time,
-                          m_run_settings.logging.imu_enabled,
-                          m_run_settings.logging.imu_dt_s,
-                          m_next_imu_log_s)) {
+        if (m_run_settings.logging.imu_enabled && m_imu_schedule.due(sample.t)) {
             log_if_supported(io::ImuIncrementLogPayload{
                 .truth = imu_sample.truth,
                 .measured = imu_sample.measured,
@@ -70,10 +100,7 @@ public:
                 .gyro_bias_truth_radps = imu_sample.gyro_bias_truth_radps,
                 .accel_bias_truth_mps2 = imu_sample.accel_bias_truth_mps2});
         }
-        if (should_log_at(sample.time,
-                          m_run_settings.logging.imu_debug_enabled,
-                          m_run_settings.logging.imu_debug_dt_s,
-                          m_next_imu_debug_log_s)) {
+        if (m_run_settings.logging.imu_debug_enabled && m_imu_debug_schedule.due(sample.t)) {
             log_if_supported(
                 io::ImuDebugLogPayload{.debug = imu_sample.debug,
                                        .truth = imu_sample.truth,
@@ -83,38 +110,27 @@ public:
         }
     }
 
-    void log_filter_if_due(const core::Time_t time_s, const Filter& filter)
+    void log_filter_if_due(const core::Timestamp& t, const Filter& filter)
     {
-        if (should_log_at(time_s,
-                          m_run_settings.logging.measurement_statistics_enabled,
-                          m_run_settings.logging.measurement_statistics_dt_s,
-                          m_next_measurement_statistics_log_s)) {
+        if (m_run_settings.logging.measurement_statistics_enabled &&
+            m_measurement_statistics_schedule.due(t)) {
             log_measurement_statistics<typename NavKit::Sensors>(m_logger, filter);
         }
-        if (should_log_at(time_s,
-                          m_run_settings.logging.nav_enabled,
-                          m_run_settings.logging.nav_dt_s,
-                          m_next_nav_log_s)) {
+        if (m_run_settings.logging.nav_enabled && m_nav_schedule.due(t)) {
             m_logger.log(io::NavEstimateLogPayload<StateDef, Filter>{
-                .time_s = time_s,
+                .time_s = core::timestamp_seconds(t),
                 .filter = filter,
             });
         }
-        if (filter.last_correction_valid() &&
-            should_log_at(time_s,
-                          m_run_settings.logging.filter_correction_enabled,
-                          m_run_settings.logging.filter_correction_dt_s,
-                          m_next_filter_correction_log_s)) {
+        if (filter.last_correction_valid() && m_run_settings.logging.filter_correction_enabled &&
+            m_filter_correction_schedule.due(t)) {
             log_if_supported(io::FilterCorrectionLogPayload<StateDef, Filter>{
-                .time_s = time_s,
+                .time_s = core::timestamp_seconds(t),
                 .filter = filter,
             });
         }
-        if (should_log_at(time_s,
-                          m_run_settings.logging.console_enabled,
-                          m_run_settings.logging.console_dt_s,
-                          m_next_console_log_s)) {
-            print_console_status(time_s, filter);
+        if (m_run_settings.logging.console_enabled && m_console_schedule.due(t)) {
+            print_console_status(core::timestamp_seconds(t), filter);
         }
     }
 
@@ -127,21 +143,6 @@ private:
                 m_logger.log(payload);
             }
         }
-    }
-
-    [[nodiscard]] static bool should_log_at(const core::Time_t time_s,
-                                            const bool enabled,
-                                            const core::Time_t dt_s,
-                                            core::Time_t& next_time_s)
-    {
-        constexpr core::Time_t epsilon_s = 1.0e-12;
-        if (!enabled || dt_s <= 0.0 || (time_s + epsilon_s) < next_time_s) {
-            return false;
-        }
-        while (next_time_s <= (time_s + epsilon_s)) {
-            next_time_s += dt_s;
-        }
-        return true;
     }
 
     static void print_console_status(const core::Time_t time_s, const Filter& filter)
@@ -197,13 +198,13 @@ private:
 
     Logger& m_logger;
     const RunSettings& m_run_settings;
-    core::Time_t m_next_console_log_s{0.0};
-    core::Time_t m_next_truth_log_s{0.0};
-    core::Time_t m_next_nav_log_s{0.0};
-    core::Time_t m_next_measurement_statistics_log_s{0.0};
-    core::Time_t m_next_imu_log_s{0.0};
-    core::Time_t m_next_imu_debug_log_s{0.0};
-    core::Time_t m_next_filter_correction_log_s{0.0};
+    core::RationalSchedule m_console_schedule{};
+    core::RationalSchedule m_truth_schedule{};
+    core::RationalSchedule m_nav_schedule{};
+    core::RationalSchedule m_measurement_statistics_schedule{};
+    core::RationalSchedule m_imu_schedule{};
+    core::RationalSchedule m_imu_debug_schedule{};
+    core::RationalSchedule m_filter_correction_schedule{};
 };
 
 } // namespace navkit::app_support

@@ -60,7 +60,7 @@ struct StatisticsFixture
 
         noise.R_e_m2 = navkit::core::Mat3::Identity();
 
-        sensor_measurement.time = 0.0;
+        sensor_measurement.t = Timestamp{};
         sensor_measurement.z = measurement;
     }
 };
@@ -108,7 +108,7 @@ void check_common_statistics(const MeasurementStatistics<Sensor>& stats,
 {
     CHECK(stats.valid);
     CHECK(stats.accepted == accepted);
-    CHECK(stats.time == doctest::Approx(expected_time));
+    CHECK(timestamp_seconds(stats.t) == doctest::Approx(expected_time));
     CHECK(stats.innovation.isApprox(expected_innovation(), 1.0e-12));
     CHECK(stats.measurement_covariance.isApprox(expected_measurement_covariance(), 1.0e-12));
     CHECK(stats.innovation_covariance.isApprox(expected_innovation_covariance(), 1.0e-12));
@@ -124,7 +124,8 @@ TEST_CASE("accepted measurement update records statistics and updates filter sta
     StatisticsFixture fixture{};
     constexpr Time_t update_time = 12.5;
     Sensor sensor{};
-    fixture.sensor_measurement.time = update_time;
+    REQUIRE(
+        timestamp_from_seconds(update_time, TimeScale::Monotonic, fixture.sensor_measurement.t));
     sensor.observation_context() = fixture.noise;
     CHECK(sensor.push(fixture.sensor_measurement));
 
@@ -144,8 +145,9 @@ TEST_CASE("direct model update does not record sensor-keyed statistics")
     StatisticsFixture fixture{};
     constexpr Time_t update_time = 23.0;
 
-    fixture.filter.observation_update<Model>(
-        fixture.measurement, update_time, fixture.noise, false);
+    Timestamp t{};
+    REQUIRE(timestamp_from_seconds(update_time, TimeScale::Monotonic, t));
+    fixture.filter.observation_update<Model>(fixture.measurement, t, fixture.noise, false);
 
     CHECK_FALSE(fixture.filter.measurement_statistics_available<Sensor>());
 

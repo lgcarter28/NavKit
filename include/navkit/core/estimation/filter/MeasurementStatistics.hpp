@@ -5,6 +5,7 @@
 
 #include "navkit/core/config/Types.hpp"
 #include "navkit/core/estimation/sensor/SensorId.hpp"
+#include "navkit/core/time/Timestamp.hpp"
 
 #include <Eigen/Dense>
 
@@ -26,7 +27,7 @@ struct MeasurementStatistics
 
     bool valid{false};
     bool accepted{false};
-    Time_t time{0.0};
+    Timestamp t{};
 
     O_t innovation{O_t::Zero()};
     R_t innovation_covariance{R_t::Zero()};

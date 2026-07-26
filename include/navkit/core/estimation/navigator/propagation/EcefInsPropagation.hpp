@@ -18,6 +18,7 @@
 #include "navkit/core/estimation/state/StateDefPolicy.hpp"
 #include "navkit/core/math/Quaternion.hpp"
 #include "navkit/core/math/Skew.hpp"
+#include "navkit/core/time/Duration.hpp"
 
 #include <Eigen/Dense>
 #include <cmath>
@@ -29,7 +30,7 @@ namespace navkit::core::estimation
 
 struct MechanizedImuInterval
 {
-    Time_t time_s{0.0};
+    Timestamp t{};
     Time_t dt_s{0.0};
     Vec3 delta_theta_ib_b_rad{Vec3::Zero()};
     Vec3 delta_v_ib_b_mps{Vec3::Zero()};
@@ -316,14 +317,15 @@ private:
             increment.delta_v_ib_b_mps - (accel_bias_mps2<StateDef>(state) * increment.dt_s);
         const ConingSculling corrected = coning_sculling_single(delta_theta, delta_v);
         return mechanized_interval_from_corrected<StateDef>(
-            state, increment.time_s, increment.dt_s, corrected);
+            state, increment.t, increment.dt_s, corrected);
     }
 
     template<StateSpaceDefPolicy StateDef>
     [[nodiscard]] static MechanizedImuInterval corrected_interval_from_pair(
         const NominalState<StateDef>& state, const ImuIncrement& first, const ImuIncrement& second)
     {
-        if (first.dt_s <= 0.0 || second.dt_s <= 0.0 || second.time_s <= first.time_s) {
+        Duration elapsed{};
+        if (first.dt_s <= 0.0 || second.dt_s <= 0.0 || !elapsed_time(second.t, first.t, elapsed)) {
             return {};
         }
 
@@ -343,7 +345,7 @@ private:
                          .delta_v_ib_b_mps = delta_v_1 + delta_v_2};
         }
         return mechanized_interval_from_corrected<StateDef>(
-            state, second.time_s, first.dt_s + second.dt_s, corrected);
+            state, second.t, first.dt_s + second.dt_s, corrected);
     }
 
     template<StateSpaceDefPolicy StateDef>
@@ -412,7 +414,7 @@ private:
     template<StateSpaceDefPolicy StateDef>
     [[nodiscard]] static MechanizedImuInterval
     mechanized_interval_from_corrected(const NominalState<StateDef>& state,
-                                       const Time_t time_s,
+                                       const Timestamp& t,
                                        const Time_t dt_s,
                                        const ConingSculling& corrected)
     {
@@ -424,7 +426,7 @@ private:
         const Vec3 earth_rate_b =
             q_b2e.conjugate() * environment::planet_rate_fixed_radps<Planet>();
         const Vec3 delta_theta_eb_b = corrected.delta_theta_ib_b_rad - (earth_rate_b * dt_s);
-        return {.time_s = time_s,
+        return {.t = t,
                 .dt_s = dt_s,
                 .delta_theta_ib_b_rad = corrected.delta_theta_ib_b_rad,
                 .delta_v_ib_b_mps = corrected.delta_v_ib_b_mps,

@@ -4,6 +4,7 @@
 #pragma once
 
 #include "navkit/core/math/Types.hpp"
+#include "navkit/core/time/Timestamp.hpp"
 #include "navkit/io/CsvWriter.hpp"
 #include "navkit/io/log_payloads/ImuIncrementLogPayload.hpp"
 
@@ -58,7 +59,7 @@ public:
 
     void log(const ImuIncrementLogPayload& payload)
     {
-        m_csv.write_row(payload.measured.time_s,
+        m_csv.write_row(core::timestamp_seconds(payload.measured.t),
                         payload.measured.dt_s,
                         payload.truth.delta_theta_ib_b_rad.x(),
                         payload.truth.delta_theta_ib_b_rad.y(),

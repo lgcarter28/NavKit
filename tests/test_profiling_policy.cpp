@@ -347,7 +347,9 @@ TEST_CASE("KalmanFilter observation update emits the configured profile point")
     ProfiledModel::ObservationContext ctx;
     ctx.R_e_m2 = navkit::core::Mat3::Identity();
 
-    filter.observation_update<ProfiledModel>(z, 1.0, ctx, true);
+    Timestamp t{};
+    REQUIRE(timestamp_from_seconds(1.0, TimeScale::Monotonic, t));
+    filter.observation_update<ProfiledModel>(z, t, ctx, true);
 
     REQUIRE(FixedSink::count == 1U);
     const auto& record = FixedSink::first_record();

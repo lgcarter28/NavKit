@@ -70,14 +70,13 @@ These are preserved at high level so the roadmap stays readable. Detailed pass-b
 
 Phase 7: trajectory-provider and timebase expansion is active. Phase 6 established repeatable statistical evidence; Phase 7 first makes multi-rate timing exact and inspectable before broadening trajectory sources and scenarios.
 
-## Active passes
+## Next pass
 
-## Pass 7.1: timebase and multi-rate scheduling
+## Pass 7.3: trajectory source abstraction
 
-- [ ] Define separate scalar-seconds math, timestamp, duration, and runtime-rate responsibilities. Retain convenient scalar seconds for physical equations unless a stronger type improves a real boundary; do not substitute `std::chrono::duration<double>` merely to wrap the existing floating-point accumulation problem.
-- [ ] Implement exact/reproducible multi-rate scheduling for non-terminating periods such as 600 Hz using integer sample indices plus a rational or fixed-point rate descriptor. Derive timestamps from index/rate rather than accumulating rounded `dt_s` values.
-- [ ] Keep JSON `rate_hz` and `dt_s` input compatibility, validate mutually exclusive selection, and document the canonical internal scheduling form.
-- [ ] Add focused tests covering 600 Hz, incommensurate consumer rates, long-duration phase error, due-event ordering, and logging cadence independent of the producer rate.
+- [ ] Add a trajectory-source abstraction so generated trajectories and CSV/playback trajectories feed the same downstream hooks. Do not create a separate playback driver unless the shared trajectory-provider path cannot express the required replay behavior.
+- [ ] Add queryable/interpolated truth sampling so consumers can request truth at arbitrary timestamps without forcing all downstream processing to run at the trajectory generation rate. Keep truth generation/system rate separate from truth logging rate, and use this seam to schedule IMU emulation at a rate distinct from truth generation.
+- [ ] Add richer trajectory initial-condition parsing and documentation for ECEF and local-level position, velocity, attitude, and angular-rate conventions.
 
 ## Future phase details
 

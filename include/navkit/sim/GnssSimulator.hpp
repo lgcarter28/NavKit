@@ -5,6 +5,7 @@
 
 #include "navkit/core/estimation/measurement/Measurement.hpp"
 #include "navkit/core/math/Types.hpp"
+#include "navkit/core/time/RationalSchedule.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
 #include <random>
@@ -13,8 +14,11 @@ namespace navkit::sim
 {
 
 using navkit::core::Mat3;
+using navkit::core::RationalRate;
+using navkit::core::RationalSchedule;
 using navkit::core::Scalar_t;
 using navkit::core::Time_t;
+using navkit::core::Timestamp;
 using navkit::core::Vec3;
 using navkit::core::estimation::Measurement;
 
@@ -26,7 +30,7 @@ enum class GnssCovarianceFrame
 
 struct GnssSimulatorConfig
 {
-    Time_t dt_s{1.0};
+    RationalRate rate{.samples = 1U, .s = 1U};
     GnssCovarianceFrame position_covariance_frame{GnssCovarianceFrame::Ecef};
     Mat3 position_cov_m2{(Vec3{9.0, 9.0, 25.0}).asDiagonal()};
     GnssCovarianceFrame velocity_covariance_frame{GnssCovarianceFrame::Ecef};
@@ -47,9 +51,9 @@ public:
     Measurement<3> generate(const TruthSample& truth);
     [[nodiscard]] Mat3 position_cov_e_m2(const TruthSample& truth) const;
     [[nodiscard]] Mat3 velocity_cov_e_m2ps2(const TruthSample& truth) const;
-    [[nodiscard]] Time_t dt_s() const
+    [[nodiscard]] const RationalRate& rate() const
     {
-        return m_cfg.dt_s;
+        return m_cfg.rate;
     }
 
     [[nodiscard]] const GnssSimulatorConfig& config() const
@@ -59,6 +63,8 @@ public:
 
 private:
     GnssSimulatorConfig m_cfg;
+    mutable RationalSchedule m_schedule{};
+    mutable bool m_schedule_initialized{false};
     std::mt19937 m_rng;
 };
 

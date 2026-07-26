@@ -19,6 +19,7 @@
 #include "navkit/core/profiling/NullProfiler.hpp"
 #include "navkit/core/profiling/ProfilePoint.hpp"
 #include "navkit/core/profiling/ProfilerPolicy.hpp"
+#include "navkit/core/time/Timestamp.hpp"
 
 #include <Eigen/Dense>
 #include <tuple>
@@ -186,18 +187,18 @@ public:
 
     template<MeasurementModelPolicy<StateDef> MeasurementModel>
     void observation_update(const typename MeasurementModel::O_t& z,
-                            Time_t time,
+                            const Timestamp& t,
                             const typename MeasurementModel::ObservationContext& ctx,
                             bool accepted = true)
     {
-        observation_update_impl<MeasurementModel, void>(z, time, ctx, accepted);
+        observation_update_impl<MeasurementModel, void>(z, t, ctx, accepted);
     }
 
     template<MeasurementModelPolicy<StateDef> MeasurementModel>
     void observation_update(const typename MeasurementModel::O_t& z,
                             const typename MeasurementModel::ObservationContext& ctx)
     {
-        observation_update<MeasurementModel>(z, 0.0, ctx, true);
+        observation_update<MeasurementModel>(z, Timestamp{}, ctx, true);
     }
 
     template<SensorPolicy Sensor>
@@ -212,7 +213,7 @@ public:
             }
             sensor.update_observation_context(meas);
             observation_update_impl<MeasurementModel, Sensor>(
-                meas.z, meas.time, sensor.observation_context(), true);
+                meas.z, meas.t, sensor.observation_context(), true);
         }
     }
 
@@ -249,7 +250,7 @@ private:
 
     template<MeasurementModelPolicy<StateDef> MeasurementModel, typename Sensor>
     void observation_update_impl(const typename MeasurementModel::O_t& z,
-                                 Time_t time,
+                                 const Timestamp& t,
                                  const typename MeasurementModel::ObservationContext& ctx,
                                  bool accepted)
     {
@@ -271,7 +272,7 @@ private:
         const Scalar_t nis = innov.dot(S.ldlt().solve(innov));
 
         if constexpr (!std::is_void_v<Sensor>) {
-            record_measurement_statistics<Sensor>(time, accepted, innov, S, R, H, K, nis);
+            record_measurement_statistics<Sensor>(t, accepted, innov, S, R, H, K, nis);
         }
 
         if (accepted) {
@@ -284,7 +285,7 @@ private:
 
     template<SensorPolicy Sensor>
         requires MeasurementModelPolicy<typename Sensor::MeasurementModel_t, StateDef>
-    void record_measurement_statistics(const Time_t time,
+    void record_measurement_statistics(const Timestamp& t,
                                        const bool accepted,
                                        const typename Sensor::MeasurementModel_t::O_t& innovation,
                                        const typename Sensor::MeasurementModel_t::R_t& S,
@@ -298,7 +299,7 @@ private:
             auto& stats = measurement_statistics<Sensor>();
             stats.valid = true;
             stats.accepted = accepted;
-            stats.time = time;
+            stats.t = t;
             stats.innovation = innovation;
             stats.innovation_covariance = S;
             stats.measurement_covariance = R;
