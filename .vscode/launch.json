@@ -2,32 +2,43 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Windows Debug navkit_sim",
+            "name": "Windows Debug navkit_sim (default)",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/debug/apps/navkit_sim/StationaryGnss/apps/navkit_sim/navkit_sim.exe",
+            "program": "${workspaceFolder}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/apps/navkit_sim/navkit_sim.exe",
             "args": [
-                "${workspaceFolder}/config/runtime/navkit_sim/stationary_gnss.json"
+                "${workspaceFolder}/config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json"
             ],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
         },
         {
-            "name": "Windows Debug navkit_tests",
+            "name": "Windows Debug navkit_tests (default)",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/debug/apps/navkit_sim/StationaryGnss/tests/navkit_tests.exe",
+            "program": "${workspaceFolder}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/tests/navkit_tests.exe",
             "args": [],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
         },
         {
-            "name": "Linux Debug navkit_sim",
+            "name": "Windows Debug navkit_sim (profiled)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled/apps/navkit_sim/navkit_sim.exe",
+            "args": [
+                "${workspaceFolder}/config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Linux Debug navkit_sim (default)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/debug/apps/navkit_sim/StationaryGnss/apps/navkit_sim/navkit_sim",
+            "program": "${workspaceFolder}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/apps/navkit_sim/navkit_sim",
             "args": [
-                "${workspaceFolder}/config/runtime/navkit_sim/stationary_gnss.json"
+                "${workspaceFolder}/config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json"
             ],
             "cwd": "${workspaceFolder}",
             "MIMode": "gdb",
@@ -35,11 +46,24 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Linux Debug navkit_tests",
+            "name": "Linux Debug navkit_tests (default)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/debug/apps/navkit_sim/StationaryGnss/tests/navkit_tests",
+            "program": "${workspaceFolder}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/tests/navkit_tests",
             "args": [],
+            "cwd": "${workspaceFolder}",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Linux Debug navkit_sim (profiled)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled/apps/navkit_sim/navkit_sim",
+            "args": [
+                "${workspaceFolder}/config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json"
+            ],
             "cwd": "${workspaceFolder}",
             "MIMode": "gdb",
             "miDebuggerPath": "/usr/bin/gdb",

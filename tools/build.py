@@ -78,6 +78,41 @@ def find_conan_toolchain(build_dir: Path, build_type: str) -> Path:
     )
 
 
+def select_conan_cmake_preset(root: Path, toolchain_file: Path) -> None:
+    """Keep one selected Conan preset include in local CMakeUserPresets state."""
+    generated_preset = toolchain_file.parent / "CMakePresets.json"
+    if not generated_preset.exists():
+        return
+
+    user_presets = root / "CMakeUserPresets.json"
+    document: dict[str, object] = {"version": 4, "vendor": {"conan": {}}}
+    if user_presets.exists():
+        try:
+            parsed = json.loads(user_presets.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            print(f"Warning: cannot update malformed local preset file: {user_presets}")
+            return
+        if isinstance(parsed, dict):
+            document = parsed
+
+    existing_includes = document.get("include", [])
+    includes = existing_includes if isinstance(existing_includes, list) else []
+    retained_includes = [
+        include
+        for include in includes
+        if not (
+            isinstance(include, str)
+            and include.replace("\\", "/").startswith("build/")
+            and include.replace("\\", "/").endswith("/generators/CMakePresets.json")
+        )
+    ]
+    selected_include = generated_preset.relative_to(root).as_posix()
+    document["include"] = [*retained_includes, selected_include]
+    document.setdefault("version", 4)
+    document.setdefault("vendor", {"conan": {}})
+    user_presets.write_text(f"{json.dumps(document, indent=2)}\n", encoding="utf-8")
+
+
 def read_cmake_cache_value(build_dir: Path, key: str) -> str | None:
     cache_path = build_dir / "CMakeCache.txt"
     if not cache_path.exists():
@@ -313,6 +348,7 @@ def main() -> int:
 
     if not args.build_only:
         toolchain_file = find_conan_toolchain(build_dir, args.build_type)
+        select_conan_cmake_preset(root, toolchain_file)
         configure_cmd = [
             "cmake",
             "-S",

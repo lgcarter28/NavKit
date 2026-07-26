@@ -1,0 +1,5 @@
+CompileFlags:
+  # The default selected product provides source navigation. To inspect the
+  # profiled product, point this at its sibling build directory and restart
+  # clangd from VS Code.
+  CompilationDatabase: build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault

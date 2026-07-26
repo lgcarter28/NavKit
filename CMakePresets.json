@@ -2,60 +2,84 @@
   "version": 4,
   "configurePresets": [
     {
-      "name": "debug-ecef-ins-gnss",
-      "displayName": "Debug - navkit_sim EcefInsGnss",
-      "binaryDir": "${sourceDir}/build/debug/apps/navkit_sim/EcefInsGnss",
+      "name": "debug-ecef-ins-gnss-lc-gyro-accel-bias-default",
+      "displayName": "Debug - ECEF INS/GNSS LC gyro/accel bias default",
+      "binaryDir": "${sourceDir}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/debug/apps/navkit_sim/EcefInsGnss/build/Debug/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "apps/navkit_sim/EcefInsGnss.hpp"
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/build/Debug/generators/conan_toolchain.cmake",
+        "NAVKIT_CONFIG": "apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
       }
     },
     {
-      "name": "debug-profiled-ecef-ins-gnss",
-      "displayName": "Debug - navkit_sim ProfiledEcefInsGnss",
-      "binaryDir": "${sourceDir}/build/debug/apps/navkit_sim/ProfiledEcefInsGnss",
+      "name": "debug-ecef-ins-gnss-lc-gyro-accel-bias-profiled",
+      "displayName": "Debug - ECEF INS/GNSS LC gyro/accel bias profiled",
+      "binaryDir": "${sourceDir}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/debug/apps/navkit_sim/ProfiledEcefInsGnss/build/Debug/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "apps/navkit_sim/ProfiledEcefInsGnss.hpp"
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled/build/Debug/generators/conan_toolchain.cmake",
+        "NAVKIT_CONFIG": "apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp"
       }
     },
     {
-      "name": "release-ecef-ins-gnss",
-      "displayName": "Release - navkit_sim EcefInsGnss",
-      "binaryDir": "${sourceDir}/build/release/apps/navkit_sim/EcefInsGnss",
+      "name": "release-ecef-ins-gnss-lc-gyro-accel-bias-default",
+      "displayName": "Release - ECEF INS/GNSS LC gyro/accel bias default",
+      "binaryDir": "${sourceDir}/build/release/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/release/apps/navkit_sim/EcefInsGnss/build/Release/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "apps/navkit_sim/EcefInsGnss.hpp"
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/release/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/build/Release/generators/conan_toolchain.cmake",
+        "NAVKIT_CONFIG": "apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
       }
     },
     {
-      "name": "release-profiled-ecef-ins-gnss",
-      "displayName": "Release - navkit_sim ProfiledEcefInsGnss",
-      "binaryDir": "${sourceDir}/build/release/apps/navkit_sim/ProfiledEcefInsGnss",
+      "name": "release-ecef-ins-gnss-lc-gyro-accel-bias-profiled",
+      "displayName": "Release - ECEF INS/GNSS LC gyro/accel bias profiled",
+      "binaryDir": "${sourceDir}/build/release/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/release/apps/navkit_sim/ProfiledEcefInsGnss/build/Release/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "apps/navkit_sim/ProfiledEcefInsGnss.hpp"
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/release/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled/build/Release/generators/conan_toolchain.cmake",
+        "NAVKIT_CONFIG": "apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp"
       }
     }
   ],
   "buildPresets": [
-    { "name": "debug-ecef-ins-gnss", "configurePreset": "debug-ecef-ins-gnss" },
-    { "name": "debug-profiled-ecef-ins-gnss", "configurePreset": "debug-profiled-ecef-ins-gnss" },
-    { "name": "release-ecef-ins-gnss", "configurePreset": "release-ecef-ins-gnss" },
-    { "name": "release-profiled-ecef-ins-gnss", "configurePreset": "release-profiled-ecef-ins-gnss" }
+    {
+      "name": "debug-ecef-ins-gnss-lc-gyro-accel-bias-default",
+      "configurePreset": "debug-ecef-ins-gnss-lc-gyro-accel-bias-default"
+    },
+    {
+      "name": "debug-ecef-ins-gnss-lc-gyro-accel-bias-profiled",
+      "configurePreset": "debug-ecef-ins-gnss-lc-gyro-accel-bias-profiled"
+    },
+    {
+      "name": "release-ecef-ins-gnss-lc-gyro-accel-bias-default",
+      "configurePreset": "release-ecef-ins-gnss-lc-gyro-accel-bias-default"
+    },
+    {
+      "name": "release-ecef-ins-gnss-lc-gyro-accel-bias-profiled",
+      "configurePreset": "release-ecef-ins-gnss-lc-gyro-accel-bias-profiled"
+    }
   ],
   "testPresets": [
-    { "name": "debug-ecef-ins-gnss", "configurePreset": "debug-ecef-ins-gnss" },
-    { "name": "debug-profiled-ecef-ins-gnss", "configurePreset": "debug-profiled-ecef-ins-gnss" },
-    { "name": "release-ecef-ins-gnss", "configurePreset": "release-ecef-ins-gnss" },
-    { "name": "release-profiled-ecef-ins-gnss", "configurePreset": "release-profiled-ecef-ins-gnss" }
+    {
+      "name": "debug-ecef-ins-gnss-lc-gyro-accel-bias-default",
+      "configurePreset": "debug-ecef-ins-gnss-lc-gyro-accel-bias-default"
+    },
+    {
+      "name": "debug-ecef-ins-gnss-lc-gyro-accel-bias-profiled",
+      "configurePreset": "debug-ecef-ins-gnss-lc-gyro-accel-bias-profiled"
+    },
+    {
+      "name": "release-ecef-ins-gnss-lc-gyro-accel-bias-default",
+      "configurePreset": "release-ecef-ins-gnss-lc-gyro-accel-bias-default"
+    },
+    {
+      "name": "release-ecef-ins-gnss-lc-gyro-accel-bias-profiled",
+      "configurePreset": "release-ecef-ins-gnss-lc-gyro-accel-bias-profiled"
+    }
   ]
 }

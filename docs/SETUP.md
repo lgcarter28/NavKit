@@ -386,16 +386,16 @@ already-built executable at runtime. When you intentionally keep multiple build
 trees for different selected configs, pass the matching `--build-dir` to the run
 wrapper.
 
-`CMakePresets.json` also contains example selected-config presets such as
-`debug-ecef-ins-gnss`, `debug-profiled-ecef-ins-gnss`,
-`release-ecef-ins-gnss`, and `release-profiled-ecef-ins-gnss`. As with any
-Conan-backed CMake preset, install dependencies into the preset binary directory
-before configuring if the toolchain file does not exist yet.
+`CMakePresets.json` contains selected-config presets for the default and
+profiled ECEF INS/GNSS loosely coupled gyro/accelerometer-bias products. As
+with any Conan-backed CMake preset, install dependencies into the preset binary
+directory before configuring if the toolchain file does not exist yet.
 
-Conan may generate a local `CMakeUserPresets.json` that includes dependency
-toolchain presets for whichever build trees you configured. Treat that file as
-local machine state; it is ignored by git. The repository-owned preset examples
-live in `CMakePresets.json`.
+Conan generates a local `CMakeUserPresets.json` with its dependency-toolchain
+preset. Treat that file as local machine state; it is ignored by git. The build
+wrapper retains only the currently selected Conan generated-preset include, so
+multiple config build trees cannot create duplicate `conan-debug`/`conan-release`
+preset names. The repository-owned product presets live in `CMakePresets.json`.
 
 ---
 
@@ -746,6 +746,22 @@ timing and hosted-runner binary sizes are intentionally not pass/fail gates.
 
 NavKit provides VS Code launch configurations for debugging.
 
+The checked-in default is the ECEF INS/GNSS loosely coupled product with gyro
+and accelerometer bias states. Its clangd and C/C++ IntelliSense configuration
+uses:
+
+```text
+build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/
+    EcefInsGnssLcGyroAccelBiasDefault/compile_commands.json
+```
+
+The launch configurations provide default and profiled simulation entries. To
+navigate the profiled product accurately, change `.clangd` and
+`C_Cpp.default.compileCommands` to the profiled sibling build directory, then
+run **Clangd: Restart language server** in VS Code. The selected compile-time
+product and its compile database must always match; one executable cannot
+dynamically switch compile-time configs.
+
 Recommended workflow:
 
 1. Build a Debug configuration manually:
@@ -764,10 +780,12 @@ python tools/build.py --build-type Debug --clean
 
 3. Press **F5** and select one of the launch configurations:
 
-- **Windows Debug navkit_sim**
-- **Windows Debug navkit_tests**
-- **Linux Debug navkit_sim**
-- **Linux Debug navkit_tests**
+- **Windows Debug navkit_sim (default)**
+- **Windows Debug navkit_sim (profiled)**
+- **Windows Debug navkit_tests (default)**
+- **Linux Debug navkit_sim (default)**
+- **Linux Debug navkit_sim (profiled)**
+- **Linux Debug navkit_tests (default)**
 
 The launch configurations intentionally assume a Debug build already exists and do not invoke the build system automatically. This keeps debugger startup fast and avoids issues related to Python virtual environments, Conan, and shell activation.
 

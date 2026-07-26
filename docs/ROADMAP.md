@@ -68,11 +68,16 @@ These are preserved at high level so the roadmap stays readable. Detailed pass-b
 
 ## Current phase
 
-Phase 6: Monte Carlo and batch analysis is complete. Phase 5 produced the first working ECEF INS/GNSS baseline; Phase 6 turned that single-run product into repeatable statistical evidence with scalable offline analysis. Phase 7 trajectory-provider expansion is next.
+Phase 7: trajectory-provider and timebase expansion is active. Phase 6 established repeatable statistical evidence; Phase 7 first makes multi-rate timing exact and inspectable before broadening trajectory sources and scenarios.
 
 ## Active passes
 
-- No active pass is scheduled. Start Phase 7 only after its first pass is promoted from the detailed roadmap.
+## Pass 7.1: timebase and multi-rate scheduling
+
+- [ ] Define separate scalar-seconds math, timestamp, duration, and runtime-rate responsibilities. Retain convenient scalar seconds for physical equations unless a stronger type improves a real boundary; do not substitute `std::chrono::duration<double>` merely to wrap the existing floating-point accumulation problem.
+- [ ] Implement exact/reproducible multi-rate scheduling for non-terminating periods such as 600 Hz using integer sample indices plus a rational or fixed-point rate descriptor. Derive timestamps from index/rate rather than accumulating rounded `dt_s` values.
+- [ ] Keep JSON `rate_hz` and `dt_s` input compatibility, validate mutually exclusive selection, and document the canonical internal scheduling form.
+- [ ] Add focused tests covering 600 Hz, incommensurate consumer rates, long-duration phase error, due-event ordering, and logging cadence independent of the producer rate.
 
 ## Future phase details
 

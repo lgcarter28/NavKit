@@ -1,5 +1,6 @@
 {
-  "C_Cpp.default.cppStandard": "c++20",
+  "C_Cpp.default.cppStandard": "c++23",
+  "C_Cpp.default.compileCommands": "${workspaceFolder}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/compile_commands.json",
   "cmake.configureOnOpen": false,
   "files.associations": {
     "*.hpp": "cpp",
