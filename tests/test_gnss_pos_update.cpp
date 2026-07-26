@@ -52,7 +52,7 @@ typename Model::State_t attitude_perturbed_state(const typename Model::State_t& 
 
 TEST_CASE("GNSS position update moves state toward measurement")
 {
-    using StateDef = navkit::core::estimation::DefaultInsStateDef;
+    using StateDef = navkit::core::estimation::InsGyroAccelBiasStateDef;
     using Nominal = StateDef::Nominal;
     using Model = navkit::core::models::GnssPosModel<StateDef>;
     navkit::core::estimation::KalmanFilter<StateDef> kf;
@@ -80,7 +80,7 @@ TEST_CASE("GNSS position update moves state toward measurement")
 
 TEST_CASE("GNSS position Jacobian follows truth-minus-estimate error convention")
 {
-    using StateDef = navkit::core::estimation::DefaultInsStateDef;
+    using StateDef = navkit::core::estimation::InsGyroAccelBiasStateDef;
     using Error = StateDef::Error;
     using Model = navkit::core::models::GnssPosModel<StateDef>;
 
@@ -94,7 +94,7 @@ TEST_CASE("GNSS position Jacobian follows truth-minus-estimate error convention"
 
 TEST_CASE("GNSS velocity Jacobian follows truth-minus-estimate error convention")
 {
-    using StateDef = navkit::core::estimation::DefaultInsStateDef;
+    using StateDef = navkit::core::estimation::InsGyroAccelBiasStateDef;
     using Error = StateDef::Error;
     using Model = navkit::core::models::GnssVelModel<StateDef>;
 
@@ -108,7 +108,7 @@ TEST_CASE("GNSS velocity Jacobian follows truth-minus-estimate error convention"
 
 TEST_CASE("GNSS position lever-arm Jacobian matches finite difference")
 {
-    using StateDef = navkit::core::estimation::DefaultInsStateDef;
+    using StateDef = navkit::core::estimation::InsGyroAccelBiasStateDef;
     using Error = StateDef::Error;
     using Model = navkit::core::models::GnssPosModel<StateDef>;
 
@@ -129,7 +129,7 @@ TEST_CASE("GNSS position lever-arm Jacobian matches finite difference")
 
 TEST_CASE("GNSS velocity lever-arm Jacobian matches finite difference")
 {
-    using StateDef = navkit::core::estimation::DefaultInsStateDef;
+    using StateDef = navkit::core::estimation::InsGyroAccelBiasStateDef;
     using Error = StateDef::Error;
     using Model = navkit::core::models::GnssVelModel<StateDef>;
 

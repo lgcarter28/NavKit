@@ -31,7 +31,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--navkit-config",
-        default="apps/navkit_sim/EcefInsGnss.hpp",
+        default="apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp",
         help="Compile-time config header relative to config/compiletime.",
     )
     parser.add_argument(

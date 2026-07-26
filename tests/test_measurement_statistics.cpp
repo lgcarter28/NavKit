@@ -15,7 +15,7 @@ namespace navkit::core::estimation::test
 namespace
 {
 
-using StateDef = DefaultInsStateDef;
+using StateDef = InsGyroAccelBiasStateDef;
 using Nominal = StateDef::Nominal;
 using Error = StateDef::Error;
 using Model = navkit::core::models::GnssPosModel<StateDef>;

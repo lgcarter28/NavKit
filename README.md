@@ -162,7 +162,7 @@ Run a specific runtime input and put all logs/figures under a chosen output
 folder:
 
 ```text
-python tools/run_scenario.py --build-type Release --config config/runtime/navkit_sim/ecef_ins_gnss.json --output-dir output/logs/my_case
+python tools/run_scenario.py --build-type Release --config config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json --output-dir output/logs/my_case
 ```
 
 ## Documentation

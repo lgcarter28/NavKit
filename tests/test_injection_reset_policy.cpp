@@ -94,7 +94,8 @@ struct MissingErrorStateReset
 TEST_CASE("InjectionPolicy accepts compatible policies")
 {
     static_assert(InjectionPolicy<ValidInjection, PolicyTestStateDef>);
-    static_assert(InjectionPolicy<DefaultInjectionPolicy<DefaultInsStateDef>, DefaultInsStateDef>);
+    static_assert(InjectionPolicy<DefaultInjectionPolicy<InsGyroAccelBiasStateDef>,
+                                  InsGyroAccelBiasStateDef>);
 
     CHECK(true);
 }
@@ -110,7 +111,8 @@ TEST_CASE("InjectionPolicy rejects incompatible policies")
 TEST_CASE("ResetPolicy accepts compatible policies")
 {
     static_assert(ResetPolicy<ValidReset, PolicyTestStateDef>);
-    static_assert(ResetPolicy<DefaultResetPolicy<DefaultInsStateDef>, DefaultInsStateDef>);
+    static_assert(
+        ResetPolicy<DefaultResetPolicy<InsGyroAccelBiasStateDef>, InsGyroAccelBiasStateDef>);
 
     CHECK(true);
 }
@@ -134,7 +136,7 @@ TEST_CASE("KalmanFilter accepts constrained injection and reset policies")
 
 TEST_CASE("Default INS injection follows truth-minus-estimate additive convention")
 {
-    using StateDef = DefaultInsStateDef;
+    using StateDef = InsGyroAccelBiasStateDef;
     using Nominal = StateDef::Nominal;
     using Error = StateDef::Error;
 
@@ -162,7 +164,7 @@ TEST_CASE("Default INS injection follows truth-minus-estimate additive conventio
 
 TEST_CASE("Default INS injection maps ECEF attitude-error correction to stored q_b2e")
 {
-    using StateDef = DefaultInsStateDef;
+    using StateDef = InsGyroAccelBiasStateDef;
     using Nominal = StateDef::Nominal;
     using Error = StateDef::Error;
 

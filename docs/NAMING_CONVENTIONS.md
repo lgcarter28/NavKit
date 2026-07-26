@@ -2,6 +2,10 @@
 
 NavKit uses Groves-style inertial navigation notation in code and logs.
 
+Runtime and compile-time configuration filenames follow the ownership and
+scenario taxonomy in [Configuration](CONFIGURATION.md#runtime-configuration-layout-and-naming).
+That document is the single normative source for configuration-file naming.
+
 ## Kinematic variable names
 
 The convention is, for the mathematical variable $x_{ab}^c$, the programming variable name follows:

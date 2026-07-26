@@ -322,17 +322,17 @@ In day-to-day development, `--build-only` is typically sufficient unless CMake c
 
 Select a compile-time configuration with `--navkit-config`. The value is
 relative to `config/compiletime`, and defaults to
-`apps/navkit_sim/EcefInsGnss.hpp`:
+`apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp`:
 
 ```bash
-python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/EcefInsGnss.hpp
+python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
 That app-level selection composes:
 
 ```text
-config/compiletime/apps/navkit_sim/EcefInsGnss.hpp
-    -> config/compiletime/navkit/products/EcefInsGnss.hpp
+config/compiletime/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
+    -> config/compiletime/navkit/products/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
 The app config is the executable composition selected by CMake. The NavKit
@@ -344,12 +344,12 @@ To run the same stationary GNSS scenario with the embedded-style profiling
 configuration:
 
 ```bash
-python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/ProfiledEcefInsGnss.hpp
-python tools/run_sim.py --build-type Debug --navkit-config apps/navkit_sim/ProfiledEcefInsGnss.hpp
+python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp
+python tools/run_sim.py --build-type Debug --navkit-config apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp
 ```
 
 That writes `profile.csv` and `profile.trace.json` under
-`output/logs/ecef_ins_gnss_demo/`. The run wrapper reads the selected
+`output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/`. The run wrapper reads the selected
 compile-time config from the build manifest written by `build.py`; it does not
 reselect compile-time configuration at run time. Use `--no-profile-trace` when
 you want only the compact CSV profile export.
@@ -357,7 +357,7 @@ you want only the compact CSV profile export.
 Use a separate build directory for each selected compile-time configuration:
 
 ```bash
-python tools/build.py --build-type Debug --build-dir build/custom/ecef-ins-gnss --navkit-config apps/navkit_sim/EcefInsGnss.hpp
+python tools/build.py --build-type Debug --build-dir build/custom/ecef-ins-gnss --navkit-config apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
 The wrapper requires Ninja for its official default layout and derives build
@@ -365,7 +365,7 @@ directories from build type and selected config, for example:
 
 ```text
 build/debug/apps/navkit_sim/EcefInsGnss
-build/debug/apps/navkit_sim/ProfiledEcefInsGnss
+build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled
 ```
 
 This keeps each generated `navkit/SelectedConfig.hpp` isolated. Debug/Release
@@ -440,7 +440,7 @@ conan install . --output-folder build/debug/apps/navkit_sim/EcefInsGnss --build=
 Conan 2 usually writes the generated CMake toolchain file to:
 
 ```text
-build/debug/apps/navkit_sim/EcefInsGnss/build/Debug/generators/conan_toolchain.cmake
+build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/build/Debug/generators/conan_toolchain.cmake
 ```
 
 On Windows with Ninja/MSVC, run the manual CMake configure and build commands
@@ -448,27 +448,27 @@ from a Visual Studio Developer Prompt or first activate Conan's generated build
 environment:
 
 ```powershell
-build\\debug\\apps\\navkit_sim\\EcefInsGnss\build\Debug\generators\conanbuild.bat
+build\\debug\\apps\\navkit_sim\\EcefInsGnssLcGyroAccelBiasDefault\build\Debug\generators\conanbuild.bat
 ```
 
 Configure CMake manually:
 
 ```bash
-cmake -S . -B build/debug/apps/navkit_sim/EcefInsGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/debug/apps/navkit_sim/EcefInsGnss/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/EcefInsGnss.hpp
+cmake -S . -B build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
 To select a different compile-time config manually, use a matching build
 directory and `-DNAVKIT_CONFIG=...`:
 
 ```bash
-conan install . --output-folder build/debug/apps/navkit_sim/ProfiledEcefInsGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Debug
-cmake -S . -B build/debug/apps/navkit_sim/ProfiledEcefInsGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/debug/apps/navkit_sim/ProfiledEcefInsGnss/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/ProfiledEcefInsGnss.hpp
+conan install . --output-folder build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Debug
+cmake -S . -B build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp
 ```
 
 Build manually:
 
 ```bash
-cmake --build build/debug/apps/navkit_sim/EcefInsGnss --config Debug
+cmake --build build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault --config Debug
 ```
 
 Install a staged local build when validating the deployable layout:
@@ -480,7 +480,7 @@ python tools/build.py --build-type Debug --build-only --install
 The default install prefix mirrors the selected build:
 
 ```text
-install/debug/apps/navkit_sim/EcefInsGnss
+install/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault
 ```
 
 The install tree contains public headers, exported CMake package files,
@@ -491,9 +491,9 @@ default.
 For Release, replace `Debug` with `Release`:
 
 ```bash
-conan install . --output-folder build/release/apps/navkit_sim/EcefInsGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Release
-cmake -S . -B build/release/apps/navkit_sim/EcefInsGnss -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/release/apps/navkit_sim/EcefInsGnss/build/Release/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DNAVKIT_CONFIG=apps/navkit_sim/EcefInsGnss.hpp
-cmake --build build/release/apps/navkit_sim/EcefInsGnss --config Release
+conan install . --output-folder build/release/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Release
+cmake -S . -B build/release/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/release/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/build/Release/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DNAVKIT_CONFIG=apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
+cmake --build build/release/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault --config Release
 ```
 
 Notes:
@@ -540,19 +540,23 @@ For numerically intensive simulation and plotting, prefer a Release build. A
 single command can select the runtime input and output directory:
 
 ```bash
-python tools/run_scenario.py --build-type Release --config config/runtime/navkit_sim/ecef_ins_gnss_runtime_covariance.json --output-dir output/logs/my_case
+python tools/run_scenario.py --build-type Release --config config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_covariance_override.json --output-dir output/logs/my_case
 ```
 
 Use `run_sim.py` when only the C++ simulation should run:
 
 ```bash
-python tools/run_sim.py --build-type Debug --config config/runtime/navkit_sim/ecef_ins_gnss.json
+python tools/run_sim.py --build-type Debug --config config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json
 ```
+
+Both scenario tools resolve role-keyed component links and write a
+`data/effective_runtime_config.json` beside the run output. Invoke
+`navkit_sim.exe` directly only with that resolved file.
 
 Run a Monte Carlo campaign with:
 
 ```bash
-python tools/run_monte_carlo.py config/runtime/monte_carlo/ecef_ins_gnss_smoke.json --build-type Release
+python tools/run_monte_carlo.py config/runtime/monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_stationary_smoke_mc.json --build-type Release
 ```
 
 Single-run logs normally live under `output/logs/<run_name>/`; Monte Carlo
@@ -577,7 +581,7 @@ For the default stationary GNSS workflow:
 
 ```bash
 python tools/run_sim.py --build-type Debug
-python tools/plot_run.py output/logs/ecef_ins_gnss_demo
+python tools/plot_run.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal
 ```
 
 Both commands update `timing.json` and print a compact timing summary for the
@@ -587,7 +591,7 @@ output needs to stay quiet.
 To view the timing artifact as a compact terminal report:
 
 ```bash
-python tools/timing_report.py output/logs/ecef_ins_gnss_demo/timing.json
+python tools/timing_report.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/data/timing.json
 ```
 
 Build, test, simulation, and analysis wrappers update the default timing
@@ -610,7 +614,7 @@ terminal output should stay quiet.
 To write a coarse executable/library size report for a build tree:
 
 ```bash
-python tools/resource_report.py --build-type Debug --output output/logs/ecef_ins_gnss_demo/resources-debug-local.json
+python tools/resource_report.py --build-type Debug --output output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/resources-debug-local.json
 ```
 
 `build.py` writes and displays the same coarse artifact-size report by default
@@ -621,7 +625,7 @@ For a Release size snapshot:
 
 ```bash
 python tools/build.py --build-type Release --clean --without-tests
-python tools/resource_report.py --build-type Release --output output/logs/ecef_ins_gnss_demo/resources-release-local.json
+python tools/resource_report.py --build-type Release --output output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/resources-release-local.json
 ```
 
 These files are intended for trend review and future Monte Carlo summaries.

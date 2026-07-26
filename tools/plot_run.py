@@ -29,7 +29,7 @@ def run_dir_from_argv(argv: list[str]) -> Path:
         if not item.startswith("-"):
             return Path(item)
 
-    return Path("output/logs/ecef_ins_gnss_demo")
+    return Path("output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal")
 
 
 def run_name_from_dir(run_dir: Path) -> str:

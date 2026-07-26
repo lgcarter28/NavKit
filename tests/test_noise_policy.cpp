@@ -14,7 +14,7 @@
 namespace navkit::core::estimation::test
 {
 
-using NoiseTestModel = navkit::core::models::GnssPosModel<DefaultInsStateDef>;
+using NoiseTestModel = navkit::core::models::GnssPosModel<InsGyroAccelBiasStateDef>;
 using NoiseTestMeasurement = Measurement<NoiseTestModel::M>;
 
 struct ExactNoisePolicy

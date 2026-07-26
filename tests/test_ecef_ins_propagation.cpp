@@ -24,13 +24,13 @@ using navkit::core::Vec3;
 using navkit::core::environment::J2;
 using navkit::core::environment::Wgs84;
 using StationaryPropagation = EcefInsPropagation<Wgs84, J2<Wgs84>>;
-using StationaryFilter = KalmanFilter<DefaultInsStateDef>;
-using NominalStateDef = DefaultInsStateDef::Nominal;
-using ErrorStateDef = DefaultInsStateDef::Error;
+using StationaryFilter = KalmanFilter<InsGyroAccelBiasStateDef>;
+using NominalStateDef = InsGyroAccelBiasStateDef::Nominal;
+using ErrorStateDef = InsGyroAccelBiasStateDef::Error;
 
 struct NonzeroProcessNoise
 {
-    using ProcessNoise_t = EcefInsProcessNoise;
+    using ProcessNoise_t = ImuProcessNoise;
 
     inline static const ProcessNoise_t process_noise{
         .gyro_white_noise_psd_rad2ps = Vec3::Constant(1.0e-8),
@@ -86,8 +86,8 @@ void initialize_stationary_filter(StationaryFilter& filter)
 
 TEST_CASE("Rotation-vector quaternion helper round-trips small attitude corrections")
 {
-    static_assert(PropagationPolicy<StationaryPropagation, DefaultInsStateDef>);
-    static_assert(PropagationPolicy<NoisyPropagation, DefaultInsStateDef>);
+    static_assert(PropagationPolicy<StationaryPropagation, InsGyroAccelBiasStateDef>);
+    static_assert(PropagationPolicy<NoisyPropagation, InsGyroAccelBiasStateDef>);
 
     const Vec3 phi{0.01, -0.02, 0.03};
     const auto q = navkit::core::math::quaternion_from_rotvec_rad(phi);
@@ -122,7 +122,7 @@ TEST_CASE("Ideal stationary ECEF IMU increment preserves nominal PVA")
     REQUIRE(ideal_stationary_increment(increment));
 
     StationaryPropagation propagation;
-    REQUIRE(propagation.process_imu_increment<DefaultInsStateDef>(increment, filter.state()));
+    REQUIRE(propagation.process_imu_increment<InsGyroAccelBiasStateDef>(increment, filter.state()));
 
     const auto& state = filter.state();
     CHECK(segment<NominalStateDef::Pos>(state).isApprox(Vec3{Wgs84::a_m, 0.0, 0.0}, 1.0e-8));
@@ -145,7 +145,8 @@ TEST_CASE("Ideal stationary ECEF IMU increments keep pure strapdown bounded at 1
         ImuIncrement increment;
         REQUIRE(simulator.generate(stationary_sample(static_cast<Time_t>(k) * dt_s), increment));
         StationaryPropagation propagation;
-        REQUIRE(propagation.process_imu_increment<DefaultInsStateDef>(increment, filter.state()));
+        REQUIRE(
+            propagation.process_imu_increment<InsGyroAccelBiasStateDef>(increment, filter.state()));
     }
 
     const auto& state = filter.state();
@@ -165,9 +166,9 @@ TEST_CASE("ECEF INS covariance prediction remains symmetric and process-noise dr
     StationaryFilter::P_t phi{};
     StationaryFilter::P_t qd{};
     NoisyPropagation propagation;
-    REQUIRE(propagation.covariance_step_from_increment<DefaultInsStateDef>(
+    REQUIRE(propagation.covariance_step_from_increment<InsGyroAccelBiasStateDef>(
         filter.state(), increment, phi, qd));
-    REQUIRE(propagation.process_imu_increment<DefaultInsStateDef>(increment, filter.state()));
+    REQUIRE(propagation.process_imu_increment<InsGyroAccelBiasStateDef>(increment, filter.state()));
     filter.propagate_covariance(phi, qd);
 
     const auto& covariance = filter.covariance();
@@ -188,7 +189,7 @@ TEST_CASE("ECEF INS covariance prediction applies Gauss-Markov bias damping")
     StationaryFilter::P_t phi{};
     StationaryFilter::P_t qd{};
     NoisyPropagation propagation;
-    REQUIRE(propagation.covariance_step_from_increment<DefaultInsStateDef>(
+    REQUIRE(propagation.covariance_step_from_increment<InsGyroAccelBiasStateDef>(
         filter.state(), increment, phi, qd));
 
     CHECK(phi(ErrorStateDef::GyroB::i + 0, ErrorStateDef::GyroB::i + 0) == doctest::Approx(0.5));
@@ -201,8 +202,8 @@ TEST_CASE("ECEF INS propagation rejects invalid IMU intervals without throwing")
     initialize_stationary_filter(filter);
 
     StationaryPropagation propagation;
-    CHECK_FALSE(
-        propagation.process_imu_increment<DefaultInsStateDef>(ImuIncrement{}, filter.state()));
+    CHECK_FALSE(propagation.process_imu_increment<InsGyroAccelBiasStateDef>(ImuIncrement{},
+                                                                            filter.state()));
 }
 
 } // namespace navkit::core::estimation::test

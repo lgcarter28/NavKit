@@ -5,6 +5,7 @@
 
 #include "navkit/app_support/initialization/CovarianceFloorJson.hpp"
 #include "navkit/app_support/initialization/InitialCovarianceJson.hpp"
+#include "navkit/app_support/initialization/InitialEstimateErrorJson.hpp"
 #include "navkit/app_support/initialization/NavInitialization.hpp"
 #include "navkit/app_support/initialization/NominalStateOverrideJson.hpp"
 #include "navkit/app_support/runtime/PropagationRuntimeConfigJson.hpp"
@@ -49,9 +50,11 @@ void initialize_propagator(const nlohmann::json& cfg, Propagation& propagation)
 }
 
 template<typename InitializerConfig, typename Navigator>
-void initialize_navigator(const PvaInitialization& pva_init,
-                          const nlohmann::json& cfg,
-                          Navigator& navigator)
+void initialize_navigator(
+    const PvaInitialization& pva_init,
+    const nlohmann::json& cfg,
+    const InitialTruthReference<typename InitializerConfig::StateDef>& truth_reference,
+    Navigator& navigator)
 {
     using StateDef = typename InitializerConfig::StateDef;
     const typename Navigator::Filter_t::P_t initial_covariance =
@@ -71,8 +74,32 @@ void initialize_navigator(const PvaInitialization& pva_init,
     };
     initialize_filter_from_nav_initialization<InitializerConfig>(
         nav_init, covariance_floor, navigator.filter());
+    detail::apply_runtime_initial_estimate_error<StateDef>(
+        cfg, truth_reference, navigator.filter().state());
     detail::apply_runtime_nominal_state_override<StateDef>(cfg, navigator.filter().state());
     initialize_propagator<InitializerConfig>(cfg, navigator.propagation());
+}
+
+/// Initialize a Navigator without simulation truth reference data.
+///
+/// This compatibility overload preserves ordinary application startup. Runtime
+/// `initial_estimate_error` is intentionally a simulation/analysis-only feature and
+/// therefore requires the explicit reference overload above.
+template<typename InitializerConfig, typename Navigator>
+void initialize_navigator(const PvaInitialization& pva_init,
+                          const nlohmann::json& cfg,
+                          Navigator& navigator)
+{
+    using StateDef = typename InitializerConfig::StateDef;
+    const nlohmann::json::const_iterator filter_initialization_iter =
+        cfg.find("filter_initialization");
+    if (filter_initialization_iter != cfg.end() && filter_initialization_iter->is_object() &&
+        filter_initialization_iter->contains("initial_estimate_error")) {
+        detail::throw_runtime_config_error(
+            "filter_initialization.initial_estimate_error requires a simulation truth reference");
+    }
+    InitialTruthReference<StateDef> empty_truth_reference{};
+    initialize_navigator<InitializerConfig>(pva_init, cfg, empty_truth_reference, navigator);
 }
 
 } // namespace navkit::app_support

@@ -17,8 +17,8 @@ template<typename Config>
 [[nodiscard]] nlohmann::json profile_compiletime_metadata()
 {
     if constexpr (has_profile_export_v<Config>) {
-        using Clock = typename Config::ProfileClock;
-        using Sink = typename Config::ProfileSink;
+        using Clock = typename Config::Profiling::ProfileClock;
+        using Sink = typename Config::Profiling::ProfileSink;
 
         return {{"enabled", true},
                 {"clock_source", std::string(Clock::source)},

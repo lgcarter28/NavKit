@@ -68,17 +68,21 @@ These are preserved at high level so the roadmap stays readable. Detailed pass-b
 
 ## Current phase
 
-NavKit is currently in Phase 6: Monte Carlo and batch analysis. Phase 5 produced the first working ECEF INS/GNSS baseline; Phase 6 turns that single-run product into repeatable statistical evidence.
+Phase 6: Monte Carlo and batch analysis is temporarily reopened for one bounded desktop-analysis scaling pass. Phase 5 produced the first working ECEF INS/GNSS baseline; Phase 6 turned that single-run product into repeatable statistical evidence. Phase 7 trajectory-provider expansion remains the next product-algorithm phase.
 
 ## Active passes
 
-## Pass 6.8: Monte Carlo initialization support
+## Pass 6.9: analysis performance characterization and low-risk scaling
 
-- [ ] Connect Monte Carlo execution to the Phase 5 advanced analysis/restart initialization path for deterministic seeded initial estimate errors and mid-trajectory restart studies.
-- [ ] Support deterministic seeded draws for initial estimate errors and simulator error terms without leaking simulator truth/error context into product-core code.
-- [ ] Add a separate simulation/analysis-only Monte Carlo initial-estimate-error path. This path should support deterministic seeds, explicit error vectors, and covariance-colored random draws in the selected `StateDef::Error` ordering so analysis runs can start mid-trajectory with statistically controlled estimator errors.
-- [ ] For Monte Carlo estimate-error initialization, distinguish between directly setting nominal estimates and sampling estimate errors relative to truth. For persistent estimated states such as IMU biases, the statistically consistent form is `estimated_state = true_state + sampled_estimate_error`, so the actual initial estimate error falls within the configured covariance.
-- [ ] Introduce an explicit app/sim-side reference context before implementing truth-relative non-PVA initialization. A future `InitialEstimateReference`-style object should carry truth kinematics plus truth sensor error/calibration states, such as IMU turn-on/in-run bias, without letting app-support initialization reach into simulator internals ad hoc.
+- [ ] Record per-stage desktop-analysis timings and throughput for CSV/HDF5 load, per-run derivation, aggregate reduction, HDF5 write/compression, each renderer, report generation, and campaign totals.
+- [ ] Record campaign scale and resource evidence: run/sample counts, raw-input and bundle sizes, retained-table mode, and practical process-memory observations where portable.
+- [ ] Ensure each selected artifact loads and derives only the data/columns it needs; preserve the existing lean Monte Carlo logging defaults.
+- [ ] Add explicit artifact-selection controls for bundle packaging, raw-table retention, aggregate plot families, consistency dashboard families, and static versus interactive rendering.
+- [ ] Add deterministic cache fingerprints over source manifests/log inputs, schema versions, time window, decimation, and rendering settings so unchanged packages and figures can be safely reused.
+- [ ] Evaluate HDF5 chunking/compression and introduce a documented `full` versus `derived_only` bundle mode before adding data-pipeline concurrency.
+- [ ] Add opt-in `analysis.parallel_jobs` only for independent post-bundle figure/dashboard rendering, defaulting to one worker and preserving deterministic output names.
+- [ ] Keep HDF5 final writes, aggregate merging, manifests, and reports single-owner. Defer worker-shard HDF5 writing and parallel CSV/derivation until profiling demonstrates that their benefit exceeds IPC, memory, and refactoring complexity.
+- [ ] Add serial-versus-parallel equivalence coverage before any parallel analysis mode can become the default.
 
 ## Future phase details
 

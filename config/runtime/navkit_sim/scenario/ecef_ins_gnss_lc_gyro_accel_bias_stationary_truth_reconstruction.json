@@ -1,0 +1,19 @@
+{
+  "components": {
+    "trajectory": "../components/trajectory/stationary_ecef_1000hz.json",
+    "imu": "../components/imu/ideal_raw.json",
+    "gnss": "../components/gnss/truth_pos_vel.json",
+    "pva_initialization": "../components/initialization/pva/pva_no_errors.json"
+  },
+  "run_name": "ecef_ins_gnss_lc_gyro_accel_bias_stationary_truth_reconstruction",
+  "output_dir": "output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_truth_reconstruction",
+  "logging": {
+    "console": { "enabled": true, "rate_hz": 1.0 },
+    "truth": { "enabled": true, "rate_hz": 10.0 },
+    "nav_estimate": { "enabled": true, "rate_hz": 10.0, "covariance": "triangular" },
+    "imu": { "enabled": true, "rate_hz": 100.0 },
+    "imu_debug": { "enabled": false },
+    "filter_correction": { "enabled": true, "rate_hz": 10.0, "covariance": "diagonal" },
+    "measurement_statistics": { "enabled": true, "rate_hz": 1.0 }
+  }
+}

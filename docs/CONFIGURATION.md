@@ -105,29 +105,29 @@ itself. It should not know which executable will consume it.
 For example:
 
 ```cpp
-struct MinimalConfig
+struct ExampleConfig
 {
     using Numeric = NumericConfig;
     using GnssBuffer = GnssBufferConfig;
 };
 
-static_assert(navkit::core::config::ConfigPolicy<MinimalConfig>);
-static_assert(navkit::core::estimation::BufferConfigPolicy<MinimalConfig::GnssBuffer>);
+static_assert(navkit::core::config::ConfigPolicy<ExampleConfig>);
+static_assert(navkit::core::estimation::BufferConfigPolicy<ExampleConfig::GnssBuffer>);
 ```
 
-`MinimalConfig` is intended as a teaching/example shape, not a universal
-production target and not a base class.
+Keep focused concept examples in tests rather than maintaining a second,
+non-runnable product configuration solely for teaching purposes.
 
 Runnable/product NavKit configs also expose the product graph that downstream
 apps consume:
 
 ```cpp
-struct EcefInsGnssConfig
+struct EcefInsGnssLcGyroAccelBiasDefaultConfig
 {
-    using StateDef = navkit::core::estimation::DefaultInsStateDef;
+    using StateDef = navkit::core::estimation::InsGyroAccelBiasStateDef;
     using SensorGraph = components::PrimaryGnssPosVelSensors<StateDef>;
-    using InitialCovariance = components::DefaultInsInitialCovariance;
-    using PropagationConfig = components::EcefInsGnssPropagation;
+    using InitialCovariance = components::InsGyroAccelBiasInitialCovarianceDefault;
+    using PropagationConfig = components::EcefInsPropagationConfig;
     using PrimaryGnssPositionSensor = typename SensorGraph::PrimaryGnssPositionSensor;
     using PrimaryGnssVelocitySensor = typename SensorGraph::PrimaryGnssVelocitySensor;
     using Sensors = typename SensorGraph::Sensors;
@@ -138,7 +138,7 @@ struct EcefInsGnssConfig
     using Navigator = /* concrete navigator type */;
 };
 
-static_assert(navkit::api::config::NavKitProductConfigPolicy<EcefInsGnssConfig>);
+static_assert(navkit::api::config::NavKitProductConfigPolicy<EcefInsGnssLcGyroAccelBiasDefaultConfig>);
 ```
 
 `SensorId` gives each configured sensor a stable product-graph identity even
@@ -175,7 +175,7 @@ being built:
 ```cpp
 struct EcefInsGnssAppConfig
 {
-    using NavKit = navkit::config::navkit::EcefInsGnssConfig;
+    using NavKit = navkit::config::navkit::EcefInsGnssLcGyroAccelBiasDefaultConfig;
 
     using PrimaryGnssSensor = typename NavKit::PrimaryGnssSensor;
     using PrimaryGnssEmulator = navkit::app_support::GnssEmulator<PrimaryGnssSensor::Id>;
@@ -262,8 +262,8 @@ does not apply a truth-relative error.
 The app and NavKit config trees are deliberately separate:
 
 ```text
-config/compiletime/navkit/products/EcefInsGnss.hpp
-config/compiletime/apps/navkit_sim/EcefInsGnss.hpp
+config/compiletime/navkit/products/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
+config/compiletime/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
 Using the same descriptive file name in both places is fine because the
@@ -331,14 +331,14 @@ contract. Do not hide fallback scenario behavior in app-support helpers.
 The CMake model is one compile-time configuration per build tree:
 
 ```text
-cmake -S . -B build/debug/apps/navkit_sim/EcefInsGnss -G Ninja -DNAVKIT_CONFIG=apps/navkit_sim/EcefInsGnss.hpp
+cmake -S . -B build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault -G Ninja -DNAVKIT_CONFIG=apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
 `NAVKIT_CONFIG` is a CMake cache variable relative to `config/compiletime`. It
 has a useful default:
 
 ```text
-apps/navkit_sim/EcefInsGnss.hpp
+apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
 Debug/Release and `NAVKIT_CONFIG` are separate axes:
@@ -353,11 +353,11 @@ default, repository Python tools derive the build directory from the selected
 config header:
 
 ```text
-apps/navkit_sim/EcefInsGnss.hpp
-    -> build/debug/apps/navkit_sim/EcefInsGnss
+apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
+    -> build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault
 
-apps/navkit_sim/ProfiledEcefInsGnss.hpp
-    -> build/debug/apps/navkit_sim/ProfiledEcefInsGnss
+apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp
+    -> build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled
 ```
 
 Runtime JSON is still checked against the compiled app composition. For example,
@@ -373,19 +373,82 @@ examples are available for directed tests and debugging. This validation lives
 in `navkit::app_support` because it is app/runtime-input glue, not reusable
 product-core NavKit configuration.
 
-Scenario files may link reusable runtime components through explicit
-role-to-path entries. Component paths are resolved relative to the scenario
-file, loaded first, and then the scenario's inline values are merged on top:
+### Runtime configuration layout and naming
+
+Runtime JSON has two intentional roles:
+
+```text
+config/runtime/navkit_sim/
+  components/  # reusable physical, estimator, and initialization fragments
+  scenario/    # complete runnable simulation compositions
+```
+
+Scenario filenames use lowercase `snake_case` and follow:
+
+```text
+<product>_<trajectory>_<purpose>.json
+```
+
+The `<product>` token identifies the selected navigation architecture, in this
+order:
+
+```text
+<mechanization>_<aiding>_<coupling>_<state_model>
+```
+
+`lc` and `tc` are the canonical abbreviations for loosely and tightly coupled
+aiding. For example, `ecef_ins_gnss_lc_gyro_accel_bias` is the ECEF INS,
+GNSS-aided, loosely coupled product with gyro- and accelerometer-bias error
+states. A concrete state-model token is required when it changes the selected
+compile-time state-space contract; it is not a scenario-local tuning detail.
+
+For example, `ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json` is the baseline ECEF
+INS/GNSS simulation with a stationary trajectory, while
+`ecef_ins_gnss_lc_gyro_accel_bias_stationary_covariance_matched.json` makes the intended
+covariance-matching study explicit. Do not encode implementation details such
+as `runtime`, rates, output paths, or IMU part numbers in the scenario filename;
+those belong in the linked components.
+
+Runtime component filenames use lowercase `snake_case` and identify only their
+local capability and variant, such as `hg1700_tactical.json`,
+`nominal_pos_vel.json`, or `pva_random_error_default.json`. The directory
+already communicates ownership, so filenames should not repeat it. A scenario's
+`run_name` must match its filename stem, and its normal `output_dir` is
+`output/logs/<run_name>`.
+
+Monte Carlo campaign files live under `config/runtime/monte_carlo/` and use
+the corresponding scenario stem plus `_mc`, for example
+`ecef_ins_gnss_lc_gyro_accel_bias_stationary_covariance_matched_mc.json`. Compile-time config
+headers use PascalCase equivalents of the same product identity under their
+matching `navkit/products/variants/<product_family>/` and
+`apps/<app>/variants/<product_family>/` ownership directories. They follow:
+
+```text
+<Mechanization><Aiding><Coupling><StateModel><Modifier>.hpp
+```
+
+For example, `EcefInsGnssLcGyroAccelBiasDefault.hpp` is a concrete selectable
+product/app composition. `Default`, `Profiled`, and comparable purpose modifiers
+always appear at the end. The reusable product-family graph and its concrete
+variants share a family folder; for example,
+`variants/ecef_ins_gnss_lc/EcefInsGnssLc.hpp` is the graph used by the concrete
+`EcefInsGnssLcGyroAccelBias*` variants. Reusable compile-time slices live under
+`products/components/<owner>/` and use a PascalCase domain-role name such as
+`filter/InsGyroAccelBiasInitialCovarianceDefault.hpp`.
+
+Scenario files link reusable runtime components through explicit role-to-path
+entries. Component paths are resolved relative to the scenario file, loaded
+first, and then the scenario's inline values are merged on top:
 
 ```json
 {
-  "run_name": "ecef_ins_gnss_demo",
-  "output_dir": "output/logs/ecef_ins_gnss_demo",
+  "run_name": "ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal",
+  "output_dir": "output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal",
   "components": {
-    "trajectory": "components/trajectory/stationary_ecef_1000hz.json",
-    "imu": "components/imu/specs/hg1700_tactical.json",
-    "gnss": "components/gnss/nominal_pos_vel.json",
-    "pva_initialization": "components/initialization/pva/pva_random_error_default.json"
+    "trajectory": "../components/trajectory/stationary_ecef_1000hz.json",
+    "imu": "../components/imu/specs/hg1700_tactical.json",
+    "gnss": "../components/gnss/nominal_pos_vel.json",
+    "pva_initialization": "../components/initialization/pva/pva_random_error_default.json"
   },
   "logging": {
     "console": {
@@ -405,17 +468,17 @@ Filter initial covariance is a separate product/runtime boundary. The compiled
 NavKit product config selects an initial-covariance component:
 
 ```cpp
-using InitialCovariance = components::DefaultInsInitialCovariance;
-using CovarianceFloor = components::DefaultInsCovarianceFloor;
+using InitialCovariance = components::InsGyroAccelBiasInitialCovarianceDefault;
+using CovarianceFloor = components::InsGyroAccelBiasCovarianceFloorDefault;
 ```
 
 The selected component provides immutable compile-time covariance storage, for
 example:
 
 ```cpp
-struct DefaultInsInitialCovariance
+struct InsGyroAccelBiasInitialCovarianceDefault
 {
-    using StateDef = navkit::core::estimation::DefaultInsStateDef;
+    using StateDef = navkit::core::estimation::InsGyroAccelBiasStateDef;
     using InitialCovariance_t =
         navkit::core::estimation::InitialCovariance<StateDef>;
 
@@ -464,13 +527,13 @@ PVA-initialization components, while `filter_initialization.initial_covariance`
 states what the estimator believes. The supplied HG1700 components demonstrate
 both cases:
 
-- `hg1700_matched_initial_covariance.json` matches the PVA initialization-error
+- `ins_gyro_accel_bias_initial_covariance_hg1700_matched.json` matches the PVA initialization-error
   covariance and HG1700 turn-on bias covariance.
-- `hg1700_conservative_initial_covariance.json` uses larger PVA and bias
+- `ins_gyro_accel_bias_initial_covariance_hg1700_conservative.json` uses larger PVA and bias
   covariance without changing the simulated truth-error distributions.
 
-The corresponding `ecef_ins_gnss_covariance_matched.json` and
-`ecef_ins_gnss_covariance_conservative.json` scenarios differ only in the
+The corresponding `ecef_ins_gnss_lc_gyro_accel_bias_stationary_covariance_matched.json` and
+`ecef_ins_gnss_lc_gyro_accel_bias_stationary_covariance_conservative.json` scenarios differ only in the
 selected filter-initialization component. This makes covariance-belief
 sensitivity explicit and prevents a nominal scenario from silently rewriting
 simulator statistics.
@@ -511,9 +574,9 @@ Covariance floors use the same ownership pattern. A selected NavKit product
 config provides an immutable compile-time floor:
 
 ```cpp
-struct DefaultInsCovarianceFloor
+struct InsGyroAccelBiasCovarianceFloorDefault
 {
-    using StateDef = navkit::core::estimation::DefaultInsStateDef;
+    using StateDef = navkit::core::estimation::InsGyroAccelBiasStateDef;
     using CovarianceFloor_t =
         navkit::core::estimation::CovarianceFloor<StateDef>;
 
@@ -602,14 +665,44 @@ encode simulator truth errors, and does not replace transfer alignment.
 Transfer alignment remains observation-driven through normal measurement/update
 paths.
 
+Monte Carlo and simulation-analysis runs may instead initialize the entire
+estimated state from simulator truth plus a generic estimate-error vector. This
+is deliberately separate from normal PVA startup and the direct
+`nominal_state` restore form:
+
+```json
+{
+  "filter_initialization": {
+    "initial_estimate_error": {
+      "type": "random_error",
+      "covariance": {
+        "diag": [ /* StateDef::Error::N variances in Error-state order */ ]
+      },
+      "seed": 123456789
+    }
+  }
+}
+```
+
+`"type": "explicit_error"` accepts a same-length `values` vector instead.
+For either form, the vector expresses **estimated minus truth** in the selected
+`StateDef::Error` ordering. Simulation app support builds an explicit
+truth-derived reference containing the initial PVA truth and realized IMU bias
+truth, then sets `estimated_state = truth_state + sampled_estimate_error`.
+This makes a persistent-state error, such as a gyro-bias estimate error,
+statistically meaningful without exposing simulator truth inside `navkit::core`.
+The random covariance must be positive semidefinite. The estimate-error form
+cannot be combined with `nominal_state`, which avoids ambiguous double
+initialization.
+
 Propagation configuration follows the same compile-time-default/runtime-override
 pattern, but the selected propagation policy owns the values it consumes. For
 the ECEF INS/GNSS product, process-noise PSDs and first-order Gauss-Markov IMU
 bias dynamics are intentionally separate components:
 
 ```cpp
-using ProcessNoise = components::DefaultEcefInsProcessNoise;
-using ImuBiasDynamics = components::DefaultGaussMarkovImuBiasDynamics;
+using ProcessNoise = components::ImuProcessNoiseDefault;
+using ImuBiasDynamics = components::GaussMarkovImuBiasDynamicsDefault;
 ```
 
 `ProcessNoise` owns the continuous-time white-noise and bias-drive PSD values
@@ -656,8 +749,8 @@ Example:
 {
   "schema": "navkit.monte_carlo_campaign.v2",
   "type": "monte_carlo_campaign",
-  "campaign_name": "ecef_ins_gnss_smoke_mc",
-  "nominal_config": "../navkit_sim/ecef_ins_gnss_monte_carlo.json",
+  "campaign_name": "ecef_ins_gnss_lc_gyro_accel_bias_stationary_smoke_mc",
+  "nominal_config": "../navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_monte_carlo.json",
   "runs": {
     "count": 3,
     "start_index": 0
@@ -697,7 +790,7 @@ and rendering cost.
 
 Monte Carlo scenarios should inline a lean run-level `logging` block in the
 nominal runtime scenario, as in
-`config/runtime/navkit_sim/ecef_ins_gnss_monte_carlo.json`. Aggregate
+`config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_monte_carlo.json`. Aggregate
 state/covariance plots need truth trajectory, navigation estimate with
 triangular covariance, and a low-rate IMU nominal log when bias truth-error plots
 are desired. High-rate IMU increment logs, IMU debug logs, filter correction
@@ -729,14 +822,14 @@ existing campaign report folders without re-running simulations.
 The Python build wrapper forwards the same selection:
 
 ```text
-python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/EcefInsGnss.hpp
+python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
 The default build directory is already config-rooted. Use `--build-dir` only
 when an explicit custom location is needed:
 
 ```text
-python tools/build.py --build-type Debug --build-dir build/custom/stationary --navkit-config apps/navkit_sim/EcefInsGnss.hpp
+python tools/build.py --build-type Debug --build-dir build/custom/stationary --navkit-config apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
 Each build directory has its own generated `navkit/SelectedConfig.hpp`, so two
@@ -750,8 +843,7 @@ that pattern; they do not make Debug/Release part of the config itself.
 
 The expected workflow is:
 
-1. Copy the nearest example, such as
-   `config/compiletime/navkit/products/MinimalConfig.hpp`.
+1. Copy the nearest runnable product configuration.
 2. Rename the config type.
 3. Adjust or add the NavKit config slices your library/application needs.
 4. For runnable/product NavKit configs, add the aggregate

@@ -42,7 +42,7 @@ def load_runtime_config(path: Path) -> JsonObject:
 
 
 def runtime_run_name(config: JsonObject) -> str:
-    run_name = config.get("run_name", "ecef_ins_gnss_demo")
+    run_name = config.get("run_name", "ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal")
     if not isinstance(run_name, str):
         raise ValueError("runtime config 'run_name' must be a string")
     return run_name

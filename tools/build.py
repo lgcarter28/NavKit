@@ -251,7 +251,10 @@ def main() -> int:
         "--resource-output",
         type=Path,
         default=None,
-        help="Resource report output path. Defaults to output/logs/ecef_ins_gnss_demo/resources-<build>-local.json.",
+        help=(
+            "Resource report output path. Defaults to "
+            "output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/resources-<build>-local.json."
+        ),
     )
     parser.add_argument(
         "--no-resource-report",

@@ -11,7 +11,7 @@
 
 TEST_CASE("Navigator compiles and processes GNSS sensor")
 {
-    using StateDef = navkit::core::estimation::DefaultInsStateDef;
+    using StateDef = navkit::core::estimation::InsGyroAccelBiasStateDef;
     using Nominal = StateDef::Nominal;
     using Model = navkit::core::models::GnssPosModel<StateDef>;
     using Sensor = navkit::core::estimation::Sensor<0U, Model, 4>;

@@ -13,7 +13,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(NAVKIT_BUILD_TESTS "Build NavKit tests" ON)
-set(NAVKIT_CONFIG "apps/navkit_sim/EcefInsGnss.hpp"
+set(NAVKIT_CONFIG "apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
     CACHE STRING "Compile-time NavKit config header relative to config/compiletime")
 
 set(NAVKIT_CONFIG_ROOT "${PROJECT_SOURCE_DIR}/config/compiletime")
@@ -22,7 +22,7 @@ if(IS_ABSOLUTE "${NAVKIT_CONFIG}")
 endif()
 
 if(NAVKIT_CONFIG MATCHES "\\\\")
-    message(FATAL_ERROR "NAVKIT_CONFIG must use forward slashes, for example apps/navkit_sim/EcefInsGnss.hpp")
+    message(FATAL_ERROR "NAVKIT_CONFIG must use forward slashes, for example apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp")
 endif()
 
 if(NAVKIT_CONFIG MATCHES "(^|/)\\.\\.($|/)")

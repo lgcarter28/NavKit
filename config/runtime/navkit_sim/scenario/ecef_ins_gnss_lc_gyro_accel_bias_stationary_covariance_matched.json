@@ -1,0 +1,23 @@
+{
+  "components": {
+    "trajectory": "../components/trajectory/stationary_ecef_1000hz.json",
+    "imu": "../components/imu/specs/hg1700_tactical.json",
+    "gnss": "../components/gnss/nominal_pos_vel.json",
+    "process_noise": "../components/propagation/imu_process_noise_default.json",
+    "imu_bias_dynamics": "../components/propagation/imu_bias_dynamics_gauss_markov_default.json",
+    "pva_initialization": "../components/initialization/pva/pva_random_error_default.json",
+    "filter_initialization": "../components/initialization/filter/ins_gyro_accel_bias_initial_covariance_hg1700_matched.json",
+    "covariance_floor": "../components/initialization/filter/ins_gyro_accel_bias_covariance_floor_default.json"
+  },
+  "run_name": "ecef_ins_gnss_lc_gyro_accel_bias_stationary_covariance_matched",
+  "output_dir": "output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_covariance_matched",
+  "logging": {
+    "console": { "enabled": false },
+    "truth": { "enabled": true, "rate_hz": 5.0 },
+    "nav_estimate": { "enabled": true, "rate_hz": 5.0, "covariance": "triangular" },
+    "imu": { "enabled": true, "rate_hz": 5.0 },
+    "imu_debug": { "enabled": false },
+    "filter_correction": { "enabled": false, "covariance": "diagonal" },
+    "measurement_statistics": { "enabled": true, "rate_hz": 1.0 }
+  }
+}

@@ -5,8 +5,8 @@
 #include "navkit/core/estimation/navigator/Navigator.hpp"
 #include "navkit/core/estimation/navigator/NavigatorUpdatePolicy.hpp"
 #include "navkit/core/estimation/navigator/SensorCollectionPolicy.hpp"
-#include "navkit/core/estimation/navigator/propagation/EcefInsProcessNoise.hpp"
 #include "navkit/core/estimation/navigator/propagation/ImuBiasDynamics.hpp"
+#include "navkit/core/estimation/navigator/propagation/ImuProcessNoise.hpp"
 #include "navkit/core/estimation/navigator/propagation/PropagationPolicies.hpp"
 #include "navkit/core/estimation/navigator/propagation/PropagationPolicy.hpp"
 #include "navkit/core/estimation/navigator/update/UpdatePolicy.hpp"
@@ -21,7 +21,7 @@
 namespace navkit::core::estimation::test
 {
 
-using NavigatorPolicyStateDef = DefaultInsStateDef;
+using NavigatorPolicyStateDef = InsGyroAccelBiasStateDef;
 using NavigatorPolicyModel = navkit::core::models::GnssPosModel<NavigatorPolicyStateDef>;
 using NavigatorPolicySensor = Sensor<0U, NavigatorPolicyModel, 4>;
 using NavigatorPolicyFilter = KalmanFilter<NavigatorPolicyStateDef>;
@@ -75,7 +75,7 @@ struct MissingStrapdownIntegration
 
 struct PropagationPolicyTestBase
 {
-    using ProcessNoise_t = EcefInsProcessNoise;
+    using ProcessNoise_t = ImuProcessNoise;
     using ImuBiasDynamics_t = GaussMarkovImuBiasDynamics;
     struct RuntimeConfig_t
     {

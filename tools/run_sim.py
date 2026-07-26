@@ -98,7 +98,9 @@ def main() -> int:
         ),
     )
     parser.add_argument(
-        "--config", type=Path, default=Path("config/runtime/navkit_sim/ecef_ins_gnss.json")
+        "--config",
+        type=Path,
+        default=Path("config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json"),
     )
     parser.add_argument(
         "--output-dir",
@@ -150,9 +152,9 @@ def main() -> int:
     timing_path = data_dir / "timing.json"
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    runtime_config_path = args.config
-    if args.output_dir is not None or args.run_name is not None:
-        runtime_config_path = write_effective_runtime_config(runtime_config, output_dir)
+    # The simulation executable consumes the fully resolved JSON object. This keeps
+    # component linking a Python/tooling concern and makes every run replayable.
+    runtime_config_path = write_effective_runtime_config(runtime_config, output_dir)
 
     if not remove_stale_profile_artifacts(data_dir):
         return 1

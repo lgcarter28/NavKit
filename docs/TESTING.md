@@ -81,9 +81,9 @@ For a local timing smoke pass:
 python tools/build.py --build-type Debug --skip-conan
 python tools/run_tests.py --build-type Debug
 python tools/run_scenario.py --build-type Debug --no-plot
-python tools/plot_run.py output/logs/ecef_ins_gnss_demo
-python tools/timing_report.py output/logs/ecef_ins_gnss_demo/timing.json
-python tools/resource_report.py --build-type Debug --output output/logs/ecef_ins_gnss_demo/resources-debug-local.json
+python tools/plot_run.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal
+python tools/timing_report.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/data/timing.json
+python tools/resource_report.py --build-type Debug --output output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/resources-debug-local.json
 ```
 
 Build, test, simulation, and analysis wrappers update the default timing
@@ -111,7 +111,7 @@ misleading reports.
 Required top-level fields:
 
 - `schema`: currently `navkit.timing.v1`.
-- `run_name`: logical run name, such as `ecef_ins_gnss_demo`.
+- `run_name`: logical run name, such as `ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal`.
 - `created_utc`: timestamp for first artifact creation.
 - `updated_utc`: timestamp for the most recent record update.
 - `environment`: object with at least `platform` and `python`.

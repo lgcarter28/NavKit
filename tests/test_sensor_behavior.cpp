@@ -13,7 +13,7 @@ namespace navkit::core::estimation::test
 namespace
 {
 
-using SensorTestModel = navkit::core::models::GnssPosModel<DefaultInsStateDef>;
+using SensorTestModel = navkit::core::models::GnssPosModel<InsGyroAccelBiasStateDef>;
 using SensorTestMeasurement = Measurement<SensorTestModel::M>;
 
 struct MeasurementDrivenNoisePolicy

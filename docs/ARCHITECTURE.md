@@ -239,7 +239,7 @@ roadmap items, not current behavior.
   covariance attitude state as a 3D small-angle `Att` perturbation, builds
   first-order `F_k`/`G_k`/`Phi_k`/`Q_d` products, and applies the v1
   PVA+gyro-bias+accelerometer-bias dynamics to the selected
-  `DefaultInsStateDef` aggregate. Its nominal layout stores attitude in
+  `InsGyroAccelBiasStateDef` aggregate. Its nominal layout stores attitude in
   `AttQuat`, while its error/covariance layout keeps attitude as a 3D
   `AttRotVec` perturbation.
 - Planet and gravity policies are the most complete examples of the intended

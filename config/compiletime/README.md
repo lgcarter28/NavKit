@@ -2,22 +2,25 @@
 
 This directory contains repository-provided C++ configuration headers.
 
-- `navkit/products/` contains reusable NavKit product graph configurations,
-  including the deliberately small `MinimalConfig.hpp` teaching config.
-- `apps/` contains top-level executable composition configurations.
+- `navkit/products/variants/<product_family>/` contains a reusable product-family
+  graph and its complete NavKit variants.
+- `navkit/products/components/` contains smaller reusable slices grouped by their
+  owning domain: `propagation`, `filter`, `sensors`, `profiling`, and `foundation`.
+- `apps/<app>/variants/<product_family>/` contains the matching top-level
+  executable compositions.
 - `targets/` may be added later for desktop and embedded product targets.
 
 The `navkit/` and `apps/` trees are intentionally separate. It is normal for
-both trees to contain the same descriptive file name, such as
-`EcefInsGnss.hpp`: the NavKit product file owns reusable library
-configuration, while the app file owns the executable composition that links a
-NavKit config to an app runner.
+both variant trees to contain the same descriptive file name, such as
+`EcefInsGnssLcGyroAccelBiasDefault.hpp`: the NavKit product file owns reusable
+library configuration, while the app file owns the executable composition that
+links a NavKit config to an app runner.
 
 Provided `NAVKIT_CONFIG` selections:
 
-- `apps/navkit_sim/EcefInsGnss.hpp`: default stationary GNSS demo app using
+- `apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp`: default stationary GNSS demo app using
   the unprofiled NavKit GNSS library config.
-- `apps/navkit_sim/ProfiledEcefInsGnss.hpp`: same app shape, but consumes a
+- `apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp`: same app shape, but consumes a
   profiled NavKit GNSS library config with a host microsecond clock,
   fixed-capacity profiling ring-buffer sink, and scoped profiler so the app
   emits `profile.csv`.
@@ -25,8 +28,7 @@ Provided `NAVKIT_CONFIG` selections:
 Runnable/product NavKit configs should read like product graphs and usually end
 with a single aggregate check, such as
 `static_assert(navkit::api::config::NavKitProductConfigPolicy<Config>);`.
-Detailed slice-level concept assertions belong in deliberately educational
-examples, such as `navkit/products/MinimalConfig.hpp`, and in focused tests.
+Detailed slice-level concept assertions belong in focused tests.
 Product configs should include `navkit/api/config/ConfigApi.hpp` for shared
 core graph machinery, then include only the concrete model, profiler, target, or
 component headers they select.

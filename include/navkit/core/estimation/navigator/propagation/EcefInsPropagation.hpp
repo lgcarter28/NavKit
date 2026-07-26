@@ -10,8 +10,8 @@
 #include "navkit/core/environment/planet/PlanetPolicy.hpp"
 #include "navkit/core/estimation/navigator/ImuConingSculling.hpp"
 #include "navkit/core/estimation/navigator/ImuIncrement.hpp"
-#include "navkit/core/estimation/navigator/propagation/EcefInsProcessNoise.hpp"
 #include "navkit/core/estimation/navigator/propagation/ImuBiasDynamics.hpp"
+#include "navkit/core/estimation/navigator/propagation/ImuProcessNoise.hpp"
 #include "navkit/core/estimation/state/Segment.hpp"
 #include "navkit/core/estimation/state/State.hpp"
 #include "navkit/core/estimation/state/StateAccessors.hpp"
@@ -39,7 +39,7 @@ struct MechanizedImuInterval
 
 template<environment::RotatingPlanetPolicy Planet,
          environment::GravityPolicy Gravity,
-         EcefInsProcessNoiseConfigPolicy ProcessNoiseConfig = EcefInsZeroProcessNoise,
+         ImuProcessNoiseConfigPolicy ProcessNoiseConfig = ZeroImuProcessNoise,
          ImuBiasDynamicsConfigPolicy ImuBiasDynamicsConfig = ZeroGaussMarkovImuBiasDynamics,
          std::size_t ImuBufferCapacity = 512U,
          std::size_t CovarianceHistoryCapacity = 256U,

@@ -4,7 +4,9 @@
 #pragma once
 
 #include "navkit/app_support/emulation/concrete/ImuRuntimeConfig.hpp"
+#include "navkit/app_support/initialization/InitialTruthReference.hpp"
 #include "navkit/core/estimation/navigator/ImuIncrement.hpp"
+#include "navkit/core/estimation/state/Segment.hpp"
 #include "navkit/sim/ImuSimulatorPolicy.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
@@ -95,14 +97,19 @@ public:
         return m_last_error;
     }
 
-    [[nodiscard]] const core::Vec3& gyro_bias_truth_radps() const
+    template<core::estimation::StateSpaceDefPolicy StateDef>
+    void apply_initial_truth_reference(InitialTruthReference<StateDef>& reference) const
     {
-        return m_simulator.gyro_bias_radps();
-    }
+        using Nominal = typename StateDef::Nominal;
 
-    [[nodiscard]] const core::Vec3& accel_bias_truth_mps2() const
-    {
-        return m_simulator.accel_bias_mps2();
+        if constexpr (requires { typename Nominal::GyroB; }) {
+            core::estimation::segment<typename Nominal::GyroB>(reference.truth_state) =
+                m_simulator.gyro_bias_radps();
+        }
+        if constexpr (requires { typename Nominal::AccB; }) {
+            core::estimation::segment<typename Nominal::AccB>(reference.truth_state) =
+                m_simulator.accel_bias_mps2();
+        }
     }
 
 private:

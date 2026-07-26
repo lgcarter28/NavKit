@@ -96,27 +96,28 @@ input and output location explicitly:
 
 ```powershell
 python tools/run_scenario.py --build-type Release `
-  --config config/runtime/navkit_sim/ecef_ins_gnss_runtime_covariance.json `
+  --config config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_covariance_override.json `
   --output-dir output/logs/my_case
 ```
 
-`run_scenario.py` writes `effective_runtime_config.json` when applying a run
-name or output override, executes the ordinary simulator, then invokes
-`plot_run.py`. Add `--no-plot` to retain the one-command scenario setup
-while skipping post-processing.
+`run_scenario.py` resolves a component-linked scenario into a self-contained
+`effective_runtime_config.json`, executes the ordinary simulator, then invokes
+`plot_run.py`. The resolved file makes every run replayable and is the input
+required when invoking the simulator executable directly. Add `--no-plot` to
+retain the one-command scenario setup while skipping post-processing.
 
 Use the lower-level runner when no analysis should run:
 
 ```powershell
 python tools/run_sim.py --build-type Release `
-  --config config/runtime/navkit_sim/ecef_ins_gnss.json
+  --config config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json
 ```
 
 Analyze existing logs without rerunning the simulation:
 
 ```powershell
-python tools/plot_run.py output/logs/ecef_ins_gnss_demo
-python tools/plot_run.py output/logs/ecef_ins_gnss_demo `
+python tools/plot_run.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal
+python tools/plot_run.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal `
   --plot state_ned --start-time 10 --show
 ```
 
@@ -149,7 +150,7 @@ Run a campaign from its JSON configuration:
 
 ```powershell
 python tools/run_monte_carlo.py `
-  config/runtime/monte_carlo/ecef_ins_gnss_smoke.json `
+  config/runtime/monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_stationary_smoke_mc.json `
   --build-type Release
 ```
 
@@ -157,7 +158,7 @@ Override common campaign controls without editing the JSON:
 
 ```powershell
 python tools/run_monte_carlo.py `
-  config/runtime/monte_carlo/ecef_ins_gnss_smoke.json `
+  config/runtime/monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_stationary_smoke_mc.json `
   --build-type Release `
   --run-count 100 `
   --output-root output/monte_carlo_scratch `
@@ -202,7 +203,7 @@ Replay one campaign member by passing its effective input to `run_sim.py` or
 
 ```powershell
 python tools/plot_monte_carlo.py `
-  output/monte_carlo/ecef_ins_gnss_smoke_mc `
+  output/monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_stationary_smoke_mc `
   --plot attitude_ned --start-time 10 --show
 ```
 
@@ -219,11 +220,11 @@ Two supplied campaigns isolate initial-covariance matching:
 
 ```powershell
 python tools/run_monte_carlo.py `
-  config/runtime/monte_carlo/ecef_ins_gnss_covariance_matched.json `
+  config/runtime/monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_stationary_covariance_matched_mc.json `
   --build-type Release
 
 python tools/run_monte_carlo.py `
-  config/runtime/monte_carlo/ecef_ins_gnss_covariance_conservative.json `
+  config/runtime/monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_stationary_covariance_conservative_mc.json `
   --build-type Release
 ```
 
@@ -247,8 +248,8 @@ initial-epoch metrics.
 Package an existing run or campaign:
 
 ```powershell
-python tools/package_analysis.py output/logs/ecef_ins_gnss_demo
-python tools/package_analysis.py output/monte_carlo/ecef_ins_gnss_smoke_mc
+python tools/package_analysis.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal
+python tools/package_analysis.py output/monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_stationary_smoke_mc
 ```
 
 Monte Carlo campaigns package HDF5 and generate Plotly interactive aggregate
@@ -260,15 +261,15 @@ Use the normal static plotting path on either a CSV directory or a single-run
 bundle:
 
 ```powershell
-python tools/plot_run.py output/logs/ecef_ins_gnss_demo
-python -m navkit_analysis.plots output/logs/ecef_ins_gnss_demo/data/analysis_bundle.h5
+python tools/plot_run.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal
+python -m navkit_analysis.plots output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/data/analysis_bundle.h5
 ```
 
 Regenerate a cached campaign aggregate from either raw CSV runs or the bundle:
 
 ```powershell
-python tools/plot_monte_carlo.py output/monte_carlo/ecef_ins_gnss_smoke_mc --plot attitude_ned
-python tools/plot_monte_carlo.py output/monte_carlo/ecef_ins_gnss_smoke_mc/analysis_bundle.h5 --plot attitude_ned --renderer plotly
+python tools/plot_monte_carlo.py output/monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_stationary_smoke_mc --plot attitude_ned
+python tools/plot_monte_carlo.py output/monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_stationary_smoke_mc/analysis_bundle.h5 --plot attitude_ned --renderer plotly
 ```
 
 Generate the joint NEES/NIS consistency dashboards and reports from an existing
@@ -276,15 +277,15 @@ campaign bundle. Use `--refresh-cache` only after changing the source run data
 or when packaging an older bundle that lacks the cache:
 
 ```powershell
-python tools/plot_consistency.py output/monte_carlo/ecef_ins_gnss_smoke_mc/analysis_bundle.h5
-python tools/plot_consistency.py output/monte_carlo/ecef_ins_gnss_smoke_mc/analysis_bundle.h5 --refresh-cache --max-plot-points 1000
+python tools/plot_consistency.py output/monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_stationary_smoke_mc/analysis_bundle.h5
+python tools/plot_consistency.py output/monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_stationary_smoke_mc/analysis_bundle.h5 --refresh-cache --max-plot-points 1000
 ```
 
 For quick exploration, select arbitrary named fields without creating a custom
 script:
 
 ```powershell
-python tools/plot_field.py output/logs/ecef_ins_gnss_demo --table nav --y p_e_x_m --renderer plotly
+python tools/plot_field.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal --table nav --y p_e_x_m --renderer plotly
 ```
 
 Use HDF5 for repeated analysis of large campaigns. It avoids reopening hundreds
@@ -321,7 +322,7 @@ bundle lacks the required cache:
 
 ```powershell
 python tools/plot_consistency.py `
-  output/monte_carlo/ecef_ins_gnss_smoke_mc/analysis_bundle.h5 `
+  output/monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_stationary_smoke_mc/analysis_bundle.h5 `
   --refresh-cache --max-plot-points 1000
 ```
 

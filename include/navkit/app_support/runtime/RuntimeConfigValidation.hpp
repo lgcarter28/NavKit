@@ -8,6 +8,7 @@
 #include "navkit/app_support/emulation/concrete/ImuRuntimeConfig.hpp"
 #include "navkit/app_support/initialization/CovarianceFloorJson.hpp"
 #include "navkit/app_support/initialization/InitialCovarianceJson.hpp"
+#include "navkit/app_support/initialization/InitialEstimateErrorJson.hpp"
 #include "navkit/app_support/initialization/NominalStateOverrideJson.hpp"
 #include "navkit/app_support/runtime/PropagationRuntimeConfigJson.hpp"
 #include "navkit/app_support/runtime/RunSettings.hpp"
@@ -39,7 +40,7 @@ inline void validate_filter_initialization_runtime_config_shape(const nlohmann::
     }
 
     const std::vector<std::string_view> allowed_filter_initialization_keys{
-        "initial_covariance", "covariance_floor", "nominal_state"};
+        "initial_covariance", "covariance_floor", "nominal_state", "initial_estimate_error"};
     for (nlohmann::json::const_iterator iter = filter_initialization_iter->begin();
          iter != filter_initialization_iter->end();
          ++iter) {
@@ -145,6 +146,7 @@ void validate_runtime_config(const nlohmann::json& cfg)
     detail::validate_runtime_initial_covariance_shape<typename Config::NavKit::StateDef>(cfg);
     detail::validate_runtime_covariance_floor_shape<typename Config::NavKit::StateDef>(cfg);
     detail::validate_runtime_nominal_state_override_shape<typename Config::NavKit::StateDef>(cfg);
+    detail::validate_runtime_initial_estimate_error_shape<typename Config::NavKit::StateDef>(cfg);
     detail::validate_runtime_propagation_config_shape<typename Config::NavKit::Propagation>(cfg);
     TransferAlignmentProvider::validate_runtime_config(cfg);
 }

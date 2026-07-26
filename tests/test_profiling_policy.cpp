@@ -12,6 +12,7 @@
 #include "navkit/core/profiling/ProfileSinkPolicy.hpp"
 #include "navkit/core/profiling/ProfileSinks.hpp"
 #include "navkit/core/profiling/ProfilerPolicy.hpp"
+#include "navkit/core/profiling/ProfilingConfigPolicy.hpp"
 #include "navkit/core/profiling/ScopedProfiler.hpp"
 #include "test_main.hpp"
 
@@ -114,9 +115,17 @@ struct MissingProfileFunctionProfiler
     using Scope = NullProfileScope;
 };
 
+struct NullProfilingConfig
+{
+    using Profiler = NullProfiler;
+};
+
+struct MissingProfilerConfig
+{};
+
 using FakeProfiler = ScopedProfiler<FakeClock, FixedSink>;
 using SteppingProfiler = ScopedProfiler<SteppingClock, FixedSink>;
-using ProfiledStateDef = navkit::core::estimation::DefaultInsStateDef;
+using ProfiledStateDef = navkit::core::estimation::InsGyroAccelBiasStateDef;
 using ProfiledModel = navkit::core::models::GnssPosModel<ProfiledStateDef>;
 using ProfiledFilter = navkit::core::estimation::KalmanFilter<
     ProfiledStateDef,
@@ -146,6 +155,7 @@ TEST_CASE("Profiler concepts accept valid clock, sink, scope, and profiler polic
     static_assert(ProfileScopePolicy<ProfileScope<FakeClock, FixedSink>>);
     static_assert(ProfilerPolicy<NullProfiler>);
     static_assert(ProfilerPolicy<FakeProfiler>);
+    static_assert(ProfilingConfigPolicy<NullProfilingConfig>);
 
     CHECK(true);
 }
@@ -158,6 +168,7 @@ TEST_CASE("Profiler concepts reject missing capabilities")
     static_assert(!ProfileSinkPolicy<WrongRecordSink, FakeClock>);
     static_assert(!ProfilerPolicy<MissingScopeProfiler>);
     static_assert(!ProfilerPolicy<MissingProfileFunctionProfiler>);
+    static_assert(!ProfilingConfigPolicy<MissingProfilerConfig>);
 
     CHECK(true);
 }

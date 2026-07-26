@@ -58,13 +58,13 @@ struct InvalidSegmentIndex
 TEST_CASE("StateDefPolicy accepts valid state definitions")
 {
     static_assert(StateDefPolicy<ValidStateDef>);
-    static_assert(StateDefPolicy<DefaultInsNominalStateDef>);
-    static_assert(StateDefPolicy<DefaultInsErrorStateDef>);
-    static_assert(StateSpaceDefPolicy<DefaultInsStateDef>);
+    static_assert(StateDefPolicy<InsGyroAccelBiasNominalStateDef>);
+    static_assert(StateDefPolicy<InsGyroAccelBiasErrorStateDef>);
+    static_assert(StateSpaceDefPolicy<InsGyroAccelBiasStateDef>);
 
     CHECK(ValidStateDef::N == 6);
-    CHECK(DefaultInsNominalStateDef::N == 16);
-    CHECK(DefaultInsErrorStateDef::N == 15);
+    CHECK(InsGyroAccelBiasNominalStateDef::N == 16);
+    CHECK(InsGyroAccelBiasErrorStateDef::N == 15);
 }
 
 TEST_CASE("StateDefPolicy rejects invalid state definitions")

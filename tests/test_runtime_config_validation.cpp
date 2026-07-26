@@ -1,7 +1,7 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "apps/navkit_sim/EcefInsGnss.hpp"
+#include "apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
 #include "navkit/app_support/SimulationApp.hpp"
 #include "navkit/app_support/emulation/EmulatorBinding.hpp"
 #include "navkit/app_support/emulation/EmulatorBindingPolicy.hpp"
@@ -35,7 +35,8 @@ namespace navkit::app_support::test
 namespace
 {
 
-using EcefInsGnssAppConfig = navkit::config::apps::navkit_sim::EcefInsGnssConfig;
+using EcefInsGnssAppConfig =
+    navkit::config::apps::navkit_sim::EcefInsGnssLcGyroAccelBiasDefaultConfig;
 
 struct DuplicateSensorIdConfig
 {
@@ -206,7 +207,7 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts the documented input shape")
     static_assert(navkit::core::estimation::CovarianceFloorConfigPolicy<
                   EcefInsGnssAppConfig::NavKit::CovarianceFloor,
                   EcefInsGnssAppConfig::NavKit::StateDef>);
-    static_assert(navkit::core::estimation::EcefInsProcessNoiseConfigPolicy<
+    static_assert(navkit::core::estimation::ImuProcessNoiseConfigPolicy<
                   EcefInsGnssAppConfig::NavKit::PropagationConfig::ProcessNoise>);
     static_assert(navkit::core::estimation::ImuBiasDynamicsConfigPolicy<
                   EcefInsGnssAppConfig::NavKit::PropagationConfig::ImuBiasDynamics>);
@@ -504,6 +505,34 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects unknown filter initialization
 {
     nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
     cfg.emplace("filter_initialization", nlohmann::json{{"monte_carlo_truth_error", {}}});
+
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+}
+
+TEST_CASE("ECEF INS GNSS runtime validator accepts generic random initial estimate error")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace(
+        "filter_initialization",
+        nlohmann::json{
+            {"initial_estimate_error",
+             {{"type", "random_error"},
+              {"covariance",
+               {{"diag",
+                 {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0}}}},
+              {"seed", 123U}}}});
+
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+}
+
+TEST_CASE("ECEF INS GNSS runtime validator rejects malformed initial estimate error")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.emplace(
+        "filter_initialization",
+        nlohmann::json{
+            {"initial_estimate_error",
+             {{"type", "random_error"}, {"covariance", {{"diag", {1.0, 2.0}}}}, {"seed", 123U}}}});
 
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
@@ -910,6 +939,62 @@ TEST_CASE("NavInitialization maps into the configured Navigator filter state")
     CHECK(filter.state()(Nominal::AccB::i + 0) == doctest::Approx(1.0e-3));
     CHECK(filter.state()(Nominal::AccB::i + 1) == doctest::Approx(2.0e-3));
     CHECK(filter.state()(Nominal::AccB::i + 2) == doctest::Approx(3.0e-3));
+}
+
+TEST_CASE("Initial estimate error applies against the simulation truth reference")
+{
+    using NavKit = EcefInsGnssAppConfig::NavKit;
+    using StateDef = NavKit::StateDef;
+    using Nominal = StateDef::Nominal;
+
+    nlohmann::json cfg = explicit_pva_runtime_config();
+    cfg.emplace("filter_initialization",
+                nlohmann::json{{"initial_estimate_error",
+                                {{"type", "explicit_error"},
+                                 {"values",
+                                  {1.0,
+                                   2.0,
+                                   3.0,
+                                   4.0,
+                                   5.0,
+                                   6.0,
+                                   0.0,
+                                   0.0,
+                                   0.0,
+                                   1.0e-4,
+                                   2.0e-4,
+                                   3.0e-4,
+                                   1.0e-3,
+                                   2.0e-3,
+                                   3.0e-3}}}}});
+    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
+    const PvaInitialization pva_init =
+        PvaExplicitInitializationProvider::initialize(cfg, trajectory);
+    InitialTruthReference<StateDef> reference{};
+    populate_initial_pva_from_truth<StateDef>(trajectory.truth_samples.front(), reference);
+    core::estimation::segment<typename Nominal::GyroB>(reference.truth_state) =
+        core::Vec3{0.01, 0.02, 0.03};
+    core::estimation::segment<typename Nominal::AccB>(reference.truth_state) =
+        core::Vec3{0.1, 0.2, 0.3};
+
+    std::unique_ptr<NavKit::Navigator> navigator = std::make_unique<NavKit::Navigator>();
+    initialize_navigator<NavKit>(pva_init, cfg, reference, *navigator);
+
+    const typename NavKit::Filter::State_t& state = navigator->filter().state();
+    CHECK(state(Nominal::Pos::i + 0) ==
+          doctest::Approx(reference.truth_state(Nominal::Pos::i) + 1.0));
+    CHECK(state(Nominal::Vel::i + 2) ==
+          doctest::Approx(reference.truth_state(Nominal::Vel::i + 2) + 6.0));
+    CHECK(state(Nominal::GyroB::i + 0) == doctest::Approx(0.0101));
+    CHECK(state(Nominal::GyroB::i + 2) == doctest::Approx(0.0303));
+    CHECK(state(Nominal::AccB::i + 0) == doctest::Approx(0.101));
+    CHECK(state(Nominal::AccB::i + 2) == doctest::Approx(0.303));
+    CHECK(state.template segment<4>(Nominal::AttQuat::i).norm() == doctest::Approx(1.0));
+
+    std::unique_ptr<NavKit::Navigator> navigator_without_reference =
+        std::make_unique<NavKit::Navigator>();
+    CHECK_THROWS_AS(initialize_navigator<NavKit>(pva_init, cfg, *navigator_without_reference),
+                    std::runtime_error);
 }
 
 } // namespace navkit::app_support::test

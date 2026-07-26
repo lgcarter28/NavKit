@@ -1,6 +1,6 @@
 # Phase 6 - Monte Carlo and Batch Analysis
 
-**Status:** completed pass history. Current active Phase 6 pass ownership lives in `docs/ROADMAP.md`; this file preserves completed pass detail after each pass is fully complete.
+**Status:** completed pass history plus the active Pass 6.9 follow-forward. Current active Phase 6 pass ownership lives in `docs/ROADMAP.md`; completed pass detail is preserved here after verification.
 
 Monte Carlo support comes immediately after Phase 5 because it is the gold-standard workflow for navigation analysis and will turn the current single-run scenario tooling into repeatable statistical evidence.
 
@@ -35,7 +35,7 @@ Monte Carlo support comes immediately after Phase 5 because it is the gold-stand
 - [x] Added a lightweight `tools/compare_monte_carlo.py` utility that builds comparison CSV/Markdown tables from existing campaign report folders without re-reading raw run logs.
 - [x] Enabled low-rate measurement-statistics logging in the runtime-covariance scenario used for Pass 6.2 validation so GNSS NIS metrics are populated.
 - [x] Documented the aggregate report layout, report interpretation, and comparison workflow.
-- [x] Validated the pass with a 100-run Release campaign from `config/runtime/monte_carlo/ecef_ins_gnss_runtime_covariance.json`; all 100 runs passed, aggregate figures/reports were generated, and the comparison utility was smoke-tested on the generated report.
+- [x] Validated the pass with a 100-run Release campaign from the current runtime-covariance-override campaign; all 100 runs passed, aggregate figures/reports were generated, and the comparison utility was smoke-tested on the generated report.
 
 ## Pass 6.3: schema versioning and compatibility
 
@@ -57,7 +57,7 @@ Monte Carlo support comes immediately after Phase 5 because it is the gold-stand
 - [x] Refined Plotly Monte Carlo figures to keep individual histories visible, use one shared Unicode legend, and toggle the otherwise-disabled unified hover panel on demand.
 - [x] Made HDF5 bundle packaging and the full Plotly HTML aggregate-figure set the default campaign analysis artifacts; `analysis.renderer: "matplotlib"` remains the explicit static-PNG option.
 - [x] Added `docs/ANALYSIS.md`, updated setup/documentation maps, and kept direct C++ HDF5 logging explicitly out of scope in favor of future embedded binary telemetry plus Python conversion/repackaging.
-- [x] Validated a 500-run and a 1,000-run Release campaign from `config/runtime/monte_carlo/ecef_ins_gnss_runtime_covariance.json`; all requested run bundles, aggregate reports, static plots, and interactive plots completed successfully.
+- [x] Validated a 500-run and a 1,000-run Release campaign from the current runtime-covariance-override campaign; all requested run bundles, aggregate reports, static plots, and interactive plots completed successfully.
 - [x] Measured representative 1,000-run NED-position regeneration: raw CSV plus Matplotlib took 213.198 s; cached HDF5 plus Matplotlib took 10.275 s; cached HDF5 plus Plotly HTML took 16.868 s. The 1,000-run full-fidelity bundle was 2.32 GB and required 1,319.129 s to package, making raw-table retention the clear future optimization seam.
 
 ## Pass 6.5: Monte Carlo consistency dashboards and statistical evidence
@@ -89,3 +89,22 @@ Monte Carlo support comes immediately after Phase 5 because it is the gold-stand
 - [x] Retained the dedicated body gyro-bias and accelerometer-bias Monte Carlo error/covariance plots as the visual companion to the new numerical matching metrics.
 - [x] Revisited the default bias covariance: the compile-time default now agrees with the moderate conservative runtime default instead of retaining the formerly oversized gyro-bias variance.
 - [x] Validated both controlled scenarios with 100-run Release campaigns. Matched empirical/filter sigma ratios were 0.97--1.06 for gyro and 0.99--1.11 for accelerometer; conservative ratios were 0.31--0.35 across all six axes, agreeing with the designed value of `1 / sqrt(10)`.
+
+## Pass 6.8: scenario taxonomy and Monte Carlo initialization support
+
+- [x] Moved runnable `navkit_sim` compositions into `config/runtime/navkit_sim/scenario/`, retaining reusable physical, estimator, and initialization fragments under role-keyed `components/`.
+- [x] Standardized scenario names as `<product>_<trajectory>_<purpose>.json`, with matching `run_name`, default `output/logs/<run_name>`, and component links relative to the scenario file.
+- [x] Renamed Monte Carlo campaigns to the matching scenario stem plus `_mc`, updated tools/docs/examples/defaults, and removed stale flat scenario paths.
+- [x] Documented the runtime/compile-time config taxonomy in `docs/CONFIGURATION.md` and added a concise normative pointer from `docs/NAMING_CONVENTIONS.md`.
+- [x] Made single-scenario execution resolve component links into an explicit replayable `effective_runtime_config.json`; direct `navkit_sim` invocation now clearly requires that resolved input.
+- [x] Added a simulation/analysis-only `InitialTruthReference` carrying initial truth PVA plus realized sensor calibration/error truth, keeping simulator truth/error context out of `navkit::core`.
+- [x] Added `filter_initialization.initial_estimate_error` support for explicit vectors and deterministic covariance-colored `random_error` draws in the selected `StateDef::Error` ordering; JSON covariance is validated as symmetric positive semidefinite.
+- [x] Applied estimate errors with `estimated_state = true_state + sampled_estimate_error`, including persistent IMU bias estimates, and rejected this truth-relative feature from startup paths without an explicit simulation reference.
+- [x] Added a restart Monte Carlo scenario/campaign and validated component resolution, the Release single-run restart path, and a three-run deterministic Release campaign. The campaign derived independent seeds for IMU, GNSS, and initial-estimate-error draws; all three runs and generated aggregate artifacts succeeded.
+
+## Pass 6.9: analysis performance characterization and low-risk scaling
+
+- [ ] Characterize desktop analysis with stage-level timing, scale, storage, and practical memory evidence before adding broad concurrency.
+- [ ] Reduce unnecessary input loading, add safe artifact/cache selection, and evaluate HDF5 chunking/compression plus `full` versus `derived_only` bundle retention.
+- [ ] Add opt-in parallel rendering only for independent post-bundle figures/dashboards; retain a single HDF5 writer and serial aggregate/report ownership.
+- [ ] Add serial-versus-parallel equivalence evidence before any parallel analysis path becomes the default.

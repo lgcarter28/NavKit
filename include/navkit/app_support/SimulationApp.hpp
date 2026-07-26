@@ -9,6 +9,7 @@
 #include "navkit/app_support/emulation/EmulatorRuntime.hpp"
 #include "navkit/app_support/emulation/concrete/ImuRuntime.hpp"
 #include "navkit/app_support/initialization/FilterInitialization.hpp"
+#include "navkit/app_support/initialization/InitialTruthReference.hpp"
 #include "navkit/app_support/logging/SimulationRunLogger.hpp"
 #include "navkit/app_support/profiling/ProfileExport.hpp"
 #include "navkit/app_support/runtime/JsonInput.hpp"
@@ -20,6 +21,7 @@
 #include <filesystem>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <tuple>
 
 namespace navkit::app_support
 {
@@ -51,6 +53,11 @@ public:
         auto emulator_runtimes = Emulators::make_runtimes(cfg);
         Imu imu_runtime(cfg);
 
+        if (trajectory.truth_samples.empty()) {
+            std::printf("Simulation trajectory contains no truth samples.\n");
+            return 3;
+        }
+
         reset_profile_sink_if_configured<NavKit>();
 
         std::unique_ptr<Navigator> navigator_storage = std::make_unique<Navigator>();
@@ -58,7 +65,12 @@ public:
         Filter& filter = navigator.filter();
         const PvaInitialization pva_initialization =
             NavInitializationProvider::initialize(cfg, trajectory);
-        initialize_navigator<NavKit>(pva_initialization, cfg, navigator);
+        InitialTruthReference<StateDef> truth_reference{};
+        populate_initial_pva_from_truth<StateDef>(trajectory.truth_samples.front(),
+                                                  truth_reference);
+        apply_initial_truth_reference_from_runtimes<StateDef>(
+            std::tie(imu_runtime, emulator_runtimes), truth_reference);
+        initialize_navigator<NavKit>(pva_initialization, cfg, truth_reference, navigator);
         TransferAlignmentProvider::template transfer_align<Navigator>(navigator, cfg, trajectory);
 
         Logger logger(run_settings.data_dir, run_settings.run_name, cfg);

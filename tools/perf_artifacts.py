@@ -12,10 +12,10 @@ from typing import Any
 
 TIMING_SCHEMA = "navkit.timing.v1"
 RESOURCE_SCHEMA = "navkit.resources.v1"
-DEFAULT_TIMING_PATH = Path("output/logs/ecef_ins_gnss_demo/data/timing.json")
-DEFAULT_RESOURCE_DIR = Path("output/logs/ecef_ins_gnss_demo")
-DEFAULT_RUN_NAME = "ecef_ins_gnss_demo"
-DEFAULT_NAVKIT_CONFIG = "apps/navkit_sim/EcefInsGnss.hpp"
+DEFAULT_TIMING_PATH = Path("output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/data/timing.json")
+DEFAULT_RESOURCE_DIR = Path("output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal")
+DEFAULT_RUN_NAME = "ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal"
+DEFAULT_NAVKIT_CONFIG = "apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
 
 
 def utc_now() -> str:

@@ -10,7 +10,7 @@
 namespace navkit::core::estimation
 {
 
-struct DefaultInsNominalStateDef
+struct InsGyroAccelBiasNominalStateDef
 {
     using Scalar_t = navkit::core::Scalar_t;
 
@@ -23,7 +23,7 @@ struct DefaultInsNominalStateDef
     static constexpr int N = 16;
 };
 
-struct DefaultInsErrorStateDef
+struct InsGyroAccelBiasErrorStateDef
 {
     using Scalar_t = navkit::core::Scalar_t;
 
@@ -36,14 +36,14 @@ struct DefaultInsErrorStateDef
     static constexpr int N = 15;
 };
 
-struct DefaultInsStateDef
+struct InsGyroAccelBiasStateDef
 {
-    using Nominal = DefaultInsNominalStateDef;
-    using Error = DefaultInsErrorStateDef;
+    using Nominal = InsGyroAccelBiasNominalStateDef;
+    using Error = InsGyroAccelBiasErrorStateDef;
 };
 
-static_assert(StateDefPolicy<DefaultInsNominalStateDef>);
-static_assert(StateDefPolicy<DefaultInsErrorStateDef>);
-static_assert(StateSpaceDefPolicy<DefaultInsStateDef>);
+static_assert(StateDefPolicy<InsGyroAccelBiasNominalStateDef>);
+static_assert(StateDefPolicy<InsGyroAccelBiasErrorStateDef>);
+static_assert(StateSpaceDefPolicy<InsGyroAccelBiasStateDef>);
 
 } // namespace navkit::core::estimation

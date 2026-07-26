@@ -1,4 +1,4 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to NavKit will be documented in this file.
 
@@ -14,6 +14,15 @@ This project follows
 
 ### Added
 
+- Product-family variant directories for compile-time NavKit and simulation-app
+  selections, plus ownership-based compile-time component directories.
+- Reusable `EcefInsGnssLc<...>` product composition with explicit concrete
+  `GyroAccelBias` default/profiled selections, plus state-contract-aware
+  compile-time and runtime configuration naming.
+- Runtime scenario taxonomy under `config/runtime/navkit_sim/scenario`, with
+  role-keyed component compositions, resolved replayable run inputs, and
+  Monte Carlo restart-initialization scenarios supporting deterministic
+  explicit or covariance-colored full error-state estimate errors.
 - Matched and deliberately conservative HG1700 Monte Carlo covariance scenarios
   plus initial gyro/accelerometer bias covariance-matching report metrics.
 - Uncertainty-normalized Monte Carlo CDF-residual consistency dashboards with
@@ -116,7 +125,7 @@ This project follows
 - Clarified that same-named NavKit and app compile-time config files are expected when separated by ownership directories, and documented how runtime JSON links to the selected app/NavKit composition.
 - Replaced the bespoke stationary GNSS app runner with the generic simulation app loop while preserving stationary GNSS log/profile behavior.
 - Moved runnable NavKit product graph aliases into reusable NavKit configs and collapsed app configs to `NavKit` plus explicit `EmulatorBindings`.
-- Renamed the profiled reusable NavKit GNSS config to `ProfiledEcefInsGnss.hpp` to match the app-level selected config name.
+- Renamed the profiled reusable NavKit GNSS config to `EcefInsGnssLcGyroAccelBiasProfiled.hpp` to match the app-level selected config name.
 - Replaced app-facing sensor-index wiring with configured `Sensor::Id` values, emulator-owned stream IDs, explicit `(Emulator, Sensor)` bindings, and tuple helpers for ID-based lookup.
 - Replaced derived `MeasurementModels` config aliases with explicit `MeasurementStatisticsTuple` aliases keyed by configured sensor types.
 - Split app-support policy concepts into standalone headers and constrained simulation app configs, emulator bindings, emulator runtime plumbing, runtime validation, measurement models, and Navigator sensor processing on their real concept boundaries.
@@ -147,7 +156,7 @@ This project follows
 - Corrected the truth-log metadata convention for `q_eb` so it matches the ECEF-to-body attitude used by trajectory truth and IMU derivation.
 - Tightened the IMU emulator API and truth schema: `TruthSample` now carries only trajectory truth, truth logs no longer include IMU-derived acceleration/angular-rate fields, reusable quaternion/skew helpers live under core math, and IMU generation uses explicit `bool`/out-parameter failure handling instead of exceptions or `std::optional`.
 - Selected stationary GNSS product configs now use the first ECEF INS propagation policy instead of `NoOpPropagation`, while `NoOpPropagation` remains available for measurement-only products.
-- Split the selected ECEF INS state-space definition into explicit nominal and error layouts: `DefaultInsStateDef` now aggregates `DefaultInsNominalStateDef` with `AttQuat` and `DefaultInsErrorStateDef` with `AttRotVec`, so propagation, covariance, Jacobians, and injection use the correct vector dimensions at their boundaries.
+- Split the selected ECEF INS state-space definition into explicit nominal and error layouts: `InsGyroAccelBiasStateDef` now aggregates `InsGyroAccelBiasNominalStateDef` with `AttQuat` and `InsGyroAccelBiasErrorStateDef` with `AttRotVec`, so propagation, covariance, Jacobians, and injection use the correct vector dimensions at their boundaries.
 - Extended MSVC NavKit-owned compile options with `/bigobj` so template-heavy selected-config application translation units compile reliably on Windows.
 - Corrected the propagation/filter ownership boundary: propagation policies now operate on configured state definitions, build discrete covariance inputs, and leave `KalmanFilter` responsible for applying covariance propagation.
 - Reduced the v1 INS state definitions to bias-only PVA/IMU-error states by removing stale gyro and accelerometer scale-factor segments.

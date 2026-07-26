@@ -11,7 +11,7 @@
 #include "navkit/core/estimation/sensor/SensorConfigPolicy.hpp"
 #include "navkit/core/estimation/state/StateDefs.hpp"
 #include "navkit/core/models/GnssPosModel.hpp"
-#include "navkit/products/MinimalConfig.hpp"
+#include "navkit/products/components/propagation/EcefInsPropagationConfig.hpp"
 
 #include <cstddef>
 #include <doctest/doctest.h>
@@ -38,32 +38,51 @@ struct ZeroCapacityBufferConfig
     static constexpr std::size_t BufferSize = 0;
 };
 
-struct MinimalConfig
+struct ExampleNumericConfig
 {
-    using Numeric = navkit::config::navkit::MinimalConfig::Numeric;
+    using Scalar_t = navkit::core::Scalar_t;
+    using Time_t = navkit::core::Time_t;
+};
+
+struct ExampleBufferConfig
+{
+    static constexpr std::size_t BufferSize = 16U;
+};
+
+struct ExampleConfig
+{
+    using Numeric = ExampleNumericConfig;
+    using GnssBuffer = ExampleBufferConfig;
 };
 
 struct MissingNumericConfig
 {
-    using GnssBuffer = navkit::config::navkit::MinimalConfig::GnssBuffer;
+    using GnssBuffer = ExampleBufferConfig;
 };
 
 struct NumericOnlyConfig
 {
-    using Numeric = navkit::config::navkit::MinimalConfig::Numeric;
+    using Numeric = ExampleNumericConfig;
 };
+
+struct MissingPropagationConfig
+{};
 
 TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
 {
-    using ExampleConfig = navkit::config::navkit::MinimalConfig;
     using SelectedAppConfig = navkit::selected_config::Config;
     using SimConfig = navkit::app_support::NavKitConfig_t<navkit::selected_config::Config>;
 
     static_assert(NumericConfigPolicy<ExampleConfig::Numeric>);
     static_assert(navkit::core::estimation::BufferConfigPolicy<ExampleConfig::GnssBuffer>);
-    static_assert(ConfigPolicy<ExampleConfig>);
     static_assert(ConfigPolicy<SimConfig>);
-    static_assert(ConfigPolicy<MinimalConfig>);
+    static_assert(ConfigPolicy<ExampleConfig>);
+    static_assert(navkit::core::estimation::PropagationConfigPolicy<
+                  navkit::config::navkit::products::components::EcefInsPropagationConfig,
+                  navkit::core::estimation::InsGyroAccelBiasStateDef>);
+    static_assert(!navkit::core::estimation::PropagationConfigPolicy<
+                  MissingPropagationConfig,
+                  navkit::core::estimation::InsGyroAccelBiasStateDef>);
     static_assert(navkit::api::config::NavKitProductConfigPolicy<SimConfig>);
     static_assert(navkit::core::estimation::sensor_ids_unique_v<SimConfig::Sensors>);
     static_assert(std::is_same_v<navkit::core::estimation::SensorFromId_t<
@@ -103,7 +122,7 @@ TEST_CASE("Narrow config concepts reject only their own missing capabilities")
 
 TEST_CASE("Concrete config composes at product-core sensor boundaries")
 {
-    using StateDef = navkit::core::estimation::DefaultInsStateDef;
+    using StateDef = navkit::core::estimation::InsGyroAccelBiasStateDef;
     using Model = navkit::core::models::GnssPosModel<StateDef>;
     using SimConfig = navkit::app_support::NavKitConfig_t<navkit::selected_config::Config>;
     using Sensor = navkit::core::estimation::

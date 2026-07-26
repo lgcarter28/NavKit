@@ -32,16 +32,16 @@ template<typename Config, typename = void>
 inline constexpr bool has_profile_export_v = false;
 
 template<typename Config>
-inline constexpr bool
-    has_profile_export_v<Config,
-                         std::void_t<typename Config::ProfileTick, typename Config::ProfileSink>> =
-        true;
+inline constexpr bool has_profile_export_v<
+    Config,
+    std::void_t<typename Config::Profiling::ProfileTick, typename Config::Profiling::ProfileSink>> =
+    true;
 
 template<typename Config>
 void reset_profile_sink_if_configured()
 {
     if constexpr (has_profile_export_v<Config>) {
-        using Sink = typename Config::ProfileSink;
+        using Sink = typename Config::Profiling::ProfileSink;
         Sink::reset();
     }
 }
@@ -51,7 +51,7 @@ void export_profile_if_configured(const std::filesystem::path& output_dir,
                                   const std::string& run_name)
 {
     if constexpr (has_profile_export_v<Config>) {
-        using Sink = typename Config::ProfileSink;
+        using Sink = typename Config::Profiling::ProfileSink;
 
         const auto profile_path = output_dir / "profile.csv";
         const std::size_t record_count = io::drain_profile_sink_to_csv<Sink>(profile_path);

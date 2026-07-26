@@ -157,12 +157,15 @@ struct WrongGainDimensions
 TEST_CASE("MeasurementModelPolicy accepts compatible measurement models")
 {
     static_assert(MeasurementModelPolicy<ValidMeasurement, MeasurementModelPolicyTestStateDef>);
-    static_assert(MeasurementModelPolicy<navkit::core::models::GnssPosModel<DefaultInsStateDef>,
-                                         DefaultInsStateDef>);
-    static_assert(MeasurementModelPolicy<navkit::core::models::GnssVelModel<DefaultInsStateDef>,
-                                         DefaultInsStateDef>);
-    static_assert(MeasurementModelPolicy<navkit::core::models::BaroAltModel<DefaultInsStateDef>,
-                                         DefaultInsStateDef>);
+    static_assert(
+        MeasurementModelPolicy<navkit::core::models::GnssPosModel<InsGyroAccelBiasStateDef>,
+                               InsGyroAccelBiasStateDef>);
+    static_assert(
+        MeasurementModelPolicy<navkit::core::models::GnssVelModel<InsGyroAccelBiasStateDef>,
+                               InsGyroAccelBiasStateDef>);
+    static_assert(
+        MeasurementModelPolicy<navkit::core::models::BaroAltModel<InsGyroAccelBiasStateDef>,
+                               InsGyroAccelBiasStateDef>);
 
     CHECK(true);
 }
@@ -175,8 +178,9 @@ TEST_CASE("MeasurementModelPolicy rejects incomplete or incompatible models")
     static_assert(
         !MeasurementModelPolicy<BadObservationReturn, MeasurementModelPolicyTestStateDef>);
     static_assert(!MeasurementModelPolicy<WrongGainDimensions, MeasurementModelPolicyTestStateDef>);
-    static_assert(!MeasurementModelPolicy<navkit::core::models::GnssPosModel<DefaultInsStateDef>,
-                                          MeasurementModelPolicyTestStateDef>);
+    static_assert(
+        !MeasurementModelPolicy<navkit::core::models::GnssPosModel<InsGyroAccelBiasStateDef>,
+                                MeasurementModelPolicyTestStateDef>);
 
     CHECK(true);
 }
