@@ -32,39 +32,37 @@ This phase expands truth generation and scheduling after Monte Carlo exists, so 
 
 ## Pass 7.3: trajectory source abstraction
 
-- [x] Added `sim::TruthTrajectory` as the shared generated/CSV source contract. The simulation app consumes it directly, so CSV playback follows the normal initialization, IMU, emulator, Navigator, and logging path without a dedicated playback driver.
+- [x] Added `sim::TruthTrajectory` as the shared generated/CSV tabulated-truth container. The simulation app consumes it through the common source boundary, so CSV playback follows the normal initialization, IMU, emulator, Navigator, and logging path without a dedicated playback driver.
 - [x] Added bounded arbitrary-time truth queries: ECEF position, velocity, and angular rate interpolate linearly while quaternion attitude uses SLERP. The IMU runtime now requests truth at its own exact rational sample timestamps, independent of native truth cadence; source logging remains separately cadence-gated.
 - [x] Completed and documented richer trajectory source conventions. Stationary initialization accepts ECEF/local-level position, velocity, quaternion/RPY/DCM attitude, and angular-rate forms. `w_nb_b_radps` now applies `w_ib_b = C_e2b w_ie_e + C_n2b w_en_n + w_nb_b`, including local transport rate; CSV sources accept strict ECEF PVA/quaternion rows and optionally supplied body IMU rates.
 
 ## Pass 7.4: planned-time application loop and streaming trajectory sources
 
-- [ ] Add a separately configured rational application cadence. The application owns planned simulation time and configuration validation must reject an application rate that cannot meet the fastest required consumer deadline.
-- [ ] Replace the eager-only simulation trajectory boundary with a narrow simulation-runtime virtual source contract: `initialize`, `advance_to(const Timestamp&)`, bounded `query(const Timestamp&, TruthSample&)`, and completion/status access. Virtual dispatch is an explicit simulation/application exception; embedded-facing product-core code remains static/policy based.
-- [ ] Provide stationary generation and CSV playback as concrete source implementations. Each source owns its internal integration/source rate and enough retained history for bounded interpolation; consumers request their exact time of validity rather than assuming clean-rate multiples.
-- [ ] Reuse `RationalSchedule` for both consumer gates and the master planned-time cursor. Keep `due(t)` for consumption, add `next(t)` for producer scheduling, and define reset/initialize semantics so the first produced time is strictly after the selected epoch without duplicate ticker arithmetic.
-- [ ] Add simulation and real-time clock implementations with the same `wait_until(const Timestamp&)` signature. A simulation clock immediately adopts the planned timestamp; a real-time/HWIL clock waits to its mapped physical deadline and later reports lateness through the status/error contract.
-- [ ] Split synthetic emulator work into `prepare` and `publish` phases with explicit typed prepared payloads. Preparation may query truth, draw/update synthetic stochastic state, and build outputs ahead of the deadline, but may not mutate Navigator-visible queues. Publication occurs after the clock deadline and is the sole point measurements enter Navigator buffers and logging. Hardware inputs remain a separate asynchronous/post-deadline capability.
-- [ ] Implement and test the planned loop contract:
+- [x] Added an explicit `application` rational-rate component to every runnable scenario. Runtime validation now requires it and rejects a cadence that is not an integer multiple of the configured IMU or any synthetic emulator rate.
+- [x] Replaced the eager-only app trajectory boundary with the narrow simulation-only virtual `TrajectorySource` contract: `advance_to(const Timestamp&)`, bounded `query(const Timestamp&, TruthSample&)`, `t_start()`, `t_end()`, and completion status. Virtual dispatch remains confined to simulation/app support; product-core navigation remains static/policy composed.
+- [x] Added lazy `StationaryTrajectorySource` and bounded `TabulatedTrajectorySource` implementations. The latter wraps generated/CSV `TruthTrajectory` storage and retains its interpolation behavior, so consumers request exact timestamps without a separate playback driver or cadence assumption.
+- [x] Added the first planned-time producer path alongside the existing consumer-side rational schedule. Pass 7.5 follows up by separating these roles into dedicated timeline and schedule types.
+- [x] Added `SimulatedClock` and `RealtimeClock` with the shared `wait_until(const Timestamp&)` contract. The simulation clock immediately adopts planned time; the real-time implementation maps planned monotonic time to a steady-clock deadline. Lateness/status enrichment remains Phase 9 work.
+- [x] Split synthetic emulation into typed `prepare` and `publish` phases. Preparation can query truth, advance deterministic synthetic schedules/RNG state, and build typed output without exposing it; publication after `wait_until(t)` is the only path that mutates Navigator sensor/IMU buffers and writes measurement logs.
+- [x] Reworked `SimulationApp` around the owned planned loop: initialize source/IMU/logger/clock at the epoch; prepare and publish the epoch measurements; then repeat `next(t_curr)`, source advance, prepare, clock wait, publish, and `Navigator::update()` until source completion.
+- [x] Documented source, clock, and preparation/publication ownership in architecture/configuration references. Added deterministic tests for exact `next()` timestamps, rational application-rate compatibility, bounded source queries, no early IMU-buffer publication, and shared simulated/real-time clock boundary behavior. The default Debug scenario completed with 601 truth/nav samples, 6001 IMU samples, and 61 GNSS position/velocity samples over the 60-second run.
 
-  ```text
-  scheduler.next(t_curr)
-  trajectory.advance_to(t_curr)
-  emulators.prepare(trajectory, t_curr, prepared_updates)
-  clock.wait_until(t_curr)
-  emulators.publish(prepared_updates, navigator, logger)
-  navigator.update()
-  ```
+## Pass 7.5: app-support clock and rational-cadence role cleanup
 
-- [ ] Update architecture/configuration documentation and add deterministic tests for exact app-time progression, query bounds/interpolation, no early publication, and simulated versus real-time clock boundary behavior.
+- [x] Added the narrow app-support virtual Clock boundary: initialize(t_epoch), wait_until(t), and now(). SimulatedClock and RealtimeClock implement it; the application component now requires a runtime-selected simulated or realtime mode. Product-core NavKit remains clock-agnostic.
+- [x] Moved planned-time initialization before epoch preparation/publication, so invalid application cadence fails before any queue or logging mutation.
+- [x] Split SimulationApp failure handling into clock, IMU publication, generic emulator publication, and Navigator update ownership boundaries with distinct messages.
+- [x] Split rational cadence roles. RationalSchedule now owns only consumer-side due(t) state; RationalTimeline owns planned timestamp next(t) production. Both use the same canonical rational-rate validity and exact sample-index timestamp arithmetic.
+- [x] Added tests for virtual clock construction/mode parsing, supported realtime runtime configuration, invalid/missing clock rejection, and exact RationalTimeline phase behavior. Debug build/tests and the nominal 60-second planned-time scenario completed successfully.
 
-## Pass 7.5: scenario trajectory expansion
+## Pass 7.6: scenario trajectory expansion
 
 - [ ] Add a simple ballistic trajectory: stationary launch-pad initialization, optional transfer-alignment window, initial heading/pitch definition, and a simple axial body-x boost profile before ballistic/coast behavior. Keep this intentionally simple before adding aero or guidance complexity.
 - [ ] Add a constant-altitude, constant-speed trajectory on the curved Earth rather than flat-Earth kinematics.
 - [ ] Add calibration-maneuver trajectories: horizontal S-turn, vertical S-turn, and bank-left/bank-right excitation for observability and calibration studies.
 - [ ] Add a basic waypoint trajectory with simple bank-to-turn behavior once coordinate, attitude, and trajectory-source contracts are stable.
 
-## Pass 7.6: reusable trajectory math cleanup
+## Pass 7.7: reusable trajectory math cleanup
 
 - [ ] Move remaining reusable Earth-rate, triad-calibration, frame-transform, and trajectory-provider conversion helpers into their owning core math/frames/environment locations instead of leaving them buried in trajectory or simulator code. Concrete examples to sweep include `earth_rate_e_radps`, `nonorthogonality_matrix`, `misalignment_matrix`, and the frame-transform helpers currently living in trajectory/simulator implementation files.
 - [ ] Define and test the minimum coordinate operations needed by PCPF/ECEF mechanization, local-vertical measurements, NED plots, and future local-level mechanizations.

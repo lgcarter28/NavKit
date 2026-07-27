@@ -13,7 +13,8 @@
 #include "navkit/core/math/Quaternion.hpp"
 #include "navkit/core/math/Types.hpp"
 #include "navkit/core/time/Duration.hpp"
-#include "navkit/sim/TrajectoryGenerator.hpp"
+#include "navkit/sim/StationaryTrajectorySource.hpp"
+#include "navkit/sim/TabulatedTrajectorySource.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
 #include <Eigen/Dense>
@@ -22,6 +23,7 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <nlohmann/json.hpp>
 #include <sstream>
 #include <string>
@@ -33,11 +35,8 @@ namespace navkit::app_support
 
 struct TrajectoryRun
 {
-    core::Vec3 initial_position_e_m{};
-    core::Vec3 initial_velocity_e_mps{};
-    Eigen::Quaternion<core::Scalar_t> initial_q_b2e{Eigen::Quaternion<core::Scalar_t>::Identity()};
-    core::Vec3 initial_w_ib_b_radps{core::Vec3::Zero()};
-    sim::TruthTrajectory truth{};
+    std::unique_ptr<sim::TrajectorySource> source{};
+    sim::TruthSample initial_truth{};
 };
 
 namespace detail
@@ -467,19 +466,21 @@ inline TrajectoryRun trajectory_run_from_json(const nlohmann::json& cfg,
         const std::filesystem::path csv_path =
             source_base_dir / trajectory_config.at("csv_path").get<std::string>();
         sim::TruthTrajectory truth = detail::truth_trajectory_from_csv(csv_path);
-        return {.initial_position_e_m = truth.first().p_e,
-                .initial_velocity_e_mps = truth.first().v_e,
-                .initial_q_b2e = truth.first().q_b2e,
-                .initial_w_ib_b_radps = truth.first().w_ib_b_radps,
-                .truth = std::move(truth)};
+        const sim::TruthSample initial_truth = truth.first();
+        return {.source = std::make_unique<sim::TabulatedTrajectorySource>(std::move(truth)),
+                .initial_truth = initial_truth};
     }
 
     const sim::StationaryTrajectoryConfig traj_cfg = stationary_trajectory_config_from_json(cfg);
-    return {.initial_position_e_m = traj_cfg.p_e,
-            .initial_velocity_e_mps = traj_cfg.v_e,
-            .initial_q_b2e = traj_cfg.q_b2e,
-            .initial_w_ib_b_radps = traj_cfg.w_ib_b_radps,
-            .truth = sim::TrajectoryGenerator::stationary(traj_cfg)};
+    const sim::TruthSample initial_truth{
+        .t = traj_cfg.t_epoch,
+        .p_e = traj_cfg.p_e,
+        .v_e = traj_cfg.v_e,
+        .q_b2e = traj_cfg.q_b2e,
+        .w_ib_b_radps = traj_cfg.w_ib_b_radps,
+    };
+    return {.source = std::make_unique<sim::StationaryTrajectorySource>(traj_cfg),
+            .initial_truth = initial_truth};
 }
 
 } // namespace navkit::app_support

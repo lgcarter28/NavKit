@@ -72,18 +72,7 @@ Phase 7: trajectory-provider and timebase expansion is active. Phase 6 establish
 
 ## Next pass
 
-## Pass 7.4: planned-time application loop and streaming trajectory sources
-
-- [ ] Make the simulation application an embedded-facing planned-time orchestrator. Add a separately configurable rational application rate and reject configurations whose application cadence cannot meet the fastest required consumer deadline.
-- [ ] Evolve the simulation-only trajectory boundary from an eagerly synthesized container into a narrow virtual streaming source contract: initialize, `advance_to(t)`, bounded `query(t, sample)`, and completion/status access. Keep virtual dispatch confined to app/simulation infrastructure; product-core navigation remains static/policy composed.
-- [ ] Implement stationary generation and CSV playback behind that common source contract. Let each source own its internal resolution and retained query history; consumers query exact timestamps and never depend on a source cadence being an integer multiple of their own.
-- [ ] Extend `RationalSchedule` rather than introducing a duplicated ticker: retain consumer `due(t)` semantics and add a producer `next(t)` path with exact sample-index timing. Clearly define initialization/reset ownership and ensure the first `next()` timestamp is strictly after the epoch.
-- [ ] Add simulation and real-time clock policies with a common `wait_until(const Timestamp&)` contract. The simulated clock immediately adopts planned time; the real-time/HWIL clock waits to the mapped wall-clock deadline and exposes failure/lateness through the future status seam.
-- [ ] Split emulator runtime work into typed two-phase operations. `prepare(source, t, prepared_updates)` may query truth and advance synthetic stochastic state before the deadline but must not mutate Navigator-visible buffers; `publish(prepared_updates, navigator, logger)` makes data observable only after `wait_until(t)`. Keep real hardware acquisition as a distinct post-deadline/asynchronous path rather than pretending it can be precomputed.
-- [ ] Drive the app loop with the explicit ownership sequence: obtain `t_curr` from the application scheduler; `trajectory.advance_to(t_curr)`; prepare synthetic emulator updates; `clock.wait_until(t_curr)`; publish prepared updates; then call `navigator.update()`.
-- [ ] Document the master-clock, source-resolution, preparation/publication, SWIL, and HWIL contracts in architecture/configuration documentation. Add deterministic timing tests for exact planned timestamps, no early publication, source query bounds/interpolation, and simulation-clock versus real-time-clock boundary behavior.
-
-## Pass 7.5: scenario trajectory expansion
+## Pass 7.6: scenario trajectory expansion
 
 - [ ] Add a simple ballistic trajectory: stationary launch-pad initialization, optional transfer-alignment window, initial heading/pitch definition, and a simple axial body-x boost profile before ballistic/coast behavior. Keep this intentionally simple before adding aero or guidance complexity.
 - [ ] Add a constant-altitude, constant-speed trajectory on the curved Earth rather than flat-Earth kinematics.

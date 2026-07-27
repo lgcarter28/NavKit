@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "navkit/core/time/RationalRate.hpp"
 #include "navkit/io/LoggerPolicy.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
@@ -27,6 +28,7 @@ concept EmulatorPolicy = requires(typename Candidate::Runtime& runtime,
 
     { Candidate::validate_runtime_config(cfg) } -> std::same_as<void>;
     { Candidate::make_runtime(cfg) } -> std::same_as<typename Candidate::Runtime>;
+    { Candidate::runtime_rate_from_json(cfg) } -> std::same_as<navkit::core::RationalRate>;
     { Candidate::configure_sensor(sensor, cfg) } -> std::same_as<void>;
     { Candidate::configure_logger(logger, cfg) } -> std::same_as<void>;
     { Candidate::generate(runtime, truth) } -> std::same_as<typename Sensor::Measurement_t>;

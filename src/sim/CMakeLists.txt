@@ -3,8 +3,9 @@
 
 add_library(navkit_sim
     TruthTrajectory.cpp
+    TabulatedTrajectorySource.cpp
     BaroSimulator.cpp
-    TrajectoryGenerator.cpp
+    StationaryTrajectorySource.cpp
     GnssSimulator.cpp
     ImuSimulator.cpp
 )

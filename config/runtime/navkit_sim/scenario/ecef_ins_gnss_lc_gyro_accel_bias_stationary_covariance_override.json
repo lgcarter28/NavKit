@@ -1,6 +1,7 @@
 {
   "components": {
     "trajectory": "../components/trajectory/stationary_ecef_1000hz.json",
+    "application": "../components/application/default_1000hz.json",
     "imu": "../components/imu/specs/hg1700_tactical.json",
     "gnss": "../components/gnss/nominal_pos_vel.json",
     "process_noise": "../components/propagation/imu_process_noise_default.json",

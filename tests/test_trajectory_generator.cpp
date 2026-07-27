@@ -2,7 +2,7 @@
 // All Rights Reserved.
 
 #include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
-#include "navkit/sim/TrajectoryGenerator.hpp"
+#include "navkit/sim/StationaryTrajectorySource.hpp"
 #include "test_main.hpp"
 
 #include <filesystem>
@@ -11,26 +11,42 @@
 namespace navkit::sim::test
 {
 
-TEST_CASE("Stationary trajectory includes both endpoints at fixed sample spacing")
+using navkit::core::RationalRate;
+using navkit::core::Timestamp;
+using navkit::core::timestamp_at_sample_index;
+using navkit::core::timestamp_seconds;
+using navkit::core::Vec3;
+
+TEST_CASE("Stationary trajectory source makes planned truth available without eager samples")
 {
     StationaryTrajectoryConfig config;
     config.duration_s = 2.0;
     config.rate = RationalRate{.samples = 2U, .s = 1U};
     config.p_e << 1.0, 2.0, 3.0;
 
-    const TruthTrajectory trajectory = TrajectoryGenerator::stationary(config);
+    StationaryTrajectorySource trajectory(config);
+    TruthSample sample{};
 
-    REQUIRE(trajectory.size() == 5U);
-    CHECK(timestamp_seconds(trajectory.first().t) == doctest::Approx(0.0));
-    CHECK(timestamp_seconds(trajectory.last().t) == doctest::Approx(2.0));
+    CHECK(timestamp_seconds(trajectory.t_start()) == doctest::Approx(0.0));
+    CHECK(timestamp_seconds(trajectory.t_end()) == doctest::Approx(2.0));
+    CHECK_FALSE(trajectory.query(Timestamp{}, sample));
 
-    for (std::size_t index = 0; index < trajectory.size(); ++index) {
-        const TruthSample& sample = trajectory.samples().at(index);
-        CHECK(timestamp_seconds(sample.t) == doctest::Approx(0.5 * static_cast<double>(index)));
-        CHECK(sample.p_e.isApprox(config.p_e));
-        CHECK(sample.v_e.isZero());
-        CHECK(sample.q_b2e.isApprox(Eigen::Quaterniond::Identity()));
-    }
+    REQUIRE(trajectory.advance_to(Timestamp{}));
+    REQUIRE(trajectory.query(Timestamp{}, sample));
+    CHECK(sample.p_e.isApprox(config.p_e));
+    CHECK(sample.v_e.isZero());
+    CHECK(sample.q_b2e.isApprox(Eigen::Quaterniond::Identity()));
+
+    const Timestamp half_second{.ns = 500'000'000U};
+    REQUIRE(trajectory.advance_to(half_second));
+    REQUIRE(trajectory.query(half_second, sample));
+    CHECK(timestamp_seconds(sample.t) == doctest::Approx(0.5));
+    CHECK_FALSE(trajectory.query(Timestamp{.s = 1U}, sample));
+    CHECK_FALSE(trajectory.is_complete());
+
+    REQUIRE(trajectory.advance_to(Timestamp{.s = 2U}));
+    CHECK(trajectory.is_complete());
+    CHECK_FALSE(trajectory.advance_to(Timestamp{.s = 3U}));
 }
 
 TEST_CASE(
@@ -90,13 +106,14 @@ TEST_CASE("CSV trajectory source uses the shared truth trajectory contract")
 
     const nlohmann::json cfg{
         {"trajectory", {{"type", "csv"}, {"csv_path", path.filename().string()}}}};
-    const app_support::TrajectoryRun run =
-        app_support::trajectory_run_from_json(cfg, path.parent_path());
-    REQUIRE(run.truth.size() == 2U);
+    app_support::TrajectoryRun run = app_support::trajectory_run_from_json(cfg, path.parent_path());
+    REQUIRE(run.source);
+    REQUIRE(run.source->advance_to(Timestamp{.s = 1U}));
     TruthSample midpoint{};
-    REQUIRE(run.truth.sample_at(Timestamp{.s = 1U}, midpoint));
+    REQUIRE(run.source->query(Timestamp{.s = 1U}, midpoint));
     CHECK(midpoint.p_e.x() == doctest::Approx(6378138.0));
     CHECK(midpoint.v_e.x() == doctest::Approx(1.0));
+    CHECK_FALSE(run.source->query(Timestamp{.s = 2U}, midpoint));
 
     std::filesystem::remove(path);
 }

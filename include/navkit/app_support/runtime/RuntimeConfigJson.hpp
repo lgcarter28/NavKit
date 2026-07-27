@@ -4,6 +4,7 @@
 #pragma once
 
 #include "navkit/app_support/runtime/RuntimeConfigError.hpp"
+#include "navkit/app_support/time/ClockMode.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -14,6 +15,27 @@
 
 namespace navkit::app_support::detail
 {
+
+/** Translates a runtime JSON clock selection to the app-support clock mode. */
+[[nodiscard]] inline bool
+clock_mode_from_json(const nlohmann::json& cfg, const std::string_view key, ClockMode& mode)
+{
+    const nlohmann::json::const_iterator iter = cfg.find(std::string{key});
+    if (iter == cfg.end() || !iter->is_string()) {
+        return false;
+    }
+
+    const std::string value = iter->get<std::string>();
+    if (value == "simulated") {
+        mode = ClockMode::Simulated;
+        return true;
+    }
+    if (value == "realtime") {
+        mode = ClockMode::Realtime;
+        return true;
+    }
+    return false;
+}
 
 [[nodiscard]] inline const nlohmann::json& require_object(const nlohmann::json& cfg,
                                                           std::string_view path)

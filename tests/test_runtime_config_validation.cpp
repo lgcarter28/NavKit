@@ -76,6 +76,7 @@ struct NotABinding
     return {
         {"run_name", "ecef_ins_gnss_demo"},
         {"output_dir", "output/logs/ecef_ins_gnss_demo"},
+        {"application", {{"clock", "simulated"}, {"rate_hz", 1000.0}}},
         {"logging",
          {{"console", {{"enabled", true}, {"rate_hz", 1.0}}},
           {"truth", {{"enabled", true}, {"rate_hz", 10.0}}},
@@ -116,6 +117,21 @@ struct NotABinding
               0.007615435494667714,
               0.007615435494667714,
               0.030461741978670857}}}}}}};
+}
+
+TEST_CASE("Runtime JSON clock parser accepts only supported app-support modes")
+{
+    const nlohmann::json simulated{{"clock", "simulated"}};
+    const nlohmann::json realtime{{"clock", "realtime"}};
+    const nlohmann::json invalid{{"clock", "invalid"}};
+    ClockMode mode{};
+
+    REQUIRE(detail::clock_mode_from_json(simulated, "clock", mode));
+    CHECK(mode == ClockMode::Simulated);
+    REQUIRE(detail::clock_mode_from_json(realtime, "clock", mode));
+    CHECK(mode == ClockMode::Realtime);
+    CHECK_FALSE(detail::clock_mode_from_json(invalid, "clock", mode));
+    CHECK_FALSE(detail::clock_mode_from_json(simulated, "missing", mode));
 }
 
 [[nodiscard]] std::vector<double> identity_pva_cov_full()
@@ -354,6 +370,34 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects missing runtime-owned cadence
     cfg = valid_ecef_ins_gnss_runtime_config();
     cfg.at("trajectory").erase("duration_s");
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.erase("application");
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("application").erase("clock");
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("application")["clock"] = "realtime";
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("application")["clock"] = "invalid";
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("application") = {{"clock", "simulated"}, {"rate_hz", 600.0}};
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("gnss").erase("dt_s");
+    cfg.at("gnss")["rate_hz"] = 600.0;
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg.at("application") = {{"clock", "simulated"}, {"rate_hz", 3000.0}};
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
 
     cfg = valid_ecef_ins_gnss_runtime_config();
     cfg.at("logging").at("truth").erase("rate_hz");
@@ -695,9 +739,9 @@ TEST_CASE("Trajectory w_nb_b initialization includes Earth and local transport r
     const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
     const core::Scalar_t expected_x_radps =
         core::environment::Wgs84::omega_rad_s + (100.0 / core::environment::Wgs84::a_m);
-    CHECK(trajectory.initial_w_ib_b_radps.x() == doctest::Approx(expected_x_radps));
-    CHECK(trajectory.initial_w_ib_b_radps.y() == doctest::Approx(0.0));
-    CHECK(trajectory.initial_w_ib_b_radps.z() == doctest::Approx(0.0));
+    CHECK(trajectory.initial_truth.w_ib_b_radps.x() == doctest::Approx(expected_x_radps));
+    CHECK(trajectory.initial_truth.w_ib_b_radps.y() == doctest::Approx(0.0));
+    CHECK(trajectory.initial_truth.w_ib_b_radps.z() == doctest::Approx(0.0));
 }
 
 TEST_CASE("Explicit PVA initialization provider applies configured errors")
@@ -717,7 +761,7 @@ TEST_CASE("Explicit PVA initialization provider applies configured errors")
     CHECK(core::estimation::pos_e_m(pva_init.pva)(2) == doctest::Approx(25.0));
     CHECK(core::estimation::vel_e_mps(pva_init.pva).isZero());
     CHECK(core::estimation::rpy_b2e_rad(pva_init.pva)
-              .isApprox(core::math::rpy_rad_from_quaternion(trajectory.truth.first().q_b2e)));
+              .isApprox(core::math::rpy_rad_from_quaternion(trajectory.initial_truth.q_b2e)));
 }
 
 TEST_CASE("Direct PVA initialization provider uses configured values")
@@ -876,7 +920,7 @@ TEST_CASE("Random PVA initialization provider produces deterministic colored dra
     CHECK(core::estimation::vel_e_mps(first.pva).isApprox(core::estimation::vel_e_mps(second.pva)));
     CHECK(core::estimation::rpy_b2e_rad(first.pva).isApprox(
         core::estimation::rpy_b2e_rad(second.pva)));
-    CHECK_FALSE((core::estimation::pos_e_m(first.pva) - trajectory.initial_position_e_m).isZero());
+    CHECK_FALSE((core::estimation::pos_e_m(first.pva) - trajectory.initial_truth.p_e).isZero());
 }
 
 TEST_CASE("Random PVA initialization provider accepts NED covariance frame")
@@ -890,8 +934,7 @@ TEST_CASE("Random PVA initialization provider accepts NED covariance frame")
     CHECK_NOTHROW(PvaRandomInitializationProvider::validate_runtime_config(cfg));
     const PvaInitialization pva_init = PvaRandomInitializationProvider::initialize(cfg, trajectory);
 
-    CHECK_FALSE(
-        (core::estimation::pos_e_m(pva_init.pva) - trajectory.initial_position_e_m).isZero());
+    CHECK_FALSE((core::estimation::pos_e_m(pva_init.pva) - trajectory.initial_truth.p_e).isZero());
 }
 
 TEST_CASE("NavInitialization maps into the configured Navigator filter state")
@@ -932,7 +975,7 @@ TEST_CASE("NavInitialization maps into the configured Navigator filter state")
     const PvaInitialization nav_init =
         PvaExplicitInitializationProvider::initialize(cfg, trajectory);
     const Eigen::Quaternion<core::Scalar_t> expected_q_b2e =
-        trajectory.truth.first().q_b2e.normalized();
+        trajectory.initial_truth.q_b2e.normalized();
 
     auto navigator = std::make_unique<NavKit::Navigator>();
     initialize_navigator<NavKit>(nav_init, cfg, *navigator);
@@ -999,7 +1042,7 @@ TEST_CASE("Initial estimate error applies against the simulation truth reference
     const PvaInitialization pva_init =
         PvaExplicitInitializationProvider::initialize(cfg, trajectory);
     InitialTruthReference<StateDef> reference{};
-    populate_initial_pva_from_truth<StateDef>(trajectory.truth.first(), reference);
+    populate_initial_pva_from_truth<StateDef>(trajectory.initial_truth, reference);
     core::estimation::segment<typename Nominal::GyroB>(reference.truth_state) =
         core::Vec3{0.01, 0.02, 0.03};
     core::estimation::segment<typename Nominal::AccB>(reference.truth_state) =

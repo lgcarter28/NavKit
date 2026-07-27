@@ -325,15 +325,43 @@ Cadence accepts exactly one of `rate_hz` or `dt_s`. The parser canonicalizes
 either form to a rational samples-per-second representation for phase-stable
 scheduling. Prefer `rate_hz` for rates such as 600 Hz whose period has a
 repeating decimal representation; retain `dt_s` only when the period is the
-more natural scenario input.
+more natural scenario input. Every runnable scenario must also select an
+`application` cadence. Its rate must be an integer multiple of the IMU and
+each configured synthetic emulator rate, so the application reaches every
+producer deadline exactly. For example, an application that serves both a
+1000 Hz IMU and a 600 Hz sensor must run at 3000 Hz or another common integer
+multiple, not merely at the numerically faster 1000 Hz rate.
+
+The same `application` component selects the app-support clock mode. Use
+`"clock": "simulated"` for deterministic SWIL, which immediately adopts every
+planned timestamp. Use `"clock": "realtime"` when planned timestamps must map
+to steady-clock deadlines for an HWIL-style loop. This runtime selection does
+not alter embedded NavKit algorithms.
 
 ### Trajectory sources and timing
 
 The `trajectory` component selects one source that feeds the same typed truth
 contract used by initialization, IMU emulation, sensor emulation, logging, and
-the Navigator. There is no separate playback application or driver.
+the Navigator. A separate `application` component provides the master planned
+loop cadence:
 
-- `"type": "stationary"` generates native-rate ECEF truth from the configured
+```json
+{
+  "components": {
+    "trajectory": "../components/trajectory/stationary_ecef_1000hz.json",
+    "application": "../components/application/default_1000hz.json"
+  }
+}
+```
+
+There is no separate playback application or driver. The application advances
+the selected source through each planned timestamp. Synthetic IMU/GNSS runtimes
+query the source while preparing their updates; the app publishes them to the
+Navigator only after the selected clock reaches that timestamp. This executes
+immediately for SWIL and retains the same scheduling boundary for future
+real-time/HWIL clocks.
+
+- `"type": "stationary"` generates ECEF truth lazily from the configured
   duration, cadence, initial position/velocity/attitude, and optional angular
   rate.
 - `"type": "csv"` loads `csv_path`, resolved relative to the main scenario
@@ -347,7 +375,7 @@ the Navigator. There is no separate playback application or driver.
 Truth remains queryable between native source samples. Position, velocity, and
 angular rate interpolate linearly; body-to-ECEF quaternion attitude uses SLERP.
 The IMU runtime requests truth at its own exact rational timestamps, so a 600 Hz
-IMU can consume a 1000 Hz source without phase drift or a separate playback
+IMU can consume a tabulated source without phase drift or a separate playback
 loop. The source never extrapolates beyond its first or last sample.
 
 Stationary-source initial conditions accept ECEF or local-level conventions.
@@ -486,9 +514,10 @@ first, and then the scenario's inline values are merged on top:
 {
   "run_name": "ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal",
   "output_dir": "output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal",
-  "components": {
-    "trajectory": "../components/trajectory/stationary_ecef_1000hz.json",
-    "imu": "../components/imu/specs/hg1700_tactical.json",
+    "components": {
+      "trajectory": "../components/trajectory/stationary_ecef_1000hz.json",
+      "application": "../components/application/default_1000hz.json",
+      "imu": "../components/imu/specs/hg1700_tactical.json",
     "gnss": "../components/gnss/nominal_pos_vel.json",
     "pva_initialization": "../components/initialization/pva/pva_random_error_default.json"
   },

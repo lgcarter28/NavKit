@@ -5,7 +5,9 @@
 
 #include "navkit/core/time/Timestamp.hpp"
 
+#include <array>
 #include <limits>
+#include <numeric>
 
 namespace navkit::core
 {
@@ -22,6 +24,39 @@ struct RationalRate
 [[nodiscard]] constexpr bool rational_rate_is_valid(const RationalRate& rate)
 {
     return rate.samples > 0U && rate.s > 0U;
+}
+
+/** Returns whether a timestamp epoch and rational cadence form a valid timebase. */
+[[nodiscard]] constexpr bool rational_cadence_is_valid(const Timestamp& t_epoch,
+                                                       const RationalRate& rate)
+{
+    return timestamp_is_valid(t_epoch) && rational_rate_is_valid(rate);
+}
+
+/** Returns whether faster_rate's cadence exactly contains every slower-rate event. */
+[[nodiscard]] constexpr bool rational_rate_is_integer_multiple(const RationalRate& faster_rate,
+                                                               const RationalRate& slower_rate)
+{
+    if (!rational_rate_is_valid(faster_rate) || !rational_rate_is_valid(slower_rate)) {
+        return false;
+    }
+
+    std::array<std::uint64_t, 2U> numerator{
+        faster_rate.samples,
+        slower_rate.s,
+    };
+    std::array<std::uint64_t, 2U> denominator{
+        faster_rate.s,
+        slower_rate.samples,
+    };
+    for (std::uint64_t& denominator_factor : denominator) {
+        for (std::uint64_t& numerator_factor : numerator) {
+            const std::uint64_t divisor = std::gcd(numerator_factor, denominator_factor);
+            numerator_factor /= divisor;
+            denominator_factor /= divisor;
+        }
+    }
+    return denominator.at(0U) == 1U && denominator.at(1U) == 1U;
 }
 
 /**

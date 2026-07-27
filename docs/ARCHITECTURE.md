@@ -142,14 +142,40 @@ between them.
 
 Simulation cadence uses `core::RationalRate` and a 64-bit sample index rather
 than repeated floating-point additions. Runtime JSON still accepts one of
-`rate_hz` or `dt_s`, then canonicalizes it once. `sim::TruthTrajectory` is the
-shared generated/CSV source contract: it retains native samples and answers
-in-range arbitrary-time queries with linear ECEF state interpolation and
-quaternion SLERP. The IMU runtime therefore requests exact source truth at its
-own cadence rather than relying on the first producer sample after a due time.
+`rate_hz` or `dt_s`, then canonicalizes it once. `RationalSchedule::due(t)` is
+the consumer-side cadence gate, while `RationalTimeline::next(t)` produces the
+next exact planned timestamp strictly after the timeline epoch.
+
+`sim::TrajectorySource` is a simulation-only virtual boundary. It makes truth
+available through `advance_to(t)` and serves bounded exact-time `query(t,
+sample)` calls without extrapolation. `StationaryTrajectorySource` produces
+truth lazily; `TabulatedTrajectorySource` wraps generated or CSV-backed
+`TruthTrajectory` storage, which retains native samples and uses linear ECEF
+state interpolation plus quaternion SLERP. This keeps the reusable product-core
+navigation path statically composed while allowing application/simulation code
+to select a source at runtime.
+
+`SimulationApp` owns the planned master cadence and a runtime-selected
+app-support `Clock`. Its configured application
+rate must be an integer multiple of every synthetic producer rate, so each
+consumer deadline is visited exactly. At each planned timestamp, the app
+advances the source and prepares synthetic emulator updates before the deadline,
+then calls `wait_until(t)`, publishes those prepared updates to Navigator-visible
+queues, and invokes `Navigator::update()`. The simulated clock adopts planned
+time immediately; the real-time clock maps the same API to a steady-clock
+deadline for future HWIL use. Synthetic preparation may run ahead of the wall
+clock, but publication—and all real hardware acquisition—remains post-deadline.
+
+`Clock` is intentionally virtual only in app support: `SimulatedClock` adopts
+planned time immediately, while `RealtimeClock` waits against a steady-clock
+deadline. The selected `"simulated"` or `"realtime"` mode is runtime JSON, not
+an embedded NavKit policy. Exact planned timestamps come from `RationalTimeline`;
+consumer-side `RationalSchedule` remains solely the due-time gate for log and
+synthetic-emulator cadences.
 
 The time vocabulary is split by dependency: `TimeTypes.hpp`, `Timestamp.hpp`,
-`Duration.hpp`, `RationalRate.hpp`, and `RationalSchedule.hpp`. `Time.hpp` is a
+`Duration.hpp`, `RationalRate.hpp`, `RationalSchedule.hpp`, and
+`RationalTimeline.hpp`. `Time.hpp` is a
 convenience umbrella, while production headers include the narrowest dependency
 they use. `SignedDuration` remains deferred until a real latency/replay or
 timestamp-offset boundary requires signed intervals.

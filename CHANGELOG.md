@@ -14,6 +14,14 @@ This project follows
 
 ### Added
 
+- Planned-time simulation orchestration with exact rational application
+  cadence, streaming stationary/CSV trajectory sources, simulated and
+  real-time clock contracts, and two-phase synthetic emulator preparation and
+  publication so Navigator-visible measurements are not exposed before their
+  planned deadline.
+- Runtime-selectable simulated/realtime app-support clocks, explicit planned
+  timeline production separate from consumer-side due schedules, and
+  owner-specific planned-loop failure reporting.
 - Shared `TruthTrajectory` source storage/querying for generated and CSV ECEF
   truth, exact-cadence IMU truth sampling with interpolation, CSV playback
   through the normal simulation app path, and full local-level transport-rate

@@ -15,12 +15,12 @@
 #include "navkit/app_support/runtime/JsonInput.hpp"
 #include "navkit/app_support/runtime/RunSettings.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigValidation.hpp"
+#include "navkit/app_support/time/ClockFactory.hpp"
 #include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
-#include "navkit/core/time/RationalRate.hpp"
+#include "navkit/core/time/RationalTimeline.hpp"
 
 #include <cstdio>
 #include <filesystem>
-#include <limits>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <tuple>
@@ -51,13 +51,27 @@ public:
         validate_runtime_config<Config>(cfg);
 
         const RunSettings run_settings = run_settings_from_json(cfg);
-        const TrajectoryRun trajectory = trajectory_run_from_json(cfg, config_path.parent_path());
+        TrajectoryRun trajectory = trajectory_run_from_json(cfg, config_path.parent_path());
         auto emulator_runtimes = Emulators::make_runtimes(cfg);
         Imu imu_runtime(cfg);
 
-        if (trajectory.truth.empty()) {
-            std::printf("Simulation trajectory contains no truth samples.\n");
+        if (!trajectory.source) {
+            std::printf("Simulation trajectory source was not created.\n");
             return 3;
+        }
+        const core::Timestamp t_start = trajectory.source->t_start();
+        if (!trajectory.source->advance_to(t_start)) {
+            std::printf("Simulation trajectory source failed to advance to its start time.\n");
+            return 3;
+        }
+        sim::TruthSample initial_truth{};
+        if (!trajectory.source->query(t_start, initial_truth)) {
+            std::printf("Simulation trajectory source failed to provide initial truth.\n");
+            return 3;
+        }
+        if (!imu_runtime.initialize(initial_truth)) {
+            std::printf("IMU runtime initialization failed: %s\n", imu_runtime.last_error().data());
+            return 2;
         }
 
         reset_profile_sink_if_configured<NavKit>();
@@ -68,7 +82,7 @@ public:
         const PvaInitialization pva_initialization =
             NavInitializationProvider::initialize(cfg, trajectory);
         InitialTruthReference<StateDef> truth_reference{};
-        populate_initial_pva_from_truth<StateDef>(trajectory.truth.first(), truth_reference);
+        populate_initial_pva_from_truth<StateDef>(initial_truth, truth_reference);
         apply_initial_truth_reference_from_runtimes<StateDef>(
             std::tie(imu_runtime, emulator_runtimes), truth_reference);
         initialize_navigator<NavKit>(pva_initialization, cfg, truth_reference, navigator);
@@ -76,54 +90,99 @@ public:
 
         Logger logger(run_settings.data_dir, run_settings.run_name, cfg);
         SimulationRunLogger<Config> run_logger(logger, run_settings);
-        if (!run_logger.initialize(trajectory.truth.first().t)) {
+        if (!run_logger.initialize(t_start)) {
             std::printf("Simulation run logger initialization failed\n");
             return 5;
         }
         Emulators::configure(navigator, logger, cfg);
-
-        for (const sim::TruthSample& sample : trajectory.truth.samples()) {
-            run_logger.log_truth_if_due(sample);
+        std::unique_ptr<Clock> clock = clock_from_mode(run_settings.clock_mode);
+        if (!clock || !clock->initialize(t_start)) {
+            std::printf("Simulation clock initialization failed\n");
+            return 5;
         }
 
-        core::SampleIndex imu_sample_index = 0U;
-        while (true) {
-            core::Timestamp imu_timestamp{};
-            if (!core::timestamp_at_sample_index(trajectory.truth.first().t,
-                                                 imu_runtime.rate(),
-                                                 imu_sample_index,
-                                                 imu_timestamp) ||
-                core::timestamp_less(trajectory.truth.last().t, imu_timestamp)) {
-                break;
-            }
+        core::RationalTimeline app_timeline{};
+        if (!app_timeline.initialize(t_start, run_settings.application_rate)) {
+            std::printf("Application timeline initialization failed\n");
+            return 5;
+        }
 
-            sim::TruthSample sample{};
-            if (!trajectory.truth.sample_at(imu_timestamp, sample)) {
-                std::printf("Unable to query trajectory truth at IMU timestamp\n");
+        typename Emulators::PreparedUpdates prepared_updates{};
+        if (!Emulators::prepare(*trajectory.source, t_start, emulator_runtimes, prepared_updates)) {
+            std::printf("Simulation emulator preparation failed at t=%f\n",
+                        core::timestamp_seconds(t_start));
+            return 2;
+        }
+        if (!clock->wait_until(t_start)) {
+            std::printf("Simulation clock failed to reach initialization time t=%f\n",
+                        core::timestamp_seconds(t_start));
+            return 4;
+        }
+        if (!Emulators::publish(prepared_updates, emulator_runtimes, navigator, logger)) {
+            std::printf("Simulation emulator publication failed at t=%f\n",
+                        core::timestamp_seconds(t_start));
+            return 4;
+        }
+        if (!navigator.update()) {
+            std::printf("Navigator initialization update failed at t=%f\n",
+                        core::timestamp_seconds(t_start));
+            return 4;
+        }
+        run_logger.log_truth_if_due(initial_truth);
+        run_logger.log_filter_if_due(t_start, filter);
+
+        while (!trajectory.source->is_complete()) {
+            core::Timestamp t_curr{};
+            if (!app_timeline.next(t_curr)) {
+                std::printf("Application timeline overflow\n");
+                return 7;
+            }
+            if (!trajectory.source->advance_to(t_curr)) {
+                if (trajectory.source->is_complete()) {
+                    break;
+                }
+                std::printf("Unable to advance trajectory source to application timestamp\n");
                 return 6;
             }
+            sim::TruthSample truth{};
+            if (!trajectory.source->query(t_curr, truth)) {
+                std::printf("Unable to query trajectory truth at application timestamp\n");
+                return 6;
+            }
+
             ImuRuntimeSample imu_sample{};
-            if (!imu_runtime.process(sample, navigator, imu_sample)) {
-                std::printf("IMU runtime failure at t=%f: %s\n",
-                            core::timestamp_seconds(sample.t),
+            prepared_updates = {};
+            if (!imu_runtime.prepare(*trajectory.source, t_curr, imu_sample) ||
+                !Emulators::prepare(
+                    *trajectory.source, t_curr, emulator_runtimes, prepared_updates)) {
+                std::printf("Emulator preparation failed at t=%f: %s\n",
+                            core::timestamp_seconds(t_curr),
                             imu_runtime.last_error().data());
                 return 2;
             }
-            run_logger.log_imu_if_due(sample, imu_sample);
-            Emulators::process(navigator, logger, emulator_runtimes, sample);
-
-            if (!navigator.update()) {
-                std::printf("Navigator propagation failed at t=%f\n",
-                            core::timestamp_seconds(sample.t));
+            if (!clock->wait_until(t_curr)) {
+                std::printf("Simulation clock failed to reach t=%f\n",
+                            core::timestamp_seconds(t_curr));
                 return 4;
             }
-            run_logger.log_filter_if_due(sample.t, filter);
-
-            if (imu_sample_index == std::numeric_limits<core::SampleIndex>::max()) {
-                std::printf("IMU sample schedule overflow\n");
-                return 7;
+            if (!imu_runtime.publish(imu_sample, navigator)) {
+                std::printf("IMU publication failed at t=%f: %s\n",
+                            core::timestamp_seconds(t_curr),
+                            imu_runtime.last_error().data());
+                return 2;
             }
-            ++imu_sample_index;
+            if (!Emulators::publish(prepared_updates, emulator_runtimes, navigator, logger)) {
+                std::printf("Simulation emulator publication failed at t=%f\n",
+                            core::timestamp_seconds(t_curr));
+                return 4;
+            }
+            if (!navigator.update()) {
+                std::printf("Navigator update failed at t=%f\n", core::timestamp_seconds(t_curr));
+                return 4;
+            }
+            run_logger.log_truth_if_due(truth);
+            run_logger.log_imu_if_due(truth, imu_sample);
+            run_logger.log_filter_if_due(t_curr, filter);
         }
 
         logger.close();

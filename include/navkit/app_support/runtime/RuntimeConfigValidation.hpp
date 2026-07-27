@@ -57,6 +57,22 @@ void validate_emulator_runtime_config(const nlohmann::json& cfg, std::index_sequ
     (std::tuple_element_t<Is, EmulatorBindings>::Emulator_t::validate_runtime_config(cfg), ...);
 }
 
+template<typename EmulatorBindings, std::size_t... Is>
+void validate_application_rate_for_emulators(const core::RationalRate& application_rate,
+                                             const nlohmann::json& cfg,
+                                             std::index_sequence<Is...>)
+{
+    const bool all_aligned =
+        (core::rational_rate_is_integer_multiple(
+             application_rate,
+             std::tuple_element_t<Is, EmulatorBindings>::Emulator_t::runtime_rate_from_json(cfg)) &&
+         ...);
+    if (!all_aligned) {
+        throw_runtime_config_error(
+            "application rate must be an integer multiple of every emulator rate");
+    }
+}
+
 } // namespace detail
 
 template<SimulationAppConfigPolicy Config>
@@ -74,6 +90,7 @@ void validate_runtime_config(const nlohmann::json& cfg)
     allowed_keys.push_back("run_name");
     allowed_keys.push_back("output_dir");
     allowed_keys.push_back("logging");
+    allowed_keys.push_back("application");
     allowed_keys.push_back("trajectory");
     allowed_keys.push_back("imu");
     allowed_keys.push_back("pva_initialization");
@@ -85,6 +102,20 @@ void validate_runtime_config(const nlohmann::json& cfg)
     detail::require_string(cfg, "run_name");
     detail::require_string(cfg, "output_dir");
     validate_logging_runtime_config(cfg);
+    const nlohmann::json& application = detail::require_object(cfg, "application");
+    detail::reject_unknown_top_level_keys(
+        application, std::vector<std::string_view>{"clock", "dt_s", "rate_hz"});
+    validate_runtime_rate(application, "application");
+    if (!application.contains("dt_s") && !application.contains("rate_hz")) {
+        detail::throw_runtime_config_error("application must specify one of 'dt_s' or 'rate_hz'");
+    }
+    const core::RationalRate application_rate =
+        rational_rate_from_required_runtime_rate(application, "application");
+    detail::require_string(application, "clock");
+    ClockMode clock_mode{};
+    if (!detail::clock_mode_from_json(application, "clock", clock_mode)) {
+        detail::throw_runtime_config_error("application.clock must be 'simulated' or 'realtime'");
+    }
 
     const auto& trajectory = detail::require_object(cfg, "trajectory");
     detail::require_optional_string(trajectory, "type");
@@ -145,6 +176,14 @@ void validate_runtime_config(const nlohmann::json& cfg)
     detail::validate_emulator_runtime_config<EmulatorBindings>(
         cfg, std::make_index_sequence<std::tuple_size_v<EmulatorBindings>>{});
     validate_imu_runtime_config(cfg);
+    const core::RationalRate imu_rate =
+        rational_rate_from_required_runtime_rate(cfg.at("imu"), "imu");
+    if (!core::rational_rate_is_integer_multiple(application_rate, imu_rate)) {
+        detail::throw_runtime_config_error(
+            "application rate must be an integer multiple of the IMU rate");
+    }
+    detail::validate_application_rate_for_emulators<EmulatorBindings>(
+        application_rate, cfg, std::make_index_sequence<std::tuple_size_v<EmulatorBindings>>{});
 
     NavInitializationProvider::validate_runtime_config(cfg);
     detail::validate_filter_initialization_runtime_config_shape(cfg);

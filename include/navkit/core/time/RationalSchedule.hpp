@@ -11,8 +11,8 @@ namespace navkit::core
 {
 
 /**
- * Tracks due events on an exact rational cadence. A producer may poll it at any
- * timestamp; skipped periods are consumed without accumulating phase error.
+ * Tracks exact rational cadence for consumer-side due-time gating.
+ * Consumer polling with due() consumes skipped periods without accumulating phase error.
  */
 class RationalSchedule
 {
@@ -22,13 +22,13 @@ public:
     constexpr RationalSchedule(const Timestamp t_epoch, const RationalRate rate)
         : m_t_epoch(t_epoch)
         , m_rate(rate)
-        , m_initialized(is_valid(t_epoch, rate))
+        , m_initialized(rational_cadence_is_valid(t_epoch, rate))
     {}
 
     /** Returns whether a phase reference and cadence form a valid schedule. */
     [[nodiscard]] static constexpr bool is_valid(const Timestamp& t_epoch, const RationalRate& rate)
     {
-        return timestamp_is_valid(t_epoch) && rational_rate_is_valid(rate);
+        return rational_cadence_is_valid(t_epoch, rate);
     }
 
     /** Starts an uninitialized schedule at its phase reference timestamp. */
@@ -39,7 +39,7 @@ public:
         }
         m_t_epoch = t_epoch;
         m_rate = rate;
-        m_next_sample_index = 0U;
+        m_next_due_sample_index = 0U;
         m_initialized = true;
         return true;
     }
@@ -52,7 +52,7 @@ public:
         }
         m_t_epoch = t_epoch;
         m_rate = rate;
-        m_next_sample_index = 0U;
+        m_next_due_sample_index = 0U;
         m_initialized = true;
         return true;
     }
@@ -74,7 +74,7 @@ public:
         }
 
         Timestamp t_due{};
-        if (!timestamp_at_sample_index(m_t_epoch, m_rate, m_next_sample_index, t_due)) {
+        if (!timestamp_at_sample_index(m_t_epoch, m_rate, m_next_due_sample_index, t_due)) {
             return false;
         }
         if (timestamp_less(t, t_due)) {
@@ -82,11 +82,11 @@ public:
         }
 
         do {
-            if (m_next_sample_index == std::numeric_limits<SampleIndex>::max()) {
+            if (m_next_due_sample_index == std::numeric_limits<SampleIndex>::max()) {
                 return false;
             }
-            ++m_next_sample_index;
-            if (!timestamp_at_sample_index(m_t_epoch, m_rate, m_next_sample_index, t_due)) {
+            ++m_next_due_sample_index;
+            if (!timestamp_at_sample_index(m_t_epoch, m_rate, m_next_due_sample_index, t_due)) {
                 return false;
             }
         } while (!timestamp_less(t, t_due));
@@ -96,7 +96,7 @@ public:
 private:
     Timestamp m_t_epoch{};
     RationalRate m_rate{};
-    SampleIndex m_next_sample_index{};
+    SampleIndex m_next_due_sample_index{};
     bool m_initialized{false};
 };
 

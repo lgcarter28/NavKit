@@ -1,6 +1,7 @@
 {
   "components": {
     "trajectory": "../components/trajectory/stationary_ecef_1000hz.json",
+    "application": "../components/application/default_1000hz.json",
     "imu": "../components/imu/ideal_raw.json",
     "gnss": "../components/gnss/truth_pos_vel.json",
     "pva_initialization": "../components/initialization/pva/pva_no_errors.json"

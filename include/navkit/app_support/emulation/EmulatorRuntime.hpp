@@ -8,16 +8,38 @@
 #include "navkit/app_support/emulation/EmulatorBindingTuplePolicy.hpp"
 #include "navkit/core/estimation/sensor/SensorTupleTraits.hpp"
 #include "navkit/io/LoggerPolicy.hpp"
+#include "navkit/sim/TrajectorySource.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
 #include <concepts>
 #include <nlohmann/json.hpp>
-#include <stdexcept>
 #include <tuple>
 #include <utility>
 
 namespace navkit::app_support
 {
+
+namespace detail
+{
+
+template<typename Binding>
+struct PreparedEmulatorUpdate
+{
+    bool generated{false};
+    sim::TruthSample truth{};
+    typename Binding::Sensor_t::Measurement_t measurement{};
+};
+
+template<typename BindingTuple>
+struct PreparedEmulatorUpdates;
+
+template<typename... Bindings>
+struct PreparedEmulatorUpdates<std::tuple<Bindings...>>
+{
+    using Type = std::tuple<PreparedEmulatorUpdate<Bindings>...>;
+};
+
+} // namespace detail
 
 template<navkit::api::config::NavKitProductConfigPolicy NavKit,
          navkit::io::LoggerPolicy Logger,
@@ -26,6 +48,7 @@ class EmulatorRuntime
 {
 public:
     using Navigator = typename NavKit::Navigator;
+    using PreparedUpdates = typename detail::PreparedEmulatorUpdates<EmulatorBindings>::Type;
 
     static auto make_runtimes(const nlohmann::json& cfg)
     {
@@ -42,17 +65,36 @@ public:
             std::make_index_sequence<std::tuple_size_v<EmulatorBindings>>{});
     }
 
+    /** Prepares all due synthetic emulator updates without modifying Navigator queues. */
     template<typename EmulatorRuntimes>
-    static void process(Navigator& navigator,
-                        Logger& logger,
-                        EmulatorRuntimes& runtimes,
-                        const sim::TruthSample& sample)
+    [[nodiscard]] static bool prepare(const sim::TrajectorySource& source,
+                                      const core::Timestamp& t,
+                                      EmulatorRuntimes& runtimes,
+                                      PreparedUpdates& prepared_updates)
     {
-        process_impl<EmulatorBindings>(
-            navigator,
-            logger,
+        sim::TruthSample sample{};
+        if (!source.query(t, sample)) {
+            return false;
+        }
+        return prepare_impl<EmulatorBindings>(
             runtimes,
             sample,
+            prepared_updates,
+            std::make_index_sequence<std::tuple_size_v<EmulatorBindings>>{});
+    }
+
+    /** Publishes prepared updates to sensors and logging after the planned deadline. */
+    template<typename EmulatorRuntimes>
+    [[nodiscard]] static bool publish(const PreparedUpdates& prepared_updates,
+                                      const EmulatorRuntimes& runtimes,
+                                      Navigator& navigator,
+                                      Logger& logger)
+    {
+        return publish_impl<EmulatorBindings>(
+            prepared_updates,
+            runtimes,
+            navigator,
+            logger,
             std::make_index_sequence<std::tuple_size_v<EmulatorBindings>>{});
     }
 
@@ -77,14 +119,14 @@ private:
         requires EmulatorBindingPolicy<Binding, Logger>
     static void configure_one(Navigator& navigator, Logger& logger, const nlohmann::json& cfg)
     {
-        auto& sensor = sensor_for_binding<Binding>(navigator);
+        typename Binding::Sensor_t& sensor = sensor_for_binding<Binding>(navigator);
         Binding::Emulator_t::configure_sensor(sensor, cfg);
         Binding::Emulator_t::configure_logger(logger, cfg);
     }
 
     template<typename Binding>
         requires EmulatorBindingPolicy<Binding, Logger>
-    static auto& sensor_for_binding(Navigator& navigator)
+    static typename Binding::Sensor_t& sensor_for_binding(Navigator& navigator)
     {
         constexpr auto SensorIndex =
             navkit::core::estimation::SensorIndexFromId_v<Binding::Id, typename NavKit::Sensors>;
@@ -92,55 +134,86 @@ private:
     }
 
     template<typename BindingTuple, typename EmulatorRuntimes, std::size_t... Is>
-    static void process_impl(Navigator& navigator,
-                             Logger& logger,
-                             EmulatorRuntimes& runtimes,
-                             const sim::TruthSample& sample,
-                             std::index_sequence<Is...>)
+    [[nodiscard]] static bool prepare_impl(EmulatorRuntimes& runtimes,
+                                           const sim::TruthSample& sample,
+                                           PreparedUpdates& prepared_updates,
+                                           std::index_sequence<Is...>)
     {
-        (process_one<std::tuple_element_t<Is, BindingTuple>>(
-             navigator, logger, std::get<Is>(runtimes), sample),
+        bool success = true;
+        ((success = success && prepare_one<std::tuple_element_t<Is, BindingTuple>>(
+                                   std::get<Is>(runtimes), sample, std::get<Is>(prepared_updates))),
          ...);
+        return success;
     }
 
     template<typename Binding, typename Runtime>
         requires EmulatorBindingPolicy<Binding, Logger>
-    static void process_one(Navigator& navigator,
-                            Logger& logger,
-                            Runtime& runtime,
-                            const sim::TruthSample& sample)
+    [[nodiscard]] static bool prepare_one(Runtime& runtime,
+                                          const sim::TruthSample& sample,
+                                          detail::PreparedEmulatorUpdate<Binding>& prepared)
     {
+        prepared = {};
         if constexpr (requires {
                           {
                               Binding::Emulator_t::should_generate(runtime, sample)
                           } -> std::same_as<bool>;
                       }) {
             if (!Binding::Emulator_t::should_generate(runtime, sample)) {
-                return;
+                return true;
             }
         }
 
-        auto& sensor = sensor_for_binding<Binding>(navigator);
-        const auto measurement = Binding::Emulator_t::generate(runtime, sample);
+        prepared.generated = true;
+        prepared.truth = sample;
+        prepared.measurement = Binding::Emulator_t::generate(runtime, sample);
+        return true;
+    }
+
+    template<typename BindingTuple, typename EmulatorRuntimes, std::size_t... Is>
+    [[nodiscard]] static bool publish_impl(const PreparedUpdates& prepared_updates,
+                                           const EmulatorRuntimes& runtimes,
+                                           Navigator& navigator,
+                                           Logger& logger,
+                                           std::index_sequence<Is...>)
+    {
+        bool success = true;
+        ((success = success &&
+                    publish_one<std::tuple_element_t<Is, BindingTuple>>(
+                        std::get<Is>(prepared_updates), std::get<Is>(runtimes), navigator, logger)),
+         ...);
+        return success;
+    }
+
+    template<typename Binding, typename Runtime>
+        requires EmulatorBindingPolicy<Binding, Logger>
+    [[nodiscard]] static bool publish_one(const detail::PreparedEmulatorUpdate<Binding>& prepared,
+                                          const Runtime& runtime,
+                                          Navigator& navigator,
+                                          Logger& logger)
+    {
+        if (!prepared.generated) {
+            return true;
+        }
+
+        typename Binding::Sensor_t& sensor = sensor_for_binding<Binding>(navigator);
         if constexpr (requires {
                           Binding::Emulator_t::update_sensor_context(
-                              runtime, sample, measurement, sensor);
+                              runtime, prepared.truth, prepared.measurement, sensor);
                       }) {
-            Binding::Emulator_t::update_sensor_context(runtime, sample, measurement, sensor);
+            Binding::Emulator_t::update_sensor_context(
+                runtime, prepared.truth, prepared.measurement, sensor);
         }
 
         if constexpr (requires {
-                          Binding::Emulator_t::log_sample(runtime, sample, measurement, logger);
+                          Binding::Emulator_t::log_sample(
+                              runtime, prepared.truth, prepared.measurement, logger);
                       }) {
-            Binding::Emulator_t::log_sample(runtime, sample, measurement, logger);
+            Binding::Emulator_t::log_sample(runtime, prepared.truth, prepared.measurement, logger);
         }
         else {
-            Binding::Emulator_t::log_measurement(logger, measurement);
+            Binding::Emulator_t::log_measurement(logger, prepared.measurement);
         }
-
-        if (!sensor.push(measurement)) {
-            throw std::runtime_error("Sensor buffer overflow for configured emulator");
-        }
+        return sensor.push(prepared.measurement);
     }
 };
 

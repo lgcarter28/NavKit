@@ -2,11 +2,13 @@
 // All Rights Reserved.
 
 #include "navkit/app_support/runtime/RuntimeRate.hpp"
+#include "navkit/app_support/time/ClockFactory.hpp"
 #include "navkit/core/time/Time.hpp"
 #include "test_main.hpp"
 
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <nlohmann/json.hpp>
 
 namespace navkit::core::test
@@ -112,6 +114,63 @@ TEST_CASE("Rational schedule remains phase-stable across a faster producer caden
     }
 
     CHECK(due_count == 601U);
+}
+
+TEST_CASE("Rational timeline produces exact planned timestamps after its epoch")
+{
+    constexpr RationalRate rate{.samples = 600U, .s = 1U};
+    const Timestamp t_epoch{.s = 7U, .ns = 500'000'000U};
+    RationalTimeline timeline{};
+    Timestamp first{};
+    Timestamp second{};
+
+    REQUIRE(timeline.initialize(t_epoch, rate));
+    REQUIRE(timeline.next(first));
+    REQUIRE(timeline.next(second));
+
+    CHECK(timestamp_seconds(first) == doctest::Approx(7.5 + (1.0 / 600.0)));
+    CHECK(timestamp_seconds(second) == doctest::Approx(7.5 + (2.0 / 600.0)));
+    CHECK(timestamp_less(t_epoch, first));
+    CHECK(timestamp_less(first, second));
+}
+
+TEST_CASE("Rational-rate integer-multiple validation protects planned application cadence")
+{
+    CHECK(rational_rate_is_integer_multiple(RationalRate{.samples = 3'000U, .s = 1U},
+                                            RationalRate{.samples = 600U, .s = 1U}));
+    CHECK(rational_rate_is_integer_multiple(RationalRate{.samples = 1'000U, .s = 1U},
+                                            RationalRate{.samples = 1U, .s = 1U}));
+    CHECK_FALSE(rational_rate_is_integer_multiple(RationalRate{.samples = 1'000U, .s = 1U},
+                                                  RationalRate{.samples = 600U, .s = 1U}));
+}
+
+TEST_CASE("Simulation clock adopts planned time without waiting")
+{
+    std::unique_ptr<navkit::app_support::Clock> clock =
+        navkit::app_support::clock_from_mode(navkit::app_support::ClockMode::Simulated);
+    const Timestamp t_epoch{.s = 3U};
+    const Timestamp t_next{.s = 3U, .ns = 500'000'000U};
+
+    REQUIRE(clock);
+    REQUIRE(clock->initialize(t_epoch));
+    CHECK(clock->now() == t_epoch);
+    REQUIRE(clock->wait_until(t_next));
+    CHECK(clock->now() == t_next);
+    CHECK_FALSE(clock->wait_until(t_epoch));
+}
+
+TEST_CASE("Realtime clock shares the planned-time boundary without accepting reverse time")
+{
+    std::unique_ptr<navkit::app_support::Clock> clock =
+        navkit::app_support::clock_from_mode(navkit::app_support::ClockMode::Realtime);
+    const Timestamp t_epoch{.s = 3U};
+    const Timestamp t_other_scale{.scale = TimeScale::Gps, .s = 3U};
+
+    REQUIRE(clock);
+    REQUIRE(clock->initialize(t_epoch));
+    REQUIRE(clock->wait_until(t_epoch));
+    CHECK(clock->now() == t_epoch);
+    CHECK_FALSE(clock->wait_until(t_other_scale));
 }
 
 TEST_CASE("Runtime rate parser canonicalizes rate and period JSON forms")

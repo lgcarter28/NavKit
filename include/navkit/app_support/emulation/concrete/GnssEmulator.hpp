@@ -207,6 +207,11 @@ struct GnssEmulator
         return Runtime(runtime_config_from_json(cfg));
     }
 
+    static core::RationalRate runtime_rate_from_json(const nlohmann::json& cfg)
+    {
+        return runtime_config_from_json(cfg).rate;
+    }
+
     template<typename Sensor>
     static void configure_sensor(Sensor& sensor, const nlohmann::json& cfg)
     {
@@ -299,6 +304,11 @@ struct GnssVelocityEmulator
     static Runtime make_runtime(const nlohmann::json& cfg)
     {
         return Runtime(runtime_config_from_json(cfg));
+    }
+
+    static core::RationalRate runtime_rate_from_json(const nlohmann::json& cfg)
+    {
+        return runtime_config_from_json(cfg).rate;
     }
 
     template<typename Sensor>

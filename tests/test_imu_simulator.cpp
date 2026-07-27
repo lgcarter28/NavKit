@@ -224,6 +224,24 @@ TEST_CASE("IMU runtime cumulative increments advance at generation rate")
                           third_output.truth.delta_theta_ib_b_rad.z()));
 }
 
+TEST_CASE("IMU runtime preparation does not publish before its planned deadline")
+{
+    const nlohmann::json config =
+        nlohmann::json{{"imu", {{"type", "ideal"}, {"seed", 1U}, {"rate_hz", 1.0}}}};
+
+    navkit::app_support::ImuRuntime<DefaultImuSimulator> runtime(config);
+    RecordingNavigator navigator{};
+    navkit::app_support::ImuRuntimeSample prepared{};
+
+    REQUIRE(runtime.initialize(stationary_body_z_specific_force_sample(0.0)));
+    REQUIRE(runtime.prepare(stationary_body_z_specific_force_sample(1.0), prepared));
+    REQUIRE(prepared.generated);
+    CHECK(navigator.push_count == 0);
+
+    REQUIRE(runtime.publish(prepared, navigator));
+    CHECK(navigator.push_count == 1);
+}
+
 TEST_CASE("IMU simulator seeded stochastic terms are deterministic")
 {
     ImuSimulatorConfig config;

@@ -6,5 +6,6 @@
 #include "navkit/core/time/Duration.hpp"
 #include "navkit/core/time/RationalRate.hpp"
 #include "navkit/core/time/RationalSchedule.hpp"
+#include "navkit/core/time/RationalTimeline.hpp"
 #include "navkit/core/time/TimeTypes.hpp"
 #include "navkit/core/time/Timestamp.hpp"

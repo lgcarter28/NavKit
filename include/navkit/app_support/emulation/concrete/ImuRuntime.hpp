@@ -8,7 +8,9 @@
 #include "navkit/app_support/runtime/RuntimeRate.hpp"
 #include "navkit/core/estimation/navigator/ImuIncrement.hpp"
 #include "navkit/core/estimation/state/Segment.hpp"
+#include "navkit/core/time/RationalSchedule.hpp"
 #include "navkit/sim/ImuSimulatorPolicy.hpp"
+#include "navkit/sim/TrajectorySource.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
 #include <nlohmann/json.hpp>
@@ -46,6 +48,46 @@ public:
         return m_rate;
     }
 
+    /** Initializes IMU interval state at the selected trajectory epoch. */
+    [[nodiscard]] bool initialize(const navkit::sim::TruthSample& sample)
+    {
+        if (m_initialized || !m_schedule.initialize(sample.t, m_rate)) {
+            m_last_error = "failed to initialize IMU schedule";
+            return false;
+        }
+        m_simulator.initialize(sample);
+        m_initialized = true;
+        return true;
+    }
+
+    /** Prepares an IMU increment from truth without modifying Navigator buffers. */
+    [[nodiscard]] bool prepare(const navkit::sim::TrajectorySource& source,
+                               const core::Timestamp& t,
+                               ImuRuntimeSample& output)
+    {
+        navkit::sim::TruthSample sample{};
+        if (!source.query(t, sample)) {
+            m_last_error = "failed to query truth at IMU timestamp";
+            output = {};
+            return false;
+        }
+        return prepare(sample, output);
+    }
+
+    /** Publishes a prepared IMU increment to the Navigator after its deadline. */
+    template<typename Navigator>
+    [[nodiscard]] bool publish(const ImuRuntimeSample& prepared, Navigator& navigator)
+    {
+        if (!prepared.generated) {
+            return true;
+        }
+        if (!navigator.push_imu(prepared.measured)) {
+            m_last_error = "navigator IMU buffer is full";
+            return false;
+        }
+        return true;
+    }
+
     template<typename Navigator>
     [[nodiscard]] bool process(Navigator& navigator, const navkit::sim::TruthSample& sample)
     {
@@ -58,8 +100,25 @@ public:
     process(const navkit::sim::TruthSample& sample, Navigator& navigator, ImuRuntimeSample& output)
     {
         if (!m_initialized) {
-            m_simulator.initialize(sample);
-            m_initialized = true;
+            output = {};
+            return initialize(sample);
+        }
+
+        if (!prepare(sample, output)) {
+            return false;
+        }
+        return publish(output, navigator);
+    }
+
+    /** Prepares an IMU increment from an already queried truth sample. */
+    [[nodiscard]] bool prepare(const navkit::sim::TruthSample& sample, ImuRuntimeSample& output)
+    {
+        if (!m_initialized) {
+            m_last_error = "IMU runtime must be initialized before preparation";
+            output = {};
+            return false;
+        }
+        if (!m_schedule.due(sample.t)) {
             output = {};
             return true;
         }
@@ -69,11 +128,6 @@ public:
         navkit::sim::ImuIntervalDebug debug;
         if (!m_simulator.generate(sample, increment, interval, debug)) {
             m_last_error = "failed to generate IMU increment";
-            output = {};
-            return false;
-        }
-        if (!navigator.push_imu(increment)) {
-            m_last_error = "navigator IMU buffer is full";
             output = {};
             return false;
         }
@@ -122,6 +176,7 @@ public:
 private:
     ImuSimulator m_simulator;
     core::RationalRate m_rate{};
+    core::RationalSchedule m_schedule{};
     core::Vec3 m_truth_delta_theta_sum{core::Vec3::Zero()};
     core::Vec3 m_truth_delta_v_sum{core::Vec3::Zero()};
     core::Vec3 m_measured_delta_theta_sum{core::Vec3::Zero()};
