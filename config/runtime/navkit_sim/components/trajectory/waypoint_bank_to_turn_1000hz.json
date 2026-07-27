@@ -1,0 +1,17 @@
+{
+  "trajectory": {
+    "type": "waypoint",
+    "duration_s": 120.0,
+    "rate_hz": 1000.0,
+    "speed_mps": 100.0,
+    "bank_limit_rad": 0.3490658504,
+    "acceptance_radius_m": 50.0,
+    "p_lla_deg_m": [35.0, -106.0, 1500.0],
+    "rpy_b2n_rad": [0.0, 0.0, 0.0],
+    "waypoints_lla_deg_m": [
+      [35.018, -106.000, 1500.0],
+      [35.018, -105.978, 1500.0],
+      [35.000, -105.978, 1500.0]
+    ]
+  }
+}

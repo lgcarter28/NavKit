@@ -3,6 +3,7 @@
 
 #include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
 #include "navkit/sim/StationaryTrajectorySource.hpp"
+#include "navkit/sim/TrajectoryProfiles.hpp"
 #include "test_main.hpp"
 
 #include <filesystem>
@@ -116,6 +117,77 @@ TEST_CASE("CSV trajectory source uses the shared truth trajectory contract")
     CHECK_FALSE(run.source->query(Timestamp{.s = 2U}, midpoint));
 
     std::filesystem::remove(path);
+}
+
+TEST_CASE("Generated ballistic trajectory preserves a launch-pad dwell before boost")
+{
+    BallisticTrajectoryConfig config{};
+    config.profile.duration_s = 3.0;
+    config.profile.rate = RationalRate{.samples = 10U, .s = 1U};
+    config.profile.p_e_m = Vec3{6378137.0, 0.0, 0.0};
+    config.launch_pad_duration_s = 1.0;
+    config.boost_duration_s = 1.0;
+    config.boost_acceleration_b_x_mps2 = 30.0;
+
+    const TruthTrajectory trajectory = ballistic_trajectory(config);
+    REQUIRE(trajectory.size() > 20U);
+    TruthSample launch_pad_truth{};
+    REQUIRE(trajectory.sample_at(Timestamp{.ns = 500'000'000U}, launch_pad_truth));
+    CHECK(launch_pad_truth.p_e.isApprox(config.profile.p_e_m));
+    CHECK(launch_pad_truth.v_e.isApprox(config.profile.v_e_mps));
+
+    TruthSample boosted_truth{};
+    REQUIRE(trajectory.sample_at(Timestamp{.s = 2U}, boosted_truth));
+    CHECK_FALSE(boosted_truth.p_e.isApprox(config.profile.p_e_m));
+    CHECK(boosted_truth.v_e.norm() > 1.0);
+}
+
+TEST_CASE("Generated curved-Earth and calibration trajectories produce bounded truth")
+{
+    TrajectoryProfileConfig profile{};
+    profile.duration_s = 5.0;
+    profile.rate = RationalRate{.samples = 20U, .s = 1U};
+    profile.p_e_m = Vec3{6378137.0, 0.0, 0.0};
+
+    ConstantAltitudeTrajectoryConfig constant_altitude{};
+    constant_altitude.profile = profile;
+    constant_altitude.speed_mps = 100.0;
+    const TruthTrajectory constant_altitude_truth = constant_altitude_trajectory(constant_altitude);
+    REQUIRE(constant_altitude_truth.size() > 2U);
+    CHECK(constant_altitude_truth.first().p_e.norm() ==
+          doctest::Approx(constant_altitude_truth.last().p_e.norm()).epsilon(1.0e-4));
+    CHECK(constant_altitude_truth.last().v_e.norm() == doctest::Approx(100.0).epsilon(1.0e-3));
+
+    CalibrationTrajectoryConfig calibration{};
+    calibration.profile = profile;
+    calibration.speed_mps = 100.0;
+    calibration.amplitude_rad = 0.2;
+    calibration.period_s = 2.0;
+    calibration.maneuver = CalibrationManeuver::BankLeftRight;
+    const TruthTrajectory calibration_truth = calibration_trajectory(calibration);
+    REQUIRE(calibration_truth.size() > 2U);
+    CHECK_FALSE(calibration_truth.first().q_b2e.isApprox(calibration_truth.samples().at(5U).q_b2e));
+    CHECK(calibration_truth.samples().at(5U).w_ib_b_radps.norm() > 0.0);
+}
+
+TEST_CASE("Generated waypoint trajectory turns toward configured local-level waypoints")
+{
+    WaypointTrajectoryConfig config{};
+    config.profile.duration_s = 20.0;
+    config.profile.rate = RationalRate{.samples = 20U, .s = 1U};
+    config.profile.p_e_m = Vec3{6378137.0, 0.0, 0.0};
+    config.speed_mps = 100.0;
+    config.bank_limit_rad = 0.3;
+    config.acceptance_radius_m = 10.0;
+    config.waypoint_e_m = {
+        Vec3{6378137.0, 1000.0, 0.0},
+        Vec3{6378137.0, 1000.0, 1000.0},
+    };
+
+    const TruthTrajectory trajectory = waypoint_trajectory(config);
+    REQUIRE(trajectory.size() > 2U);
+    CHECK_FALSE(trajectory.first().p_e.isApprox(trajectory.last().p_e));
+    CHECK(trajectory.last().v_e.norm() == doctest::Approx(config.speed_mps).epsilon(1.0e-3));
 }
 
 } // namespace navkit::sim::test

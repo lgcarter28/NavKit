@@ -1,0 +1,10 @@
+{
+  "trajectory": {
+    "type": "constant_altitude",
+    "duration_s": 120.0,
+    "rate_hz": 1000.0,
+    "speed_mps": 150.0,
+    "p_lla_deg_m": [35.0, -106.0, 1500.0],
+    "rpy_b2n_rad": [0.0, 0.0, 0.7853981634]
+  }
+}

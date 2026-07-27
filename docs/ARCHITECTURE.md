@@ -66,6 +66,7 @@ include/navkit/
     emulation/
       concrete/
     runtime/
+    time/
     initialization/
     logging/
     profiling/

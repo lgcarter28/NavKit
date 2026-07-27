@@ -15,6 +15,7 @@
 #include "navkit/core/time/Duration.hpp"
 #include "navkit/sim/StationaryTrajectorySource.hpp"
 #include "navkit/sim/TabulatedTrajectorySource.hpp"
+#include "navkit/sim/TrajectoryProfiles.hpp"
 #include "navkit/sim/TruthSample.hpp"
 
 #include <Eigen/Dense>
@@ -331,41 +332,7 @@ csv_has_columns(const std::unordered_map<std::string, std::size_t>& columns,
 
 inline void populate_missing_angular_rates(std::vector<sim::TruthSample>& samples)
 {
-    if (samples.empty()) {
-        return;
-    }
-    if (samples.size() == 1U) {
-        samples.front().w_ib_b_radps =
-            samples.front().q_b2e.conjugate() *
-            core::environment::planet_rate_fixed_radps<core::environment::Wgs84>();
-        return;
-    }
-    for (std::size_t index = 0U; index < samples.size(); ++index) {
-        const std::size_t first_index = index + 1U < samples.size() ? index : index - 1U;
-        const std::size_t second_index = index + 1U < samples.size() ? index + 1U : index;
-        if (first_index == second_index) {
-            samples.at(index).w_ib_b_radps =
-                samples.at(index).q_b2e.conjugate() *
-                core::environment::planet_rate_fixed_radps<core::environment::Wgs84>();
-            continue;
-        }
-
-        const sim::TruthSample& first = samples.at(first_index);
-        const sim::TruthSample& second = samples.at(second_index);
-        core::Duration duration{};
-        if (!core::elapsed_time(second.t, first.t, duration)) {
-            throw_runtime_config_error("trajectory CSV timestamps must be strictly increasing");
-        }
-        const core::Time_t dt_s = core::duration_seconds(duration);
-        const Eigen::Quaternion<core::Scalar_t> q_mid =
-            core::math::normalized_with_positive_scalar(first.q_b2e.slerp(0.5, second.q_b2e));
-        const Eigen::Quaternion<core::Scalar_t> q_body_relative =
-            first.q_b2e.conjugate() * second.q_b2e;
-        samples.at(index).w_ib_b_radps =
-            (core::math::rotvec_rad_from_quaternion(q_body_relative) / dt_s) +
-            (q_mid.conjugate() *
-             core::environment::planet_rate_fixed_radps<core::environment::Wgs84>());
-    }
+    sim::populate_truth_angular_rates(samples);
 }
 
 [[nodiscard]] inline sim::TruthTrajectory
@@ -457,6 +424,105 @@ stationary_trajectory_config_from_json(const nlohmann::json& cfg)
     return traj_cfg;
 }
 
+[[nodiscard]] inline sim::TrajectoryProfileConfig
+trajectory_profile_config_from_json(const nlohmann::json& cfg)
+{
+    const nlohmann::json& trajectory_config = cfg.at("trajectory");
+    sim::TrajectoryProfileConfig profile{};
+    profile.duration_s = trajectory_config.at("duration_s").get<core::Time_t>();
+    profile.rate = rational_rate_from_required_runtime_rate(trajectory_config, "trajectory");
+    profile.p_e_m = detail::position_e_m_from_json(trajectory_config);
+    profile.v_e_mps = detail::velocity_e_mps_from_json(trajectory_config, profile.p_e_m);
+    profile.q_b2e = detail::attitude_b2e_from_json(trajectory_config, profile.p_e_m);
+    return profile;
+}
+
+[[nodiscard]] inline sim::BallisticTrajectoryConfig
+ballistic_trajectory_config_from_json(const nlohmann::json& cfg)
+{
+    const nlohmann::json& trajectory_config = cfg.at("trajectory");
+    sim::BallisticTrajectoryConfig trajectory{};
+    trajectory.profile = trajectory_profile_config_from_json(cfg);
+    trajectory.launch_pad_duration_s = trajectory_config.value("launch_pad_duration_s", 0.0);
+    trajectory.boost_duration_s = trajectory_config.at("boost_duration_s").get<core::Time_t>();
+    trajectory.boost_acceleration_b_x_mps2 =
+        trajectory_config.at("boost_acceleration_b_x_mps2").get<core::Scalar_t>();
+    return trajectory;
+}
+
+[[nodiscard]] inline sim::ConstantAltitudeTrajectoryConfig
+constant_altitude_trajectory_config_from_json(const nlohmann::json& cfg)
+{
+    const nlohmann::json& trajectory_config = cfg.at("trajectory");
+    sim::ConstantAltitudeTrajectoryConfig trajectory{};
+    trajectory.profile = trajectory_profile_config_from_json(cfg);
+    trajectory.speed_mps = trajectory_config.at("speed_mps").get<core::Scalar_t>();
+    return trajectory;
+}
+
+[[nodiscard]] inline sim::CalibrationManeuver
+calibration_maneuver_from_json(const nlohmann::json& trajectory_config)
+{
+    const std::string maneuver = trajectory_config.at("maneuver").get<std::string>();
+    if (maneuver == "horizontal_s_turn") {
+        return sim::CalibrationManeuver::HorizontalSTurn;
+    }
+    if (maneuver == "vertical_s_turn") {
+        return sim::CalibrationManeuver::VerticalSTurn;
+    }
+    if (maneuver == "bank_left_right") {
+        return sim::CalibrationManeuver::BankLeftRight;
+    }
+    detail::throw_runtime_config_error(
+        "calibration trajectory maneuver must be 'horizontal_s_turn', 'vertical_s_turn', "
+        "or 'bank_left_right'");
+}
+
+[[nodiscard]] inline sim::CalibrationTrajectoryConfig
+calibration_trajectory_config_from_json(const nlohmann::json& cfg)
+{
+    const nlohmann::json& trajectory_config = cfg.at("trajectory");
+    sim::CalibrationTrajectoryConfig trajectory{};
+    trajectory.profile = trajectory_profile_config_from_json(cfg);
+    trajectory.maneuver = calibration_maneuver_from_json(trajectory_config);
+    trajectory.speed_mps = trajectory_config.at("speed_mps").get<core::Scalar_t>();
+    trajectory.amplitude_rad = trajectory_config.at("amplitude_rad").get<core::Scalar_t>();
+    trajectory.period_s = trajectory_config.at("period_s").get<core::Time_t>();
+    return trajectory;
+}
+
+[[nodiscard]] inline std::vector<core::Vec3>
+waypoints_e_m_from_json(const nlohmann::json& trajectory_config)
+{
+    const nlohmann::json& waypoints = trajectory_config.at("waypoints_lla_deg_m");
+    if (!waypoints.is_array() || waypoints.empty()) {
+        detail::throw_runtime_config_error(
+            "waypoint trajectory 'waypoints_lla_deg_m' must be a nonempty array");
+    }
+
+    std::vector<core::Vec3> result{};
+    result.reserve(waypoints.size());
+    for (const nlohmann::json& waypoint : waypoints) {
+        detail::require_numeric_array_value(waypoint, 3U);
+        result.push_back(detail::lla_deg_m_to_ecef_m(vec3_from_json<core::Vec3>(waypoint)));
+    }
+    return result;
+}
+
+[[nodiscard]] inline sim::WaypointTrajectoryConfig
+waypoint_trajectory_config_from_json(const nlohmann::json& cfg)
+{
+    const nlohmann::json& trajectory_config = cfg.at("trajectory");
+    sim::WaypointTrajectoryConfig trajectory{};
+    trajectory.profile = trajectory_profile_config_from_json(cfg);
+    trajectory.waypoint_e_m = waypoints_e_m_from_json(trajectory_config);
+    trajectory.speed_mps = trajectory_config.at("speed_mps").get<core::Scalar_t>();
+    trajectory.bank_limit_rad = trajectory_config.at("bank_limit_rad").get<core::Scalar_t>();
+    trajectory.acceptance_radius_m =
+        trajectory_config.at("acceptance_radius_m").get<core::Scalar_t>();
+    return trajectory;
+}
+
 inline TrajectoryRun trajectory_run_from_json(const nlohmann::json& cfg,
                                               const std::filesystem::path& source_base_dir = {})
 {
@@ -471,15 +537,46 @@ inline TrajectoryRun trajectory_run_from_json(const nlohmann::json& cfg,
                 .initial_truth = initial_truth};
     }
 
-    const sim::StationaryTrajectoryConfig traj_cfg = stationary_trajectory_config_from_json(cfg);
-    const sim::TruthSample initial_truth{
-        .t = traj_cfg.t_epoch,
-        .p_e = traj_cfg.p_e,
-        .v_e = traj_cfg.v_e,
-        .q_b2e = traj_cfg.q_b2e,
-        .w_ib_b_radps = traj_cfg.w_ib_b_radps,
-    };
-    return {.source = std::make_unique<sim::StationaryTrajectorySource>(traj_cfg),
+    if (type == "stationary") {
+        const sim::StationaryTrajectoryConfig trajectory =
+            stationary_trajectory_config_from_json(cfg);
+        const sim::TruthSample initial_truth{
+            .t = trajectory.t_epoch,
+            .p_e = trajectory.p_e,
+            .v_e = trajectory.v_e,
+            .q_b2e = trajectory.q_b2e,
+            .w_ib_b_radps = trajectory.w_ib_b_radps,
+        };
+        return {.source = std::make_unique<sim::StationaryTrajectorySource>(trajectory),
+                .initial_truth = initial_truth};
+    }
+
+    sim::TruthTrajectory truth{};
+    if (type == "ballistic") {
+        truth = sim::ballistic_trajectory(ballistic_trajectory_config_from_json(cfg));
+    }
+    else if (type == "constant_altitude") {
+        truth =
+            sim::constant_altitude_trajectory(constant_altitude_trajectory_config_from_json(cfg));
+    }
+    else if (type == "calibration") {
+        truth = sim::calibration_trajectory(calibration_trajectory_config_from_json(cfg));
+    }
+    else if (type == "waypoint") {
+        truth = sim::waypoint_trajectory(waypoint_trajectory_config_from_json(cfg));
+    }
+    else {
+        detail::throw_runtime_config_error(
+            "trajectory.type must be 'stationary', 'csv', 'ballistic', 'constant_altitude', "
+            "'calibration', or 'waypoint'");
+    }
+
+    if (truth.empty()) {
+        detail::throw_runtime_config_error(
+            "trajectory generation failed for the configured profile");
+    }
+    const sim::TruthSample initial_truth = truth.first();
+    return {.source = std::make_unique<sim::TabulatedTrajectorySource>(std::move(truth)),
             .initial_truth = initial_truth};
 }
 

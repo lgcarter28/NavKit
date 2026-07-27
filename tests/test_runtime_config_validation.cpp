@@ -252,6 +252,69 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts a CSV trajectory source")
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
 
+TEST_CASE("ECEF INS GNSS runtime validator accepts generated trajectory profiles")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("trajectory") = {{"type", "ballistic"},
+                            {"duration_s", 30.0},
+                            {"rate_hz", 1000.0},
+                            {"p_lla_deg_m", {0.0, 0.0, 0.0}},
+                            {"v_n_mps", {0.0, 0.0, 0.0}},
+                            {"rpy_b2n_rad", {0.0, 0.5, 0.0}},
+                            {"launch_pad_duration_s", 5.0},
+                            {"boost_duration_s", 10.0},
+                            {"boost_acceleration_b_x_mps2", 30.0}};
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+
+    cfg.at("trajectory") = {{"type", "constant_altitude"},
+                            {"duration_s", 30.0},
+                            {"rate_hz", 1000.0},
+                            {"p_lla_deg_m", {35.0, -106.0, 1500.0}},
+                            {"rpy_b2n_rad", {0.0, 0.0, 0.5}},
+                            {"speed_mps", 120.0}};
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+
+    cfg.at("trajectory") = {{"type", "calibration"},
+                            {"duration_s", 30.0},
+                            {"rate_hz", 1000.0},
+                            {"p_lla_deg_m", {35.0, -106.0, 1500.0}},
+                            {"rpy_b2n_rad", {0.0, 0.0, 0.5}},
+                            {"maneuver", "horizontal_s_turn"},
+                            {"speed_mps", 120.0},
+                            {"amplitude_rad", 0.2},
+                            {"period_s", 20.0}};
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+
+    cfg.at("trajectory") = {
+        {"type", "waypoint"},
+        {"duration_s", 30.0},
+        {"rate_hz", 1000.0},
+        {"p_lla_deg_m", {35.0, -106.0, 1500.0}},
+        {"rpy_b2n_rad", {0.0, 0.0, 0.5}},
+        {"waypoints_lla_deg_m", {{35.001, -106.0, 1500.0}, {35.001, -105.999, 1500.0}}},
+        {"speed_mps", 120.0},
+        {"bank_limit_rad", 0.3},
+        {"acceptance_radius_m", 25.0}};
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+}
+
+TEST_CASE("ECEF INS GNSS runtime validator rejects unused generated profile inputs")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("trajectory") = {{"type", "constant_altitude"},
+                            {"duration_s", 30.0},
+                            {"rate_hz", 1000.0},
+                            {"p_lla_deg_m", {35.0, -106.0, 1500.0}},
+                            {"rpy_b2n_rad", {0.0, 0.0, 0.5}},
+                            {"speed_mps", 120.0},
+                            {"v_n_mps", {120.0, 0.0, 0.0}}};
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg.at("trajectory").erase("v_n_mps");
+    cfg.at("trajectory").emplace("w_ib_b_radps", nlohmann::json{0.0, 0.0, 0.0});
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+}
+
 TEST_CASE("ECEF INS GNSS runtime validator accepts GNSS full covariance")
 {
     auto cfg = valid_ecef_ins_gnss_runtime_config();

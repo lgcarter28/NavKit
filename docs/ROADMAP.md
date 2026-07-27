@@ -72,12 +72,22 @@ Phase 7: trajectory-provider and timebase expansion is active. Phase 6 establish
 
 ## Next pass
 
-## Pass 7.6: scenario trajectory expansion
+## Pass 7.7: reusable trajectory math cleanup
 
-- [ ] Add a simple ballistic trajectory: stationary launch-pad initialization, optional transfer-alignment window, initial heading/pitch definition, and a simple axial body-x boost profile before ballistic/coast behavior. Keep this intentionally simple before adding aero or guidance complexity.
-- [ ] Add a constant-altitude, constant-speed trajectory on the curved Earth rather than flat-Earth kinematics.
-- [ ] Add calibration-maneuver trajectories: horizontal S-turn, vertical S-turn, and bank-left/bank-right excitation for observability and calibration studies.
-- [ ] Add a basic waypoint trajectory with simple bank-to-turn behavior once coordinate, attitude, and trajectory-source contracts are stable.
+- [ ] Move remaining reusable Earth-rate, triad-calibration, frame-transform, and trajectory-provider conversion helpers into their owning core math/frames/environment locations instead of leaving them buried in trajectory or simulator code. Concrete examples to sweep include `earth_rate_e_radps`, `nonorthogonality_matrix`, `misalignment_matrix`, and the frame-transform helpers currently living in trajectory/simulator implementation files.
+- [ ] Define and test the minimum coordinate operations needed by PCPF/ECEF mechanization, local-vertical measurements, NED plots, and future local-level mechanizations.
+- [ ] Confirm position, velocity, attitude, angular-rate, and specific-force frame conventions in code, algorithm docs, JSON schemas, and plot labels.
+- [ ] Ensure the selected planet and gravity policies are threaded through physics code wherever Earth-specific constants still leak into reusable math.
+- [ ] Add straight-line, constant-turn, and short GNSS-outage validation scenarios for the existing ECEF INS/GNSS path.
+- [ ] Revisit attitude covariance reset mapping and covariance health diagnostics once richer attitude/error-state tests are in place.
+
+## Pass 7.8: frame-explicit attitude input conventions
+
+- [ ] Accept exactly one configured attitude payload in every supported representation/frame direction: `q_*`, `dcm_*`, and `rpy_*_rad` for `e2b`, `b2e`, `i2b`, `b2i`, `n2b`, and `b2n`.
+- [ ] Convert every accepted input at the app-support boundary to the canonical passive body-to-ECEF quaternion `q_b2e`; Navigator and downstream simulation must consume only that canonical form.
+- [ ] Add reusable frame-pair conversion utilities and require the context each conversion needs: initial ECEF position for NED forms and timestamp plus the selected ECI/ECEF Earth-orientation convention for inertial forms.
+- [ ] Document `rpy_start2end_rad = [roll, pitch, yaw]` as aerospace 3-2-1 yaw-pitch-roll composition encoding the same passive `C_start2end`; explicitly prohibit treating inverse Euler forms as componentwise sign negations.
+- [ ] Add positive conversion and negative ambiguity/context regression coverage for every supported attitude input form.
 
 ## Future phase details
 

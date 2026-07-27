@@ -364,6 +364,22 @@ real-time/HWIL clocks.
 - `"type": "stationary"` generates ECEF truth lazily from the configured
   duration, cadence, initial position/velocity/attitude, and optional angular
   rate.
+- `"type": "ballistic"` produces a stationary launch-pad dwell followed by a
+  fixed body-x boost and an unpowered ECEF coast. `launch_pad_duration_s`
+  deliberately makes early truth available for a future transfer-alignment
+  provider; it does not enable transfer alignment by itself. The profile accepts
+  an ECEF or local-level initial position, velocity, and attitude, plus
+  `boost_duration_s` and `boost_acceleration_b_x_mps2`.
+- `"type": "constant_altitude"` generates a constant-speed, curved-Earth path
+  at the configured WGS-84 ellipsoid height. It accepts `speed_mps` and an
+  initial ECEF/local-level position and attitude; velocity and body rate are
+  derived from that profile.
+- `"type": "calibration"` generates one selected constant-speed excitation:
+  `"horizontal_s_turn"`, `"vertical_s_turn"`, or `"bank_left_right"`.
+  `speed_mps`, `amplitude_rad`, and `period_s` define the maneuver.
+- `"type": "waypoint"` follows a nonempty `waypoints_lla_deg_m` list with a
+  simple bank-limited local-level heading controller. `speed_mps`,
+  `bank_limit_rad`, and `acceptance_radius_m` define its behavior.
 - `"type": "csv"` loads `csv_path`, resolved relative to the main scenario
   JSON file. A v1 CSV source uses monotonic `time_s` and strictly increasing
   rows. It must provide `p_e_x_m`, `p_e_y_m`, `p_e_z_m`, `v_e_x_mps`,
@@ -371,6 +387,15 @@ real-time/HWIL clocks.
   `q_b2e_y`, `q_b2e_z`. It may also provide all three
   `w_ib_b_{x,y,z}_radps` columns; otherwise NavKit derives the angular rate
   from adjacent truth attitudes and Earth rate.
+
+All generated profiles require exactly one initial position convention and may
+provide at most one initial attitude convention. The stationary and ballistic
+profiles may specify initial velocity; the constant-altitude, calibration, and
+waypoint profiles derive velocity from their profile inputs and reject direct
+velocity fields. Every non-stationary generated profile derives
+`w_ib_b_radps` from consecutive truth attitudes and rejects configured angular
+rate fields so runtime input never silently overrides or ignores the selected
+profile dynamics.
 
 Truth remains queryable between native source samples. Position, velocity, and
 angular rate interpolate linearly; body-to-ECEF quaternion attitude uses SLERP.

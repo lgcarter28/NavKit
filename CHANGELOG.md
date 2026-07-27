@@ -14,6 +14,11 @@ This project follows
 
 ### Added
 
+- Generated runtime trajectory profiles and scenarios for launch-pad ballistic
+  boost/coast, curved-Earth constant-altitude flight, three calibration
+  maneuvers, and bank-limited waypoint following. All generated non-stationary
+  profiles derive body inertial angular rate from their truth attitude and
+  reject unsupported direct input fields rather than silently ignoring them.
 - Planned-time simulation orchestration with exact rational application
   cadence, streaming stationary/CSV trajectory sources, simulated and
   real-time clock contracts, and two-phase synthetic emulator preparation and

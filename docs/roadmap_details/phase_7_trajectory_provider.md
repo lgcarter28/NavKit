@@ -57,10 +57,11 @@ This phase expands truth generation and scheduling after Monte Carlo exists, so 
 
 ## Pass 7.6: scenario trajectory expansion
 
-- [ ] Add a simple ballistic trajectory: stationary launch-pad initialization, optional transfer-alignment window, initial heading/pitch definition, and a simple axial body-x boost profile before ballistic/coast behavior. Keep this intentionally simple before adding aero or guidance complexity.
-- [ ] Add a constant-altitude, constant-speed trajectory on the curved Earth rather than flat-Earth kinematics.
-- [ ] Add calibration-maneuver trajectories: horizontal S-turn, vertical S-turn, and bank-left/bank-right excitation for observability and calibration studies.
-- [ ] Add a basic waypoint trajectory with simple bank-to-turn behavior once coordinate, attitude, and trajectory-source contracts are stable.
+- [x] Added a simple boost/coast ballistic profile with a stationary launch-pad dwell, ECEF/local-level initial position/velocity/attitude, a fixed body-x boost, and ECEF gravity/Coriolis coast. The dwell supplies early truth for a future transfer-alignment provider; transfer alignment itself remains a later Phase 13 capability.
+- [x] Added a constant-altitude, constant-speed curved-Earth profile that preserves WGS-84 ellipsoid height while following a local-level great-circle path.
+- [x] Added horizontal S-turn, vertical S-turn, and bank-left/bank-right calibration profiles for observability and calibration studies.
+- [x] Added a basic bank-limited waypoint profile using local-level waypoint targeting, plus reusable runtime component and full scenario JSON inputs for each generated profile.
+- [x] Added direct profile and runtime-validation regression coverage, a Debug scenario check, and Release end-to-end checks for all generated scenarios.
 
 ## Pass 7.7: reusable trajectory math cleanup
 
@@ -70,3 +71,11 @@ This phase expands truth generation and scheduling after Monte Carlo exists, so 
 - [ ] Ensure the selected planet and gravity policies are threaded through physics code wherever Earth-specific constants still leak into reusable math.
 - [ ] Add straight-line, constant-turn, and short GNSS-outage validation scenarios for the existing ECEF INS/GNSS path.
 - [ ] Revisit attitude covariance reset mapping and covariance health diagnostics once richer attitude/error-state tests are in place.
+
+## Pass 7.8: frame-explicit attitude input conventions
+
+- [ ] Accept exactly one configured attitude payload in every supported representation/frame direction: `q_*`, `dcm_*`, and `rpy_*_rad` for `e2b`, `b2e`, `i2b`, `b2i`, `n2b`, and `b2n`.
+- [ ] Convert every accepted input at the app-support boundary to the canonical passive body-to-ECEF quaternion `q_b2e`; Navigator and downstream simulation must consume only that canonical form.
+- [ ] Add reusable frame-pair conversion utilities and require the context each conversion needs: initial ECEF position for NED forms and timestamp plus the selected ECI/ECEF Earth-orientation convention for inertial forms.
+- [ ] Document `rpy_start2end_rad = [roll, pitch, yaw]` as aerospace 3-2-1 yaw-pitch-roll composition encoding the same passive `C_start2end`; explicitly prohibit treating inverse Euler forms as componentwise sign negations.
+- [ ] Add positive conversion and negative ambiguity/context regression coverage for every supported attitude input form.

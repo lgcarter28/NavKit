@@ -1,0 +1,20 @@
+{
+  "components": {
+    "trajectory": "../components/trajectory/ballistic_launch_pad_1000hz.json",
+    "application": "../components/application/default_1000hz.json",
+    "imu": "../components/imu/specs/hg1700_tactical.json",
+    "gnss": "../components/gnss/nominal_pos_vel.json",
+    "pva_initialization": "../components/initialization/pva/pva_random_error_default.json"
+  },
+  "run_name": "ecef_ins_gnss_lc_gyro_accel_bias_ballistic_nominal",
+  "output_dir": "output/logs/ecef_ins_gnss_lc_gyro_accel_bias_ballistic_nominal",
+  "logging": {
+    "console": { "enabled": true, "rate_hz": 1.0 },
+    "truth": { "enabled": true, "rate_hz": 10.0 },
+    "nav_estimate": { "enabled": true, "rate_hz": 10.0, "covariance": "triangular" },
+    "imu": { "enabled": true, "rate_hz": 100.0 },
+    "imu_debug": { "enabled": false },
+    "filter_correction": { "enabled": true, "rate_hz": 10.0, "covariance": "diagonal" },
+    "measurement_statistics": { "enabled": true, "rate_hz": 1.0 }
+  }
+}
