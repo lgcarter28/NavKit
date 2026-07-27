@@ -25,5 +25,6 @@ Use `docs/ROADMAP.md` as the active roadmap. It is intentionally short and shoul
 - `phase_15_embedded_hardening.md` - remaining embedded readiness, type/API hygiene, documentation, and CI/release workflow.
 - `phase_16_advanced_algorithms.md` - advanced GNSS techniques, vision/LiDAR/SLAM, celestial/radar/external aiding, GPS-denied demonstrations, and robust/multi-hypothesis algorithms.
 - `phase_17_additional_mechanizations_environments.md` - additional mechanizations, environments, and physical models.
-- `phase_18_alternative_estimators.md` - sliding-window, factor-graph, and smoothing backends.
-- `phase_19_simulation_platform.md` - HIL, multi-vehicle simulation, production scenario management, and qualification reports.
+- `phase_18_guidance_control_vehicle_dynamics.md` - guidance/control signal flow, controlled-attitude point-mass models, and future rigid-body vehicle dynamics.
+- `phase_19_alternative_estimators.md` - sliding-window, factor-graph, and smoothing backends.
+- `phase_20_simulation_platform.md` - HIL, multi-vehicle simulation, production scenario management, trajectory analysis, and qualification reports.
