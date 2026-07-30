@@ -4,13 +4,14 @@
 #include "navkit/SelectedConfig.hpp"
 #include "navkit/api/config/ConfigApi.hpp"
 #include "navkit/app_support/config/ConfigTraits.hpp"
-#include "navkit/app_support/config/LoggingConfigTraits.hpp"
+#include "navkit/app_support/logging/RuntimeLogger.hpp"
 #include "navkit/core/config/ConfigPolicy.hpp"
 #include "navkit/core/estimation/filter/MeasurementStatisticsStorage.hpp"
 #include "navkit/core/estimation/sensor/Sensor.hpp"
 #include "navkit/core/estimation/sensor/SensorConfigPolicy.hpp"
 #include "navkit/core/estimation/state/StateDefs.hpp"
 #include "navkit/core/models/GnssPosModel.hpp"
+#include "navkit/io/LoggerPolicy.hpp"
 #include "navkit/products/components/propagation/EcefInsPropagationConfig.hpp"
 
 #include <cstddef>
@@ -68,10 +69,14 @@ struct NumericOnlyConfig
 struct MissingPropagationConfig
 {};
 
+template<typename Config>
+concept HasLoggerAlias = requires { typename Config::Logger; };
+
 TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
 {
     using SelectedAppConfig = navkit::selected_config::Config;
     using SimConfig = navkit::app_support::NavKitConfig_t<navkit::selected_config::Config>;
+    using RuntimeLogger = navkit::app_support::RuntimeLogger<SimConfig>;
 
     static_assert(NumericConfigPolicy<ExampleConfig::Numeric>);
     static_assert(navkit::core::estimation::BufferConfigPolicy<ExampleConfig::GnssBuffer>);
@@ -93,8 +98,22 @@ TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
                                      SimConfig::SensorGraph::primary_gnss_velocity_sensor_id,
                                      SimConfig::Sensors>,
                                  SimConfig::PrimaryGnssVelocitySensor>);
-    static_assert(std::is_same_v<navkit::app_support::LoggerConfig_t<SelectedAppConfig>,
-                                 SelectedAppConfig::Logger>);
+    static_assert(!HasLoggerAlias<SelectedAppConfig>);
+    static_assert(std::is_same_v<SelectedAppConfig::App::Logger, RuntimeLogger>);
+    static_assert(navkit::io::LoggerPolicy<RuntimeLogger>);
+    static_assert(
+        navkit::io::LoggerPayloadPolicy<RuntimeLogger, navkit::io::TrajectoryEcefLogPayload>);
+    static_assert(
+        navkit::io::LoggerPayloadPolicy<RuntimeLogger, navkit::io::TrajectoryEciLogPayload>);
+    static_assert(
+        navkit::io::LoggerPayloadPolicy<RuntimeLogger, navkit::io::TrajectoryNedLogPayload>);
+    static_assert(
+        navkit::io::LoggerPayloadPolicy<RuntimeLogger, navkit::io::TrajectoryBodyLogPayload>);
+    static_assert(
+        navkit::io::LoggerPayloadPolicy<RuntimeLogger, navkit::io::TrajectoryGuidanceLogPayload>);
+    static_assert(
+        navkit::io::LoggerPayloadPolicy<RuntimeLogger,
+                                        navkit::io::TrajectoryAutopilotVehicleLogPayload>);
     static_assert(std::is_same_v<
                   SimConfig::Filter::MeasurementStatisticsTuple_t,
                   navkit::core::estimation::MeasurementStatisticsStorage_t<SimConfig::Sensors>>);

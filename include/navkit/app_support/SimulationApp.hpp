@@ -4,7 +4,6 @@
 #pragma once
 
 #include "navkit/app_support/config/ConfigTraits.hpp"
-#include "navkit/app_support/config/LoggingConfigTraits.hpp"
 #include "navkit/app_support/config/SimulationAppConfigPolicy.hpp"
 #include "navkit/app_support/emulation/EmulatorRuntime.hpp"
 #include "navkit/app_support/emulation/concrete/ImuRuntime.hpp"
@@ -41,7 +40,7 @@ public:
     using NavInitializationProvider = typename Config::NavInitializationProvider;
     using TransferAlignmentProvider = typename Config::TransferAlignmentProvider;
     using ImuSimulator = typename Config::ImuSimulator;
-    using Logger = LoggerConfig_t<Config>;
+    using Logger = RuntimeLogger<NavKit>;
     using Emulators = EmulatorRuntime<NavKit, Logger, EmulatorBindings>;
     using Imu = ImuRuntime<ImuSimulator>;
 
