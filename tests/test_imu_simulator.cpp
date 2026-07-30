@@ -3,6 +3,7 @@
 
 #include "navkit/app_support/emulation/concrete/ImuRuntime.hpp"
 #include "navkit/app_support/emulation/concrete/ImuRuntimeConfig.hpp"
+#include "navkit/core/environment/RotatingPlanetKinematics.hpp"
 #include "navkit/core/environment/gravity/J2.hpp"
 #include "navkit/core/environment/planet/Wgs84.hpp"
 #include "navkit/sim/ImuSimulator.hpp"
@@ -86,7 +87,9 @@ TEST_CASE("Ideal stationary ECEF IMU truth includes Earth-rate gyro and specific
 
     ImuInterval interval;
     REQUIRE(DefaultImuSimulator::interval_from_truth_ecef(previous, current, interval));
-    const Vec3 gravity_e = J2<Wgs84>::acceleration(previous.p_e);
+    const Vec3 gravitation_e = J2<Wgs84>::acceleration(previous.p_e);
+    const Vec3 centrifugal_e =
+        navkit::core::environment::centrifugal_acceleration_fixed_mps2<Wgs84>(previous.p_e);
     const ImuIncrement truth = DefaultImuSimulator::increment_from_interval(interval);
 
     CHECK(navkit::core::timestamp_seconds(interval.t) == doctest::Approx(1.0));
@@ -94,8 +97,9 @@ TEST_CASE("Ideal stationary ECEF IMU truth includes Earth-rate gyro and specific
     CHECK(truth.delta_theta_ib_b_rad.x() == doctest::Approx(0.0));
     CHECK(truth.delta_theta_ib_b_rad.y() == doctest::Approx(0.0));
     CHECK(truth.delta_theta_ib_b_rad.z() == doctest::Approx(Wgs84::omega_rad_s));
-    CHECK(approx_vec(truth.delta_v_ib_b_mps, -gravity_e));
+    CHECK(approx_vec(truth.delta_v_ib_b_mps, -gravitation_e - centrifugal_e));
     CHECK(truth.delta_v_ib_b_mps.x() > 0.0);
+    CHECK(truth.delta_v_ib_b_mps.x() < -gravitation_e.x());
 }
 
 TEST_CASE("Ideal gyro truth combines ECEF attitude delta with Earth rotation")

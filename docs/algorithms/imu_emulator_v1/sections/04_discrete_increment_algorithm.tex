@@ -102,9 +102,15 @@ from \cref{eq:imu_bias_gauss_markov_discrete_covariance}.
 
 \begin{implbox}
 For v1, generate increments from interval-average rates and specific forces.
-Coning and sculling compensation belong to the Navigator mechanization path,
-not inside the IMU emulator. The emulator is responsible for producing the raw
-increment stream that a real IMU would provide.
+With compile-time output compensation disabled, the emulator produces the raw
+sub-sample stream and the Navigator combines consecutive increments with its
+two-sample coning/sculling algorithm. With emulator output compensation
+enabled to represent an IMU that performs compensation internally, each
+published increment is already an external compensated interval and the
+Navigator processes it individually with midpoint-attitude resolution. The
+application compile-time configuration must select exactly one owner; raw
+increments must not be left uncompensated, and corrected increments must not
+be compensated a second time.
 \end{implbox}
 
 \section{Algorithm Summary}

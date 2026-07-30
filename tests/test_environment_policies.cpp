@@ -1,6 +1,7 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
+#include "navkit/core/environment/RotatingPlanetKinematics.hpp"
 #include "navkit/core/environment/gravity/GravityPolicy.hpp"
 #include "navkit/core/environment/gravity/J2.hpp"
 #include "navkit/core/environment/gravity/Spherical.hpp"
@@ -64,6 +65,21 @@ TEST_CASE("J2 WGS84 gravity produces finite acceleration")
 
     CHECK(g_p.allFinite());
     CHECK(g_p.x() < 0.0);
+}
+
+TEST_CASE("Rotating-planet centrifugal acceleration is outward with an exact Jacobian")
+{
+    const Eigen::Vector3d p_p{Wgs84::a_m, 0.0, 100.0};
+    const Eigen::Vector3d centrifugal = centrifugal_acceleration_fixed_mps2<Wgs84>(p_p);
+    const Eigen::Matrix3d gradient = centrifugal_acceleration_gradient_fixed_1ps2<Wgs84>();
+
+    CHECK(centrifugal.x() > 0.0);
+    CHECK(centrifugal.y() == doctest::Approx(0.0));
+    CHECK(centrifugal.z() == doctest::Approx(0.0));
+    CHECK(centrifugal.isApprox(gradient * p_p, 1.0e-15));
+    CHECK(gradient(0, 0) == doctest::Approx(Wgs84::omega_rad_s * Wgs84::omega_rad_s));
+    CHECK(gradient(1, 1) == doctest::Approx(Wgs84::omega_rad_s * Wgs84::omega_rad_s));
+    CHECK(gradient(2, 2) == doctest::Approx(0.0));
 }
 
 } // namespace navkit::core::environment::test

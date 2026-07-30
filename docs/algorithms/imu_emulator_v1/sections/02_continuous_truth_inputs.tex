@@ -69,13 +69,29 @@ $C_{e,k+1}^{b}$. The corresponding interval-average gyro truth is
 \section{Specific Force From ECEF Truth}
 
 The accelerometer does not measure coordinate acceleration directly. It measures
-specific force. In ECEF coordinates,
+specific force. The configured v1 gravity policy returns mass-attraction
+gravitation $\boldsymbol{\gamma}^{e}$; it does not include the rotating-frame
+centrifugal pseudo-acceleration. Define
+\begin{equation}
+\mathbf{a}_{\mathrm{cf}}^{e}(\mathbf{p}^{e})
+=
+-\omegab_{ie}^{e}\times
+\left(\omegab_{ie}^{e}\times\mathbf{p}^{e}\right),
+\qquad
+\mathbf{g}^{e}
+=
+\boldsymbol{\gamma}^{e}+\mathbf{a}_{\mathrm{cf}}^{e},
+\label{eq:imu_apparent_gravity_definition}
+\end{equation}
+where $\mathbf{g}^{e}$ is plumb-bob/apparent gravity. In ECEF coordinates,
 \begin{equation}
 \dot{\mathbf{v}}_{eb}^{e}
 =
 C_b^e\fb_{ib}^{b}
 \;+\;
-\mathbf{g}^{e}(\mathbf{p}_{eb}^{e})
+\boldsymbol{\gamma}^{e}(\mathbf{p}_{eb}^{e})
+\;+\;
+\mathbf{a}_{\mathrm{cf}}^{e}(\mathbf{p}_{eb}^{e})
 -
 2\omegab_{ie}^{e}\times\mathbf{v}_{eb}^{e}.
 \end{equation}
@@ -90,7 +106,9 @@ C_e^b
 \;+\;
 2\omegab_{ie}^{e}\times\mathbf{v}_{eb}^{e}
 -
-\mathbf{g}^{e}(\mathbf{p}_{eb}^{e})
+\boldsymbol{\gamma}^{e}(\mathbf{p}_{eb}^{e})
+-
+\mathbf{a}_{\mathrm{cf}}^{e}(\mathbf{p}_{eb}^{e})
 \right).
 }
 \label{eq:imu_truth_specific_force_from_ecef}
@@ -117,9 +135,13 @@ For endpoint trajectory truth, use the v1 interval approximations
 +\mathbf{p}_{eb,k+1}^{e}
 \right),
 &
-\bar{\mathbf{g}}_{k}^{e}
+\bar{\boldsymbol{\gamma}}_{k}^{e}
 &=
-\mathbf{g}^{e}(\bar{\mathbf{p}}_{eb,k}^{e}).
+\boldsymbol{\gamma}^{e}(\bar{\mathbf{p}}_{eb,k}^{e}),
+&
+\bar{\mathbf{a}}_{\mathrm{cf},k}^{e}
+&=
+\mathbf{a}_{\mathrm{cf}}^{e}(\bar{\mathbf{p}}_{eb,k}^{e}).
 \end{align}
 Then the interval-average specific force is
 \begin{equation}
@@ -132,7 +154,9 @@ Then the interval-average specific force is
 \;+\;
 2\omegab_{ie}^{e}\times\bar{\mathbf{v}}_{eb,k}^{e}
 -
-\bar{\mathbf{g}}_{k}^{e}
+\bar{\boldsymbol{\gamma}}_{k}^{e}
+-
+\bar{\mathbf{a}}_{\mathrm{cf},k}^{e}
 \right).
 }
 \label{eq:imu_average_specific_force_from_ecef_truth}
@@ -142,6 +166,13 @@ For a stationary body fixed in ECEF, $\mathbf{v}_{eb}^{e}=\zero$ and
 $\dot{\mathbf{v}}_{eb}^{e}=\zero$, so
 \begin{equation}
 \fb_{ib}^{b}
+=
+-C_e^b
+\left(
+\boldsymbol{\gamma}^{e}(\mathbf{p}_{eb}^{e})
++
+\mathbf{a}_{\mathrm{cf}}^{e}(\mathbf{p}_{eb}^{e})
+\right)
 =
 -C_e^b\mathbf{g}^{e}(\mathbf{p}_{eb}^{e}).
 \label{eq:imu_stationary_specific_force}

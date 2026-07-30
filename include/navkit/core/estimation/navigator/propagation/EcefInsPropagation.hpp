@@ -90,9 +90,15 @@ struct EcefInsPropagation
                                     const ImuIncrement& second,
                                     NominalState<StateDef>& state) const
     {
-        const MechanizedImuInterval interval =
-            corrected_interval_from_pair<StateDef>(state, first, second);
-        return propagate_nominal_state<StateDef>(interval, state);
+        if constexpr (apply_coning_sculling_compensation) {
+            const MechanizedImuInterval interval =
+                corrected_interval_from_pair<StateDef>(state, first, second);
+            return propagate_nominal_state<StateDef>(interval, state);
+        }
+        else {
+            return process_imu_increment<StateDef>(first, state) &&
+                   process_imu_increment<StateDef>(second, state);
+        }
     }
 
     template<StateSpaceDefPolicy StateDef>
@@ -132,14 +138,13 @@ struct EcefInsPropagation
                                              ErrorStateCov<StateDef>& phi,
                                              ErrorStateCov<StateDef>& qd) const
     {
-        const MechanizedImuInterval interval =
-            corrected_interval_from_pair<StateDef>(state, first, second);
-        return covariance_step_from_interval<StateDef>(state,
-                                                       interval,
-                                                       m_runtime_config.imu_bias_dynamics,
-                                                       m_runtime_config.process_noise,
-                                                       phi,
-                                                       qd);
+        return covariance_step_from_increment_pair<StateDef>(state,
+                                                             first,
+                                                             second,
+                                                             m_runtime_config.imu_bias_dynamics,
+                                                             m_runtime_config.process_noise,
+                                                             phi,
+                                                             qd);
     }
 
     template<StateSpaceDefPolicy StateDef>
@@ -151,10 +156,34 @@ struct EcefInsPropagation
                                                     ErrorStateCov<StateDef>& phi,
                                                     ErrorStateCov<StateDef>& qd)
     {
-        const MechanizedImuInterval interval =
-            corrected_interval_from_pair<StateDef>(state, first, second);
-        return covariance_step_from_interval<StateDef>(
-            state, interval, bias_dynamics, process_noise, phi, qd);
+        if constexpr (apply_coning_sculling_compensation) {
+            const MechanizedImuInterval interval =
+                corrected_interval_from_pair<StateDef>(state, first, second);
+            return covariance_step_from_interval<StateDef>(
+                state, interval, bias_dynamics, process_noise, phi, qd);
+        }
+        else {
+            ErrorStateCov<StateDef> phi_first{};
+            ErrorStateCov<StateDef> qd_first{};
+            ErrorStateCov<StateDef> phi_second{};
+            ErrorStateCov<StateDef> qd_second{};
+            NominalState<StateDef> state_at_second = state;
+            if (!covariance_step_from_increment<StateDef>(
+                    state, first, bias_dynamics, process_noise, phi_first, qd_first) ||
+                !propagate_nominal_state<StateDef>(
+                    corrected_interval_from_single<StateDef>(state_at_second, first),
+                    state_at_second) ||
+                !covariance_step_from_increment<StateDef>(
+                    state_at_second, second, bias_dynamics, process_noise, phi_second, qd_second)) {
+                phi.setIdentity();
+                qd.setZero();
+                return false;
+            }
+            phi = phi_second * phi_first;
+            qd = (phi_second * qd_first * phi_second.transpose()) + qd_second;
+            qd = 0.5 * (qd + qd.transpose());
+            return true;
+        }
     }
 
     template<typename StateDef, typename State_t>
@@ -228,25 +257,27 @@ struct EcefInsPropagation
         using Error = typename StateDef::Error;
         ErrorStateCov<StateDef> F = ErrorStateCov<StateDef>::Zero();
 
-        const Eigen::Quaternion<Scalar_t> q_b2e = navkit::core::estimation::q_b2e<StateDef>(state);
-        const Eigen::Matrix<Scalar_t, 3, 3> C_b_e = q_b2e.toRotationMatrix();
+        const Eigen::Quaternion<Scalar_t> q_b2e_mid =
+            midpoint_quaternion_b2e<StateDef>(state, interval);
+        const Eigen::Matrix<Scalar_t, 3, 3> C_b2e_mid = q_b2e_mid.toRotationMatrix();
         const Vec3 omega_ie_e = environment::planet_rate_fixed_radps<Planet>();
         const Eigen::Matrix<Scalar_t, 3, 3> Omega_ie_e =
             navkit::core::math::skew_symmetric(omega_ie_e);
-        const Vec3 f_ib_e = C_b_e * interval.specific_force_ib_b_mps2;
+        const Vec3 f_ib_e = C_b2e_mid * interval.specific_force_ib_b_mps2;
 
         F.template block<3, 3>(Error::Pos::i, Error::Vel::i).setIdentity();
         F.template block<3, 3>(Error::Vel::i, Error::Pos::i) =
-            environment::gravity_gradient_fixed_mps2_per_m<Gravity>(position_e_m<StateDef>(state));
+            environment::gravity_gradient_fixed_mps2_per_m<Gravity>(position_e_m<StateDef>(state)) +
+            environment::centrifugal_acceleration_gradient_fixed_1ps2<Planet>();
         F.template block<3, 3>(Error::Vel::i, Error::Vel::i) = -2.0 * Omega_ie_e;
         F.template block<3, 3>(Error::Vel::i, Error::AttRotVec::i) =
             -navkit::core::math::skew_symmetric(f_ib_e);
         if constexpr (requires { typename Error::AccB; }) {
-            F.template block<3, 3>(Error::Vel::i, Error::AccB::i) = -C_b_e;
+            F.template block<3, 3>(Error::Vel::i, Error::AccB::i) = -C_b2e_mid;
         }
         F.template block<3, 3>(Error::AttRotVec::i, Error::AttRotVec::i) = -Omega_ie_e;
         if constexpr (requires { typename Error::GyroB; }) {
-            F.template block<3, 3>(Error::AttRotVec::i, Error::GyroB::i) = -C_b_e;
+            F.template block<3, 3>(Error::AttRotVec::i, Error::GyroB::i) = -C_b2e_mid;
             F.template block<3, 3>(Error::GyroB::i, Error::GyroB::i) =
                 (-bias_dynamics.gyro_bias_correlation_rate_1ps).asDiagonal();
         }
@@ -260,15 +291,16 @@ struct EcefInsPropagation
 
     template<typename StateDef>
     [[nodiscard]] static Eigen::Matrix<Scalar_t, StateDef::Error::N, 12>
-    build_g_matrix(const NominalState<StateDef>& state)
+    build_g_matrix(const NominalState<StateDef>& state, const MechanizedImuInterval& interval)
     {
         using Error = typename StateDef::Error;
         Eigen::Matrix<Scalar_t, Error::N, 12> G = Eigen::Matrix<Scalar_t, Error::N, 12>::Zero();
-        const Eigen::Quaternion<Scalar_t> q_b2e = navkit::core::estimation::q_b2e<StateDef>(state);
-        const Eigen::Matrix<Scalar_t, 3, 3> C_b_e = q_b2e.toRotationMatrix();
+        const Eigen::Quaternion<Scalar_t> q_b2e_mid =
+            midpoint_quaternion_b2e<StateDef>(state, interval);
+        const Eigen::Matrix<Scalar_t, 3, 3> C_b2e_mid = q_b2e_mid.toRotationMatrix();
 
-        G.template block<3, 3>(Error::Vel::i, 3) = C_b_e;
-        G.template block<3, 3>(Error::AttRotVec::i, 0) = C_b_e;
+        G.template block<3, 3>(Error::Vel::i, 3) = C_b2e_mid;
+        G.template block<3, 3>(Error::AttRotVec::i, 0) = C_b2e_mid;
         if constexpr (requires { typename Error::GyroB; }) {
             G.template block<3, 3>(Error::GyroB::i, 6).setIdentity();
         }
@@ -328,6 +360,16 @@ private:
         if (first.dt_s <= 0.0 || second.dt_s <= 0.0 || !elapsed_time(second.t, first.t, elapsed)) {
             return {};
         }
+        // Rational cadences such as 600 Hz necessarily alternate adjacent
+        // nanosecond timestamp intervals. Accept one timestamp quantum plus
+        // floating-point conversion margin while still rejecting genuinely
+        // unequal or noncontiguous samples.
+        constexpr Time_t timing_tolerance_s = 2.0e-9;
+        const Time_t elapsed_s = duration_seconds(elapsed);
+        if (std::abs(first.dt_s - second.dt_s) > timing_tolerance_s ||
+            std::abs(elapsed_s - second.dt_s) > timing_tolerance_s) {
+            return {};
+        }
 
         const Vec3 gyro_bias = gyro_bias_radps<StateDef>(state);
         const Vec3 accel_bias = accel_bias_mps2<StateDef>(state);
@@ -335,15 +377,8 @@ private:
         const Vec3 delta_theta_2 = second.delta_theta_ib_b_rad - (gyro_bias * second.dt_s);
         const Vec3 delta_v_1 = first.delta_v_ib_b_mps - (accel_bias * first.dt_s);
         const Vec3 delta_v_2 = second.delta_v_ib_b_mps - (accel_bias * second.dt_s);
-        ConingSculling corrected{};
-        if constexpr (apply_coning_sculling_compensation) {
-            corrected =
-                coning_sculling_two_sample(delta_theta_1, delta_v_1, delta_theta_2, delta_v_2);
-        }
-        else {
-            corrected = {.delta_theta_ib_b_rad = delta_theta_1 + delta_theta_2,
-                         .delta_v_ib_b_mps = delta_v_1 + delta_v_2};
-        }
+        const ConingSculling corrected =
+            coning_sculling_two_sample(delta_theta_1, delta_v_1, delta_theta_2, delta_v_2);
         return mechanized_interval_from_corrected<StateDef>(
             state, second.t, first.dt_s + second.dt_s, corrected);
     }
@@ -363,7 +398,8 @@ private:
         }
 
         const ErrorStateCov<StateDef> F = build_f_matrix<StateDef>(state, interval, bias_dynamics);
-        const Eigen::Matrix<Scalar_t, StateDef::Error::N, 12> G = build_g_matrix<StateDef>(state);
+        const Eigen::Matrix<Scalar_t, StateDef::Error::N, 12> G =
+            build_g_matrix<StateDef>(state, interval);
         phi = first_order_phi<StateDef>(F, interval.dt_s);
         qd = first_order_qd<StateDef>(G, interval.dt_s, process_noise);
         return true;
@@ -392,13 +428,16 @@ private:
         const Vec3 v_k = velocity_e_mps<StateDef>(state_before);
         const Eigen::Quaternion<Scalar_t> q_b2e_k =
             navkit::core::estimation::q_b2e<StateDef>(state_before);
-        const Eigen::Matrix<Scalar_t, 3, 3> C_b2e_k = q_b2e_k.toRotationMatrix();
+        const Eigen::Quaternion<Scalar_t> q_b2e_mid =
+            midpoint_quaternion_b2e<StateDef>(state_before, interval);
 
-        const Vec3 gravity_e = Gravity::acceleration(p_k);
+        const Vec3 gravitation_e = Gravity::acceleration(p_k);
+        const Vec3 centrifugal_e = environment::centrifugal_acceleration_fixed_mps2<Planet>(p_k);
         const Vec3 omega_ie_e = environment::planet_rate_fixed_radps<Planet>();
-        const Vec3 delta_v_e = C_b2e_k * interval.delta_v_ib_b_mps;
+        const Vec3 delta_v_e = q_b2e_mid * interval.delta_v_ib_b_mps;
         const Vec3 coriolis_e = 2.0 * omega_ie_e.cross(v_k);
-        const Vec3 v_next = v_k + delta_v_e + ((gravity_e - coriolis_e) * interval.dt_s);
+        const Vec3 v_next =
+            v_k + delta_v_e + ((gravitation_e + centrifugal_e - coriolis_e) * interval.dt_s);
         const Vec3 p_next = p_k + (0.5 * (v_k + v_next) * interval.dt_s);
 
         const Eigen::Quaternion<Scalar_t> delta_q_eb_b =
@@ -432,6 +471,18 @@ private:
                 .delta_v_ib_b_mps = corrected.delta_v_ib_b_mps,
                 .delta_theta_eb_b_rad = delta_theta_eb_b,
                 .specific_force_ib_b_mps2 = corrected.delta_v_ib_b_mps / dt_s};
+    }
+
+    template<StateSpaceDefPolicy StateDef>
+    [[nodiscard]] static Eigen::Quaternion<Scalar_t>
+    midpoint_quaternion_b2e(const NominalState<StateDef>& state,
+                            const MechanizedImuInterval& interval)
+    {
+        const Eigen::Quaternion<Scalar_t> q_b2e_start =
+            navkit::core::estimation::q_b2e<StateDef>(state);
+        const Eigen::Quaternion<Scalar_t> delta_q_half_eb_b =
+            navkit::core::math::quaternion_from_rotvec_rad(0.5 * interval.delta_theta_eb_b_rad);
+        return navkit::core::math::normalized_with_positive_scalar(q_b2e_start * delta_q_half_eb_b);
     }
 
     RuntimeConfig_t m_runtime_config{runtime_config};

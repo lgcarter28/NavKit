@@ -29,12 +29,21 @@ Define
 \Omega_{ie}^{e} &= \crossmat{\omegab_{ie}^{e}},\\
 \hat{\fb}_{ib}^{e} &= \hat{C}_b^e\hat{\fb}_{ib}^{b},\\
 G_p^e &=
-\left.\frac{\partial\gb^e}{\partial\pb_{eb}^e}\right|_{\hat{\pb}_{eb}^{e}},\\
+\left.
+\frac{\partial
+\left(
+\boldsymbol{\gamma}^e+\mathbf{a}_{\mathrm{cf}}^e
+\right)}
+{\partial\pb_{eb}^e}
+\right|_{\hat{\pb}_{eb}^{e}},\\
 B_g &= \operatorname{diag}(\boldsymbol{\beta}_g),\\
 B_a &= \operatorname{diag}(\boldsymbol{\beta}_a).
 \end{align}
-For Earth products, $G_p^e$ should come from the selected WGS-84/J2-capable
-gravity policy rather than a hard-coded spherical approximation.
+For Earth products, the selected WGS-84/J2-capable gravity policy supplies
+the mass-attraction gradient $G_\gamma^e$, and the rotating-planet model adds
+$-\Omega_{ie}^e\Omega_{ie}^e$ so that
+$G_p^e=G_\gamma^e-\Omega_{ie}^e\Omega_{ie}^e$ is the complete
+apparent-gravity gradient.
 
 \subsection{Navigation Error Equations}
 
@@ -191,17 +200,19 @@ Let $F_k$ denote the continuous-time error-state dynamics matrix from
 constant over $[t_k,t_k+\Delta t]$.
 With
 \begin{align}
-\hat{C}_{b,k}^{e} &= C_b^e\left(\hat{\quat}_{b,k}^{e}\right),\\
-\hat{\fb}_{ib,k}^{e} &= \hat{C}_{b,k}^{e}\hat{\fb}_{ib,k}^{b},
+\bar C_{b,k}^{e} &= C_b^e\left(\hat{\quat}_{b,\mathrm{mid},k}^{e}\right)
+\quad\text{from \cref{eq:v1_midpoint_attitude}},\\
+\hat{\fb}_{ib,k}^{e} &= \bar C_{b,k}^{e}\hat{\fb}_{ib,k}^{b},
 \qquad
 \hat{\fb}_{ib,k}^{b}
 =
 \frac{\Delta\mathbf{V}_{ib,k}^{b}}{\Delta t}
 \quad\text{from \cref{eq:v1_interval_average_specific_force}},\\
 G_{p,k}^{e} &=
-\left.
-\frac{\partial\gb^e}{\partial\pb_{eb}^{e}}
-\right|_{\hat{\pb}_{eb,k}^{e}},\\
+G_{\gamma,k}^{e}
+-
+\Omega_{ie}^{e}\Omega_{ie}^{e}
+\quad\text{from \cref{eq:v1_apparent_gravity_gradient}},\\
 B_{g,k} &= \operatorname{diag}(\boldsymbol{\beta}_{g,k}),\\
 B_{a,k} &= \operatorname{diag}(\boldsymbol{\beta}_{a,k}),
 \end{align}
@@ -211,8 +222,8 @@ the v1 interval-specific continuous-time dynamics matrix is
 F_k =
 \begin{bmatrix}
 \zero & \I & \zero & \zero & \zero\\
-G_{p,k}^{e} & -2\Omega_{ie}^{e} & -\crossmat{\hat{\fb}_{ib,k}^{e}} & \zero & -\hat{C}_{b,k}^{e}\\
-\zero & \zero & -\Omega_{ie}^{e} & -\hat{C}_{b,k}^{e} & \zero\\
+G_{p,k}^{e} & -2\Omega_{ie}^{e} & -\crossmat{\hat{\fb}_{ib,k}^{e}} & \zero & -\bar C_{b,k}^{e}\\
+\zero & \zero & -\Omega_{ie}^{e} & -\bar C_{b,k}^{e} & \zero\\
 \zero & \zero & \zero & -B_{g,k} & \zero\\
 \zero & \zero & \zero & \zero & -B_{a,k}
 \end{bmatrix}.
@@ -235,8 +246,8 @@ The corresponding frozen noise-input matrix is built directly from
 G_k =
 \begin{bmatrix}
 \zero & \zero & \zero & \zero\\
-\zero & \hat{C}_{b,k}^{e} & \zero & \zero\\
-\hat{C}_{b,k}^{e} & \zero & \zero & \zero\\
+\zero & \bar C_{b,k}^{e} & \zero & \zero\\
+\bar C_{b,k}^{e} & \zero & \zero & \zero\\
 \zero & \zero & \I & \zero\\
 \zero & \zero & \zero & \I
 \end{bmatrix}.

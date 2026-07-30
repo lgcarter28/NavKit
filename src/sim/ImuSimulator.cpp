@@ -25,7 +25,10 @@ ImuSimulator<OutputConingScullingCompensated>::ImuSimulator(const ImuSimulatorCo
 {
     realize_random_terms(m_cfg.gyro, m_cfg.gyro_random);
     realize_random_terms(m_cfg.accel, m_cfg.accel_random);
+    // Bias state must use the realized turn-on draw, which is unavailable in the initializer list.
+    // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     m_gyro_bias_radps = m_cfg.gyro.bias_turnon;
+    // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     m_accel_bias_mps2 = m_cfg.accel.bias_turnon;
 }
 
@@ -82,11 +85,13 @@ bool ImuSimulator<OutputConingScullingCompensated>::interval_from_truth_ecef(
     const Vec3 a_bar_e = (current.v_e - previous.v_e) / dt_s;
     const Vec3 v_bar_e = 0.5 * (previous.v_e + current.v_e);
     const Vec3 p_bar_e = 0.5 * (previous.p_e + current.p_e);
-    const Vec3 gravity_e = J2<Wgs84>::acceleration(p_bar_e);
+    const Vec3 gravitation_e = J2<Wgs84>::acceleration(p_bar_e);
+    const Vec3 centrifugal_e =
+        core::environment::centrifugal_acceleration_fixed_mps2<Wgs84>(p_bar_e);
     const Vec3 specific_force_e =
         a_bar_e +
         (2.0 * navkit::core::environment::planet_rate_fixed_radps<Wgs84>().cross(v_bar_e)) -
-        gravity_e;
+        gravitation_e - centrifugal_e;
     const Vec3 specific_force_b = q_mid.conjugate() * specific_force_e;
 
     interval = {};
@@ -100,7 +105,8 @@ bool ImuSimulator<OutputConingScullingCompensated>::interval_from_truth_ecef(
     debug.p_bar_e_m = p_bar_e;
     debug.v_bar_e_mps = v_bar_e;
     debug.a_bar_e_mps2 = a_bar_e;
-    debug.gravity_e_mps2 = gravity_e;
+    debug.gravitation_e_mps2 = gravitation_e;
+    debug.centrifugal_acceleration_e_mps2 = centrifugal_e;
     debug.specific_force_e_mps2 = specific_force_e;
     debug.delta_theta_eb_b_rad = delta_theta_eb_b;
     return true;

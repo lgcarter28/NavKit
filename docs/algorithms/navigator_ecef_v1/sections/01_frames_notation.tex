@@ -49,6 +49,19 @@ primary meaning. This document's mathematical notation follows the compact
 Groves-style convention: $C_b^e$ maps from $b$ to $e$.
 \end{warningbox}
 
+When a runtime boundary accepts Euler angles,
+\texttt{rpy\_start2end\_rad} stores roll, pitch, and yaw and encodes the same
+passive transform as \texttt{q\_start2end} and \texttt{dcm\_start2end}:
+\begin{equation}
+C_{\mathrm{start}}^{\mathrm{end}}
+=
+R_z(\mathrm{yaw})R_y(\mathrm{pitch})R_x(\mathrm{roll}).
+\end{equation}
+This is the aerospace 3-2-1 yaw-pitch-roll composition. The Euler parameters
+of the inverse transform must be extracted from
+$\left(C_{\mathrm{start}}^{\mathrm{end}}\right)^T$; they are not generally the
+componentwise negatives of the forward Euler parameters.
+
 \section{Truth, Estimate, Measurement, and Error Notation}
 
 Unadorned variables represent the true physical quantity. A hat denotes the

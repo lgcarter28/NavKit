@@ -11,6 +11,8 @@ namespace navkit::core::estimation
 struct ConingSculling
 {
     Vec3 delta_theta_ib_b_rad{Vec3::Zero()};
+    // Sculling-motion-corrected increment resolved in the interval-midpoint body frame. The
+    // mechanization applies the midpoint body-to-navigation attitude exactly once.
     Vec3 delta_v_ib_b_mps{Vec3::Zero()};
 };
 
@@ -28,8 +30,6 @@ struct ConingSculling
     const Vec3 delta_theta = delta_theta_1_ib_b_rad + delta_theta_2_ib_b_rad +
                              ((2.0 / 3.0) * delta_theta_1_ib_b_rad.cross(delta_theta_2_ib_b_rad));
     const Vec3 delta_v = delta_v_1_ib_b_mps + delta_v_2_ib_b_mps +
-                         (0.5 * (delta_theta_1_ib_b_rad + delta_theta_2_ib_b_rad)
-                                    .cross(delta_v_1_ib_b_mps + delta_v_2_ib_b_mps)) +
                          ((2.0 / 3.0) * ((delta_theta_1_ib_b_rad.cross(delta_v_2_ib_b_mps)) +
                                          (delta_v_1_ib_b_mps.cross(delta_theta_2_ib_b_rad))));
     return {.delta_theta_ib_b_rad = delta_theta, .delta_v_ib_b_mps = delta_v};

@@ -32,25 +32,12 @@ standard two-sample coning correction
 \end{equation}
 and a two-sample sculling-corrected specific-force velocity increment
 \begin{align}
-\Delta\mathbf{V}^{b}
+\Delta\mathbf{V}^{b_{\mathrm{mid}}}
 &=
 \Delta\hat{\mathbf{v}}_1
 +
 \Delta\hat{\mathbf{v}}_2
 +
-\frac{1}{2}
-\left(
-\Delta\hat{\boldsymbol\theta}_1
-+
-\Delta\hat{\boldsymbol\theta}_2
-\right)
-\times
-\left(
-\Delta\hat{\mathbf{v}}_1
-+
-\Delta\hat{\mathbf{v}}_2
-\right) \nonumber\\
-&\quad+
 \frac{2}{3}
 \left(
 \Delta\hat{\boldsymbol\theta}_1
@@ -63,11 +50,30 @@ and a two-sample sculling-corrected specific-force velocity increment
 \right).
 \label{eq:v1_sculling_two_sample}
 \end{align}
+The increment in \cref{eq:v1_sculling_two_sample} is resolved in the
+interval-midpoint body frame. The mean-rotation contribution is supplied by
+the midpoint body-to-ECEF attitude in
+\cref{eq:v1_discrete_velocity_update}; therefore the implementation must not
+also add
+$\tfrac{1}{2}(\Delta\hat{\boldsymbol\theta}_1+
+\Delta\hat{\boldsymbol\theta}_2)\times
+(\Delta\hat{\mathbf{v}}_1+\Delta\hat{\mathbf{v}}_2)$ to this increment.
+Doing both would double count the first-order mean body rotation. For a
+single raw increment, $\Delta\mathbf{V}^{b_{\mathrm{mid}}}$ is the measured
+increment interpreted at the interval midpoint.
+
 The exact coefficient convention must be verified against the selected IMU
 increment ordering in tests. Higher-order multi-sample algorithms are deferred
 until the two-sample path is correct and profiled. The v1 formulas are the
-standard two-sample coning and sculling corrections used for incremental IMU
+standard two-sample coning correction and the corresponding midpoint-frame
+form of the two-sample sculling correction used for incremental IMU
 mechanization \cite{groves2013,titterton2004}.
+
+If the selected IMU reports internally compensated output intervals, the
+Navigator does not combine two of those intervals with
+\cref{eq:v1_coning_two_sample,eq:v1_sculling_two_sample}. It advances them
+individually, retaining the same midpoint-body delta-velocity contract. The
+compile-time simulator/product handshake selects one compensation owner.
 
 \section{Quaternion Attitude Propagation}
 
@@ -160,6 +166,22 @@ After discrete propagation, normalize:
 
 \section{Velocity and Position Propagation}
 
+The configured v1 gravity policy returns mass-attraction gravitation
+$\boldsymbol{\gamma}^{e}$, not plumb-bob gravity. Define the outward
+centrifugal pseudo-acceleration and plumb-bob gravity by
+\begin{align}
+\mathbf{a}_{\mathrm{cf}}^{e}(\mathbf{p}^{e})
+&=
+-\omegab_{ie}^{e}\times
+\left(\omegab_{ie}^{e}\times\mathbf{p}^{e}\right),\\
+\gb^{e}(\mathbf{p}^{e})
+&=
+\boldsymbol{\gamma}^{e}(\mathbf{p}^{e})
++
+\mathbf{a}_{\mathrm{cf}}^{e}(\mathbf{p}^{e}).
+\label{eq:v1_apparent_gravity_definition}
+\end{align}
+
 Using plumb-bob gravity $\gb^{e}(\pb_{eb}^{e})$, the ECEF velocity equation is
 \begin{equation}
 \boxed{
@@ -182,37 +204,72 @@ The corresponding position equation is
 }
 \end{equation}
 
-The gravity vector and gravity gradient used by the mechanization and
-covariance prediction must come from the configured gravity policy. For Earth
-products, the intended v1 baseline is a WGS-84/J2-capable gravity model rather
-than a hard-coded spherical approximation \cite{groves2013}.
+The mass-attraction vector and its gradient used by the mechanization and
+covariance prediction come from the configured gravity policy. The rotating
+planet policy supplies the centrifugal term and its exact gradient. For Earth
+products, the intended v1 baseline is a WGS-84/J2-capable mass-attraction model
+rather than a hard-coded spherical approximation \cite{groves2013}.
 
 For implementation, the configured gravity policy must provide both
 \begin{equation}
-\gb_k^e=\gb^e\left(\hat{\pb}_{eb,k}^{e}\right),
+\boldsymbol{\gamma}_k^e
+=
+\boldsymbol{\gamma}^e\left(\hat{\pb}_{eb,k}^{e}\right),
 \qquad
-G_{p,k}^{e}
+G_{\gamma,k}^{e}
 =
 \left.
-\frac{\partial\gb^e}{\partial\pb_{eb}^{e}}
+\frac{\partial\boldsymbol{\gamma}^e}{\partial\pb_{eb}^{e}}
 \right|_{\hat{\pb}_{eb,k}^{e}}.
 \label{eq:v1_gravity_policy_contract}
 \end{equation}
-The mechanization uses $\gb_k^e$; the covariance prediction uses
-$G_{p,k}^{e}$.
+The mechanization constructs
+\begin{equation}
+\gb_k^e
+=
+\boldsymbol{\gamma}_k^e+\mathbf{a}_{\mathrm{cf},k}^e,
+\qquad
+G_{p,k}^{e}
+=
+G_{\gamma,k}^{e}
+-
+\Omega_{ie}^{e}\Omega_{ie}^{e},
+\label{eq:v1_apparent_gravity_gradient}
+\end{equation}
+where
+$-\Omega_{ie}^{e}\Omega_{ie}^{e}
+=\partial\mathbf{a}_{\mathrm{cf}}^e/\partial\mathbf{p}^e$.
+The covariance prediction uses this complete apparent-gravity gradient.
 
 \section{Discrete Velocity and Position Update}
 
-Using the sculling-corrected specific-force increment
-$\Delta\mathbf{V}_{ib,k}^{b}$ from \cref{eq:v1_sculling_two_sample}, the v1
-velocity update is
+Using the midpoint-body-resolved sculling-corrected specific-force increment
+$\Delta\mathbf{V}_{ib,k}^{b_{\mathrm{mid}}}$ from
+\cref{eq:v1_sculling_two_sample}, define
+\begin{align}
+\delta\quat_{\mathrm{mid},k}
+&=
+q\left(\frac{1}{2}\Delta\boldsymbol\Theta_{eb,k}^{b}\right),\\
+\hat{\quat}_{b,\mathrm{mid},k}^{e}
+&=
+\operatorname{normalize}
+\left(
+\hat{\quat}_{b,k}^{e,+}\otimes\delta\quat_{\mathrm{mid},k}
+\right),\\
+\bar C_{b,k}^{e}
+&=
+C_b^e\left(\hat{\quat}_{b,\mathrm{mid},k}^{e}\right).
+\label{eq:v1_midpoint_attitude}
+\end{align}
+This normalized midpoint quaternion is the v1 approximation to the exact
+interval-average body-to-ECEF transform. The v1 velocity update is
 \begin{equation}
 \boxed{
 \hat{\vb}_{eb,k+1}^{e,-}
 =
 \hat{\vb}_{eb,k}^{e,+}
 +
-\hat{C}_{b,k}^{e}\Delta\mathbf{V}_{ib,k}^{b}
+\bar C_{b,k}^{e}\Delta\mathbf{V}_{ib,k}^{b_{\mathrm{mid}}}
 +
 \left(
 \gb_k^e
@@ -248,13 +305,15 @@ specific force corresponding to the same sculling-corrected velocity increment:
 \boxed{
 \hat{\fb}_{ib,k}^{b}
 =
-\frac{\Delta\mathbf{V}_{ib,k}^{b}}{\Delta t}.
+\frac{\Delta\mathbf{V}_{ib,k}^{b_{\mathrm{mid}}}}{\Delta t}.
 }
 \label{eq:v1_interval_average_specific_force}
 \end{equation}
-This is the body-frame quantity used to form
-$\hat{\fb}_{ib,k}^{e}=\hat{C}_{b,k}^{e}\hat{\fb}_{ib,k}^{b}$ in the
-interval-specific $F_k$ matrix.
+This midpoint-body-frame quantity is used to form
+$\hat{\fb}_{ib,k}^{e}=\bar C_{b,k}^{e}\hat{\fb}_{ib,k}^{b}$ in the
+interval-specific $F_k$ matrix. The same midpoint transform is used for
+accelerometer/gyro bias coupling and continuous-noise mapping during this v1
+interval linearization.
 
 \section{Discrete Integration}
 

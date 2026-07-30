@@ -28,12 +28,12 @@ The v1 trajectory provider emits timestamped ECEF truth states:
 t_k, \qquad
 \mathbf{p}_{eb,k}^{e}, \qquad
 \mathbf{v}_{eb,k}^{e}, \qquad
-C_{e,k}^{b}.
+\mathbf{q}_{b,k}^{e}.
 \label{eq:imu_trajectory_truth_contract}
 \end{align}
-Here $C_{e,k}^{b}$ maps ECEF-resolved vectors into the body frame at sample
-$k$. If an implementation stores the inverse attitude, it must invert it before
-using the equations in this document. The trajectory provider should not emit
+Here $\mathbf{q}_{b,k}^{e}$ maps body-resolved components into ECEF at sample $k$;
+the emulator obtains $C_{e,k}^{b}=\left(C_{b,k}^{e}\right)^T$ when an equation
+requires the inverse mapping. The trajectory provider should not emit
 $\omegab_{ib}^{b}$, $\fb_{ib}^{b}$, or IMU increments as primary truth fields.
 Those are emulator outputs derived from the ECEF truth states.
 

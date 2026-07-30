@@ -75,7 +75,8 @@ struct ImuIntervalDebug
     Vec3 p_bar_e_m{Vec3::Zero()};
     Vec3 v_bar_e_mps{Vec3::Zero()};
     Vec3 a_bar_e_mps2{Vec3::Zero()};
-    Vec3 gravity_e_mps2{Vec3::Zero()};
+    Vec3 gravitation_e_mps2{Vec3::Zero()};
+    Vec3 centrifugal_acceleration_e_mps2{Vec3::Zero()};
     Vec3 specific_force_e_mps2{Vec3::Zero()};
     Vec3 delta_theta_eb_b_rad{Vec3::Zero()};
 };
@@ -84,6 +85,8 @@ template<bool OutputConingScullingCompensated = false>
 class ImuSimulator
 {
 public:
+    // When true, each published increment represents an externally compensated interval and must
+    // be mechanized individually. When false, the Navigator owns two-sample compensation.
     static constexpr bool output_coning_sculling_compensated_v = OutputConingScullingCompensated;
 
     explicit ImuSimulator(const ImuSimulatorConfig& cfg = {});
