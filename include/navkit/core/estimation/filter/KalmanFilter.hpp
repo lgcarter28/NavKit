@@ -4,6 +4,7 @@
 #pragma once
 
 #include "navkit/core/estimation/filter/CovarianceFloor.hpp"
+#include "navkit/core/estimation/filter/CovarianceHealth.hpp"
 #include "navkit/core/estimation/filter/MeasurementStatistics.hpp"
 #include "navkit/core/estimation/filter/MeasurementStatisticsStorage.hpp"
 #include "navkit/core/estimation/filter/injection/InjectionPolicies.hpp"
@@ -90,6 +91,26 @@ public:
         return m_last_correction_valid;
     }
 
+    [[nodiscard]] bool pending_correction_valid() const
+    {
+        return m_pending_correction_valid;
+    }
+
+    /** Starts a Navigator correction cycle and clears its first-order correction total. */
+    void begin_measurement_update_cycle()
+    {
+        m_cycle_correction.setZero();
+        m_last_correction.setZero();
+        m_last_correction_valid = false;
+        m_measurement_update_cycle_active = true;
+    }
+
+    /** Ends correction accumulation; direct Filter injection then reports one correction. */
+    void end_measurement_update_cycle()
+    {
+        m_measurement_update_cycle_active = false;
+    }
+
     P_t& covariance()
     {
         return m_P;
@@ -98,6 +119,12 @@ public:
     [[nodiscard]] const P_t& covariance() const
     {
         return m_P;
+    }
+
+    [[nodiscard]] CovarianceHealthResult<typename P_t::Scalar>
+    covariance_health(const CovarianceHealthTolerances<typename P_t::Scalar>& tolerances = {}) const
+    {
+        return evaluate_covariance_health(m_P, tolerances);
     }
 
     void set_state(const State_t& x)
@@ -219,7 +246,16 @@ public:
 
     void inject()
     {
-        m_last_correction = m_dx;
+        if (m_measurement_update_cycle_active && m_pending_correction_valid) {
+            // Corrections from sequential sensors are expressed at successive
+            // linearization points. Their sum is the first-order cycle-total
+            // error-state correction exposed to the existing once-per-cycle log.
+            m_cycle_correction += m_dx;
+            m_last_correction = m_cycle_correction;
+        }
+        else {
+            m_last_correction = m_dx;
+        }
         m_last_correction_valid = m_pending_correction_valid;
         Injection::apply(m_x, m_dx);
     }
@@ -312,11 +348,13 @@ private:
     State_t m_x{};
     ErrorState_t m_dx{};
     ErrorState_t m_last_correction{};
+    ErrorState_t m_cycle_correction{};
     P_t m_P{};
     P_t m_covariance_floor{P_t::Zero()};
     MeasurementStatisticsTuple_t m_measurement_stats{};
     bool m_pending_correction_valid{false};
     bool m_last_correction_valid{false};
+    bool m_measurement_update_cycle_active{false};
 };
 
 } // namespace navkit::core::estimation

@@ -31,6 +31,11 @@ struct UpdateAfterEachSensor
     template<SensorPolicy Sensor>
     static void sensor_update(Filter& filter, const Sensor&)
     {
+        if constexpr (requires { filter.pending_correction_valid(); }) {
+            if (!filter.pending_correction_valid()) {
+                return;
+            }
+        }
         filter.inject();
         filter.reset();
     }

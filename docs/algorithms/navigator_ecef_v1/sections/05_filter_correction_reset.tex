@@ -124,7 +124,7 @@ For small attitude corrections, the attitude reset block is
 \begin{equation}
 G_{\text{reset},\theta}
 \approx
-\I-\frac{1}{2}\crossmat{\delta\hat{\boldsymbol{\theta}}}.
+\I+\frac{1}{2}\crossmat{\delta\hat{\boldsymbol{\theta}}}.
 \label{eq:v1_attitude_reset_block}
 \end{equation}
 For the v1 state ordering, the full reset Jacobian is
@@ -146,6 +146,19 @@ Resolving the attitude error in ECEF keeps the error coordinates tied to the
 navigation frame convention, but multiplicative attitude injection still
 changes the local perturbation coordinates. The reset operation and reset
 Jacobian therefore remain part of the filter/injection policy contract, not a
-hidden side effect of a measurement model. This approximation follows the same
-small-rotation convention as the broader NavKit reference and Sola's
-error-state quaternion treatment \cite{sola2018}.
+hidden side effect of a measurement model. The positive skew sign follows from
+the left-multiplicative, ECEF-resolved error convention:
+\begin{equation}
+\exp\!\left(\crossmat{\delta\boldsymbol{\theta}^{+}}\right)
+=
+\exp\!\left(\crossmat{\delta\boldsymbol{\theta}^{-}}\right)
+\exp\!\left(-\crossmat{\delta\hat{\boldsymbol{\theta}}}\right).
+\end{equation}
+Linearizing this composition about
+$\delta\boldsymbol{\theta}^{-}=\delta\hat{\boldsymbol{\theta}}$ produces
+$\I+\tfrac{1}{2}\crossmat{\delta\hat{\boldsymbol{\theta}}}$. The familiar
+negative-skew reset block applies to the opposite, right-multiplicative local
+error convention and must not be mixed with
+\cref{eq:v1_attitude_error_dcm_relation,eq:v1_quat_injection}. This
+approximation follows the same small-rotation convention as Sola's error-state
+quaternion treatment \cite{sola2018}.

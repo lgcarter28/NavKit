@@ -85,16 +85,22 @@ struct MissingFilterUpdate
 struct MissingStrapdownIntegration
 {};
 
+struct PropagationPolicyTestRuntimeConfig
+{
+    ImuProcessNoise process_noise{};
+    GaussMarkovImuBiasDynamics imu_bias_dynamics{};
+};
+
 struct PropagationPolicyTestBase
 {
     using ProcessNoise_t = ImuProcessNoise;
     using ImuBiasDynamics_t = GaussMarkovImuBiasDynamics;
-    struct RuntimeConfig_t
-    {
-        ProcessNoise_t process_noise{};
-        ImuBiasDynamics_t imu_bias_dynamics{};
-    };
+    // The spelling is part of the PropagationPolicy configuration contract.
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    using RuntimeConfig_t = PropagationPolicyTestRuntimeConfig;
 
+    // The spelling is part of the PropagationPolicy configuration contract.
+    // NOLINTNEXTLINE(bugprone-throwing-static-initialization,readability-identifier-naming)
     inline static const RuntimeConfig_t runtime_config{};
 
     void set_runtime_config(const RuntimeConfig_t& config)
@@ -264,6 +270,8 @@ struct RecordingPropagation : PropagationPolicyTestBase
     static inline int covariance_increment_call_count{0};
     static inline int covariance_pair_call_count{0};
     static inline Timestamp t_last_imu{};
+    // Test instrumentation intentionally retains the last Eigen-backed runtime configuration.
+    // NOLINTNEXTLINE(bugprone-throwing-static-initialization)
     static inline RuntimeConfig_t last_runtime_config{};
 
     static void reset()
@@ -324,6 +332,12 @@ struct RecordingPropagation : PropagationPolicyTestBase
         qd.setZero();
         return first.dt_s > 0.0 && second.dt_s > 0.0;
     }
+};
+
+struct RecordingCompensatingPropagation : RecordingPropagation
+{
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr bool apply_coning_sculling_compensation = true;
 };
 
 template<typename Filter, typename Sensors>
@@ -394,6 +408,7 @@ TEST_CASE("PropagationPolicy captures state propagation and covariance-step cons
 {
     static_assert(PropagationPolicy<NavigatorPolicyPropagation, NavigatorPolicyStateDef>);
     static_assert(PropagationPolicy<RecordingPropagation, NavigatorPolicyStateDef>);
+    static_assert(PropagationPolicy<RecordingCompensatingPropagation, NavigatorPolicyStateDef>);
     static_assert(!PropagationPolicy<MissingStrapdownIntegration, NavigatorPolicyStateDef>);
     static_assert(!PropagationPolicy<MissingCovariancePrediction, NavigatorPolicyStateDef>);
     static_assert(!PropagationPolicy<MissingImuProcessing, NavigatorPolicyStateDef>);
@@ -517,6 +532,56 @@ TEST_CASE("Navigator consumes queued IMU increments through propagation policy")
     CHECK(RecordingPropagation::covariance_pair_call_count == 1);
     CHECK(RecordingPropagation::covariance_increment_call_count == 1);
     CHECK(timestamp_seconds(RecordingPropagation::t_last_imu) == doctest::Approx(3.0));
+}
+
+TEST_CASE("Navigator retains unmatched raw IMU increments for two-sample compensation")
+{
+    using Nav =
+        Navigator<NavigatorPolicyFilter, NavigatorPolicySensors, RecordingCompensatingPropagation>;
+
+    RecordingPropagation::reset();
+    Nav navigator;
+
+    NavigatorPolicySensor::Measurement_t measurement{};
+    CHECK(navigator.sensor<0>().push(measurement));
+    CHECK(navigator.push_imu(imu_increment_at(0.25, 0.25)));
+    CHECK(navigator.update());
+
+    CHECK(navigator.imu_buffer_size() == 1U);
+    CHECK(navigator.sensor<0>().has_measurement());
+    CHECK(RecordingPropagation::imu_increment_call_count == 0);
+    CHECK(RecordingPropagation::imu_pair_call_count == 0);
+
+    CHECK(navigator.push_imu(imu_increment_at(0.5, 0.25)));
+    CHECK(navigator.update());
+
+    CHECK(navigator.imu_buffer_size() == 0U);
+    CHECK_FALSE(navigator.sensor<0>().has_measurement());
+    CHECK(RecordingPropagation::imu_increment_call_count == 0);
+    CHECK(RecordingPropagation::imu_pair_call_count == 1);
+    CHECK(RecordingPropagation::covariance_pair_call_count == 1);
+}
+
+TEST_CASE("Navigator finalization consumes a trailing raw increment and partial covariance step")
+{
+    using Nav =
+        Navigator<NavigatorPolicyFilter, NavigatorPolicySensors, RecordingCompensatingPropagation>;
+
+    RecordingPropagation::reset();
+    Nav navigator;
+
+    CHECK(navigator.push_imu(imu_increment_at(0.25, 0.25)));
+    CHECK(navigator.update());
+    CHECK(navigator.imu_buffer_size() == 1U);
+    CHECK(navigator.covariance_history_size() == 0U);
+
+    CHECK(navigator.finalize());
+
+    CHECK(navigator.imu_buffer_size() == 0U);
+    CHECK(navigator.pending_covariance_step_count() == 0U);
+    CHECK(navigator.covariance_history_size() == 1U);
+    CHECK(RecordingPropagation::imu_increment_call_count == 1);
+    CHECK(RecordingPropagation::covariance_increment_call_count == 1);
 }
 
 TEST_CASE("Navigator reports IMU propagation failure")

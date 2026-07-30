@@ -46,7 +46,7 @@ struct EcefInsGnssLc
                                        core::estimation::DefaultResetPolicy<StateDef_t>,
                                        Sensors,
                                        Profiler>;
-    using NavigatorUpdate = core::estimation::UpdatePostFilter<Filter>;
+    using NavigatorUpdate = core::estimation::UpdateAfterEachSensor<Filter>;
     using Navigator =
         core::estimation::Navigator<Filter, Sensors, Propagation, NavigatorUpdate, Profiler>;
 };

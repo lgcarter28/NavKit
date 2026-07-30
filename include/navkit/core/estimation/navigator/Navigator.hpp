@@ -95,12 +95,27 @@ public:
 
     [[nodiscard]] bool push_imu(const ImuIncrement& increment)
     {
-        return m_imu_buffer.push(increment);
+        const bool pushed = m_imu_buffer.push(increment);
+        if (pushed && increment.dt_s > 0.0 && increment.delta_theta_ib_b_rad.allFinite()) {
+            m_latest_omega_ib_b_meas_radps = increment.delta_theta_ib_b_rad / increment.dt_s;
+            m_latest_imu_angular_rate_valid = true;
+        }
+        return pushed;
     }
 
     [[nodiscard]] std::size_t imu_buffer_size() const
     {
         return m_imu_buffer.size();
+    }
+
+    [[nodiscard]] bool latest_imu_angular_rate_valid() const
+    {
+        return m_latest_imu_angular_rate_valid;
+    }
+
+    [[nodiscard]] const Vec3& latest_omega_ib_b_meas_radps() const
+    {
+        return m_latest_omega_ib_b_meas_radps;
     }
 
     [[nodiscard]] bool last_propagation_success() const
@@ -135,6 +150,70 @@ public:
 
     bool process_strapdown_integration()
     {
+        return process_strapdown_integration(false);
+    }
+
+    bool propagate_covariance()
+    {
+        return propagate_covariance(false);
+    }
+
+    void process_measurements()
+    {
+        auto profile_scope =
+            Profiler::profile(navkit::core::profiling::ProfilePoint::NavigatorProcessMeasurements);
+        static_cast<void>(profile_scope);
+
+        if constexpr (requires { m_filter.begin_measurement_update_cycle(); }) {
+            m_filter.begin_measurement_update_cycle();
+        }
+        std::apply([this](auto&... sensor_obj) { (this->process_one_sensor(sensor_obj), ...); },
+                   m_sensors);
+        Update_t::filter_update(m_filter);
+        if constexpr (requires { m_filter.end_measurement_update_cycle(); }) {
+            m_filter.end_measurement_update_cycle();
+        }
+    }
+
+    bool update()
+    {
+        const bool propagation_ok = process_strapdown_integration();
+        const bool covariance_ok = propagate_covariance();
+        if (!awaiting_imu_pair()) {
+            process_measurements();
+        }
+        return propagation_ok && covariance_ok;
+    }
+
+    /**
+     * Completes a finite IMU stream.
+     *
+     * Raw two-sample coning/sculling normally retains one unmatched increment.
+     * Finalization permits that last interval to use the single-sample path,
+     * force-propagates any partial covariance interval, and then drains aiding
+     * measurements against the final nominal state.
+     */
+    bool finalize()
+    {
+        const bool propagation_ok = process_strapdown_integration(true);
+        const bool covariance_ok = propagate_covariance(true);
+        process_measurements();
+        return propagation_ok && covariance_ok;
+    }
+
+private:
+    [[nodiscard]] bool awaiting_imu_pair() const
+    {
+        if constexpr (Propagation_t::apply_coning_sculling_compensation) {
+            return !m_imu_buffer.empty();
+        }
+        else {
+            return false;
+        }
+    }
+
+    bool process_strapdown_integration(const bool flush_single)
+    {
         m_last_propagation_success = true;
 
         while (m_imu_buffer.size() >= 2U) {
@@ -147,7 +226,8 @@ public:
             }
         }
 
-        if (!m_imu_buffer.empty()) {
+        if (!m_imu_buffer.empty() &&
+            (flush_single || !Propagation_t::apply_coning_sculling_compensation)) {
             ImuIncrement increment{};
             if (!m_imu_buffer.pop(increment) || !process_imu_single(increment)) {
                 m_last_propagation_success = false;
@@ -158,9 +238,9 @@ public:
         return true;
     }
 
-    bool propagate_covariance()
+    bool propagate_covariance(const bool force_pending)
     {
-        if (covariance_step_ready()) {
+        if (m_has_pending_covariance_step && (force_pending || covariance_step_ready())) {
             m_filter.propagate_covariance(m_pending_covariance_step.phi,
                                           m_pending_covariance_step.qd);
             static_cast<void>(m_covariance_history.push(m_pending_covariance_step));
@@ -169,27 +249,6 @@ public:
         }
         return true;
     }
-
-    void process_measurements()
-    {
-        auto profile_scope =
-            Profiler::profile(navkit::core::profiling::ProfilePoint::NavigatorProcessMeasurements);
-        static_cast<void>(profile_scope);
-
-        std::apply([this](auto&... sensor_obj) { (this->process_one_sensor(sensor_obj), ...); },
-                   m_sensors);
-        Update_t::filter_update(m_filter);
-    }
-
-    bool update()
-    {
-        const bool propagation_ok = process_strapdown_integration();
-        const bool covariance_ok = propagate_covariance();
-        process_measurements();
-        return propagation_ok && covariance_ok;
-    }
-
-private:
     bool process_imu_single(const ImuIncrement& increment)
     {
         const auto state_before = m_filter.state();
@@ -256,8 +315,10 @@ private:
     ImuBuffer_t m_imu_buffer{};
     CovarianceHistory_t m_covariance_history{};
     CovarianceStep m_pending_covariance_step{};
+    Vec3 m_latest_omega_ib_b_meas_radps{Vec3::Zero()};
     bool m_has_pending_covariance_step{false};
     bool m_last_propagation_success{true};
+    bool m_latest_imu_angular_rate_valid{false};
 };
 
 } // namespace navkit::core::estimation
