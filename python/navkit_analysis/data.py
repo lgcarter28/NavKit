@@ -221,10 +221,10 @@ def _derive_truth_error(nav: pd.DataFrame, truth: pd.DataFrame | None, imu: pd.D
 
     for axis_index, axis_name in enumerate(("x", "y", "z")):
         derived_columns[f"error_p_e_{axis_name}_m"] = (
-            nav_p_e[:, axis_index] - truth_p_e[:, axis_index]
+            truth_p_e[:, axis_index] - nav_p_e[:, axis_index]
         )
         derived_columns[f"error_v_e_{axis_name}_mps"] = (
-            nav_v_e[:, axis_index] - truth_v_e[:, axis_index]
+            truth_v_e[:, axis_index] - nav_v_e[:, axis_index]
         )
 
     truth_q = _normalized_quaternion_wxyz(_interp_columns(truth, time_s, _truth_attitude_columns(truth)))
@@ -267,10 +267,10 @@ def _derive_truth_error(nav: pd.DataFrame, truth: pd.DataFrame | None, imu: pd.D
     ].to_numpy()
     for axis_index, axis_name in enumerate(("x", "y", "z")):
         derived_columns[f"error_gyro_bias_b_{axis_name}_radps"] = (
-            nav_gyro[:, axis_index] - gyro_truth[:, axis_index]
+            gyro_truth[:, axis_index] - nav_gyro[:, axis_index]
         )
         derived_columns[f"error_accel_bias_b_{axis_name}_mps2"] = (
-            nav_accel[:, axis_index] - accel_truth[:, axis_index]
+            accel_truth[:, axis_index] - nav_accel[:, axis_index]
         )
 
     for column in nav.columns:
