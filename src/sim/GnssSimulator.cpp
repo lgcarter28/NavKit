@@ -6,8 +6,10 @@
 #include "navkit/core/environment/RotatingPlanetKinematics.hpp"
 #include "navkit/core/environment/planet/Wgs84.hpp"
 #include "navkit/core/frames/LocalLevel.hpp"
+#include "navkit/core/time/Duration.hpp"
 #include "navkit/sim/RandomDraw.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 namespace navkit::sim
@@ -24,9 +26,27 @@ bool GnssSimulator::should_generate(const TruthSample& truth) const
         if (!m_schedule.reset(truth.t, m_cfg.rate)) {
             return false;
         }
+        m_schedule_epoch = truth.t;
         m_schedule_initialized = true;
     }
-    return m_schedule.due(truth.t);
+    return m_schedule.due(truth.t) && availability_active(truth.t);
+}
+
+bool GnssSimulator::availability_active(const Timestamp& t) const
+{
+    if (m_cfg.active_windows.empty()) {
+        return true;
+    }
+
+    core::Duration elapsed{};
+    if (!core::elapsed_time(t, m_schedule_epoch, elapsed)) {
+        return false;
+    }
+
+    const Time_t elapsed_s = core::duration_seconds(elapsed);
+    return std::ranges::any_of(m_cfg.active_windows, [elapsed_s](const GnssActiveWindow& window) {
+        return elapsed_s >= window.start_s && elapsed_s < window.end_s;
+    });
 }
 
 Measurement<3> GnssSimulator::generate_position(const TruthSample& truth)
@@ -66,8 +86,8 @@ Mat3 GnssSimulator::position_cov_e_m2(const TruthSample& truth) const
         return m_cfg.position_cov_m2;
     }
 
-    const Mat3 C_n2e = navkit::core::frames::ned_to_ecef_matrix(truth.p_e);
-    return C_n2e * m_cfg.position_cov_m2 * C_n2e.transpose();
+    const Mat3 dcm_n2e = navkit::core::frames::ned_to_ecef_matrix(truth.p_e);
+    return dcm_n2e * m_cfg.position_cov_m2 * dcm_n2e.transpose();
 }
 
 Mat3 GnssSimulator::velocity_cov_e_m2ps2(const TruthSample& truth) const
@@ -76,8 +96,8 @@ Mat3 GnssSimulator::velocity_cov_e_m2ps2(const TruthSample& truth) const
         return m_cfg.velocity_cov_m2ps2;
     }
 
-    const Mat3 C_n2e = navkit::core::frames::ned_to_ecef_matrix(truth.p_e);
-    return C_n2e * m_cfg.velocity_cov_m2ps2 * C_n2e.transpose();
+    const Mat3 dcm_n2e = navkit::core::frames::ned_to_ecef_matrix(truth.p_e);
+    return dcm_n2e * m_cfg.velocity_cov_m2ps2 * dcm_n2e.transpose();
 }
 
 } // namespace navkit::sim

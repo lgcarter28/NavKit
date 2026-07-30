@@ -103,7 +103,7 @@ H_v
 \zero &
 \I &
 -\crossmat{\hat{C}_b^e u_g^b}
--
++
 \hat{C}_b^e\crossmat{l_{bg}^{b}}\hat{C}_e^b\crossmat{\omegab_{ie}^{e}} &
 \hat{C}_b^e\crossmat{l_{bg}^{b}} &
 \zero
@@ -123,7 +123,7 @@ predicted antenna velocity is
 +
 \left(
 -\crossmat{\hat{C}_b^e u_g^b}
--
++
 \hat{C}_b^e\crossmat{l_{bg}^{b}}\hat{C}_e^b\crossmat{\omegab_{ie}^{e}}
 \right)
 \delta\boldsymbol{\theta}
@@ -131,6 +131,14 @@ predicted antenna velocity is
 \hat{C}_b^e\crossmat{l_{bg}^{b}}\delta\bb_g.
 \label{eq:v1_gnss_vel_perturbation}
 \end{align}
+The positive inner Earth-rate term follows from
+$C_b^{e,true}\approx(\I+\crossmat{\delta\boldsymbol{\theta}})\hat C_b^e$:
+the perturbation of $-C_e^b\omegab_{ie}^e$ is
+$-\hat C_e^b\crossmat{\omegab_{ie}^e}\delta\boldsymbol{\theta}$, and crossing
+that result with the lever arm introduces the second sign change. The
+implementation obtains $\hat{\omegab}_{ib}^b$ from the latest valid IMU
+increment and applies the nominal gyro-bias correction; simulator truth
+angular rate is not passed into the filter observation context.
 If this sign convention changes, the velocity lever-arm Jacobian must change
 with it.
 

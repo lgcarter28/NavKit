@@ -9,6 +9,7 @@
 #include "navkit/sim/TruthSample.hpp"
 
 #include <random>
+#include <vector>
 
 namespace navkit::sim
 {
@@ -28,6 +29,13 @@ enum class GnssCovarianceFrame
     Ned
 };
 
+/** Half-open GNSS-availability interval relative to the simulator's first query. */
+struct GnssActiveWindow
+{
+    Time_t start_s{};
+    Time_t end_s{};
+};
+
 struct GnssSimulatorConfig
 {
     RationalRate rate{.samples = 1U, .s = 1U};
@@ -36,6 +44,7 @@ struct GnssSimulatorConfig
     GnssCovarianceFrame velocity_covariance_frame{GnssCovarianceFrame::Ecef};
     Mat3 velocity_cov_m2ps2{(Vec3{0.04, 0.04, 0.04}).asDiagonal()};
     Vec3 p_b_ant_b_m{Vec3::Zero()};
+    std::vector<GnssActiveWindow> active_windows{};
     unsigned int seed{42U};
     bool noise_enabled{true};
 };
@@ -62,8 +71,11 @@ public:
     }
 
 private:
+    [[nodiscard]] bool availability_active(const Timestamp& t) const;
+
     GnssSimulatorConfig m_cfg;
     mutable RationalSchedule m_schedule{};
+    mutable Timestamp m_schedule_epoch{};
     mutable bool m_schedule_initialized{false};
     std::mt19937 m_rng;
 };

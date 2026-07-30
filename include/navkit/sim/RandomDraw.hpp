@@ -8,11 +8,29 @@
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstdint>
 #include <random>
 
 namespace navkit::sim
 {
+
+/**
+ * Deterministically derives an independent random stream seed from a component
+ * seed and a stable stream index.
+ *
+ * This keeps one user-facing/Monte-Carlo component seed while preventing
+ * separately owned simulator instances from replaying the same random stream.
+ */
+[[nodiscard]] inline std::uint32_t derive_random_stream_seed(const std::uint32_t component_seed,
+                                                             const std::uint32_t stream_index)
+{
+    std::seed_seq sequence{component_seed, stream_index};
+    std::array<std::uint32_t, 1> derived_seed{};
+    sequence.generate(derived_seed.begin(), derived_seed.end());
+    return derived_seed.front();
+}
 
 template<int N, typename Rng>
 [[nodiscard]] Eigen::Matrix<navkit::core::Scalar_t, N, 1>

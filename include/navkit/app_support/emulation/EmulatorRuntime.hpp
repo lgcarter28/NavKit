@@ -198,8 +198,15 @@ private:
         typename Binding::Sensor_t& sensor = sensor_for_binding<Binding>(navigator);
         if constexpr (requires {
                           Binding::Emulator_t::update_sensor_context(
-                              runtime, prepared.truth, prepared.measurement, sensor);
+                              runtime, prepared.truth, prepared.measurement, navigator, sensor);
                       }) {
+            Binding::Emulator_t::update_sensor_context(
+                runtime, prepared.truth, prepared.measurement, navigator, sensor);
+        }
+        else if constexpr (requires {
+                               Binding::Emulator_t::update_sensor_context(
+                                   runtime, prepared.truth, prepared.measurement, sensor);
+                           }) {
             Binding::Emulator_t::update_sensor_context(
                 runtime, prepared.truth, prepared.measurement, sensor);
         }

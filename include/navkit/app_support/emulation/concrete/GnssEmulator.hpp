@@ -16,8 +16,10 @@
 #include "navkit/io/log_products/GnssVelocityDebugLogProduct.hpp"
 #include "navkit/io/log_products/GnssVelocityLogProduct.hpp"
 #include "navkit/sim/GnssSimulator.hpp"
+#include "navkit/sim/RandomDraw.hpp"
 
 #include <Eigen/Eigenvalues>
+#include <cstdint>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <string_view>
@@ -30,9 +32,48 @@ using SensorId = navkit::core::estimation::SensorId;
 namespace detail
 {
 
+enum class GnssRandomStream : std::uint32_t
+{
+    Position = 0U,
+    Velocity = 1U,
+};
+
 inline void validate_gnss_covariance_config(const nlohmann::json& covariance,
                                             std::string_view path,
                                             std::string_view diag_key);
+
+inline void validate_gnss_active_windows(const nlohmann::json& gnss)
+{
+    const nlohmann::json::const_iterator windows_iter = gnss.find("active_windows");
+    if (windows_iter == gnss.end()) {
+        return;
+    }
+    if (!windows_iter->is_array()) {
+        throw_runtime_config_error("gnss.active_windows must be an array");
+    }
+
+    core::Time_t previous_end_s{};
+    bool first_window = true;
+    for (std::size_t index = 0U; index < windows_iter->size(); ++index) {
+        const nlohmann::json& window = windows_iter->at(index);
+        const std::string path = "gnss.active_windows[" + std::to_string(index) + "]";
+        if (!window.is_object()) {
+            throw_runtime_config_error(path + " must be an object");
+        }
+        require_nonnegative_number(window, "start_s");
+        require_positive_number(window, "end_s");
+        const core::Time_t start_s = window.at("start_s").get<core::Time_t>();
+        const core::Time_t end_s = window.at("end_s").get<core::Time_t>();
+        if (end_s <= start_s) {
+            throw_runtime_config_error(path + ".end_s must be greater than start_s");
+        }
+        if (!first_window && start_s < previous_end_s) {
+            throw_runtime_config_error("gnss.active_windows must be sorted and non-overlapping");
+        }
+        previous_end_s = end_s;
+        first_window = false;
+    }
+}
 
 inline void validate_gnss_runtime_config(const nlohmann::json& cfg, std::string_view runtime_key)
 {
@@ -46,6 +87,7 @@ inline void validate_gnss_runtime_config(const nlohmann::json& cfg, std::string_
     validate_gnss_covariance_config(
         require_object(gnss, "velocity_cov"), "gnss.velocity_cov", "vel_m2ps2");
     require_optional_vec3(gnss, "p_b_ant_b_m");
+    validate_gnss_active_windows(gnss);
     require_unsigned_integer(gnss, "seed");
     require_bool(gnss, "noise_enabled");
 }
@@ -168,6 +210,16 @@ inline sim::GnssSimulatorConfig gnss_runtime_config_from_json(const nlohmann::js
     if (gnss_config.contains("p_b_ant_b_m")) {
         gnss_cfg.p_b_ant_b_m = vec3_from_json<core::Vec3>(gnss_config.at("p_b_ant_b_m"));
     }
+    if (gnss_config.contains("active_windows")) {
+        const nlohmann::json& active_windows = gnss_config.at("active_windows");
+        gnss_cfg.active_windows.reserve(active_windows.size());
+        for (const nlohmann::json& window : active_windows) {
+            gnss_cfg.active_windows.push_back(sim::GnssActiveWindow{
+                .start_s = window.at("start_s").get<core::Time_t>(),
+                .end_s = window.at("end_s").get<core::Time_t>(),
+            });
+        }
+    }
     gnss_cfg.seed = gnss_config.at("seed").get<unsigned int>();
     gnss_cfg.noise_enabled = gnss_config.at("noise_enabled").get<bool>();
     return gnss_cfg;
@@ -199,7 +251,10 @@ struct GnssEmulator
 
     static RuntimeConfig runtime_config_from_json(const nlohmann::json& cfg)
     {
-        return detail::gnss_runtime_config_from_json(cfg, RuntimeKey);
+        RuntimeConfig runtime_config = detail::gnss_runtime_config_from_json(cfg, RuntimeKey);
+        runtime_config.seed = sim::derive_random_stream_seed(
+            runtime_config.seed, static_cast<std::uint32_t>(detail::GnssRandomStream::Position));
+        return runtime_config;
     }
 
     static Runtime make_runtime(const nlohmann::json& cfg)
@@ -298,7 +353,10 @@ struct GnssVelocityEmulator
 
     static RuntimeConfig runtime_config_from_json(const nlohmann::json& cfg)
     {
-        return detail::gnss_runtime_config_from_json(cfg, RuntimeKey);
+        RuntimeConfig runtime_config = detail::gnss_runtime_config_from_json(cfg, RuntimeKey);
+        runtime_config.seed = sim::derive_random_stream_seed(
+            runtime_config.seed, static_cast<std::uint32_t>(detail::GnssRandomStream::Velocity));
+        return runtime_config;
     }
 
     static Runtime make_runtime(const nlohmann::json& cfg)
@@ -316,6 +374,8 @@ struct GnssVelocityEmulator
     {
         const RuntimeConfig gnss_cfg = runtime_config_from_json(cfg);
         sensor.observation_context().p_b_ant_b_m = gnss_cfg.p_b_ant_b_m;
+        sensor.observation_context().omega_ie_e_radps =
+            core::environment::planet_rate_fixed_radps<core::environment::Wgs84>();
         if (gnss_cfg.velocity_covariance_frame == sim::GnssCovarianceFrame::Ecef) {
             sensor.observation_context().R_e_m2ps2 = gnss_cfg.velocity_cov_m2ps2;
         }
@@ -339,13 +399,19 @@ struct GnssVelocityEmulator
         return runtime.generate_velocity(sample);
     }
 
-    template<typename Sensor, typename Measurement>
+    template<typename Navigator, typename Sensor, typename Measurement>
     static void update_sensor_context(const Runtime& runtime,
                                       const sim::TruthSample& sample,
                                       const Measurement&,
+                                      const Navigator& navigator,
                                       Sensor& sensor)
     {
-        sensor.observation_context().omega_eb_b_radps = detail::omega_eb_b_radps_from_truth(sample);
+        sensor.observation_context().imu_angular_rate_valid =
+            navigator.latest_imu_angular_rate_valid();
+        if (navigator.latest_imu_angular_rate_valid()) {
+            sensor.observation_context().omega_ib_b_meas_radps =
+                navigator.latest_omega_ib_b_meas_radps();
+        }
         sensor.observation_context().R_e_m2ps2 = runtime.velocity_cov_e_m2ps2(sample);
     }
 
