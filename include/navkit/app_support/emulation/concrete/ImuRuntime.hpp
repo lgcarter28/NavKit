@@ -9,9 +9,9 @@
 #include "navkit/core/estimation/navigator/ImuIncrement.hpp"
 #include "navkit/core/estimation/state/Segment.hpp"
 #include "navkit/core/time/RationalSchedule.hpp"
-#include "navkit/sim/ImuSimulatorPolicy.hpp"
-#include "navkit/sim/TrajectorySource.hpp"
-#include "navkit/sim/TruthSample.hpp"
+#include "navkit/sim/sensors/ImuSimulatorPolicy.hpp"
+#include "navkit/sim/trajectory/TrajectorySource.hpp"
+#include "navkit/sim/trajectory/TruthSample.hpp"
 
 #include <nlohmann/json.hpp>
 #include <string_view>

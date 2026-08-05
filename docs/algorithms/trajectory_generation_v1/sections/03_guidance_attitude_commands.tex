@@ -1,0 +1,487 @@
+\chapter{Source-Agnostic Guidance and State-Machine Contract}
+
+\section{Controller-Facing State}
+
+Guidance consumes the source-agnostic controller state
+\begin{equation}
+\mathcal{X}_{c}(t)=
+\left\{
+t,\,
+\pb^{i},\,
+\vb^{i},\,
+\ab^{i},\,
+\quat_b^i,\,
+\boldsymbol{\omega}_{ib}^{b}
+\right\}.
+\label{eq:control_state}
+\end{equation}
+The application may populate \cref{eq:control_state} from a truth passthrough,
+a timestamped navigation estimate, or a future hardware adapter. The selected
+source is not represented in the payload and is never inspected by a Guidance
+implementation. The trajectory runtime adapts only the attitude, body rate,
+NED velocity, and ECI-to-NED transformation needed by Autopilot into a focused
+Autopilot state. Autopilot therefore does not receive unused position,
+acceleration, gravity, or plant-environment fields. In closed-loop simulation,
+the Navigator result published after one application update is the latest
+controller-facing state available to the next applicable Guidance or
+Autopilot tick.
+
+Mission references remain distinct from this feedback state. Configured
+initial altitude, heading, launch attitude, and waypoints define the requested
+trajectory and are not redefined by initialization error in the selected
+navigation estimate. Navigation error therefore perturbs closed-loop tracking
+without silently changing the mission being tracked.
+
+\begin{implbox}
+The plant state and controller-facing state are deliberately different
+objects. Guidance and the focused Autopilot adapter may observe an imperfect
+estimate; only the trajectory plant owns and integrates truth.
+\end{implbox}
+
+\section{Runtime State Graph and Typed Blocks}
+
+All generated v1 trajectories use one runtime state-machine implementation.
+The JSON graph provides a unique state identifier $s_j$, one initial state,
+and either a terminal declaration or an ordered set of outgoing transitions
+for every state. Profile names such as ballistic, calibration, and waypoint
+describe checked-in configurations of this graph; they do not select separate
+C++ Guidance implementations.
+
+One state composes the following typed blocks:
+\begin{enumerate}
+    \item exactly one primary translation reference, such as current state,
+          local flight path, or waypoint path;
+    \item an ordered set of acceleration contributions, including analytic
+          path feedforward, velocity feedback, altitude P--D feedback, direct
+          body specific force, or zero-nongravitational-force free fall;
+    \item exactly one bank policy, either zero bank or coordinated
+          bank-to-turn;
+    \item explicit Guidance, Autopilot, body-$y$ force, and launch-pad
+          constraint flags;
+    \item nominal and optional state-entry Guidance-command filter parameters;
+    \item deterministic elapsed-time transitions or terminal behavior.
+\end{enumerate}
+Each named JSON block constructs a focused typed implementation. The runtime
+state machine composes those blocks; it does not implement a profile-specific
+chain of conditional Guidance equations.
+
+Let $t_{e,j}$ be the entry time of state $s_j$. The current v1 transition
+predicate from state $j$ to candidate state $k$ is
+\begin{equation}
+t-t_{e,j}\ge T_{j\rightarrow k}.
+\label{eq:elapsed_state_transition}
+\end{equation}
+At most one transition occurs per Guidance epoch. If multiple predicates are
+true, the smallest unique configured priority is selected. The entered state
+is evaluated immediately and emits the command for that same epoch. State
+entry invokes each selected block's entry hook but does not reset the
+persistent Guidance-command filter state.
+
+Configuration validation requires unique state IDs, a valid initial ID,
+existing transition targets, unique priorities within each source state,
+reachability from the initial state, and an explicit cycle policy. Cycles are
+rejected by default. Unknown block types and ambiguous unit/frame keys are
+configuration errors rather than ignored extensions.
+
+\section{Direct Guidance Command}
+
+At Guidance epoch $j$, the active Guidance state produces
+\begin{equation}
+\mathcal{G}_{j}=
+\left\{
+t_j,\,
+\vb_{\mathrm{ref},j}^{i},\,
+\ab_{\mathrm{cmd},j}^{i},\,
+\phi_{\mathrm{bank},j}^{n},\,
+s_j,\,
+\gamma_{\mathrm{guid},j},\,
+\gamma_{\mathrm{ap},j},\,
+\gamma_{\mathrm{pad},j}
+\right\}.
+\label{eq:guidance_command}
+\end{equation}
+Here $s_j$ is the active runtime state index and each $\gamma$ is a boolean activity or
+constraint flag. This producer output separates Guidance intent, state-machine
+execution data, and diagnostics. The consumer-facing Autopilot command contains
+only the filtered body-resolved specific force and NED bank command. It is held
+between Guidance epochs; execution flags and logging fields are not carried in
+that command. The dynamic runtime does not obtain acceleration or angular rate
+by finite differencing adjacent precomputed trajectory points.
+
+Guidance may calculate its command in NED or another convenient frame, but it
+must expose total inertial acceleration resolved in ECI. At the plant boundary,
+the equivalent non-gravitational specific-force command is explicit:
+\begin{equation}
+\fb_{\mathrm{cmd},ib}^{b}
+=
+C_i^b
+\left(
+\ab_{\mathrm{cmd}}^{i}-\gb^{i}
+\right).
+\label{eq:guidance_acceleration_to_force}
+\end{equation}
+The reverse relation used after the Vehicle response is
+\begin{equation}
+\ab_{\mathrm{rsp}}^{i}
+=
+C_b^i\fb_{\mathrm{rsp},ib}^{b}+\gb^{i}.
+\label{eq:force_to_realized_acceleration}
+\end{equation}
+Gravity is therefore neither hidden in the body-force command nor applied
+twice. The $C_i^b$ used at this plant boundary is the actual integrated
+plant attitude. Guidance and Autopilot may consume an imperfect selected
+control state, but an estimate-frame attitude is never reused to resolve the
+physical force applied to truth.
+
+\section{Rotating-Frame Acceleration Commands}
+
+Resolving an already inertial acceleration into another frame requires only a
+DCM. A command defined as a derivative relative to a rotating frame requires
+the corresponding transport terms before it can become the total inertial
+acceleration in \cref{eq:guidance_command}.
+
+For an ECEF-relative command
+$\ab_{\mathrm{cmd},eb}^{e}=(d/dt)_e\vb_{eb}^{e}$, the canonical ECI command is
+\begin{equation}
+\ab_{\mathrm{cmd},ib}^{i}
+=
+C_e^i
+\left[
+\ab_{\mathrm{cmd},eb}^{e}
++2\boldsymbol{\omega}_{ie}^{e}\times\vb_{eb}^{e}
++\boldsymbol{\omega}_{ie}^{e}\times
+ \left(
+ \boldsymbol{\omega}_{ie}^{e}\times\pb^{e}
+ \right)
+\right].
+\label{eq:ecef_relative_command_to_eci}
+\end{equation}
+For a NED-relative command
+$\ab_{\mathrm{cmd},eb}^{n}=(d/dt)_n\vb_{eb}^{n}$, first apply the local-frame
+transport theorem,
+\begin{equation}
+\ab_{\mathrm{cmd},eb}^{e}
+=
+C_n^e
+\left[
+\ab_{\mathrm{cmd},eb}^{n}
++\boldsymbol{\omega}_{en}^{n}\times\vb_{eb}^{n}
+\right],
+\label{eq:ned_relative_command_to_ecef}
+\end{equation}
+then use \cref{eq:ecef_relative_command_to_eci}. Here
+$\boldsymbol{\omega}_{en}^{n}$ is the NED frame angular rate relative to ECEF,
+resolved in NED. These equations distinguish a rotating-frame-relative
+acceleration command from an inertial acceleration that is merely displayed
+in NED or ECEF. Omitting the transport, Coriolis, or centripetal terms changes
+the physical command.
+
+\section{Implemented Block Semantics}
+
+\subsection{Launch Pad}
+
+While the launch-pad constraint is active, Guidance and Autopilot are inactive.
+The configured initial ECEF position and body-to-ECEF attitude remain fixed,
+and ECEF velocity remains zero. Their ECI equivalents evolve only because the
+Earth-fixed frame rotates:
+\begin{align}
+\pb_{\mathrm{pad}}^{i}
+&=C_e^i\pb_{0}^{e},\\
+\vb_{\mathrm{pad}}^{i}
+&=C_e^i
+  \left(
+  \boldsymbol{\omega}_{ie}^{e}\times\pb_{0}^{e}
+  \right),\\
+\ab_{\mathrm{pad}}^{i}
+&=C_e^i
+  \left[
+  \boldsymbol{\omega}_{ie}^{e}\times
+  \left(
+  \boldsymbol{\omega}_{ie}^{e}\times\pb_{0}^{e}
+  \right)
+  \right],\\
+\quat_{b,\mathrm{pad}}^{i}
+&=\quat_e^i\otimes\quat_{b,0}^{e}.
+\label{eq:pad_eci_state}
+\end{align}
+The support specific force is not zero:
+\begin{equation}
+\fb_{\mathrm{support},ib}^{b}
+=C_i^b
+\left(
+\ab_{\mathrm{pad}}^{i}-\gb^{i}
+\right).
+\label{eq:pad_support_force}
+\end{equation}
+Consequently, a stationary launch-pad accelerometer senses support against
+gravity rather than free fall.
+
+The pad support force is a constraint reaction, not stored actuator state.
+During the final constrained physics interval, the Vehicle response is
+advanced once with the first boost command while the plant remains fixed to
+the pad. This one-step overlap represents actuator buildup without storing the
+support reaction in actuator state. The following interval releases the plant
+with a finite powered response and no artificial support-force tail.
+
+At configuration time, any nonzero initial velocity must agree with the
+configured body-forward launch direction within the selected angular
+tolerance. At zero speed, the configured attitude is the launch-rail fallback;
+the implementation does not manufacture a velocity direction.
+
+\subsection{Boost and Ballistic Coast}
+
+Boost Guidance commands the selected powered acceleration along configured
+body forward. Autopilot becomes active at release and velocity-aligns during
+boost as soon as speed exceeds the same common alignment threshold used by
+every other active state. Below that threshold, the configured launch attitude
+remains the well-defined rail fallback. A zero-speed launch therefore begins
+along configured body $x$ without manufacturing a flight-path direction.
+For a ballistic launch, the threshold represents release from the initial
+launch program and must be high enough to avoid the low-speed gravity-turn
+singularity, whose turn rate contains the familiar inverse-speed behavior.
+The nominal v1 ballistic scenario uses \(50~\mathrm{m/s}\), allowing the
+vehicle to establish a meaningful climb before powered velocity alignment.
+
+The ballistic state graph can select one of two explicit coast behaviors. A
+gravity-turn state commands zero non-gravitational force:
+\begin{equation}
+\fb_{\mathrm{cmd},ib}^{b}=\mathbf{0}
+\quad\Longleftrightarrow\quad
+\ab_{\mathrm{cmd}}^{i}=\gb^{i}.
+\label{eq:gravity_turn_command}
+\end{equation}
+The trajectory is then accelerated translationally by gravity while Autopilot
+tracks a velocity-aligned attitude. This approximates an aerodynamically
+statically stable vehicle whose angle of attack and sideslip are driven toward
+zero.
+
+An alternative free-inertial state also commands
+$\fb_{\mathrm{cmd},ib}^{b}=\mathbf{0}$, but marks Autopilot inactive during
+coast. The body therefore does not track the velocity direction; attitude
+continues to propagate from the plant's realized inertial body rate without a
+new velocity-alignment command. This is the explicit exoatmospheric/free-body
+choice and must not be produced by silently changing
+\texttt{gravity\_turn} behavior.
+
+The ballistic source stops at the first descending crossing of its initial
+geodetic height after it has departed that height. The configured duration is
+a safety horizon rather than the nominal end of a successful ballistic case.
+
+\subsection{Curved-Earth and Maneuver Modes}
+
+Constant-altitude, calibration, and waypoint states may form their acceleration
+commands in NED before applying the explicit frame transformation in
+\cref{eq:guidance_acceleration_to_force}. Mode-specific gains and state remain
+owned by the concrete Guidance implementation. The common interface does not
+define a speculative generic gain bag for unrelated future algorithms.
+
+All bank commands use the principal wrapped interval
+$[-\pi,\pi]$ before being bounded by one common
+$\phi_{\max}\in(0,\pi/3]$ bank limit (60 degrees by default). Thus the
+configured v1 command range is $[-60,60]$ degrees even though bank itself is
+represented on $[-180,180]$ degrees.
+
+Calibration reference blocks author their steady analytic reference directly. The
+permanent command LPF at the Guidance output boundary, defined in
+\cref{sec:guidance_command_filter}, shapes changes without embedding a
+block-specific startup envelope in the reference definition.
+
+For a fixed commanded height $h_{\mathrm{cmd}}$, the explicit altitude
+P--D contribution to commanded Down acceleration is
+\begin{equation}
+a_{D,\mathrm{alt}}
+=K_{p,h}\left(h-h_{\mathrm{cmd}}\right)-K_{d,h}v_D,
+\label{eq:altitude_pd_guidance}
+\end{equation}
+where $v_D$ is NED Down velocity. A vehicle above the commanded height has
+$h-h_{\mathrm{cmd}}>0$ and is commanded downward; positive downward velocity
+is opposed by the derivative term. This term is added to the state's NED
+feedforward and three-axis velocity feedback before conversion to inertial
+acceleration. Runtime fields \texttt{altitude\_error\_p\_gain\_1ps2} and
+\texttt{altitude\_error\_d\_gain\_1ps} provide $K_{p,h}$ and $K_{d,h}$.
+
+Horizontal S-turn Guidance always generates the same reference heading,
+heading-rate feedforward, speed feedback, and altitude-hold contribution in
+NED. Its realization is selected independently. Skid-to-turn commands zero
+bank and retains the resulting body-$y$ specific force. Bank-to-turn derives
+the coordinated bank from the complete physical acceleration command after
+feedback.
+
+The bank geometry is formed in the plane normal to the current flight-path
+velocity, so it remains valid for nonzero pitch or flight-path elevation. Let
+$\mathbf{d}^{n}=[0\;0\;1]^T$ be NED down and define the velocity-aligned
+zero-bank axes
+\begin{align}
+\mathbf{x}_{v}^{n}
+&=\frac{\vb^{n}}{\norm{\vb^{n}}},\\
+\mathbf{z}_{0}^{n}
+&=
+\frac{
+\left(\I-\mathbf{x}_{v}^{n}\left(\mathbf{x}_{v}^{n}\right)^T\right)
+\mathbf{d}^{n}
+}{
+\norm{
+\left(\I-\mathbf{x}_{v}^{n}\left(\mathbf{x}_{v}^{n}\right)^T\right)
+\mathbf{d}^{n}
+}
+},\\
+\mathbf{y}_{0}^{n}
+&=\mathbf{z}_{0}^{n}\times\mathbf{x}_{v}^{n}.
+\label{eq:bank_velocity_frame}
+\end{align}
+Here $\mathbf{z}_{0}^{n}$ is local down projected into the velocity-normal
+plane, and $\mathbf{y}_{0}^{n}$ is the corresponding right axis. Purely
+vertical flight makes that projection singular; the v1 stateless Guidance
+implementation rejects that bank construction rather than inventing an axis.
+A future stateful bank policy may retain the last well-defined bank reference. For level northward flight,
+$\mathbf{y}_{0}^{n}$ is simply east and $\mathbf{z}_{0}^{n}$ is NED down.
+
+Resolve the physical commanded specific force in NED and project it onto
+these axes:
+\begin{align}
+\fb_{\mathrm{cmd}}^{n}
+&=C_i^n\ab_{\mathrm{cmd},ib}^{i}-\gb^{n},\\
+f_{y_0}
+&=\left(\mathbf{y}_{0}^{n}\right)^T\fb_{\mathrm{cmd}}^{n},\\
+f_{z_0}
+&=\left(\mathbf{z}_{0}^{n}\right)^T\fb_{\mathrm{cmd}}^{n}.
+\label{eq:bank_force_components}
+\end{align}
+The component parallel to $\mathbf{x}_{v}^{n}$ changes speed but cannot
+determine rotation about the flight path, so it does not enter the bank
+triangle. The unconstrained and limited commands are
+\begin{align}
+\phi_{\mathrm{raw}}
+&=\operatorname{atan2}\!\left(f_{y_0},-f_{z_0}\right)
+\in[-\pi,\pi],\\
+\phi_{\mathrm{cmd}}
+&=
+\clamp\left[
+\phi_{\mathrm{raw}},
+-\phi_{\max},
+\phi_{\max}
+\right].
+\label{eq:bank_from_ned_acceleration}
+\end{align}
+Thus $f_{y_0}$ is the commanded lateral force perpendicular to the velocity,
+and $-f_{z_0}$ is the upward support-force component. Their right triangle
+gives the coordinated roll about $\mathbf{x}_{v}^{n}$. When flight-path
+elevation is nonzero, both axes tilt with the velocity rather than silently
+substituting horizontal right and NED down.
+
+Using $C_i^n\ab_{\mathrm{cmd},ib}^{i}$ here is deliberate: the
+NED-relative derivative $\ab_{\mathrm{cmd},eb}^{n}$ omits the transport and
+Earth-rotation terms required by the physical force balance.
+Thus altitude hold changes the vertical support used by the coordinated-bank
+calculation instead of being layered on afterward. A runtime option may set
+the residual commanded body-$y$ specific force to zero while the low-fidelity
+bank response catches up. The default leaves that component enabled; the
+checked-in coordinated-turn examples disable it explicitly.
+
+Vertical S-turn Guidance holds the initial ground-track heading while applying
+a sinusoidal flight-path elevation reference. Its feedforward, speed feedback,
+and altitude feedback therefore remain in the commanded vertical plane; any
+cross-track motion is a numerical or frame-transport defect rather than an
+authored part of the maneuver.
+
+The Dutch-roll calibration state is a sustained, acceleration-based
+superposition of horizontal and vertical sinusoidal reference blocks. Define the base
+phase
+\begin{equation}
+\theta(t)=\omega t,\qquad \omega=\frac{2\pi}{T}.
+\label{eq:dutch_roll_base_phase}
+\end{equation}
+The horizontal reference uses that base phase, while the vertical
+flight-path reference uses twice the frequency:
+\begin{align}
+\chi_{\mathrm{cmd}}(t)
+&=
+\chi_0+
+A_h\,s(\xi(t))\sin\theta(t),\\
+\gamma_{\mathrm{cmd}}(t)
+&=
+-A_v\,s(\xi(t))\sin\left(2\theta(t)\right).
+\label{eq:dutch_roll_half_pipe_commands}
+\end{align}
+Runtime fields \texttt{horizontal\_amplitude\_deg} and
+\texttt{vertical\_amplitude\_deg} provide \(A_h\) and \(A_v\), respectively;
+\texttt{period\_s} provides \(T\). The runtime angles are converted to radians
+before these equations are evaluated. The sign
+shown assumes positive \(\gamma\) commands upward motion. With lateral
+position lagging the heading command by one quarter cycle, it makes the
+integrated vertical position lowest whenever the lateral motion crosses its
+centerline and highest at either lateral extreme. A front view therefore
+traces a repeating half-pipe rather than the corkscrew produced by obsolete
+same-frequency quadrature forcing. The vertical phase relationship is fixed
+by \cref{eq:dutch_roll_half_pipe_commands}; no arbitrary
+\texttt{vertical\_phase\_offset} is part of the contract.
+
+Guidance maps the horizontal acceleration through the bank-to-turn relation in
+\cref{eq:bank_from_ned_acceleration} when the runtime
+\texttt{bank\_to\_turn\_enabled} option is selected. The checked-in
+Dutch-roll calibration selects coordinated bank-to-turn and disables residual
+commanded body-$y$ specific force explicitly; neither behavior is hidden in
+the maneuver implementation. The authored forcing does not decay. Its
+coordinated response is intended to excite body roll rate \(p\) and yaw rate
+\(r\) in quadrature, but it is not a claim to reproduce the damped natural
+lateral-directional eigenmode of a six-degree-of-freedom vehicle.
+
+For waypoint turns, desired bearing error first produces a horizontal NED
+acceleration. Speed and altitude feedback are added before
+\cref{eq:bank_from_ned_acceleration} derives the bank command. The realized
+lateral acceleration rotates the velocity vector continuously. After the
+final waypoint is accepted, the current implementation continues along the
+captured terminal-leg heading instead of repeatedly reversing to pursue a
+point behind the vehicle.
+
+\section{Velocity-Aligned Attitude with Bank}
+
+Given nonzero NED velocity $\vb^{n}$ and a nonzero reference-down vector
+$\mathbf{d}^{n}$, define
+\begin{align}
+\mathbf{x}_{b}^{n}
+&=\frac{\vb^{n}}{\norm{\vb^{n}}},
+\label{eq:velocity_forward}\\
+\mathbf{z}_{0}^{n}
+&=\frac{\mathbf{d}^{n}}{\norm{\mathbf{d}^{n}}},\\
+\mathbf{y}_{b}^{n}
+&=\frac{\mathbf{z}_{0}^{n}\times\mathbf{x}_{b}^{n}}
+        {\norm{\mathbf{z}_{0}^{n}\times\mathbf{x}_{b}^{n}}},
+\label{eq:velocity_right}\\
+\mathbf{z}_{b}^{n}
+&=\frac{\mathbf{x}_{b}^{n}\times\mathbf{y}_{b}^{n}}
+        {\norm{\mathbf{x}_{b}^{n}\times\mathbf{y}_{b}^{n}}}.
+\label{eq:velocity_down}
+\end{align}
+The zero-bank passive body-to-NED DCM and quaternion are
+\begin{equation}
+C_{b,0}^{n}
+=
+\begin{bmatrix}
+\mathbf{x}_{b}^{n} & \mathbf{y}_{b}^{n} & \mathbf{z}_{b}^{n}
+\end{bmatrix},
+\qquad
+\quat_{b,0}^{n}=\operatorname{Quat}(C_{b,0}^{n}).
+\label{eq:velocity_attitude}
+\end{equation}
+The Guidance bank command is applied about the velocity-aligned body
+$x$ axis:
+\begin{align}
+\delta\quat_{\phi}
+&=\operatorname{Exp}
+\left(
+\begin{bmatrix}
+\phi_{\mathrm{bank}}^{n}&0&0
+\end{bmatrix}^{T}
+\right),\\
+\quat_{b,\mathrm{cmd}}^{n}
+&=\quat_{b,0}^{n}\otimes\delta\quat_{\phi},\\
+\quat_{b,\mathrm{cmd}}^{i}
+&=\quat_n^i\otimes\quat_{b,\mathrm{cmd}}^{n}.
+\label{eq:banked_velocity_attitude}
+\end{align}
+
+This construction is used only when speed is strictly above the configured
+velocity-alignment threshold. Below the threshold, Autopilot retains its
+last well-defined command or the configured launch attitude. This guard
+prevents a zero-speed singularity and discontinuous body-rate commands.

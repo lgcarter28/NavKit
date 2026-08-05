@@ -14,8 +14,14 @@ from matplotlib.collections import LineCollection
 from matplotlib.colors import to_hex
 from plotly.subplots import make_subplots
 
-from navkit_analysis.plot_spec import PlotSpec, PlotTrace
+from navkit_analysis.plot_spec import Plot3DSpec, PlotSpec, PlotTrace
 from navkit_analysis.style import apply_nav_axes_style, apply_style
+
+PLOTLY_INTERACTION_CONFIG: dict[str, object] = {
+    "doubleClick": "reset+autosize",
+    "responsive": True,
+    "scrollZoom": True,
+}
 
 
 def _matplotlib_line_style(line_style: str) -> str:
@@ -85,6 +91,48 @@ def render_matplotlib(spec: PlotSpec, output_path: Path | None = None) -> plt.Fi
     return figure
 
 
+def render_matplotlib_3d(
+    spec: Plot3DSpec,
+    output_path: Path | None = None,
+) -> plt.Figure:
+    """Render a three-dimensional trajectory as a Matplotlib figure."""
+    apply_style()
+    figure = plt.figure(figsize=(12.0, 9.0), constrained_layout=True)
+    axis = figure.add_subplot(111, projection="3d")
+    for trace in spec.traces:
+        if trace.mode == "markers":
+            axis.scatter(
+                trace.x,
+                trace.y,
+                trace.z,
+                color=trace.color,
+                s=trace.marker_size**2,
+                alpha=trace.opacity,
+                label=trace.label,
+            )
+        else:
+            axis.plot(
+                trace.x,
+                trace.y,
+                trace.z,
+                color=trace.color,
+                linewidth=trace.line_width,
+                alpha=trace.opacity,
+                label=trace.label,
+            )
+    axis.set_title(spec.title)
+    axis.set_xlabel(spec.x_label)
+    axis.set_ylabel(spec.y_label)
+    axis.set_zlabel(spec.z_label)
+    axis.set_box_aspect((1.0, 1.0, 1.0))
+    axis.legend(loc="upper right")
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        figure.savefig(output_path, dpi=120, bbox_inches=None)
+        print(f"Wrote {output_path}")
+    return figure
+
+
 def _plotly_dash(line_style: str) -> str:
     return {"solid": "solid", "dash": "dash", "dot": "dot"}.get(line_style, "solid")
 
@@ -99,6 +147,7 @@ def _plot_plotly_trace(
     trace: PlotTrace,
     row: int,
     show_legend: bool,
+    legend_name: str,
 ) -> None:
     y = np.asarray(trace.y)
     histories = y[None, :] if y.ndim == 1 else y
@@ -111,7 +160,8 @@ def _plot_plotly_trace(
                 y=history,
                 mode="lines",
                 name=trace.label,
-                legendgroup=trace.label,
+                legend=legend_name,
+                legendgroup=f"{legend_name}:{trace.label}",
                 showlegend=show_legend and trace.show_legend and index == 0,
                 opacity=trace.opacity,
                 line={
@@ -135,13 +185,24 @@ def render_plotly(spec: PlotSpec, output_path: Path | None = None) -> go.Figure:
         vertical_spacing=0.04,
         subplot_titles=subplot_titles,
     )
+    legend_scope = str(spec.metadata.get("legend_scope", "first_axis"))
+    shown_legend_labels: set[str] = set()
     for row, axis_spec in enumerate(spec.axes, start=1):
+        legend_name = "legend" if row == 1 else f"legend{row}"
         for trace in axis_spec.traces:
+            show_legend = row == 1
+            if legend_scope == "unique":
+                show_legend = trace.label not in shown_legend_labels
+                if trace.show_legend:
+                    shown_legend_labels.add(trace.label)
+            elif legend_scope == "per_axis":
+                show_legend = True
             _plot_plotly_trace(
                 figure,
                 trace,
                 row,
-                show_legend=row == 1,
+                show_legend=show_legend,
+                legend_name=legend_name if legend_scope == "per_axis" else "legend",
             )
         if axis_spec.zero_line:
             figure.add_hline(y=0.0, line_color="rgba(64,64,64,0.8)", line_width=1, row=row, col=1)
@@ -155,6 +216,20 @@ def render_plotly(spec: PlotSpec, output_path: Path | None = None) -> go.Figure:
         "legend": {"traceorder": "normal", "groupclick": "togglegroup", "x": 1.02, "y": 0.90},
         "margin": {"r": 230},
     }
+    if legend_scope == "per_axis":
+        layout.pop("legend")
+        for row in range(1, len(spec.axes) + 1):
+            legend_name = "legend" if row == 1 else f"legend{row}"
+            y_axis_name = "yaxis" if row == 1 else f"yaxis{row}"
+            y_domain = getattr(figure.layout, y_axis_name).domain
+            layout[legend_name] = {
+                "groupclick": "togglegroup",
+                "traceorder": "normal",
+                "x": 1.02,
+                "xanchor": "left",
+                "y": y_domain[1],
+                "yanchor": "top",
+            }
     layout["updatemenus"] = [
         {
             "type": "buttons",
@@ -176,6 +251,79 @@ def render_plotly(spec: PlotSpec, output_path: Path | None = None) -> go.Figure:
     figure.update_layout(**layout)
     if output_path is not None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        figure.write_html(output_path, include_plotlyjs="cdn", full_html=True)
+        figure.write_html(
+            output_path,
+            include_plotlyjs="cdn",
+            full_html=True,
+            config=PLOTLY_INTERACTION_CONFIG,
+        )
+        print(f"Wrote {output_path}")
+    return figure
+
+
+def render_plotly_3d(
+    spec: Plot3DSpec,
+    output_path: Path | None = None,
+) -> go.Figure:
+    """Render a responsive three-dimensional trajectory as Plotly HTML."""
+    figure = go.Figure()
+    for trace in spec.traces:
+        figure.add_trace(
+            go.Scatter3d(
+                x=trace.x,
+                y=trace.y,
+                z=trace.z,
+                mode=trace.mode,
+                name=trace.label,
+                opacity=trace.opacity,
+                line={
+                    "color": _plotly_color(trace.color),
+                    "width": trace.line_width,
+                },
+                marker={
+                    "color": _plotly_color(trace.color),
+                    "size": trace.marker_size,
+                },
+            )
+        )
+    figure.update_layout(
+        title=spec.title,
+        template="plotly_white",
+        hovermode=False,
+        scene={
+            "xaxis_title": spec.x_label,
+            "yaxis_title": spec.y_label,
+            "zaxis_title": spec.z_label,
+            "aspectmode": str(spec.metadata.get("aspectmode", "data")),
+        },
+        legend={"x": 1.02, "y": 0.95},
+        margin={"r": 180},
+        updatemenus=[
+            {
+                "type": "buttons",
+                "showactive": True,
+                "x": 1.02,
+                "xanchor": "left",
+                "y": 1.08,
+                "yanchor": "top",
+                "buttons": [
+                    {
+                        "label": "Toggle hover details",
+                        "method": "relayout",
+                        "args": [{"hovermode": "closest"}],
+                        "args2": [{"hovermode": False}],
+                    }
+                ],
+            }
+        ],
+    )
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        figure.write_html(
+            output_path,
+            include_plotlyjs="cdn",
+            full_html=True,
+            config=PLOTLY_INTERACTION_CONFIG,
+        )
         print(f"Wrote {output_path}")
     return figure

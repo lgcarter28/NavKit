@@ -38,4 +38,19 @@ This phase cleans up receiver-level aiding and simple environmental sensors befo
 ## Pass 10.5: sensor scheduling
 
 - [ ] Add explicit sensor scheduling and multi-rate behavior where runtime rates, sensor queues, and Navigator update cadence interact.
+- [ ] Replace per-sensor batch processing with timestamp-ordered FIFO
+  measurement events. If multiple observations from one sensor queue before a
+  Navigator update, evaluate, inject, and reset after each accepted event; test
+  ordering, overflow, and same-epoch behavior.
 - [ ] Add additional sensor simulators and measurement models only when they provide distinct validation value beyond GNSS/IMU.
+
+## Pass 10.6: IMU output compensation contracts
+
+- [ ] Give the precompensated IMU simulator selection a real numerical
+  coning/sculling path with explicit sample grouping, output cadence, and
+  terminal partial-group policy; it must not remain a metadata-only promise.
+- [ ] Enforce and test exactly one coning/sculling compensation owner
+  (simulator or Navigator), including simulator-on/Navigator-off and
+  simulator-off/Navigator-on equivalence and deliberate rejection of double
+  compensation or missing compensation where the selected contract requires
+  it.

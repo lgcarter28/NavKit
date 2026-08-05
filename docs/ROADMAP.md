@@ -65,58 +65,78 @@ These are preserved at high level so the roadmap stays readable. Detailed pass-b
 - [x] Phase 5.3: IMU increment contract and simulator implementation completed.
 - [x] Phase 5.4: first full ECEF strapdown aided Navigator implementation completed.
 - [x] Phase 5.5 through 5.7: stabilization, covariance propagation ownership, logging/plotting, GNSS velocity, GNSS lever arm, runtime JSON decomposition, initialization split, and scenario tooling completed.
+- [x] Phase 6: seeded Monte Carlo campaigns, versioned HDF5 analysis bundles, aggregate covariance/error products, and interactive NEES/NIS consistency diagnostics completed.
+- [x] Phase 7.1 through 7.14: exact multi-rate scheduling,
+  queryable/streaming truth sources, planned-time application orchestration,
+  reusable trajectory math, frame-explicit attitude inputs, ECI trajectory
+  integration, generated dynamic profiles, trajectory inspection products,
+  the source-agnostic low-fidelity Guidance/Autopilot/Vehicle loop, and the
+  evidence-driven trajectory/estimator correctness follow-up completed. The
+  latest profile set adds a longer five-g ballistic reference, matched
+  skid-to-turn and bank-to-turn horizontal S-turns, planar vertical
+  calibration, and a sustained Dutch-roll calibration combining horizontal
+  excitation at its base frequency with a twice-frequency vertical excitation
+  that traces a front-view half-pipe. Its analysis suite is consolidated into
+  frame-explicit kinematics, focused Guidance/Autopilot products, one combined
+  Guidance/Control view, tracking errors, and LLA/relative-local 3-D views.
+  Pass 7.14 replaces profile-owned transition branches with a validated runtime
+  Guidance state graph, separates Guidance, Autopilot, and Vehicle ownership,
+  and preserves the accepted seven-scenario Release output suite.
 
 ## Current phase
 
-Phase 7: trajectory-provider and timebase expansion is active. Phase 6 established repeatable statistical evidence; Phase 7 first makes multi-rate timing exact and inspectable before broadening trajectory sources and scenarios.
+Phase 8.1: deterministic estimator regression baselines is active. Phase 7.1
+through 7.14 are complete with repeatable static and dynamic trajectories, closed-loop
+source-agnostic Guidance/Autopilot/Vehicle behavior, corrected
+truth-minus-estimate and same-epoch aiding semantics, rotating-Earth and
+midpoint-attitude consistency, full single-run diagnostics, and six verified
+post-Pass-7.12 500-run Monte Carlo campaigns. Pass 7.13 adds seven updated
+500-run campaigns spanning ballistic, constant-altitude, horizontal
+skid-to-turn, horizontal bank-to-turn, vertical S-turn, half-pipe Dutch roll,
+and waypoint bank-to-turn. All 3,500 runs completed successfully with full
+analysis bundles and consistency products. Pass 7.14 preserves those accepted
+profiles through one runtime-configurable Guidance state machine and explicit
+Guidance-to-Autopilot-to-Vehicle contracts. Phase 8 now turns the complete
+evidence sequence into deterministic regressions, explicit thresholds,
+statistical diagnosis, and qualification reports.
 
-## Next pass
+## Pass 8.1: deterministic estimator regression baselines
 
-## Pass 7.7: reusable trajectory math cleanup
-
-- [ ] Move remaining reusable Earth-rate, triad-calibration, frame-transform, and trajectory-provider conversion helpers into their owning core math/frames/environment locations instead of leaving them buried in trajectory or simulator code. Concrete examples to sweep include `earth_rate_e_radps`, `nonorthogonality_matrix`, `misalignment_matrix`, and the frame-transform helpers currently living in trajectory/simulator implementation files.
-- [ ] Define and test the minimum coordinate operations needed by PCPF/ECEF mechanization, local-vertical measurements, NED plots, and future local-level mechanizations.
-- [ ] Confirm position, velocity, attitude, angular-rate, and specific-force frame conventions in code, algorithm docs, JSON schemas, and plot labels.
-- [ ] Ensure the selected planet and gravity policies are threaded through physics code wherever Earth-specific constants still leak into reusable math.
-- [ ] Add straight-line, constant-turn, and short GNSS-outage validation scenarios for the existing ECEF INS/GNSS path.
-- [ ] Revisit attitude covariance reset mapping and covariance health diagnostics once richer attitude/error-state tests are in place.
-
-## Pass 7.8: frame-explicit attitude input conventions
-
-- [ ] Accept exactly one configured attitude payload in every supported representation/frame direction: `q_*`, `dcm_*`, and `rpy_*_rad` for `e2b`, `b2e`, `i2b`, `b2i`, `n2b`, and `b2n`.
-- [ ] Convert every accepted input at the app-support boundary to the canonical passive body-to-ECEF quaternion `q_b2e`; Navigator and downstream simulation must consume only that canonical form.
-- [ ] Add reusable frame-pair conversion utilities and require the context each conversion needs: initial ECEF position for NED forms and timestamp plus the selected ECI/ECEF Earth-orientation convention for inertial forms.
-- [ ] Document `rpy_start2end_rad = [roll, pitch, yaw]` as aerospace 3-2-1 yaw-pitch-roll composition encoding the same passive `C_start2end`; explicitly prohibit treating inverse Euler forms as componentwise sign negations.
-- [ ] Add positive conversion and negative ambiguity/context regression coverage for every supported attitude input form.
-
-## Pass 7.9: ECI trajectory integration and velocity-aligned attitude
-
-- [ ] Make ECI Cartesian position/velocity/acceleration the canonical dynamic-truth integration state. Keep geodetic integration only as a temporary kinematic/helper path, not the default dynamic propagation scheme.
-- [ ] Add reusable translational integration utilities with runtime-selected integration method. Start with explicit/semi-implicit Euler and second-order predictor/corrector trapezoidal integration; require each generated profile to select its method explicitly, document its accuracy/stability assumptions, and reject unknown methods during runtime validation.
-- [ ] Add quaternion rotation integration utilities with explicit predictor/corrector endpoint evaluation where angular rate depends on state. Convert all current generated profiles, including ballistic boost/coast, to the ECI integration path and transform to ECEF/local-level outputs only at the boundary.
-- [ ] Add and test a velocity-aligned local-level attitude helper: default body forward along velocity, body down aligned with local NED down, and zero NED roll; let clients override the down/reference direction for coordinated-bank behavior and reject degenerate geometry.
-- [ ] Define two shallow simulation-only pure-virtual runtime boundaries with explicit typed payloads: a `FlightControlModel` maps trajectory guidance commands plus current realized state to control outputs, and a `VehicleResponseModel` maps those control outputs plus current state/environment to realized body rates, specific force, and state derivatives. Own the selected implementations through `std::unique_ptr` in the trajectory generator and construct them from validated runtime JSON discriminators. Do not introduce compile-time policies or deep inheritance for this application-only seam.
-- [ ] Keep model lifecycle and ownership explicit and small: initialize once from runtime configuration and initial truth, advance once per planned trajectory step, and expose command/response diagnostics without leaking concrete implementation types into `SimulationApp` or `TrajectorySource`.
-- [ ] Add runtime-configured low-fidelity rotational response for generated trajectories: derive `q_cmd_b2e` from the constrained local-level velocity/bank command, form the body-frame quaternion-error rotation vector, and map it to a desired body rate. Model both flight-control/actuator lag and body rotational response as independently configurable cascaded first-order systems in `p`, `q`, and `r`; apply configured per-axis body-rate saturation only after the final body-response stage, then integrate the realized quaternion. Define `tau_s = 0` as the exact instantaneous-response limit for that stage/axis; reject negative or non-finite time constants.
-- [ ] Add the matching runtime-configured translational response model in body coordinates. Treat the response state as commanded non-gravitational acceleration/specific force and model both flight-control/actuator lag and body translational response as independently configurable cascaded first-order systems on its body axes. Apply configured per-axis acceleration saturation only after the final body-response stage, transform realized response to ECI, add gravity, and integrate realized ECI velocity/position. Define `tau_s = 0` as exact command tracking for that stage/axis. IMU truth must use the realized body specific force and body rate, not command quantities.
-- [ ] Implement the initial concrete pair as `FirstOrderFlightControlModel` and `FirstOrderVehicleResponseModel`, while keeping the interfaces capable of accepting later second-order control/response implementations. A future coupled rigid-body six-DOF `VehicleResponseModel` should replace the decoupled first-order vehicle model at the same boundary rather than being forced through separate translational and rotational inheritance trees.
-- [ ] Extend trajectory truth inspection/logging with explicitly named command and realized response signals: commanded/realized velocity, non-gravitational acceleration or specific force, body angular rate, and attitude, plus tracking errors and applied limits. Add command-versus-response plots so response tuning is inspectable rather than implicit.
-- [ ] Make the profile/controller ownership explicit: a velocity-constrained profile produces a smooth velocity/acceleration command, but response dynamics integrate the realized state and therefore may lag the command. Do not simultaneously force the commanded velocity as truth after enabling response dynamics. Add bounded tracking/error diagnostics and stationary/turning regression cases.
-- [ ] Keep the selected ECI/ECEF Earth-orientation convention, truth acceleration, attitude-rate, and output-frame assumptions explicit in code, configuration, and the trajectory math documentation.
-
-## Pass 7.10: barebones trajectory truth inspection
-
-- [ ] Add a small, directly inspectable trajectory-truth log and plot suite for generated and CSV scenarios. Keep this deliberately CSV/Plotly-oriented; HDF5 packaging, high-volume caching, and trajectory-analysis optimization remain Phase 20 work.
-- [ ] Log and plot, versus time, canonical ECEF and derived ECI position, velocity, acceleration, body-to-reference attitude, and attitude rate.
-- [ ] Log and plot derived LLA position; NED velocity, acceleration, attitude, and attitude rate; and body-frame velocity, acceleration, and specific force. Record frame, units, selected Earth-orientation convention, and any derivative/integration assumptions in the log metadata.
-- [ ] Make the products independently runtime log-rate configurable and verify them against stationary, ballistic, and turning scenarios so they serve as a compact physics sanity check rather than a second monolithic analysis system.
+- [ ] Establish named baseline scenarios, supported compile-time
+  product/config combinations, numerical metrics, and explicit pass/fail
+  thresholds.
+- [ ] Add a single regression command for the default ECEF INS/GNSS simulation
+  and analysis pipeline, with machine-readable results suitable for CI.
+- [ ] Add a free-inertial truth-reconstruction regression using truth initial
+  PVA and ideal IMU increments with GNSS disabled.
+- [ ] Add a GNSS-aided truth-reconstruction regression using truth initial PVA,
+  ideal IMU increments, and truth GNSS position/velocity measurements.
+- [ ] Run both regressions on static trajectories long enough to expose
+  cadence/interpolation defects. Interpolate truth to Navigator output
+  timestamps and compare ECEF position, velocity, and attitude using justified
+  numerical integration tolerances rather than bitwise equality.
+- [ ] Preserve the existing perfect/truth-reconstruction runtime inputs and
+  execute the applicable regression matrix for each supported selected product
+  configuration.
+- [ ] Carry the Phase 7 dynamic-trajectory Monte Carlo findings into
+  qualification. The earlier six 1,000-run campaigns, the post-Pass-7.11 six
+  500-run campaigns, and the post-Pass-7.12 six 500-run campaigns all
+  completed. The latest evidence shows generally healthy PVA families and GNSS
+  NIS, while constant-altitude and waypoint cases retain elevated full-state
+  NEES associated with accelerometer-bias/cross-covariance behavior and weak
+  gyro-z observability. Treat this as evidence to diagnose, not as a passing
+  consistency result. The seven post-Pass-7.13 campaigns completed 3,500 of
+  3,500 runs and produced the full report, HDF5, covariance, NEES, and NIS
+  product set. Preserve the skid-to-turn versus bank-to-turn comparison and
+  the added sustained horizontal/vertical Dutch-roll excitation as distinct
+  qualification evidence.
 
 ## Future phase details
 
-Future backlog unrelated to the current Phase 6 Monte Carlo scope lives in dedicated detail files:
+Future backlog and completed-phase detail outside the current Phase 8 scope lives in dedicated detail files:
 
-- [`phase_6_monte_carlo.md`](roadmap_details/phase_6_monte_carlo.md): current Phase 6 completed-pass history and follow-forward detail.
-- [`phase_7_trajectory_provider.md`](roadmap_details/phase_7_trajectory_provider.md): trajectory provider, timebase, planned-time orchestration, scenario, and reusable navigation-math expansion.
+- [`phase_6_monte_carlo.md`](roadmap_details/phase_6_monte_carlo.md): completed Monte Carlo campaign, analysis-bundle, and consistency-diagnostic history.
+- [`phase_7_trajectory_provider.md`](roadmap_details/phase_7_trajectory_provider.md): completed trajectory-provider, timebase, planned-time orchestration, scenario, runtime Guidance-state-machine, and reusable navigation-math history.
 - [`phase_8_estimator_validation.md`](roadmap_details/phase_8_estimator_validation.md): estimator validation, consistency metrics, and repeatable reports.
 - [`phase_9_status_error_handling.md`](roadmap_details/phase_9_status_error_handling.md): robust status/error handling before the later high-complexity phases.
 - [`phase_10_sensor_model_cleanup.md`](roadmap_details/phase_10_sensor_model_cleanup.md): loosely coupled GNSS cleanup, altimeter/pressure models, pitot tube, magnetometer aiding, and sensor scheduling.

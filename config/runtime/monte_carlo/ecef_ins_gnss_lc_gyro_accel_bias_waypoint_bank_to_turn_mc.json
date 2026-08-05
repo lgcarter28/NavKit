@@ -1,0 +1,20 @@
+{
+  "schema": "navkit.monte_carlo_campaign.v2",
+  "type": "monte_carlo_campaign",
+  "campaign_name": "ecef_ins_gnss_lc_gyro_accel_bias_waypoint_bank_to_turn_mc",
+  "nominal_config": "../navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_waypoint_bank_to_turn_monte_carlo.json",
+  "runs": { "count": 1000, "start_index": 0 },
+  "randomization": { "master_seed": 123456789, "seed_policy": "derive_all" },
+  "execution": { "build_type": "Release", "parallel_jobs": 4 },
+  "analysis": {
+    "max_plot_points": 1000,
+    "renderer": "plotly",
+    "package_analysis": true,
+    "bundle_mode": "full",
+    "bundle_compression": "lzf",
+    "aggregate_plots": true,
+    "consistency_dashboards": true,
+    "parallel_jobs": 4
+  },
+  "output": { "root": "output/monte_carlo", "plot_individual_runs": false }
+}

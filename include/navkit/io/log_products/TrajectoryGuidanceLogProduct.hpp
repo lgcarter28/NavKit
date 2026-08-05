@@ -14,7 +14,7 @@
 namespace navkit::io
 {
 
-/** Log source-agnostic Guidance acceleration, bank, mode, and activity state. */
+/** Log source-agnostic Guidance acceleration, bank, state, and activity state. */
 class TrajectoryGuidanceLogProduct
 {
 public:
@@ -45,14 +45,21 @@ public:
                     "guidance_acceleration_response_b_x_mps2",
                     "guidance_acceleration_response_b_y_mps2",
                     "guidance_acceleration_response_b_z_mps2",
+                    "guidance_specific_force_command_b_x_mps2",
+                    "guidance_specific_force_command_b_y_mps2",
+                    "guidance_specific_force_command_b_z_mps2",
+                    "guidance_specific_force_filtered_b_x_mps2",
+                    "guidance_specific_force_filtered_b_y_mps2",
+                    "guidance_specific_force_filtered_b_z_mps2",
                     "guidance_bank_command_n_rad",
+                    "guidance_bank_filtered_n_rad",
                     "guidance_bank_response_n_rad",
                     "guidance_reference_position_e_x_m",
                     "guidance_reference_position_e_y_m",
                     "guidance_reference_position_e_z_m",
                     "guidance_reference_index",
                     "guidance_reference_position_valid",
-                    "guidance_mode",
+                    "guidance_state_index",
                     "guidance_active",
                     "pad_constraint_active"});
     }
@@ -82,14 +89,21 @@ public:
                         data.guidance_acceleration_response_b_mps2.x(),
                         data.guidance_acceleration_response_b_mps2.y(),
                         data.guidance_acceleration_response_b_mps2.z(),
+                        data.guidance_specific_force_command_b_mps2.x(),
+                        data.guidance_specific_force_command_b_mps2.y(),
+                        data.guidance_specific_force_command_b_mps2.z(),
+                        data.guidance_specific_force_filtered_b_mps2.x(),
+                        data.guidance_specific_force_filtered_b_mps2.y(),
+                        data.guidance_specific_force_filtered_b_mps2.z(),
                         data.guidance_bank_command_n_rad,
+                        data.guidance_bank_filtered_n_rad,
                         data.guidance_bank_response_n_rad,
                         data.guidance_reference_position_e_m.x(),
                         data.guidance_reference_position_e_m.y(),
                         data.guidance_reference_position_e_m.z(),
                         data.guidance_reference_index,
                         data.guidance_reference_position_valid,
-                        static_cast<unsigned int>(data.guidance_mode),
+                        data.guidance_state_index,
                         data.guidance_active,
                         data.pad_constraint_active);
     }
@@ -101,11 +115,11 @@ public:
 
     [[nodiscard]] static nlohmann::json metadata()
     {
-        return {{"schema", "navkit.trajectory_guidance.v1"},
+        return {{"schema", "navkit.trajectory_guidance.v3"},
                 {"file", "trajectory_guidance.csv"},
                 {"signal_flow",
                  "Guidance velocity reference -> inertial acceleration and NED bank command -> "
-                 "vehicle translational response"},
+                 "persistent Guidance command filter -> downstream consumers"},
                 {"frame_convention",
                  "Acceleration command and response are logged in ECI, local NED, and body. "
                  "Bank is roll with respect to local NED. A valid Guidance reference position is "

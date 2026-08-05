@@ -73,6 +73,7 @@ job:
 | `run_scenario.py` | Run one scenario and immediately generate its standard analysis |
 | `run_sim.py` | Run only the C++ simulation |
 | `plot_run.py` | Render the standard domain-aware suite for an existing single run |
+| `plot_trajectory.py` | Render available frame-explicit truth, Guidance, Autopilot/Vehicle, tracking-error, and 3-D trajectory dashboards |
 | `run_monte_carlo.py` | Execute, package, report, and plot a seeded campaign |
 | `plot_monte_carlo.py` | Regenerate selected aggregate campaign figures |
 | `plot_consistency.py` | Generate or refresh joint NEES/NIS dashboards and reports |
@@ -104,9 +105,11 @@ python tools/run_scenario.py --build-type Release `
 
 `run_scenario.py` resolves a component-linked scenario into a self-contained
 `effective_runtime_config.json`, executes the ordinary simulator, then invokes
-`plot_run.py`. The resolved file makes every run replayable and is the input
-required when invoking the simulator executable directly. Add `--no-plot` to
-retain the one-command scenario setup while skipping post-processing.
+`plot_run.py` and `plot_trajectory.py`. The trajectory tool exits cleanly when
+the scenario did not enable any trajectory-inspection products. The resolved
+file makes every run replayable and is the input required when invoking the
+simulator executable directly. Add `--no-plot` to retain the one-command
+scenario setup while skipping post-processing.
 
 Use the lower-level runner when no analysis should run:
 
@@ -121,7 +124,93 @@ Analyze existing logs without rerunning the simulation:
 python tools/plot_run.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal
 python tools/plot_run.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal `
   --plot state_ned --start-time 10 --show
+python tools/plot_trajectory.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_ballistic_nominal `
+  --renderer plotly --show
 ```
+
+Trajectory inspection remains a deliberately lightweight CSV/Plotly workflow.
+When enabled, the simulator can emit independent
+`trajectory_kinematics_ecef`, `trajectory_kinematics_eci`,
+`trajectory_kinematics_ned`, `trajectory_kinematics_body`, and
+the split `trajectory_guidance` and `trajectory_autopilot_vehicle` products.
+The kinematic products make the same truth state inspectable in complementary
+frames. The focused Guidance figure compares inertial-acceleration command and
+response in NED, the same command/response resolved in body, and
+commanded/realized NED bank. The focused Autopilot figure compares
+body-to-NED roll/pitch/yaw command and response plus body inertial angular-rate
+command/response with explicit `p`, `q`, and `r` legends. The actual-IMU moving
+average, deterministic feedforward, Vehicle-internal response stages, and
+detailed saturation flags remain available in CSV diagnostics without
+crowding the default plots.
+
+The body dashboard places the ECI-facing plant and ideal-IMU physics beside
+their rotating-Earth counterparts. It shows `v_ib_b`, `a_ib_b`, `v_eb_b`,
+`a_eb_b`, `specific_force_ib_b`, and `w_ib_b` (the code form of
+\(\omega_{ib}^{b}\)) as six explicitly titled panels. Here
+\(\omega_{ib}^{b}\) is the angular rate of body with respect to ECI, resolved
+in body coordinates; its plotted components are the body `p`, `q`, and `r`
+rates. The paired ECI/ECEF velocity and acceleration panels make the
+Earth-rotation contribution visible instead of silently mixing the two
+contracts. Body tracking errors remain command minus final response and are
+not hidden as implicit differences between traces.
+
+Guidance and Autopilot command traces are zero-order held between their exact
+producer epochs. When the trajectory log cadence is faster than either
+controller, repeated stepwise command samples are intentional; they are not
+interpolated commands or evidence that the controller ran at the logging
+rate. Vehicle-response and plant-state traces remain continuous products.
+
+The standard interactive suite also includes 3-D LLA and relative-local
+position views. `trajectory_position_relative_ned_3d.html` uses the initial
+local NED frame for its transformation, but labels and displays the axes as
+North, East, and Up, where `Up = -Down`. Its 3-D aspect follows the relative
+data extents so a shallow trajectory is not visually stretched into a large
+vertical maneuver. Quaternion fields remain available for canonical
+state/debug work, but Euler angles are the default attitude visualization
+because their named reference frame is directly interpretable.
+
+When the matching products exist, `plot_trajectory.py` writes:
+
+```text
+trajectory_kinematics_ecef.html
+trajectory_kinematics_eci.html
+trajectory_kinematics_ned.html
+trajectory_kinematics_body.html
+trajectory_position_lla_3d.html
+trajectory_position_relative_ned_3d.html
+trajectory_guidance.html
+trajectory_autopilot_response.html
+trajectory_guidance_control.html
+trajectory_tracking_error.html
+```
+
+The 3-D figures include available Guidance phase transitions and waypoint
+markers. `trajectory_guidance_control.html` aligns Guidance inertial
+acceleration command/response in NED and body, the raw and permanently
+filtered body-X/Y/Z specific-force command, body-to-NED roll/pitch/yaw
+command/response, and Autopilot body `p/q/r` command/response on one shared
+time axis. The Guidance filter traces expose the stateful interface between
+Guidance and the downstream Autopilot/Vehicle consumers; zero time constant
+is an exact per-channel bypass. The focused Guidance and Autopilot figures
+present the remaining boundaries without duplicating lower-level Vehicle-only
+or nested-loop dashboards. Legends use LLA, NED/NEU, XYZ, roll/pitch/yaw, and
+`p/q/r` vocabulary according to the displayed quantity.
+The HTML dashboards share NavKit's
+renderer-neutral plot specifications, so Matplotlib PNG output remains
+available with `--renderer matplotlib`, but Plotly is the default for fast
+zooming and signal toggling.
+
+The ECEF acceleration log is the rotating-frame derivative of ECEF-relative
+velocity, `a_e = (d/dt)_e v_eb^e`, equivalently the second derivative of ECEF
+position coordinates. The NED product resolves ECEF-relative velocity and
+coordinate acceleration locally. The body product instead records inertial
+`v_ib_b`, `a_ib_b`, and `specific_force_ib_b`, matching the ECI plant and ideal
+IMU physics rather than rotating-frame ECEF body quantities.
+Body-rate subscripts retain the full reference and resolution convention
+(`w_ib_b`, `w_eb_b`, and `w_nb_b`). Each CSV has a matching metadata file that
+records this convention and the selected constant-rate ECI/ECEF orientation
+assumption. Earth orientation is evaluated from elapsed time relative to the
+trajectory source epoch, even when that epoch is nonzero.
 
 Logging is configured independently of simulator update rates in the runtime
 scenario's `logging` object. An enabled log must provide `rate_hz` or `dt_s`;
@@ -141,10 +230,11 @@ output/logs/<run_name>/
     *.meta.json
   figures/
     *.png
+    trajectory_*.html
 ```
 
-The exact products depend on compile-time log-product selection and the runtime
-`logging` configuration.
+The desktop simulation has a centralized typed product list; the exact emitted
+products depend on the runtime `logging` configuration.
 
 ## Monte Carlo workflow
 

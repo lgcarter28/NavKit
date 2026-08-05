@@ -4,20 +4,20 @@
     "rate_hz": 1000.0,
     "seed": 43,
     "gyro": {
-      "bias_turnon_radps": [0.00002, -0.000015, 0.00003],
+      "bias_turnon_degps": [0.00114591559, -0.000859436693, 0.00171887339],
       "bias_inrun_psd_rad2ps3": [1.0e-12, 1.0e-12, 1.0e-12],
       "angle_random_walk_psd_rad2ps": [1.0e-9, 1.0e-9, 1.0e-9],
       "scale_factor": [100.0e-6, -80.0e-6, 120.0e-6],
-      "misalignment_rad": [0.0002, -0.0001, 0.00015],
+      "misalignment_deg": [0.0114591559, -0.00572957795, 0.00859436693],
       "nonorthogonality": [0.0001, -0.00015, 0.00012],
-      "quantization_rad": [1.0e-7, 1.0e-7, 1.0e-7]
+      "quantization_deg": [5.72957795e-6, 5.72957795e-6, 5.72957795e-6]
     },
     "accel": {
       "bias_turnon_mps2": [0.001, -0.0015, 0.002],
       "bias_inrun_psd_m2ps5": [1.0e-8, 1.0e-8, 1.0e-8],
       "velocity_random_walk_psd_m2ps3": [1.0e-5, 1.0e-5, 1.0e-5],
       "scale_factor": [150.0e-6, -120.0e-6, 90.0e-6],
-      "misalignment_rad": [-0.00015, 0.0002, -0.0001],
+      "misalignment_deg": [-0.00859436693, 0.0114591559, -0.00572957795],
       "nonorthogonality": [0.00012, 0.0001, -0.00014],
       "quantization_mps": [1.0e-5, 1.0e-5, 1.0e-5]
     }

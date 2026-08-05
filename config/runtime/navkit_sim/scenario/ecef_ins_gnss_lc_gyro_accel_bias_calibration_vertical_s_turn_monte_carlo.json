@@ -1,0 +1,20 @@
+{
+  "components": {
+    "trajectory": "../components/trajectory/calibration_vertical_s_turn_1000hz.json",
+    "application": "../components/application/default_1000hz.json",
+    "imu": "../components/imu/specs/hg1700_tactical.json",
+    "gnss": "../components/gnss/nominal_pos_vel.json",
+    "pva_initialization": "../components/initialization/pva/pva_random_error_default.json"
+  },
+  "run_name": "ecef_ins_gnss_lc_gyro_accel_bias_calibration_vertical_s_turn_monte_carlo",
+  "output_dir": "output/logs/ecef_ins_gnss_lc_gyro_accel_bias_calibration_vertical_s_turn_monte_carlo",
+  "logging": {
+    "console": { "enabled": false },
+    "truth": { "enabled": true, "rate_hz": 5.0 },
+    "nav_estimate": { "enabled": true, "rate_hz": 5.0, "covariance": "triangular" },
+    "imu": { "enabled": true, "rate_hz": 5.0 },
+    "imu_debug": { "enabled": false },
+    "filter_correction": { "enabled": false, "covariance": "diagonal" },
+    "measurement_statistics": { "enabled": true, "rate_hz": 1.0 }
+  }
+}

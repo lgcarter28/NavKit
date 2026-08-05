@@ -1,0 +1,101 @@
+\chapter{Purpose and Scope}
+
+\section{Purpose}
+
+This document is the implementation contract for NavKit's first reusable
+trajectory-generation pipeline. It records the frame, attitude, response, and
+integration mathematics needed to understand and reproduce the implemented
+Phase~7 behavior without reverse-engineering the C++ source.
+
+The central data flow is
+\begin{equation}
+\begin{aligned}
+\text{selected control-state source}
+&\longrightarrow
+\text{Guidance}
+\longrightarrow
+\text{Autopilot}
+\longrightarrow
+\text{Vehicle response and limits}\\
+&\longrightarrow
+\text{ECI plant integration}
+\longrightarrow
+\text{truth}
+\longrightarrow
+\text{sensors and Navigator}.
+\end{aligned}
+\label{eq:trajectory_pipeline}
+\end{equation}
+SimulationApp alone selects whether the controller-facing state is a truth
+passthrough or a timestamped Navigator estimate. Guidance consumes that typed
+state contract; the trajectory runtime extracts the narrower attitude, rate,
+velocity, and frame data required by Autopilot. Neither branch inspects the
+selected source. The plant alone owns and advances truth. Its ECEF view is the
+common input to sensor emulators and the Navigator; its ECI state is canonical
+for integration.
+
+\begin{scopebox}
+The v1 contract covers:
+\begin{itemize}
+    \item uniform-rate WGS-84 Earth orientation with ECI and ECEF aligned at a
+          configured epoch;
+    \item canonical passive body-to-ECEF and body-to-ECI quaternions;
+    \item all implemented ECEF, ECI, and NED attitude input directions in
+          quaternion, DCM, and aerospace roll/pitch/yaw form;
+    \item ECI translational and quaternion attitude integration;
+    \item velocity-aligned body attitude with a configurable down reference;
+    \item separate, swappable Guidance, Autopilot, and Vehicle boundaries,
+          with the current exact first-order low-fidelity realization;
+    \item direct acceleration-and-bank Guidance commands without finite
+          differencing a precomputed position/attitude profile;
+    \item one runtime-configured named-state graph that composes launch-pad,
+          boost, gravity-turn/free-inertial coast, curved-Earth
+          velocity/altitude/heading, calibration, and waypoint Guidance blocks;
+    \item actual simulated-IMU increment feedback to Autopilot through a
+          fixed-capacity moving-window rate estimate;
+    \item exact rational Physics, Autopilot, and Guidance schedules;
+    \item per-body-axis response constants, optional post-response symmetric
+          limits, and complete command/response diagnostics.
+\end{itemize}
+\end{scopebox}
+
+\section{Deliberate Limits}
+
+The trajectory subsystem is simulation infrastructure, not an embedded flight
+mechanization. Shallow runtime polymorphism at the Guidance, Autopilot, and
+Vehicle boundaries is intentional. The current models do not yet represent
+mass properties, aerodynamic forces and moments, winds, fin deflections, or a
+full six-degree-of-freedom vehicle. They provide deterministic,
+continuous-enough dynamics for exercising the navigation and sensor stack.
+
+Local-level Guidance-reference blocks may first construct a desired
+curved-Earth kinematic command. The realized state is nevertheless propagated in Cartesian
+ECI. Gravity is evaluated with the configured WGS-84/J2 environment at the
+current or predicted position. The frame notation follows standard strapdown
+navigation usage \cite{groves2013,titterton2004}; quaternion implementation
+details follow the explicit contracts in this document rather than relying on
+an implicit library convention \cite{sola2018}.
+
+\section{Code Traceability}
+
+The primary implementation surfaces are:
+\begin{itemize}
+    \item \path{core/frames/Geodetic.hpp},
+          \path{core/frames/LocalLevel.hpp}, and
+          \path{core/frames/RotatingFrame.hpp};
+    \item \path{core/math/Quaternion.hpp};
+    \item \path{sim/trajectory/TrajectoryAttitude.hpp} and
+          \path{sim/trajectory/TrajectoryIntegration.hpp};
+    \item \path{sim/guidance/GuidanceAlgorithms.*},
+          \path{sim/guidance/GuidanceBlocks.*}, and
+          \path{sim/guidance/GuidanceStateMachine.*};
+    \item \path{sim/autopilot/AutopilotModel.hpp} and
+          \path{sim/autopilot/FirstOrderAutopilotModel.*};
+    \item \path{sim/trajectory/VehicleResponseModel.hpp} and
+          \path{sim/trajectory/FirstOrderVehicleResponseModel.*};
+    \item \path{sim/autopilot/ImuIncrementMovingAverage.hpp} and
+          \path{sim/math/FirstOrderResponse.*};
+    \item \path{sim/trajectory/GeneratedTrajectorySource.*};
+    \item \path{app_support/trajectory/GuidanceStateMachineJson.hpp} and
+          \path{app_support/trajectory/TrajectoryAttitudeJson.hpp}.
+\end{itemize}

@@ -45,6 +45,30 @@ This avoids ambiguity around superscript/subscript conventions in code. Vector
 kinematics keep the Groves-style object/reference/resolved-frame suffix, for
 example `w_ib_b`.
 
+## Roll/pitch/yaw transform convention
+
+An identifier `rpy_start2end_rad` stores
+`[roll, pitch, yaw]` in radians and parameterizes the same passive transform as
+`dcm_start2end` and `q_start2end`. NavKit uses the aerospace 3-2-1
+yaw-pitch-roll composition:
+
+```text
+C_start2end = Rz(yaw) Ry(pitch) Rx(roll)
+v_end       = C_start2end v_start
+```
+
+Thus `rpy_n2b_rad` parameterizes the standard local-NED-to-body aerospace
+attitude, while `rpy_b2n_rad` parameterizes its inverse transform. The Euler
+angles for those inverse directions are not generally componentwise
+negations; invert the DCM or quaternion and then extract the inverse Euler
+angles.
+
+Runtime JSON is the deliberate exception to this internal radian convention:
+direct angular inputs use `*_deg`, and direct angular rates use `*_degps`.
+App support converts them once at the input boundary. Covariance, variance,
+and PSD inputs retain explicit radian-based unit suffixes, including
+squared-radian terms, until that stochastic configuration contract is revised.
+
 ## Simplified notation
 
 When the object/wrt/resolving-frame meaning is obvious or redundant,

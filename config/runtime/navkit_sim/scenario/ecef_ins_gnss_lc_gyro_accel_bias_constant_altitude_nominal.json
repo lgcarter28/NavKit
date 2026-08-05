@@ -11,6 +11,12 @@
   "logging": {
     "console": { "enabled": true, "rate_hz": 1.0 },
     "truth": { "enabled": true, "rate_hz": 10.0 },
+    "trajectory_kinematics_ecef": { "enabled": true, "rate_hz": 20.0 },
+    "trajectory_kinematics_eci": { "enabled": true, "rate_hz": 20.0 },
+    "trajectory_kinematics_ned": { "enabled": true, "rate_hz": 20.0 },
+    "trajectory_kinematics_body": { "enabled": true, "rate_hz": 20.0 },
+    "trajectory_guidance": { "enabled": true, "rate_hz": 20.0 },
+    "trajectory_autopilot_vehicle": { "enabled": true, "rate_hz": 20.0 },
     "nav_estimate": { "enabled": true, "rate_hz": 10.0, "covariance": "triangular" },
     "imu": { "enabled": true, "rate_hz": 100.0 },
     "imu_debug": { "enabled": false },

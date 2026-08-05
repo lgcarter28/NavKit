@@ -71,6 +71,7 @@ def main() -> int:
         is_analysis_bundle,
         load_monte_carlo_series_from_bundle,
     )
+    from navkit_analysis.renderers import PLOTLY_INTERACTION_CONFIG
     import matplotlib.pyplot as plt
 
     parser = argparse.ArgumentParser(
@@ -173,7 +174,7 @@ def main() -> int:
             output_path = output_path.with_suffix(".html")
             figure = plot_monte_carlo_series_interactive(series, output_path)
             if args.show:
-                figure.show()
+                figure.show(config=PLOTLY_INTERACTION_CONFIG)
             return figure
 
         if args.renderer == "plotly" and args.parallel_jobs > 1 and len(series_items) > 1:
@@ -209,7 +210,7 @@ def main() -> int:
             )
             figure = plot_monte_carlo_series_interactive(series, output_path.with_suffix(".html"))
             if args.show:
-                figure.show()
+                figure.show(config=PLOTLY_INTERACTION_CONFIG)
         return 0
 
     summary_dir = args.output_dir or (campaign_source / "summary")

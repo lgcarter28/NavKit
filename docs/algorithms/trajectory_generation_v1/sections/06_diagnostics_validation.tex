@@ -1,0 +1,204 @@
+\chapter{Diagnostics, Initialization, and Validation Contract}
+
+\section{Semantic Diagnostic Groups}
+
+Every generated dynamic truth sample may retain the following diagnostic
+groups. The default analysis products intentionally separate Guidance from
+Autopilot/Vehicle so command ownership remains obvious.
+
+\begin{center}
+\scriptsize
+\begin{longtable}{p{0.41\textwidth}p{0.49\textwidth}}
+\toprule
+Code-facing fields & Meaning \\
+\midrule
+\endhead
+\texttt{p\_i\_m}, \texttt{v\_i\_mps},
+\texttt{a\_i\_mps2}, \texttt{q\_b2i}
+& realized canonical ECI plant state \\
+\texttt{guidance\_velocity\_reference\_i\_mps}
+& held Guidance velocity reference \\
+\texttt{guidance\_acceleration\_command\_\{i,n,b\}\_mps2}
+& the same total inertial-acceleration command resolved in ECI, NED, and body \\
+\texttt{guidance\_acceleration\_response\_\{i,n,b\}\_mps2}
+& final realized inertial acceleration in the corresponding resolving frames \\
+\texttt{guidance\_bank\_\{command,response\}\_n\_rad}
+& NED bank command and realized local-level bank \\
+\texttt{guidance\_state\_index}, \texttt{guidance\_active},
+\texttt{pad\_constraint\_active}
+& generic runtime state-machine index and support-constraint state \\
+\texttt{autopilot\_q\_\{command,response\}\_b2i}
+& canonical Autopilot attitude command and realized plant attitude \\
+\texttt{autopilot\_angular\_rate\_\{feedforward,command,response\}\_b\_radps}
+& deterministic filtered-command kinematics, body $p/q/r$ command, and
+  Autopilot first-order response \\
+\texttt{autopilot\_gyro\_observation\_b\_radps}
+& actual-IMU moving-window rate used by feedback \\
+\texttt{vehicle\_velocity\_ib\_b\_mps},
+\texttt{vehicle\_acceleration\_ib\_b\_mps2}
+& inertial velocity and acceleration resolved in body \\
+\texttt{vehicle\_velocity\_eb\_b\_mps},
+\texttt{vehicle\_acceleration\_eb\_b\_mps2}
+& ECEF-relative velocity and acceleration resolved in body \\
+\texttt{vehicle\_specific\_force\_command\_b\_mps2}
+& Guidance-equivalent body specific-force command \\
+\texttt{vehicle\_specific\_force\_command\_response\_b\_mps2}
+& Vehicle-internal command/actuator response \\
+\texttt{vehicle\_specific\_force\_response\_b\_mps2}
+& final post-response, post-limit Vehicle body specific force \\
+\texttt{vehicle\_angular\_rate\_\{command,response\}\_b\_radps}
+& Autopilot response presented to Vehicle and final realized body rate \\
+\texttt{*\_tracking\_error\_b\_*}
+& command-minus-response tracking errors resolved in body \\
+\texttt{angular\_rate\_limited},
+\texttt{specific\_force\_limited}
+& detailed per-axis final-limit event flags \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+Diagnostics use the same timestamp availability contract as truth. Continuous
+plant and Vehicle-response vectors use linear interpolation, and attitudes use
+normalized spherical interpolation. Guidance and Autopilot command fields,
+their producer timestamps, and discrete state indices/flags use zero-order hold from
+the most recent due producer epoch. A logging cadence faster than Guidance or
+Autopilot consequently repeats held command values; those repeated rows do not
+represent extra controller executions.
+
+Limit flags remain available in logs and event diagnostics but are not default
+plot panels. Quaternion values remain canonical log/debug data; default
+attitude figures use frame-explicit aerospace Euler angles. Moving-window IMU
+rate observations, feedforward terms, and detailed Vehicle-internal responses
+remain available in diagnostic data but do not crowd the default focused
+figures.
+
+\section{Consolidated Figure Contract}
+
+The default trajectory-analysis suite is deliberately small and stable:
+\begin{itemize}
+    \item \texttt{trajectory\_kinematics\_ecef} and
+          \texttt{trajectory\_kinematics\_eci} show position, velocity,
+          acceleration, Euler attitude, and the corresponding frame-explicit
+          angular rate;
+    \item \texttt{trajectory\_kinematics\_ned} shows LLA plus local velocity,
+          acceleration, body-to-NED roll/pitch/yaw, and
+          $\boldsymbol{\omega}_{nb}^{b}$;
+    \item \texttt{trajectory\_kinematics\_body} shows ECI-relative velocity
+          and acceleration, ECEF-relative velocity and acceleration, specific
+          force, and the actual body inertial angular rate
+          $\boldsymbol{\omega}_{ib}^{b}$, all resolved in body;
+    \item \texttt{trajectory\_guidance} compares inertial-acceleration
+          command and response in NED, the same command and response resolved
+          in body, and NED bank command and response;
+    \item \texttt{trajectory\_autopilot\_response} compares body-to-NED
+          roll/pitch/yaw command and response plus commanded and realized
+          $\boldsymbol{\omega}_{ib}^{b}$ using explicit \(p,q,r\) legends;
+    \item \texttt{trajectory\_guidance\_control} consolidates Guidance NED/body
+          inertial-acceleration command/response, body-to-NED
+          roll/pitch/yaw command/response, and Autopilot \(p,q,r\)
+          command/response on one shared-time dashboard; and
+    \item \texttt{trajectory\_tracking\_error} retains the focused
+          command-minus-response error views.
+\end{itemize}
+
+The suite also retains \texttt{trajectory\_position\_lla\_3d} and
+\texttt{trajectory\_position\_relative\_ned\_3d}. The latter is expressed in
+the initial local NED frame but visualized as North, East, and Up, with
+\(U=-D\), so altitude appears upward. Its three-dimensional aspect is
+proportional to the data extents rather than forcing unrelated axis scales.
+Legends use LLA, North/East/Down or North/East/Up, body X/Y/Z,
+roll/pitch/yaw, and \(p/q/r\) labels as appropriate; generic unlabeled axis
+numbers are not part of the contract.
+
+The paired ECI- and ECEF-relative body panels make the Earth-rotation
+contribution explicit rather than silently mixing the two contracts.
+Likewise, the former standalone Vehicle-response and nested-loop dashboards
+are subsumed by the focused Guidance, Autopilot, and consolidated
+Guidance/Control products rather than duplicating the same traces.
+
+\section{Initialization}
+
+Initialization uses the first valid controller-facing state and environment:
+\begin{enumerate}
+    \item Guidance initializes its configured initial state without changing plant truth.
+    \item The Guidance command filter initializes its specific-force and bank
+          states from the initial dynamic plant state and latches the initial
+          state-machine time constants.
+    \item Autopilot retains the configured initial attitude, initializes its
+          body-rate response from the initial state, and initializes the
+          fixed-capacity IMU moving window.
+    \item Vehicle initializes its body-rate and both internal specific-force
+          response states from the initial dynamic plant state.
+    \item The launch-pad constraint supplies
+          \cref{eq:pad_eci_state,eq:pad_support_force} until release.
+\end{enumerate}
+This avoids artificial zero-state transients while preserving a physically
+meaningful static-pad accelerometer output.
+
+\section{Failure Conditions}
+
+The reusable math and model boundaries return failure for invalid runtime
+conditions rather than silently manufacturing a state. Important checks
+include:
+\begin{itemize}
+    \item non-finite state, command, frame, IMU, or configuration values;
+    \item nonpositive integration intervals;
+    \item incompatible rational rates or an application rate that cannot visit
+          every producer deadline;
+    \item negative first-order time constants, gains, or speed thresholds;
+    \item an IMU moving-window length outside its fixed-capacity bounds;
+    \item enabled limits that are non-finite or not strictly positive;
+    \item invalid or ambiguous attitude JSON;
+    \item non-proper DCMs and zero quaternions;
+    \item undefined NED at the ECEF origin;
+    \item velocity/down degeneracy above the alignment threshold;
+    \item a nonzero initial launch velocity inconsistent with configured body
+          forward direction;
+    \item incompatible timestamps for Earth orientation.
+\end{itemize}
+
+\section{Minimum Verification Set}
+
+The implementation must retain numerical or orchestration tests for:
+\begin{enumerate}
+    \item all 18 attitude forms mapping to the same canonical $\quat_b^e$;
+    \item ECEF/ECI and ECEF/NED round trips;
+    \item constant-acceleration ECI translation;
+    \item constant-body-rate quaternion integration and unit norm;
+    \item exact first-order response and zero-$\tau$ bypass behavior;
+    \item exact quaternion command-LPF response and constant command-rate
+          feedforward without state differentiation;
+    \item limits applied only after final Vehicle response;
+    \item moving-window rate from unequal-duration IMU increments;
+    \item source-agnostic truth and navigation-estimate controller inputs;
+    \item fixed-pad ECEF state and support specific force;
+    \item one constrained boost-response interval before physical pad release;
+    \item boost-to-\texttt{gravity\_turn} transition, zero-force coast, and
+          velocity-aligned Autopilot behavior;
+    \item boost-to-\texttt{free\_inertial} transition, zero-force coast,
+          inactive Autopilot, and unconstrained inertial attitude propagation;
+    \item ECEF- and NED-relative acceleration commands including all
+          rotating-frame transport terms;
+    \item threshold-guarded velocity alignment and degenerate input rejection;
+    \item exact Physics/Autopilot/Guidance scheduling and zero-order-held
+          command diagnostics;
+    \item finite, monotonic generated trajectories and interpolated diagnostics;
+    \item ballistic termination at the first descending launch-height crossing;
+    \item matched horizontal S-turn references with separate skid-to-turn and
+          bank-to-turn realizations, including the optional zero body-$y$
+          coordinated-force constraint;
+    \item a fixed-heading vertical S-turn with bounded cross-track position and
+          velocity over multiple complete maneuver periods;
+    \item sustained acceleration-based Dutch-roll calibration with horizontal
+          excitation at the base frequency, vertical excitation at twice that
+          frequency, the expected front-view half-pipe geometry, coordinated
+          bank-to-turn, and quadrature body \(p/r\) response;
+    \item zero-value, zero-rate initialization of shaped calibration references.
+\end{enumerate}
+
+\begin{warningbox}
+Guidance command, Autopilot response, and final Vehicle response are different
+signals. Analysis should preserve those boundaries. Comparing only truth to a
+Guidance command can reveal tracking error, but it cannot identify whether
+Autopilot or Vehicle bandwidth caused it.
+\end{warningbox}

@@ -32,7 +32,11 @@ def main() -> int:
 
     add_python_package_to_path()
     from navkit_analysis.plot_spec import quick_xy_plot_spec
-    from navkit_analysis.renderers import render_matplotlib, render_plotly
+    from navkit_analysis.renderers import (
+        PLOTLY_INTERACTION_CONFIG,
+        render_matplotlib,
+        render_plotly,
+    )
     from navkit_analysis.sources import load_analysis_run
 
     run = load_analysis_run(args.source, run_id=args.run_id)
@@ -55,7 +59,7 @@ def main() -> int:
     if args.renderer == "plotly":
         figure = render_plotly(spec, output)
         if args.show:
-            figure.show()
+            figure.show(config=PLOTLY_INTERACTION_CONFIG)
     else:
         import matplotlib.pyplot as plt
 

@@ -15,8 +15,8 @@
 #include "navkit/io/log_products/GnssPositionLogProduct.hpp"
 #include "navkit/io/log_products/GnssVelocityDebugLogProduct.hpp"
 #include "navkit/io/log_products/GnssVelocityLogProduct.hpp"
-#include "navkit/sim/GnssSimulator.hpp"
 #include "navkit/sim/RandomDraw.hpp"
+#include "navkit/sim/sensors/GnssSimulator.hpp"
 
 #include <Eigen/Eigenvalues>
 #include <cstdint>

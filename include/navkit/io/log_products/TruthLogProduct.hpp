@@ -5,7 +5,7 @@
 
 #include "navkit/core/time/Timestamp.hpp"
 #include "navkit/io/CsvWriter.hpp"
-#include "navkit/sim/TruthSample.hpp"
+#include "navkit/sim/trajectory/TruthSample.hpp"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>

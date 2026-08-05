@@ -1,0 +1,134 @@
+\chapter{Frames, Time, and Earth Orientation}
+
+\section{Frames and Transform Direction}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Symbol & Frame & Meaning \\
+\midrule
+$i$ & ECI & non-rotating inertial integration frame \\
+$e$ & ECEF & Earth-fixed frame rotating with Earth \\
+$n$ & NED & local north-east-down frame \\
+$b$ & body & vehicle and collocated ideal-IMU frame \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+$C_a^b$ and $\quat_a^b$ map vector components from frame $a$ into frame
+$b$:
+\begin{equation}
+\mathbf{x}^{b}=C_a^b\mathbf{x}^{a}
+              =\quat_a^b\otimes\mathbf{x}^{a}.
+\label{eq:start_to_end}
+\end{equation}
+Quaternion-vector multiplication in \cref{eq:start_to_end} means the rotation
+operation exposed by the implementation, not Hamilton multiplication of two
+ordinary four-vectors.
+
+\begin{warningbox}
+Code and JSON identifiers retain explicit \texttt{start2end} names such as
+\texttt{q\_b2e} and \texttt{dcm\_b2e}. Mathematical notation follows the
+compact Groves-style convention used by the Navigator document:
+$C_a^b$ and $\quat_a^b$ map from frame $a$ to frame $b$.
+\end{warningbox}
+
+\section{Uniform Earth Orientation}
+
+Let $t_0$ be the configured epoch and let
+\begin{equation}
+\Delta t=t-t_0.
+\end{equation}
+ECI and ECEF axes are defined to be aligned at $t_0$. For a uniformly rotating
+planet with rate $\omega_{ie}$ about the shared positive third axis,
+\begin{align}
+C_e^i(t,t_0) &= R_3\!\left(\omega_{ie}\Delta t\right),\\
+C_i^e(t,t_0) &= \left(C_e^i(t,t_0)\right)^{T}.
+\label{eq:earth_orientation}
+\end{align}
+The v1 Earth implementation uses the WGS-84 rate. Timestamps must use
+compatible time scales and must admit a finite elapsed duration.
+
+\section{Position, Velocity, and Acceleration}
+
+Define the constant Earth rate in ECEF as
+\begin{equation}
+\boldsymbol{\omega}_{ie}^{e}
+=
+\begin{bmatrix}0&0&\omega_{ie}\end{bmatrix}^{T}.
+\end{equation}
+The implemented fixed-to-inertial transforms are
+\begin{align}
+\pb^{i}
+&=C_e^i\pb^{e},
+\label{eq:fixed_inertial_position}\\
+\vb^{i}
+&=C_e^i
+  \left(\vb^{e}+\boldsymbol{\omega}_{ie}^{e}\times\pb^{e}\right),
+\label{eq:fixed_inertial_velocity}\\
+\ab^{i}
+&=C_e^i
+  \left(
+      \ab^{e}
+      +2\boldsymbol{\omega}_{ie}^{e}\times\vb^{e}
+      +\boldsymbol{\omega}_{ie}^{e}\times
+        \left(\boldsymbol{\omega}_{ie}^{e}\times\pb^{e}\right)
+  \right).
+\label{eq:fixed_inertial_acceleration}
+\end{align}
+The inverse relations used when emitting ECEF truth are
+\begin{align}
+\pb^{e}
+&=C_i^e\pb^{i},
+\label{eq:inertial_fixed_position}\\
+\vb^{e}
+&=C_i^e\vb^{i}
+  -\boldsymbol{\omega}_{ie}^{e}\times\pb^{e},
+\label{eq:inertial_fixed_velocity}\\
+\ab^{e}
+&=C_i^e\ab^{i}
+  -2\boldsymbol{\omega}_{ie}^{e}\times\vb^{e}
+  -\boldsymbol{\omega}_{ie}^{e}\times
+    \left(\boldsymbol{\omega}_{ie}^{e}\times\pb^{e}\right).
+\label{eq:inertial_fixed_acceleration}
+\end{align}
+Here $\ab^{e}=(d/dt)_e\vb^{e}$ is the ECEF coordinate acceleration.
+Resolving it into NED or body produces $C_e^n\ab^{e}$ or
+$C_e^b\ab^{e}$; because those resolving frames vary with time, neither
+derived vector is the time derivative of velocity components expressed in
+that derived frame.
+
+The configured trajectory gravity policy returns mass-attraction gravitation
+$\boldsymbol{\gamma}$ only. Dynamic plant acceleration in ECI therefore uses
+$\ab^i=C_b^i\fb_{ib}^{b}+\boldsymbol{\gamma}^{i}$ directly. Centrifugal and
+Coriolis terms appear only when transforming that inertial motion into ECEF,
+as in
+\cref{eq:fixed_inertial_acceleration,eq:inertial_fixed_acceleration}; they
+must not be added to the ECI plant acceleration a second time.
+
+\begin{implbox}
+Dynamic trajectory state is canonical in ECI:
+$\{t,\pb^{i},\vb^{i},\ab^{i},\quat_b^i,
+\boldsymbol{\omega}_{ib}^{b},\fb_{ib}^{b}\}$.
+ECEF output is a derived interface contract. This keeps translational
+integration Cartesian and prevents Earth rotation from being hidden inside an
+apparently inertial acceleration.
+\end{implbox}
+
+\section{Local-Level Orientation}
+
+At geodetic latitude $\varphi$ and longitude $\lambda$, the implemented
+ECEF-to-NED DCM is
+\begin{equation}
+C_e^n=
+\begin{bmatrix}
+-\sin\varphi\cos\lambda & -\sin\varphi\sin\lambda & \cos\varphi\\
+-\sin\lambda            &  \cos\lambda             & 0\\
+-\cos\varphi\cos\lambda & -\cos\varphi\sin\lambda & -\sin\varphi
+\end{bmatrix},
+\qquad
+C_n^e=\left(C_e^n\right)^{T}.
+\label{eq:ecef_ned_dcm}
+\end{equation}
+The latitude, longitude, and altitude payload
+\texttt{p\_lla\_deg\_m} uses degrees, degrees, and metres respectively.

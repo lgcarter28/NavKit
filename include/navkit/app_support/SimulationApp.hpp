@@ -15,6 +15,7 @@
 #include "navkit/app_support/runtime/RunSettings.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigValidation.hpp"
 #include "navkit/app_support/time/ClockFactory.hpp"
+#include "navkit/app_support/trajectory/TrajectoryControlState.hpp"
 #include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
 #include "navkit/core/time/RationalTimeline.hpp"
 
@@ -127,9 +128,22 @@ public:
                         core::timestamp_seconds(t_start));
             return 4;
         }
+        if (!supply_control_state(
+                run_settings, t_start, initial_truth, filter, *trajectory.source)) {
+            std::printf("Trajectory control-state publication failed at t=%f\n",
+                        core::timestamp_seconds(t_start));
+            return 4;
+        }
         run_logger.log_truth_if_due(initial_truth);
+        sim::TrajectoryDiagnostics initial_trajectory_diagnostics{};
+        if (!trajectory.source->query_diagnostics(t_start, initial_trajectory_diagnostics) ||
+            !run_logger.log_trajectory_if_due(initial_truth, initial_trajectory_diagnostics)) {
+            std::printf("Trajectory diagnostics logging failed at initialization time\n");
+            return 6;
+        }
         run_logger.log_filter_if_due(t_start, filter);
 
+        bool navigator_finalized = false;
         while (!trajectory.source->is_complete()) {
             core::Timestamp t_curr{};
             if (!app_timeline.next(t_curr)) {
@@ -170,18 +184,45 @@ public:
                             imu_runtime.last_error().data());
                 return 2;
             }
+            if (imu_sample.generated &&
+                !trajectory.source->observe_imu_increment(imu_sample.measured)) {
+                std::printf("Trajectory IMU observation failed at t=%f\n",
+                            core::timestamp_seconds(t_curr));
+                return 4;
+            }
             if (!Emulators::publish(prepared_updates, emulator_runtimes, navigator, logger)) {
                 std::printf("Simulation emulator publication failed at t=%f\n",
                             core::timestamp_seconds(t_curr));
                 return 4;
             }
-            if (!navigator.update()) {
+            const bool trajectory_complete = trajectory.source->is_complete();
+            const bool navigator_updated =
+                trajectory_complete ? navigator.finalize() : navigator.update();
+            if (!navigator_updated) {
                 std::printf("Navigator update failed at t=%f\n", core::timestamp_seconds(t_curr));
                 return 4;
             }
+            navigator_finalized = trajectory_complete;
+            if (!supply_control_state(run_settings, t_start, truth, filter, *trajectory.source)) {
+                std::printf("Trajectory control-state publication failed at t=%f\n",
+                            core::timestamp_seconds(t_curr));
+                return 4;
+            }
             run_logger.log_truth_if_due(truth);
+            sim::TrajectoryDiagnostics trajectory_diagnostics{};
+            if (!trajectory.source->query_diagnostics(t_curr, trajectory_diagnostics) ||
+                !run_logger.log_trajectory_if_due(truth, trajectory_diagnostics)) {
+                std::printf("Trajectory diagnostics logging failed at t=%f\n",
+                            core::timestamp_seconds(t_curr));
+                return 6;
+            }
             run_logger.log_imu_if_due(truth, imu_sample);
             run_logger.log_filter_if_due(t_curr, filter);
+        }
+
+        if (!navigator_finalized && !navigator.finalize()) {
+            std::printf("Navigator finalization failed after trajectory termination\n");
+            return 4;
         }
 
         logger.close();
@@ -190,6 +231,30 @@ public:
         std::printf("Wrote NavKit simulation logs to: %s\n",
                     run_settings.data_dir.string().c_str());
         return 0;
+    }
+
+private:
+    [[nodiscard]] static bool supply_control_state(const RunSettings& run_settings,
+                                                   const core::Timestamp& t_epoch,
+                                                   const sim::TruthSample& truth,
+                                                   const Filter& filter,
+                                                   sim::TrajectorySource& trajectory_source)
+    {
+        sim::TrajectoryControlState control_state{};
+        switch (run_settings.control_state_source) {
+        case ControlStateSourceMode::NavigationEstimate:
+            if (!trajectory_control_state_from_navigation<StateDef>(
+                    truth.t, t_epoch, filter.state(), control_state)) {
+                return false;
+            }
+            break;
+        case ControlStateSourceMode::TruthPassthrough:
+            if (!trajectory_control_state_from_truth(truth, t_epoch, control_state)) {
+                return false;
+            }
+            break;
+        }
+        return trajectory_source.set_control_state(control_state);
     }
 };
 

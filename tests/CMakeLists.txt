@@ -4,6 +4,7 @@
 find_package(doctest REQUIRED CONFIG)
 
 add_executable(navkit_tests
+    test_covariance_health.cpp
     test_main.cpp
     test_config_policy.cpp
     test_injection_reset_policy.cpp
@@ -28,7 +29,12 @@ add_executable(navkit_tests
     test_imu_simulator.cpp
     test_navigator_compile.cpp
     test_navigator_policy.cpp
+    test_trajectory_attitude.cpp
     test_trajectory_generator.cpp
+    test_trajectory_control_state.cpp
+    test_trajectory_dynamics.cpp
+    test_guidance_state_machine.cpp
+    test_trajectory_logging.cpp
 )
 
 target_link_libraries(navkit_tests PRIVATE navkit::core navkit::sim navkit::io doctest::doctest)

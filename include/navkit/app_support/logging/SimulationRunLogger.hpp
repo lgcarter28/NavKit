@@ -4,10 +4,10 @@
 #pragma once
 
 #include "navkit/app_support/config/ConfigTraits.hpp"
-#include "navkit/app_support/config/LoggingConfigTraits.hpp"
 #include "navkit/app_support/config/SimulationAppConfigPolicy.hpp"
 #include "navkit/app_support/emulation/concrete/ImuRuntime.hpp"
 #include "navkit/app_support/logging/MeasurementStatisticsLogger.hpp"
+#include "navkit/app_support/logging/TrajectoryLogDataBuilder.hpp"
 #include "navkit/app_support/runtime/RunSettings.hpp"
 #include "navkit/core/frames/Geodetic.hpp"
 #include "navkit/core/frames/LocalLevel.hpp"
@@ -18,7 +18,9 @@
 #include "navkit/io/log_payloads/ImuDebugLogPayload.hpp"
 #include "navkit/io/log_payloads/ImuIncrementLogPayload.hpp"
 #include "navkit/io/log_payloads/NavEstimateLogPayload.hpp"
-#include "navkit/sim/TruthSample.hpp"
+#include "navkit/io/log_payloads/TrajectoryLogPayload.hpp"
+#include "navkit/sim/trajectory/TrajectoryDynamics.hpp"
+#include "navkit/sim/trajectory/TruthSample.hpp"
 
 #include <Eigen/Dense>
 #include <cmath>
@@ -34,7 +36,8 @@ public:
     using NavKit = NavKitConfig_t<Config>;
     using StateDef = typename NavKit::StateDef;
     using Filter = typename NavKit::Filter;
-    using Logger = LoggerConfig_t<Config>;
+    using Planet = typename NavKit::PropagationConfig::Planet;
+    using Logger = RuntimeLogger<NavKit>;
 
     explicit SimulationRunLogger(Logger& logger, const RunSettings& run_settings)
         : m_logger(logger)
@@ -73,6 +76,37 @@ public:
                 t_epoch, m_run_settings.logging.filter_correction_rate)) {
             return false;
         }
+        if (m_run_settings.logging.trajectory_kinematics_ecef_enabled &&
+            !m_trajectory_kinematics_ecef_schedule.initialize(
+                t_epoch, m_run_settings.logging.trajectory_kinematics_ecef_rate)) {
+            return false;
+        }
+        if (m_run_settings.logging.trajectory_kinematics_eci_enabled &&
+            !m_trajectory_kinematics_eci_schedule.initialize(
+                t_epoch, m_run_settings.logging.trajectory_kinematics_eci_rate)) {
+            return false;
+        }
+        if (m_run_settings.logging.trajectory_kinematics_ned_enabled &&
+            !m_trajectory_kinematics_ned_schedule.initialize(
+                t_epoch, m_run_settings.logging.trajectory_kinematics_ned_rate)) {
+            return false;
+        }
+        if (m_run_settings.logging.trajectory_kinematics_body_enabled &&
+            !m_trajectory_kinematics_body_schedule.initialize(
+                t_epoch, m_run_settings.logging.trajectory_kinematics_body_rate)) {
+            return false;
+        }
+        if (m_run_settings.logging.trajectory_guidance_enabled &&
+            !m_trajectory_guidance_schedule.initialize(
+                t_epoch, m_run_settings.logging.trajectory_guidance_rate)) {
+            return false;
+        }
+        if (m_run_settings.logging.trajectory_autopilot_vehicle_enabled &&
+            !m_trajectory_autopilot_vehicle_schedule.initialize(
+                t_epoch, m_run_settings.logging.trajectory_autopilot_vehicle_rate)) {
+            return false;
+        }
+        m_trajectory_source_epoch = t_epoch;
         return true;
     }
 
@@ -108,6 +142,53 @@ public:
                                        .gyro_bias_truth_radps = imu_sample.gyro_bias_truth_radps,
                                        .accel_bias_truth_mps2 = imu_sample.accel_bias_truth_mps2});
         }
+    }
+
+    [[nodiscard]] bool log_trajectory_if_due(const sim::TruthSample& truth,
+                                             const sim::TrajectoryDiagnostics& diagnostics)
+    {
+        const bool log_ecef = m_run_settings.logging.trajectory_kinematics_ecef_enabled &&
+                              m_trajectory_kinematics_ecef_schedule.due(truth.t);
+        const bool log_eci = m_run_settings.logging.trajectory_kinematics_eci_enabled &&
+                             m_trajectory_kinematics_eci_schedule.due(truth.t);
+        const bool log_ned = m_run_settings.logging.trajectory_kinematics_ned_enabled &&
+                             m_trajectory_kinematics_ned_schedule.due(truth.t);
+        const bool log_body = m_run_settings.logging.trajectory_kinematics_body_enabled &&
+                              m_trajectory_kinematics_body_schedule.due(truth.t);
+        const bool log_guidance = m_run_settings.logging.trajectory_guidance_enabled &&
+                                  m_trajectory_guidance_schedule.due(truth.t);
+        const bool log_autopilot_vehicle =
+            m_run_settings.logging.trajectory_autopilot_vehicle_enabled &&
+            m_trajectory_autopilot_vehicle_schedule.due(truth.t);
+        if (!log_ecef && !log_eci && !log_ned && !log_body && !log_guidance &&
+            !log_autopilot_vehicle) {
+            return true;
+        }
+
+        io::TrajectoryLogData data{};
+        if (!trajectory_log_data_from_truth<Planet>(
+                truth, diagnostics, m_trajectory_source_epoch, data)) {
+            return false;
+        }
+        if (log_ecef) {
+            log_if_supported(io::TrajectoryEcefLogPayload{.data = data});
+        }
+        if (log_eci) {
+            log_if_supported(io::TrajectoryEciLogPayload{.data = data});
+        }
+        if (log_ned) {
+            log_if_supported(io::TrajectoryNedLogPayload{.data = data});
+        }
+        if (log_body) {
+            log_if_supported(io::TrajectoryBodyLogPayload{.data = data});
+        }
+        if (log_guidance) {
+            log_if_supported(io::TrajectoryGuidanceLogPayload{.data = data});
+        }
+        if (log_autopilot_vehicle) {
+            log_if_supported(io::TrajectoryAutopilotVehicleLogPayload{.data = data});
+        }
+        return true;
     }
 
     void log_filter_if_due(const core::Timestamp& t, const Filter& filter)
@@ -205,6 +286,13 @@ private:
     core::RationalSchedule m_imu_schedule{};
     core::RationalSchedule m_imu_debug_schedule{};
     core::RationalSchedule m_filter_correction_schedule{};
+    core::RationalSchedule m_trajectory_kinematics_ecef_schedule{};
+    core::RationalSchedule m_trajectory_kinematics_eci_schedule{};
+    core::RationalSchedule m_trajectory_kinematics_ned_schedule{};
+    core::RationalSchedule m_trajectory_kinematics_body_schedule{};
+    core::RationalSchedule m_trajectory_guidance_schedule{};
+    core::RationalSchedule m_trajectory_autopilot_vehicle_schedule{};
+    core::Timestamp m_trajectory_source_epoch{};
 };
 
 } // namespace navkit::app_support

@@ -189,13 +189,6 @@ struct EcefInsGnssAppConfig
         navkit::app_support::PvaExplicitInitializationProvider;
     using TransferAlignmentProvider = navkit::app_support::NoTransferAlignmentProvider;
 
-    using PrimaryGnssStatistics =
-        navkit::core::estimation::MeasurementStatistics<PrimaryGnssSensor>;
-    using Logger =
-        navkit::io::RunLogger<navkit::io::TruthLogProduct,
-                              navkit::io::GnssPositionLogProduct,
-                              navkit::io::NavEstimateLogProduct,
-                              navkit::io::GnssPositionUpdateLogProduct<PrimaryGnssStatistics>>;
     using App = navkit::app_support::SimulationApp<EcefInsGnssAppConfig>;
 };
 ```
@@ -210,9 +203,7 @@ the owned app graph: each binding carries the configured emulator type, the
 target sensor type, and an ID derived from `Emulator::Id`; the binding verifies
 that this ID matches the selected sensor's configured `Sensor::Id`. This keeps
 duplicate sensors of the same model type, such as primary and backup GNSS
-receivers, unambiguous. App configs also select the logger adapter type at
-compile time; runtime JSON still owns run-specific choices such as run name and
-output directory. App configs also select the concrete IMU simulator type used by
+receivers, unambiguous. App configs select the concrete IMU simulator type used by
 the selected simulation loop; runtime JSON configures that simulator's runtime
 mode and numeric error parameters. IMU runtime error-model keys use explicit
 deterministic/static and stochastic/in-run names. Static terms such as
@@ -224,8 +215,15 @@ draws. In-run stochastic terms use PSD keys such as
 `bias_inrun_psd`, `angle_random_walk_psd`, and
 `velocity_random_walk_psd`. Exactly one direct/random form is valid for each
 static term, and stale key names are rejected during runtime validation rather
-than silently ignored. Logger adapters are composed from concrete log products with
-`navkit::io::RunLogger<...>`; the selected app config owns the product set.
+than silently ignored.
+
+Desktop logging is not repeated in each app compile-time config.
+`navkit::app_support::RuntimeLogger<NavKit>` centrally binds the known desktop
+log-product list, including NavKit-dependent estimate/statistics products.
+Runtime JSON owns whether each product is enabled and its exact cadence. This
+keeps nonembedded trajectory/analysis logging out of the embedded-facing NavKit
+product graph while retaining compile-time typed serialization for known
+products.
 Startup navigation data is also an app boundary: `NavInitializationProvider`
 turns runtime input, simulated truth, saved state, or future embedded inputs
 into a typed PVA `NavInitialization` message. `TransferAlignmentProvider`
@@ -249,8 +247,8 @@ values. Selecting which provider is valid is a compile-time app-config
 decision; the default simulation app selects a runtime-dispatching provider
 that accepts all three PVA initializer forms. For deterministic PVA errors,
 vector keys encode the frame and units.
-ECEF-resolved errors use `p_e_m`, `v_e_mps`, and `rotvec_b2e_rad`. Local-level
-errors use `p_n_m`, `v_n_mps`, and `rotvec_b2n_rad`; app support converts those
+ECEF-resolved errors use `p_e_m`, `v_e_mps`, and `rotvec_b2e_deg`. Local-level
+errors use `p_n_m`, `v_n_mps`, and `rotvec_b2n_deg`; app support converts those
 relative NED vectors to the internal ECEF-resolved initialization convention
 using the initial truth/reference position. Random PVA initialization has no
 deterministic `pva_error` keys, so `"type": "pva_random_error"` provides
@@ -321,7 +319,17 @@ it should not author product or scenario defaults. Scenario-specific values such
 as run name, output directory, logging cadence, simulator seeds, simulator noise
 levels, trajectory duration, and trajectory cadence belong in runtime JSON.
 
-Cadence accepts exactly one of `rate_hz` or `dt_s`. The parser canonicalizes
+Runtime JSON uses degrees for direct angular values and degrees per second for
+direct angular rates. The parsing boundary converts those values once to the
+radian-based internal math representation. Covariance, variance, and PSD terms
+retain their existing radian and squared-radian units for now; their explicit
+unit-bearing keys such as `*_var_rad2`, `*_cov_rad2`, and `*_psd_rad2ps` remain
+the authority. Logged algorithm data likewise keeps its documented output
+units and is not governed by this runtime-input convention.
+
+General cadence accepts exactly one of `rate_hz` or `dt_s`. Trajectory physics
+cadence uses the more descriptive `dynamics_rate_hz` or `dynamics_dt_s` pair.
+The parser canonicalizes
 either form to a rational samples-per-second representation for phase-stable
 scheduling. Prefer `rate_hz` for rates such as 600 Hz whose period has a
 repeating decimal representation; retain `dt_s` only when the period is the
@@ -337,6 +345,26 @@ The same `application` component selects the app-support clock mode. Use
 planned timestamp. Use `"clock": "realtime"` when planned timestamps must map
 to steady-clock deadlines for an HWIL-style loop. This runtime selection does
 not alter embedded NavKit algorithms.
+
+The required `"control_state_source"` selects only the application wiring into
+source-agnostic Guidance and Autopilot:
+
+```json
+{
+  "application": {
+    "clock": "simulated",
+    "control_state_source": "navigation_estimate",
+    "rate_hz": 1000.0
+  }
+}
+```
+
+`"navigation_estimate"` is the closed-loop default used by supported scenario
+components. After each `Navigator::update()`, the latest timestamped navigation
+state is supplied to the generated trajectory source for its next applicable
+controller tick. `"truth_passthrough"` is the explicit override for controlled
+reference studies. Guidance and Autopilot see the same typed
+`TrajectoryControlState` in either case; they never inspect the selected source.
 
 ### Trajectory sources and timing
 
@@ -364,22 +392,12 @@ real-time/HWIL clocks.
 - `"type": "stationary"` generates ECEF truth lazily from the configured
   duration, cadence, initial position/velocity/attitude, and optional angular
   rate.
-- `"type": "ballistic"` produces a stationary launch-pad dwell followed by a
-  fixed body-x boost and an unpowered ECEF coast. `launch_pad_duration_s`
-  deliberately makes early truth available for a future transfer-alignment
-  provider; it does not enable transfer alignment by itself. The profile accepts
-  an ECEF or local-level initial position, velocity, and attitude, plus
-  `boost_duration_s` and `boost_acceleration_b_x_mps2`.
-- `"type": "constant_altitude"` generates a constant-speed, curved-Earth path
-  at the configured WGS-84 ellipsoid height. It accepts `speed_mps` and an
-  initial ECEF/local-level position and attitude; velocity and body rate are
-  derived from that profile.
-- `"type": "calibration"` generates one selected constant-speed excitation:
-  `"horizontal_s_turn"`, `"vertical_s_turn"`, or `"bank_left_right"`.
-  `speed_mps`, `amplitude_rad`, and `period_s` define the maneuver.
-- `"type": "waypoint"` follows a nonempty `waypoints_lla_deg_m` list with a
-  simple bank-limited local-level heading controller. `speed_mps`,
-  `bank_limit_rad`, and `acceptance_radius_m` define its behavior.
+- `"type": "state_machine"` selects the one generic generated-trajectory
+  source. Named runtime states compose reusable reference, acceleration, bank,
+  Autopilot-activity, plant-constraint, command-filter, and transition blocks.
+  Ballistic, constant-altitude, horizontal/vertical calibration, Dutch-roll,
+  and waypoint scenarios are data configurations of this same runtime graph;
+  they are not separate C++ trajectory source types.
 - `"type": "csv"` loads `csv_path`, resolved relative to the main scenario
   JSON file. A v1 CSV source uses monotonic `time_s` and strictly increasing
   rows. It must provide `p_e_x_m`, `p_e_y_m`, `p_e_z_m`, `v_e_x_mps`,
@@ -388,14 +406,209 @@ real-time/HWIL clocks.
   `w_ib_b_{x,y,z}_radps` columns; otherwise NavKit derives the angular rate
   from adjacent truth attitudes and Earth rate.
 
-All generated profiles require exactly one initial position convention and may
-provide at most one initial attitude convention. The stationary and ballistic
-profiles may specify initial velocity; the constant-altitude, calibration, and
-waypoint profiles derive velocity from their profile inputs and reject direct
-velocity fields. Every non-stationary generated profile derives
-`w_ib_b_radps` from consecutive truth attitudes and rejects configured angular
-rate fields so runtime input never silently overrides or ignores the selected
-profile dynamics.
+Every generated state-machine trajectory selects its ECI translational
+integrator and its simulation-only Guidance, Autopilot, and Vehicle
+cadences/models explicitly. The graph is a named-state contract, for example:
+
+```json
+{
+  "trajectory": {
+    "type": "state_machine",
+    "duration_s": 180.0,
+    "dynamics_rate_hz": 1000.0,
+    "autopilot_rate_hz": 500.0,
+    "guidance_rate_hz": 100.0,
+    "translational_integration": "trapezoidal_predictor_corrector",
+    "termination": { "type": "ground_impact" },
+    "maximum_bank_angle_deg": 60.0,
+    "guidance_command_filter": {
+      "specific_force_time_constant_b_s": [0.2, 0.3, 0.4],
+      "bank_time_constant_s": 0.25
+    },
+    "autopilot": {
+      "type": "first_order",
+      "controller_rate_time_constant_pqr_s": [0.02, 0.02, 0.02],
+      "attitude_command_time_constant_s": 0.1,
+      "attitude_error_gain_pqr_per_s": [2.0, 2.0, 2.0],
+      "angular_rate_feedback_gain_pqr": [0.2, 0.2, 0.2],
+      "velocity_alignment_speed_threshold_mps": 1.0,
+      "initial_velocity_alignment_tolerance_deg": 5.0,
+      "gyro_moving_average_window_samples": 20
+    },
+    "vehicle_response": {
+      "type": "first_order",
+      "vehicle_rate_time_constant_pqr_s": [0.05, 0.05, 0.05],
+      "specific_force_command_time_constant_b_s": [0.03, 0.03, 0.03],
+      "specific_force_response_time_constant_b_s": [0.08, 0.08, 0.08],
+      "angular_rate_limit_pqr_degps": [114.591559, 114.591559, 114.591559],
+      "specific_force_limit_b_mps2": [100.0, 100.0, 100.0]
+    },
+    "state_machine": {
+      "initial_state_id": "launch_pad",
+      "cycle_policy": "reject",
+      "states": [
+        {
+          "id": "launch_pad",
+          "plant": { "constraint": "hold_initial_ecef" },
+          "guidance": {
+            "enabled": false,
+            "translation": {
+              "reference": { "type": "current_state" },
+              "acceleration": [{
+                "type": "body_specific_force",
+                "specific_force_ib_b_mps2": [0.0, 0.0, 0.0]
+              }]
+            },
+            "bank": { "type": "zero" },
+            "body_y_specific_force_enabled": true
+          },
+          "autopilot": { "enabled": false },
+          "transitions": [{
+            "to": "boost",
+            "priority": 0,
+            "when": { "type": "elapsed_in_state", "greater_equal_s": 5.0 }
+          }]
+        },
+        {
+          "id": "boost",
+          "plant": { "constraint": "none" },
+          "guidance": {
+            "enabled": true,
+            "translation": {
+              "reference": { "type": "current_state" },
+              "acceleration": [{
+                "type": "body_specific_force",
+                "specific_force_ib_b_mps2": [49.03325, 0.0, 0.0]
+              }]
+            },
+            "bank": { "type": "zero" },
+            "body_y_specific_force_enabled": true
+          },
+          "autopilot": { "enabled": true },
+          "guidance_command_filter": {
+            "specific_force_time_constant_b_s": [0.05, 0.05, 0.05],
+            "bank_time_constant_s": 0.05
+          },
+          "on_entry": { "guidance_command_filter": {
+            "specific_force_time_constant_b_s": [0.75, 0.75, 0.75],
+            "bank_time_constant_s": 0.75,
+            "duration_s": 2.0
+          }},
+          "terminal": { "behavior": "run_until_trajectory_termination" }
+        }
+      ]
+    }
+  }
+}
+```
+
+`initial_state_id` must name exactly one state. State IDs must be unique;
+transition targets must exist; transition priorities within a state must be
+unique; all states must be reachable; and cycles are rejected unless
+`cycle_policy` explicitly allows them. Each state is either terminal or owns a
+nonempty transition list. The v1 transition predicate is
+`elapsed_in_state.greater_equal_s`. When multiple predicates are true, the
+lowest numeric priority wins and at most one transition occurs on that
+Guidance epoch. A newly entered state produces the command for that same epoch.
+
+Each state's translation pipeline contains exactly one primary reference and
+an ordered list of additive acceleration blocks. Current supported references
+are `current_state`, `local_flight_path`, and `waypoint_path`. Reusable
+acceleration blocks include `path_feedforward`, `velocity_hold`,
+`altitude_hold_pd`, `body_specific_force`, and `free_fall`; bank policy is
+`zero` or `coordinated_bank_to_turn`. These strings select focused typed C++
+blocks. They do not route execution through a profile-specific `if`/`else`
+chain.
+
+`translational_integration` accepts `"semi_implicit_euler"` or
+`"trapezoidal_predictor_corrector"`. The trajectory
+`dynamics_rate_hz`/`dynamics_dt_s` is the
+Physics cadence. Guidance and Autopilot each require exactly one corresponding
+`*_rate_hz` or `*_dt_s`; Physics must be an integer multiple of Autopilot, and
+Autopilot an integer multiple of Guidance. The application master cadence must
+still visit every producer deadline.
+
+The first-order Autopilot owns attitude tracking, one body-`p/q/r` response,
+and the fixed-capacity moving average of actual configured IMU increments.
+`attitude_command_time_constant_s` applies an exact quaternion first-order LPF
+between the held Guidance target and the Autopilot target; zero selects an
+instantaneous command. Desired-rate feedforward is the quaternion log between
+successive deterministic, filtered command samples divided by the Autopilot
+interval. It is command kinematics, not finite differentiation of a noisy
+truth, navigation, or IMU state, and there is no integral term.
+`initial_velocity_alignment_tolerance_deg` validates the physical trajectory
+initial condition once. It is not reapplied to a selected navigation estimate,
+whose initial attitude error is a normal closed-loop controller input.
+Vehicle response owns a second body-rate response and two internal
+specific-force stages: command/actuator response followed by final body
+response. A time constant of `0.0` is the exact instantaneous-response limit
+for that axis; negative or non-finite values are invalid. Vehicle limits are
+optional and apply only after final response. The final realized body rate and
+specific force—not their commands—drive quaternion/ECI plant integration and
+IMU truth. The complete equations are in
+`docs/algorithms/trajectory_generation_v1/`.
+
+Bank angles are represented on `[-pi, pi]` (`[-180, 180]` degrees).
+`maximum_bank_angle_deg` is the common positive command limit used by all
+generated maneuver and waypoint modes; it may not exceed 60 degrees, so the
+largest supported command range is `[-60, 60]` degrees and the default uses
+that full range.
+`guidance_command_filter` configures a permanent stateful LPF at the Guidance
+output boundary. `specific_force_time_constant_b_s` independently filters the
+body-X/Y/Z specific-force commands, and `bank_time_constant_s` filters the NED
+roll/bank command before it reaches Autopilot. Each channel uses the exact
+zero-order-hold first-order step. A time constant of `0.0` bypasses only that
+channel.
+
+Filter selection has explicit precedence. The trajectory-level object is the
+global default. A state's own `guidance_command_filter` replaces that nominal
+selection while the state is active. Its optional
+`on_entry.guidance_command_filter` temporarily has highest precedence for the
+configured positive `duration_s`, then the state nominal selection resumes.
+State entry changes filter parameters without resetting its filtered command
+state; the new constants shape the first command produced by the entered state.
+The command therefore remains continuous without requiring artificial
+intermediate states solely to slow a transition.
+
+Guidance blocks may author an acceleration relative to NED or ECEF, but the
+plant command is always total inertial acceleration resolved in ECI. App
+support validates the authored convention, and the trajectory Guidance layer
+applies local-frame transport plus Earth-rate Coriolis and centripetal terms
+before the command reaches the plant. A frame rotation alone is used only when
+an already inertial acceleration is being resolved for another view.
+
+All generated state-machine trajectories require exactly one initial position,
+velocity, and attitude convention. The dynamic runtime forms direct Guidance acceleration and bank
+commands; it does not derive `a_cmd` or `w_cmd` by finite differencing adjacent
+position, velocity, or attitude profile points.
+
+The attitude payload may use a scalar-first quaternion (`q_*`), row-major
+direction cosine matrix (`dcm_*`), or aerospace Euler vector
+(`rpy_*_deg = [roll, pitch, yaw]`) for any supported frame direction:
+
+```text
+q_b2e,   dcm_b2e,   rpy_b2e_deg
+q_e2b,   dcm_e2b,   rpy_e2b_deg
+q_b2i,   dcm_b2i,   rpy_b2i_deg
+q_i2b,   dcm_i2b,   rpy_i2b_deg
+q_b2n,   dcm_b2n,   rpy_b2n_deg
+q_n2b,   dcm_n2b,   rpy_n2b_deg
+```
+
+Every payload encodes the same passive start-to-end transform named by its
+key. RPY inputs use the 3-2-1 yaw-pitch-roll composition
+`C_start2end = Rz(yaw) Ry(pitch) Rx(roll)`; inverse-frame Euler inputs must be
+computed from the inverse transform and are not componentwise sign
+negations. App support validates the quaternion or DCM and converts the
+selected form once to canonical scalar-first `q_b2e`. Downstream truth,
+emulators, logging, and Navigator code see only that canonical form.
+
+NED forms use the configured initial position to construct the local geodetic
+NED frame. Inertial forms use the selected v1 Earth-orientation convention:
+uniform WGS-84 Earth rotation with ECI and ECEF axes aligned at the trajectory
+epoch. Frame conversion fails configuration rather than silently substituting
+an identity transform when the required position or timestamp context is
+invalid.
 
 Truth remains queryable between native source samples. Position, velocity, and
 angular rate interpolate linearly; body-to-ECEF quaternion attitude uses SLERP.
@@ -414,6 +627,66 @@ w_ib_b = C_e2b w_ie_e + C_n2b w_en_n + w_nb_b
 Here `w_ie_e` is Earth rate resolved in ECEF and `w_en_n` is local transport
 rate resolved in NED. All angular-rate fields use rad/s and their full frame
 meaning is encoded in the JSON key.
+
+Generated trajectories can expose a compact frame-explicit inspection suite
+through optional run-level logging entries:
+
+```json
+{
+  "logging": {
+    "trajectory_kinematics_ecef": {"enabled": true, "rate_hz": 20.0},
+    "trajectory_kinematics_eci": {"enabled": true, "rate_hz": 20.0},
+    "trajectory_kinematics_ned": {"enabled": true, "rate_hz": 20.0},
+    "trajectory_kinematics_body": {"enabled": true, "rate_hz": 20.0},
+    "trajectory_guidance": {"enabled": true, "rate_hz": 20.0},
+    "trajectory_autopilot_vehicle": {"enabled": true, "rate_hz": 20.0}
+  }
+}
+```
+
+These keys are optional and default disabled. If present with `enabled: true`,
+each must provide exactly one runtime cadence (`rate_hz` or `dt_s`). They do
+not alter the trajectory integration rate or response model. The products
+record canonical ECEF/ECI truth, derived NED/body views, a Guidance
+command/final-response product, and a separate Autopilot/Vehicle product.
+Guidance and Autopilot commands are zero-order-held signals: rows logged faster
+than their producer cadence intentionally repeat the last command rather than
+interpolating it.
+Body-resolved velocity and acceleration are relative to ECI, matching the
+plant and ideal-IMU physics. Keep these products disabled in normal Monte Carlo
+members: the reference trajectory is common across runs, and duplicating
+high-rate diagnostic CSVs provides no statistical value.
+
+### Synthetic GNSS active windows
+
+The runtime GNSS component exposes one user-facing `seed`. Position and
+velocity observations are generated by separately owned simulator instances,
+so app support deterministically derives stable, independent position and
+velocity random-stream seeds from that component seed. This preserves
+single-seed replay and Monte Carlo control without correlating the two
+observation-noise vectors. The derived seeds are implementation details; users
+should configure only the component seed.
+
+The optional `gnss.active_windows` array enables both position and velocity
+measurements only during configured intervals without changing their cadence.
+When the field is absent, GNSS remains continuously active:
+
+```json
+{
+  "gnss": {
+    "active_windows": [
+      { "start_s": 0.0, "end_s": 40.0 },
+      { "start_s": 50.0, "end_s": 120.0 }
+    ]
+  }
+}
+```
+
+Each entry is a half-open interval `[start_s, end_s)` measured from the GNSS
+simulator's first query timestamp. Windows must be nonnegative, sorted, and
+non-overlapping, with `end_s > start_s`. Due epochs outside every active window
+are consumed but not published, so GNSS retains its original schedule phase.
+Omit the array for continuous availability.
 
 Compile-time product choices such as selected state definitions, fixed buffer
 sizes, covariance cadence, and initial-covariance policy slices belong in the

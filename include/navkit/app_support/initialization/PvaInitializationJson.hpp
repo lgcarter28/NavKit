@@ -86,13 +86,13 @@ inline void validate_pva_error_shape(const nlohmann::json& initialization)
     require_exactly_one_pva_error_key(pva_error, {"p_e_m", "p_n_m"}, "position-error");
     require_exactly_one_pva_error_key(pva_error, {"v_e_mps", "v_n_mps"}, "velocity-error");
     require_exactly_one_pva_error_key(
-        pva_error, {"rotvec_b2e_rad", "rotvec_b2n_rad"}, "attitude-error");
+        pva_error, {"rotvec_b2e_deg", "rotvec_b2n_deg"}, "attitude-error");
     require_optional_vec3(pva_error, "p_e_m");
     require_optional_vec3(pva_error, "p_n_m");
     require_optional_vec3(pva_error, "v_e_mps");
     require_optional_vec3(pva_error, "v_n_mps");
-    require_optional_vec3(pva_error, "rotvec_b2e_rad");
-    require_optional_vec3(pva_error, "rotvec_b2n_rad");
+    require_optional_vec3(pva_error, "rotvec_b2e_deg");
+    require_optional_vec3(pva_error, "rotvec_b2n_deg");
 }
 
 inline void validate_pva_direct_shape(const nlohmann::json& initialization)
@@ -100,7 +100,7 @@ inline void validate_pva_direct_shape(const nlohmann::json& initialization)
     const nlohmann::json& pva = require_object(initialization, "pva");
     require_vec3(pva, "p_e_m");
     require_vec3(pva, "v_e_mps");
-    require_vec3(pva, "rpy_b2e_rad");
+    require_vec3(pva, "rpy_b2e_deg");
     require_optional_nonnegative_number(pva, "time_s");
 }
 
@@ -118,14 +118,15 @@ inline void validate_pva_direct_shape(const nlohmann::json& initialization)
     }
     core::estimation::pos_e_m(pva_init.pva) = required_vec3_from_object(pva, "p_e_m");
     core::estimation::vel_e_mps(pva_init.pva) = required_vec3_from_object(pva, "v_e_mps");
-    core::estimation::rpy_b2e_rad(pva_init.pva) = required_vec3_from_object(pva, "rpy_b2e_rad");
+    core::estimation::rpy_b2e_rad(pva_init.pva) =
+        radians_from_degrees(required_vec3_from_object(pva, "rpy_b2e_deg"));
     return pva_init;
 }
 
 [[nodiscard]] inline Eigen::Matrix<core::Scalar_t, 3, 3>
 n2e_matrix_at_position(const core::Vec3& p_e_m)
 {
-    return ecef_to_ned_matrix(p_e_m).transpose();
+    return core::frames::ecef_to_ned_matrix(p_e_m).transpose();
 }
 
 [[nodiscard]] inline core::Vec3 pva_error_vec3_e_from_json(const nlohmann::json& pva_error,
@@ -150,8 +151,8 @@ pva_error_from_json(const nlohmann::json& initialization, const core::Vec3& refe
         pva_error_vec3_e_from_json(pva_error, "p_e_m", "p_n_m", reference_p_e_m);
     core::estimation::vel_error_e_mps(error) =
         pva_error_vec3_e_from_json(pva_error, "v_e_mps", "v_n_mps", reference_p_e_m);
-    core::estimation::att_rotvec_e_rad(error) =
-        pva_error_vec3_e_from_json(pva_error, "rotvec_b2e_rad", "rotvec_b2n_rad", reference_p_e_m);
+    core::estimation::att_rotvec_e_rad(error) = radians_from_degrees(
+        pva_error_vec3_e_from_json(pva_error, "rotvec_b2e_deg", "rotvec_b2n_deg", reference_p_e_m));
     return error;
 }
 
@@ -237,7 +238,7 @@ pva_error_covariance_from_json(const nlohmann::json& initialization,
         T.template block<3, 3>(core::estimation::PvaErrorStateDef::Vel::i,
                                core::estimation::PvaErrorStateDef::Vel::i) = C_n2e;
     }
-    if (pva_error.contains("rotvec_b2n_rad")) {
+    if (pva_error.contains("rotvec_b2n_deg")) {
         T.template block<3, 3>(core::estimation::PvaErrorStateDef::AttRotVec::i,
                                core::estimation::PvaErrorStateDef::AttRotVec::i) = C_n2e;
     }

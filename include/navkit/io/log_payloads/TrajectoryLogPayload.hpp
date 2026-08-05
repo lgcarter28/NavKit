@@ -8,7 +8,6 @@
 
 #include <Eigen/Geometry>
 #include <cstddef>
-#include <cstdint>
 
 namespace navkit::io
 {
@@ -55,11 +54,14 @@ struct TrajectoryLogData
     core::Vec3 guidance_acceleration_response_i_mps2{core::Vec3::Zero()};
     core::Vec3 guidance_acceleration_response_n_mps2{core::Vec3::Zero()};
     core::Vec3 guidance_acceleration_response_b_mps2{core::Vec3::Zero()};
+    core::Vec3 guidance_specific_force_command_b_mps2{core::Vec3::Zero()};
+    core::Vec3 guidance_specific_force_filtered_b_mps2{core::Vec3::Zero()};
     core::Scalar_t guidance_bank_command_n_rad{};
+    core::Scalar_t guidance_bank_filtered_n_rad{};
     core::Scalar_t guidance_bank_response_n_rad{};
     core::Vec3 guidance_reference_position_e_m{core::Vec3::Zero()};
     std::size_t guidance_reference_index{};
-    std::uint8_t guidance_mode{};
+    std::size_t guidance_state_index{};
     bool guidance_active{false};
     bool pad_constraint_active{false};
     bool guidance_reference_position_valid{false};
@@ -74,7 +76,7 @@ struct TrajectoryLogData
         Eigen::Quaternion<core::Scalar_t>::Identity()};
     core::Vec3 autopilot_angular_rate_command_b_radps{core::Vec3::Zero()};
     core::Vec3 autopilot_angular_rate_feedforward_b_radps{core::Vec3::Zero()};
-    core::Vec3 autopilot_angular_rate_response_b_radps{core::Vec3::Zero()};
+    core::Vec3 autopilot_angular_rate_controller_response_b_radps{core::Vec3::Zero()};
     core::Vec3 autopilot_gyro_observation_b_radps{core::Vec3::Zero()};
     bool autopilot_active{false};
 

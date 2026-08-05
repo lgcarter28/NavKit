@@ -9,7 +9,7 @@
 #include "navkit/app_support/initialization/TransferAlignmentProviderPolicy.hpp"
 #include "navkit/app_support/logging/RuntimeLogger.hpp"
 #include "navkit/io/LoggerPolicy.hpp"
-#include "navkit/sim/ImuSimulatorPolicy.hpp"
+#include "navkit/sim/sensors/ImuSimulatorPolicy.hpp"
 
 namespace navkit::app_support
 {

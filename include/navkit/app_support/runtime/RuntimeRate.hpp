@@ -155,4 +155,34 @@ rational_rate_from_required_runtime_rate(const nlohmann::json& cfg, std::string_
                                        " must specify one of 'dt_s' or 'rate_hz'");
 }
 
+/**
+ * Parses one required runtime rate whose JSON keys carry a subsystem prefix.
+ *
+ * This preserves the shared rational conversion while allowing one object to
+ * own several independent cadences without nested adapter objects.
+ */
+[[nodiscard]] inline core::RationalRate
+rational_rate_from_required_named_runtime_rate(const nlohmann::json& cfg,
+                                               std::string_view rate_key,
+                                               std::string_view period_key,
+                                               std::string_view object_name)
+{
+    detail::require_optional_positive_number(cfg, rate_key);
+    detail::require_optional_positive_number(cfg, period_key);
+    if (cfg.contains(std::string{rate_key}) == cfg.contains(std::string{period_key})) {
+        detail::throw_runtime_config_error(
+            std::string{object_name} + " must specify exactly one of '" + std::string{rate_key} +
+            "' or '" + std::string{period_key} + "'");
+    }
+
+    nlohmann::json canonical_rate = nlohmann::json::object();
+    if (cfg.contains(std::string{rate_key})) {
+        canonical_rate["rate_hz"] = cfg.at(std::string{rate_key});
+    }
+    else {
+        canonical_rate["dt_s"] = cfg.at(std::string{period_key});
+    }
+    return rational_rate_from_required_runtime_rate(canonical_rate, object_name);
+}
+
 } // namespace navkit::app_support

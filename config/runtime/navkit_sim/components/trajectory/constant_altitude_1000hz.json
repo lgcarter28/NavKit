@@ -1,10 +1,72 @@
 {
   "trajectory": {
-    "type": "constant_altitude",
+    "type": "state_machine",
     "duration_s": 120.0,
-    "rate_hz": 1000.0,
-    "speed_mps": 150.0,
+    "dynamics_rate_hz": 1000.0,
+    "guidance_rate_hz": 100.0,
+    "autopilot_rate_hz": 500.0,
+    "translational_integration": "trapezoidal_predictor_corrector",
+    "termination": { "type": "configured_duration" },
+    "autopilot": {
+      "type": "first_order",
+      "attitude_command_time_constant_s": 0.1,
+      "controller_rate_time_constant_pqr_s": [0.02, 0.02, 0.02],
+      "attitude_error_gain_pqr_per_s": [2.0, 2.0, 2.0],
+      "angular_rate_feedback_gain_pqr": [0.2, 0.2, 0.2],
+      "velocity_alignment_speed_threshold_mps": 1.0,
+      "initial_velocity_alignment_tolerance_deg": 5.0,
+      "gyro_moving_average_window_samples": 20
+    },
+    "maximum_bank_angle_deg": 60.0,
+    "guidance_command_filter": {
+      "specific_force_time_constant_b_s": [0.2, 0.2, 0.2],
+      "bank_time_constant_s": 0.2
+    },
+    "vehicle_response": {
+      "type": "first_order",
+      "vehicle_rate_time_constant_pqr_s": [0.05, 0.05, 0.05],
+      "specific_force_command_time_constant_b_s": [0.03, 0.03, 0.03],
+      "specific_force_response_time_constant_b_s": [0.08, 0.08, 0.08],
+      "angular_rate_limit_pqr_degps": [114.591559, 114.591559, 114.591559],
+      "specific_force_limit_b_mps2": [100.0, 100.0, 100.0]
+    },
     "p_lla_deg_m": [35.0, -106.0, 1500.0],
-    "rpy_b2n_rad": [0.0, 0.0, 0.7853981634]
+    "v_n_mps": [106.066017, 106.066017, 0.0],
+    "rpy_b2n_deg": [0.0, 0.0, 45.0],
+    "state_machine": {
+      "initial_state_id": "constant_altitude",
+      "cycle_policy": "reject",
+      "states": [
+        {
+          "id": "constant_altitude",
+          "plant": { "constraint": "none" },
+          "guidance": {
+            "enabled": true,
+            "translation": {
+              "reference": {
+                "type": "local_flight_path",
+                "speed": { "type": "constant", "value_mps": 150.0 },
+                "heading": { "type": "constant", "value_deg": 45.0 },
+                "flight_path": { "type": "constant", "value_deg": 0.0 }
+              },
+              "acceleration": [
+                { "type": "path_feedforward" },
+                { "type": "velocity_hold", "gain_n_1ps": [0.5, 0.5, 0.5] },
+                {
+                  "type": "altitude_hold_pd",
+                  "target": { "type": "initial_altitude" },
+                  "proportional_gain_1ps2": 0.05,
+                  "derivative_gain_1ps": 0.1
+                }
+              ]
+            },
+            "bank": { "type": "zero" },
+            "body_y_specific_force_enabled": true
+          },
+          "autopilot": { "enabled": true },
+          "terminal": { "behavior": "run_until_trajectory_termination" }
+        }
+      ]
+    }
   }
 }

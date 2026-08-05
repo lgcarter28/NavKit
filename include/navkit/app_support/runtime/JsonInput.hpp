@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <numbers>
 #include <stdexcept>
 #include <string>
 
@@ -89,6 +90,34 @@ Vec3 vec3_from_json(const nlohmann::json& value)
     v << value.at(0).get<core::Scalar_t>(), value.at(1).get<core::Scalar_t>(),
         value.at(2).get<core::Scalar_t>();
     return v;
+}
+
+[[nodiscard]] inline constexpr core::Scalar_t radians_from_degrees(const core::Scalar_t angle_deg)
+{
+    return angle_deg * std::numbers::pi_v<core::Scalar_t> / 180.0;
+}
+
+[[nodiscard]] inline constexpr core::Scalar_t degrees_from_radians(const core::Scalar_t angle_rad)
+{
+    return angle_rad * 180.0 / std::numbers::pi_v<core::Scalar_t>;
+}
+
+template<typename Vec3>
+[[nodiscard]] Vec3 radians_from_degrees(const Vec3& angles_deg)
+{
+    return angles_deg * (std::numbers::pi_v<core::Scalar_t> / 180.0);
+}
+
+template<typename Vec3>
+[[nodiscard]] Vec3 degrees_from_radians(const Vec3& angles_rad)
+{
+    return angles_rad * (180.0 / std::numbers::pi_v<core::Scalar_t>);
+}
+
+template<typename Vec3>
+[[nodiscard]] Vec3 radians_from_degrees_json(const nlohmann::json& value)
+{
+    return radians_from_degrees(vec3_from_json<Vec3>(value));
 }
 
 } // namespace navkit::app_support

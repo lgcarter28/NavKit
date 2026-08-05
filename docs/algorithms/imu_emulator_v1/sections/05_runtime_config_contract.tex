@@ -10,15 +10,15 @@ make the emulator mode and every enabled error source explicit. A v1 shape is:
   "rate_hz": 1000.0,
   "seed": 12345,
   "gyro": {
-    "bias_turnon_radps": [0, 0, 0],
+    "bias_turnon_degps": [0, 0, 0],
     "bias_inrun_psd_rad2ps3": [0, 0, 0],
     "bias_correlation_rate_1ps": [0, 0, 0],
     "angle_random_walk_psd_rad2ps": [0, 0, 0],
     "scale_factor": [0, 0, 0],
-    "misalignment_rad": [0, 0, 0],
+    "misalignment_deg": [0, 0, 0],
     "nonorthogonality": [0, 0, 0],
-    "quantization_rad": [0, 0, 0],
-    "angular_rate_limit_radps": [0, 0, 0]
+    "quantization_deg": [0, 0, 0],
+    "angular_rate_limit_degps": [0, 0, 0]
   },
   "accel": {
     "bias_turnon_mps2": [0, 0, 0],
@@ -26,7 +26,7 @@ make the emulator mode and every enabled error source explicit. A v1 shape is:
     "bias_correlation_rate_1ps": [0, 0, 0],
     "velocity_random_walk_psd_m2ps3": [0, 0, 0],
     "scale_factor": [0, 0, 0],
-    "misalignment_rad": [0, 0, 0],
+    "misalignment_deg": [0, 0, 0],
     "nonorthogonality": [0, 0, 0],
     "quantization_mps": [0, 0, 0],
     "acceleration_limit_mps2": [0, 0, 0]
@@ -42,6 +42,12 @@ direct value, diagonal variance, or full covariance. Runtime configuration
 parsing validates and stores this declarative description; the IMU simulator
 owns the random stream and realizes the configured random terms when the
 simulator is constructed or initialized.
+
+Direct runtime angular values use degrees, and direct angular rates use
+degrees per second. The parser converts them once to the radian-based internal
+model. Variance, covariance, and PSD inputs retain the explicit radian-based
+units encoded in keys such as \texttt{bias\_turnon\_var\_rad2ps2} and
+\texttt{misalignment\_cov\_rad2}.
 
 \section{Validation Rules}
 

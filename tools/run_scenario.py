@@ -116,7 +116,18 @@ def main() -> int:
     plot_command = [sys.executable, str(tools_dir / "plot_run.py"), str(output_dir)]
     if args.show:
         plot_command.append("--show")
-    return subprocess.run(plot_command, check=False).returncode
+    plot_result = subprocess.run(plot_command, check=False)
+    if plot_result.returncode != 0:
+        return plot_result.returncode
+
+    trajectory_plot_command = [
+        sys.executable,
+        str(tools_dir / "plot_trajectory.py"),
+        str(output_dir),
+    ]
+    if args.show:
+        trajectory_plot_command.append("--show")
+    return subprocess.run(trajectory_plot_command, check=False).returncode
 
 
 if __name__ == "__main__":

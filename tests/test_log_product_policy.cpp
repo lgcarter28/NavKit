@@ -22,8 +22,8 @@
 #include "navkit/io/log_products/ImuIncrementLogProduct.hpp"
 #include "navkit/io/log_products/NavEstimateLogProduct.hpp"
 #include "navkit/io/log_products/TruthLogProduct.hpp"
-#include "navkit/sim/ImuSimulator.hpp"
-#include "navkit/sim/TruthSample.hpp"
+#include "navkit/sim/sensors/ImuSimulator.hpp"
+#include "navkit/sim/trajectory/TruthSample.hpp"
 #include "test_main.hpp"
 
 #include <filesystem>

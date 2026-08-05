@@ -8,8 +8,8 @@
 #include "navkit/app_support/emulation/EmulatorBindingTuplePolicy.hpp"
 #include "navkit/core/estimation/sensor/SensorTupleTraits.hpp"
 #include "navkit/io/LoggerPolicy.hpp"
-#include "navkit/sim/TrajectorySource.hpp"
-#include "navkit/sim/TruthSample.hpp"
+#include "navkit/sim/trajectory/TrajectorySource.hpp"
+#include "navkit/sim/trajectory/TruthSample.hpp"
 
 #include <concepts>
 #include <nlohmann/json.hpp>

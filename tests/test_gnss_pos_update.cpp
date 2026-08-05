@@ -11,7 +11,7 @@
 #include "navkit/core/math/Quaternion.hpp"
 #include "navkit/core/models/GnssPosModel.hpp"
 #include "navkit/core/models/GnssVelModel.hpp"
-#include "navkit/sim/GnssSimulator.hpp"
+#include "navkit/sim/sensors/GnssSimulator.hpp"
 #include "test_main.hpp"
 
 #include <tuple>

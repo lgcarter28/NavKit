@@ -1,17 +1,77 @@
 {
   "trajectory": {
-    "type": "waypoint",
+    "type": "state_machine",
     "duration_s": 120.0,
-    "rate_hz": 1000.0,
-    "speed_mps": 100.0,
-    "bank_limit_rad": 0.3490658504,
-    "acceptance_radius_m": 50.0,
+    "dynamics_rate_hz": 1000.0,
+    "guidance_rate_hz": 100.0,
+    "autopilot_rate_hz": 500.0,
+    "translational_integration": "trapezoidal_predictor_corrector",
+    "termination": { "type": "configured_duration" },
+    "autopilot": {
+      "type": "first_order",
+      "attitude_command_time_constant_s": 0.1,
+      "controller_rate_time_constant_pqr_s": [0.02, 0.02, 0.02],
+      "attitude_error_gain_pqr_per_s": [2.0, 2.0, 2.0],
+      "angular_rate_feedback_gain_pqr": [0.2, 0.2, 0.2],
+      "velocity_alignment_speed_threshold_mps": 1.0,
+      "initial_velocity_alignment_tolerance_deg": 5.0,
+      "gyro_moving_average_window_samples": 20
+    },
+    "maximum_bank_angle_deg": 60.0,
+    "guidance_command_filter": {
+      "specific_force_time_constant_b_s": [0.2, 0.2, 0.2],
+      "bank_time_constant_s": 0.2
+    },
+    "vehicle_response": {
+      "type": "first_order",
+      "vehicle_rate_time_constant_pqr_s": [0.05, 0.05, 0.05],
+      "specific_force_command_time_constant_b_s": [0.03, 0.03, 0.03],
+      "specific_force_response_time_constant_b_s": [0.08, 0.08, 0.08],
+      "angular_rate_limit_pqr_degps": [114.591559, 114.591559, 114.591559],
+      "specific_force_limit_b_mps2": [100.0, 100.0, 100.0]
+    },
     "p_lla_deg_m": [35.0, -106.0, 1500.0],
-    "rpy_b2n_rad": [0.0, 0.0, 0.0],
-    "waypoints_lla_deg_m": [
-      [35.018, -106.000, 1500.0],
-      [35.018, -105.978, 1500.0],
-      [35.000, -105.978, 1500.0]
-    ]
+    "v_n_mps": [100.0, 0.0, 0.0],
+    "rpy_b2n_deg": [0.0, 0.0, 0.0],
+    "state_machine": {
+      "initial_state_id": "waypoint_path",
+      "cycle_policy": "reject",
+      "states": [
+        {
+          "id": "waypoint_path",
+          "plant": { "constraint": "none" },
+          "guidance": {
+            "enabled": true,
+            "translation": {
+              "reference": {
+                "type": "waypoint_path",
+                "speed": { "type": "constant", "value_mps": 100.0 },
+                "acceptance_radius_m": 250.0,
+                "heading_error_gain_mps2_per_deg": 0.0872664626,
+                "waypoints_lla_deg_m": [
+                  [35.018, -106.000, 1500.0],
+                  [35.018, -105.978, 1500.0],
+                  [35.000, -105.978, 1500.0]
+                ]
+              },
+              "acceleration": [
+                { "type": "path_feedforward" },
+                { "type": "velocity_hold", "gain_n_1ps": [0.5, 0.5, 0.75] },
+                {
+                  "type": "altitude_hold_pd",
+                  "target": { "type": "initial_altitude" },
+                  "proportional_gain_1ps2": 0.1,
+                  "derivative_gain_1ps": 0.1
+                }
+              ]
+            },
+            "bank": { "type": "coordinated_bank_to_turn" },
+            "body_y_specific_force_enabled": false
+          },
+          "autopilot": { "enabled": true },
+          "terminal": { "behavior": "run_until_trajectory_termination" }
+        }
+      ]
+    }
   }
 }

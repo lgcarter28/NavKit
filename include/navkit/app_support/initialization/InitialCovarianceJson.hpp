@@ -167,7 +167,7 @@ initial_covariance_pva_diag_from_json(const nlohmann::json& initial_covariance,
     navkit::core::estimation::InitialCovariance<StateDef> transform =
         navkit::core::estimation::InitialCovariance<StateDef>::Identity();
     const Eigen::Matrix<navkit::core::Scalar_t, 3, 3> C_n2e =
-        ecef_to_ned_matrix(reference_p_e_m).transpose();
+        navkit::core::frames::ecef_to_ned_matrix(reference_p_e_m).transpose();
     transform.template block<3, 3>(Error::Pos::i, Error::Pos::i) = C_n2e;
     transform.template block<3, 3>(Error::Vel::i, Error::Vel::i) = C_n2e;
     transform.template block<3, 3>(Error::AttRotVec::i, Error::AttRotVec::i) = C_n2e;

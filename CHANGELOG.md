@@ -14,6 +14,87 @@ This project follows
 
 ### Added
 
+- Runtime JSON now uses degrees for direct angular values and degrees per
+  second for direct angular rates while retaining radian-based covariance and
+  PSD terms. Trajectory physics cadence is explicitly named
+  `dynamics_rate_hz`/`dynamics_dt_s`. A persistent Guidance-output LPF now
+  applies independently configured body-X/Y/Z specific-force and bank time
+  constants, supports per-channel zero-time-constant bypass, and accepts
+  continuous state-machine parameter changes without resetting filter state.
+  Optional state-entry windows temporarily select slower time constants on the
+  first sample after a Guidance transition, then return automatically to the
+  active state's nominal filter constants.
+- Pass 7.14 replaces profile-specific Guidance branches with one validated
+  runtime JSON state graph composed from typed reference, acceleration, bank,
+  transition, plant-constraint, and filter blocks. Guidance, Autopilot, and
+  Vehicle/plant ownership now have distinct simulation domains, and trajectory
+  diagnostics expose a generic `guidance_state_index` instead of a fixed mode
+  enumeration. The Guidance-to-Autopilot command now contains only filtered
+  body-specific force and bank, while focused execution, diagnostics, and
+  Autopilot-state payloads prevent downstream consumers from depending on the
+  trajectory-wide state and environment.
+- Trajectory diagnostics now express every acceleration and specific-force
+  series in standard gravity units, place independent legends beside their
+  corresponding subplots, and enable mouse-wheel zoom plus double-click home
+  reset across the shared interactive 2-D and 3-D renderers.
+- Generated trajectory Guidance now exposes explicit altitude proportional and
+  vertical-speed derivative gains. Coordinated bank is defined in the plane
+  normal to the full three-dimensional velocity vector, remains valid at
+  nonzero flight-path elevation, wraps on `[-180, 180]` degrees, and enforces
+  the common `+/-60` degree command limit.
+- The trajectory-generation reference now uses rich frame notation for DCMs
+  and quaternions and documents the permanent Guidance command filter,
+  altitude P--D contribution, and velocity-normal coordinated-bank
+  construction.
+- Pass 7.13 trajectory-profile follow-up: a 2--3 minute ballistic reference
+  with an approximately five-g powered body-X specific-force boost; paired
+  skid-to-turn and bank-to-turn horizontal
+  S-turns; altitude-coupled coordinated-bank allocation; optional body-lateral
+  specific-force suppression; planar vertical calibration; and a sustained
+  acceleration-based Dutch-roll calibration combining horizontal excitation
+  at its base frequency with twice-frequency vertical excitation, coordinated
+  bank-to-turn, a front-view half-pipe trajectory, and body `p`/`r` excitation
+  in quadrature.
+- Frame-rigorous local-guidance conversion now includes NED transport, uses
+  physical inertial acceleration for coordinated-bank force allocation, and
+  resolves plant specific-force commands through the realized physical
+  attitude rather than the selected control-state attitude.
+- Consolidated trajectory analysis into frame-explicit kinematics, focused
+  Guidance and Autopilot figures, one Guidance/Control dashboard, tracking
+  errors, and LLA/relative-local 3-D products. Body plots identify
+  `w_ib_b` as the body inertial angular rate \(\omega_{ib}^{b}\) explicitly;
+  relative-local position uses North/East/Up with `Up = -Down` and a
+  data-proportional aspect.
+- Pass 7.12 trajectory/estimator correctness follow-up: uniform
+  truth-minus-estimate analysis signs, same-epoch sequential GNSS
+  injection/reset, measured-rate antenna lever-arm velocity modeling,
+  independent deterministic GNSS position/velocity random substreams,
+  rotating-Earth centrifugal dynamics, midpoint-attitude delta-velocity
+  mechanization, ballistic gravity-turn/impact behavior, smoothed trajectory
+  commands with desired-rate feedforward, and expanded nested-loop/body-frame
+  diagnostics.
+- Source-agnostic low-fidelity Guidance, Autopilot, and Vehicle-response
+  boundaries with runtime-selected navigation-estimate or truth-passthrough
+  control state, actual simulated-IMU rate feedback, exact subsystem cadences,
+  and ECI truth-plant integration.
+- Explicit launch-pad, boost, gravity-turn, free-inertial, curved-Earth
+  constant-altitude, calibration, and waypoint Guidance modes with
+  velocity-alignment guards, two-stage specific-force response, body-rate
+  response/limits, and closed-loop navigation selected by default.
+- Runtime trajectory Guidance and Autopilot/Vehicle logs plus reusable
+  interactive Euler, ECEF/ECI/NED/body kinematic, command/response,
+  tracking-error, LLA 3-D, and relative-NED 3-D analysis products.
+- Frame-explicit trajectory attitude input for all quaternion, DCM, and
+  aerospace 3-2-1 RPY forms across ECEF, ECI, and local NED directions,
+  validated and canonicalized to passive scalar-first `q_b2e`.
+- Reusable status-returning geodetic/ECEF, local-NED, and uniformly rotating
+  fixed/inertial frame transforms with focused round-trip regression coverage.
+- A standalone modular trajectory-generation algorithm reference covering the
+  implemented Earth-orientation, attitude-input, response-dynamics, ECI
+  integration, saturation, and diagnostics contracts.
+- Optional frame-explicit trajectory-inspection products for ECEF, ECI, NED,
+  body-resolved, and command/control/realized-response data, with independent
+  runtime cadences and reusable Plotly/Matplotlib trajectory dashboards.
 - Generated runtime trajectory profiles and scenarios for launch-pad ballistic
   boost/coast, curved-Earth constant-altitude flight, three calibration
   maneuvers, and bank-limited waypoint following. All generated non-stationary
@@ -30,7 +111,7 @@ This project follows
 - Shared `TruthTrajectory` source storage/querying for generated and CSV ECEF
   truth, exact-cadence IMU truth sampling with interpolation, CSV playback
   through the normal simulation app path, and full local-level transport-rate
-  handling for `w_nb_b_radps` trajectory initialization.
+  handling for degree-based runtime `w_nb_b_degps` trajectory initialization.
 - Product-core versioned timestamp, duration, time-scale, and rational-rate
   vocabulary; exact multi-rate simulation/logging schedules; and focused
   600 Hz, duration-borrow, and incommensurate-rate regression coverage.
@@ -100,6 +181,14 @@ This project follows
 
 ### Changed
 
+- Preserved configured physical mission references independently from the
+  runtime-selected control-state feedback source, so navigation-estimate
+  initialization errors no longer redefine commanded altitude, heading, or
+  launch-rail attitude.
+- Moved non-embedded simulation logging composition out of compile-time product
+  configs into runtime logger selection, split trajectory diagnostics into
+  Guidance and Autopilot/Vehicle products, and changed GNSS availability
+  configuration from outage windows to explicit active windows.
 - Aligned the default compile-time IMU-bias initial covariance with the
   moderate conservative runtime default instead of the previous oversized
   gyro-bias covariance.
@@ -170,8 +259,8 @@ This project follows
 - Renamed compile-time config constants such as GNSS sensor IDs and buffer sizes to snake_case while keeping type aliases in PascalCase.
 - Refactored stationary simulation logging so `RunLogger` coordinates composable log-product adapters while app compile-time configs explicitly select the logger type.
 - Added payload-specific log-product concepts and CSV schema helpers so logging adapters expose explicit serialization boundaries.
-- Reworked `RunLogger` into a compile-time log-product tuple faÃ§ade with typed payload dispatch, selected-product metadata emission, and generic app-support measurement-statistics logging.
-- Moved logger composition into app compile-time configs, added logger lifecycle/payload/product-access concepts, and made `RunLogger<...>` the generic log-product tuple faÃ§ade.
+- Reworked `RunLogger` into a compile-time log-product tuple facade with typed payload dispatch, selected-product metadata emission, and generic app-support measurement-statistics logging.
+- Moved logger composition into app compile-time configs, added logger lifecycle/payload/product-access concepts, and made `RunLogger<...>` the generic log-product tuple facade.
 - Removed public `MeasurementStatisticsTuple` aliases from reusable product configs; `KalmanFilter` now derives filter-owned diagnostics storage from the configured `Sensors` tuple and exposes `measurement_statistics_available<Sensor>()`.
 - Added sensor diagnostics configuration and disabled-statistics coverage while keeping measurement statistics keyed by configured sensor type.
 - Installed Ninja through bootstrap as a local compile-database convenience for optional Windows clang-tidy diagnostics.
@@ -204,6 +293,14 @@ This project follows
 
 ### Fixed
 
+- Corrected ballistic launch behavior so pad support force is not retained as
+  actuator state and the configured speed guard preserves the launch program
+  through the low-speed gravity-turn singularity before powered
+  velocity-alignment begins.
+- Corrected waypoint bank-to-turn behavior so turns are produced by bounded
+  lateral acceleration while speed follows the current course, and final
+  waypoint acceptance transitions to a stable terminal continuation rather
+  than repeated point pursuit and reversals.
 - Removed stale feature-status claims and resolved the C++20/C++23 documentation mismatch.
 
 ---

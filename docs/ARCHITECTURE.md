@@ -58,6 +58,11 @@ include/navkit/
     profiling/
 
   sim/
+    sensors/
+    guidance/
+    autopilot/
+    trajectory/
+    math/
   io/
     log_payloads/
     log_products/
@@ -82,6 +87,11 @@ config/
 
 src/
   sim/
+    sensors/
+    guidance/
+    autopilot/
+    trajectory/
+    math/
   app_support/
 ```
 
@@ -154,7 +164,72 @@ truth lazily; `TabulatedTrajectorySource` wraps generated or CSV-backed
 `TruthTrajectory` storage, which retains native samples and uses linear ECEF
 state interpolation plus quaternion SLERP. This keeps the reusable product-core
 navigation path statically composed while allowing application/simulation code
-to select a source at runtime.
+to select a source at runtime. `GeneratedTrajectorySource` is the controlled
+dynamic implementation: it owns a simulation-only `GuidanceModel`,
+`AutopilotModel`, `VehicleResponseModel`, and canonical ECI plant state behind
+the same truth-source interface.
+
+These collaborators have explicit ownership domains. Reusable Guidance
+algorithms, typed command blocks, and the runtime `GuidanceStateMachine` live
+under `sim/guidance`; Autopilot attitude/rate tracking lives under
+`sim/autopilot`; the generated source, ECI truth integration, and Vehicle/plant
+response remain under `sim/trajectory`. The common `GuidanceCommand` payload is
+the deliberately narrow data boundary from Guidance to Autopilot: filtered
+body-resolved specific force plus NED bank command. State-machine execution
+flags and logging/realization diagnostics travel in separate producer-output
+structures rather than expanding that consumer contract. Vehicle response is
+not an Autopilot implementation detail: Autopilot produces controller
+body-rate response, while the Vehicle independently applies plant body-rate
+and specific-force response before truth integration.
+
+Guidance consumes `sim::TrajectoryControlState`, not truth objects or Navigator
+internals. The generated source adapts that selected state once into the
+focused `sim::AutopilotState` needed for attitude/rate tracking: body-to-ECI
+attitude, body inertial rate, NED velocity, and the ECI-to-NED DCM. Separate
+`AutopilotExecutionState` flags state whether tracking is active or the launch
+attitude must be held. The Autopilot does not receive plant position,
+acceleration, gravity, or other trajectory-environment fields it does not use.
+`SimulationApp` selects the state source at runtime:
+`"navigation_estimate"` is the closed-loop default, while
+`"truth_passthrough"` is an explicit analysis/reference override. The choice is
+translated at the application boundary; controller implementations never
+inspect which source was selected. After `Navigator::update()`, the app
+publishes the latest timestamped navigation-control snapshot for the next
+applicable controller tick. Current semantics deliberately use the latest
+available estimate without delayed-state replay.
+
+The generated source uses exact independent Physics, Autopilot, and Guidance
+schedules. One runtime JSON graph selects named Guidance states and composes
+typed reference, acceleration, bank, plant-constraint, and transition blocks;
+trajectory names such as ballistic or waypoint no longer select bespoke C++
+Guidance classes. Guidance emits total inertial acceleration plus a NED bank
+intent in a `GuidanceOutput`; the physical plant boundary converts that intent
+to a complete minimal `GuidanceCommand`. A persistent Guidance-output filter
+independently shapes body-X/Y/Z specific force and bank using global,
+state-nominal, or temporary state-entry time constants without resetting its
+command state. Runtime diagnostics log
+the generic `guidance_state_index`, not an obsolete fixed mode enumeration.
+Autopilot forms attitude and body-rate commands, consuming the actual
+configured IMU increments through a fixed-capacity moving-window
+`sum(delta_theta) / sum(dt)` observation. Vehicle response owns final body
+rate, its two internal specific-force response stages, post-response limits,
+and the conversion back to realized ECI acceleration. Only the ECI plant
+integrates truth. This runtime-polymorphic simulation boundary is intentionally
+outside the statically composed embedded product core.
+
+Guidance blocks that author acceleration relative to NED or ECEF apply the
+appropriate local-frame transport, Coriolis, and centripetal terms before
+publishing the canonical total inertial acceleration in ECI; a DCM-only
+rotation is valid only when the source quantity is already an inertial
+acceleration. Ballistic coast behavior is explicit in its configured state:
+zero nongravitational force plus active Autopilot produces a velocity-aligned
+gravity turn, while the same force command with inactive Autopilot permits
+free inertial attitude propagation.
+
+Guidance and Autopilot outputs are zero-order held between their exact producer
+epochs. Runtime diagnostics sampled at Physics or logging cadence repeat the
+held values until the next producer update rather than interpolating commands
+or implying extra controller executions.
 
 `SimulationApp` owns the planned master cadence and a runtime-selected
 app-support `Clock`. Its configured application
@@ -173,6 +248,15 @@ deadline. The selected `"simulated"` or `"realtime"` mode is runtime JSON, not
 an embedded NavKit policy. Exact planned timestamps come from `RationalTimeline`;
 consumer-side `RationalSchedule` remains solely the due-time gate for log and
 synthetic-emulator cadences.
+
+At each planned application epoch, the source first receives the latest
+selected controller-facing state and advances Physics through that exact time.
+Synthetic emulators then prepare observations from available truth. After
+`Clock::wait_until(t)`, the app publishes prepared sensor data, routes the same
+published IMU increment to both Navigator and the source's Autopilot observation
+path, invokes `Navigator::update()`, and refreshes the closed-loop control-state
+snapshot. Preparation may run ahead of a real-time deadline; publication and
+controller observation of sensor data may not.
 
 The time vocabulary is split by dependency: `TimeTypes.hpp`, `Timestamp.hpp`,
 `Duration.hpp`, `RationalRate.hpp`, `RationalSchedule.hpp`, and
@@ -207,7 +291,10 @@ Use CMake target kinds honestly:
 - `navkit::io` is currently an `INTERFACE` target because IO support is still
   header-only. It carries the desktop JSON dependency.
 - `navkit::sim` is a compiled library because simulator implementation sources
-  live in `src/sim/*.cpp`.
+  live under `src/sim/`. Sensor simulators are grouped under `sensors/`, while
+  runtime Guidance and Autopilot own top-level `guidance/` and `autopilot/`
+  domains. Trajectory truth integration and Vehicle/plant response stay under
+  `trajectory/`; shared simulation math lives under `math/`.
 - `navkit::app_support` is currently an `INTERFACE` target because its reusable
   support is template-heavy and selected-config dependent. It provides C++
   helpers for JSON runtime inputs, compiled configuration description, selected
@@ -244,10 +331,15 @@ initialization and transfer-alignment seams, app-side logging adapters, profile
 export, and trajectory providers. IO log products and typed payload wrappers live under
 `include/navkit/io/log_products` and `include/navkit/io/log_payloads` so the
 serialization boundary is explicit without forcing logging into product-core
-code. `navkit::io::RunLogger<...>` is a small compile-time façade over the
-selected app-configured log-product tuple: it owns output-directory setup, product
-open/flush/close orchestration, per-product metadata files, and the run
-manifest, while concrete products own CSV schemas and payload serialization.
+code. `app_support::RuntimeLogger<NavKit>` centrally defines the desktop
+simulation product list and binds NavKit-dependent log-product types.
+`navkit::io::RunLogger<...>` remains the small compile-time façade that owns
+output-directory setup, product open/flush/close orchestration, per-product
+metadata files, and the run manifest, while concrete products own CSV schemas
+and payload serialization. Concrete app compile-time configs do not repeat the
+desktop logging tuple. Runtime JSON owns whether each known product is enabled
+and its cadence; this keeps nonembedded logging selection out of the NavKit
+product config.
 
 This boundary avoids checked-in sidecar metadata that can drift from the actual
 compiled configuration. If build-manifest writing moves fully into C++ later,
@@ -256,26 +348,29 @@ configuration facts.
 
 ## Current data flow
 
-The working demonstration is stationary ECEF INS propagation with GNSS-position
-aiding:
+The current simulation supports stationary and dynamically generated ECEF
+INS/GNSS scenarios:
 
 ```text
-stationary truth
-    -> IMU simulator
-    -> Navigator IMU buffer
-    -> ECEF INS propagation policy
-    -> GNSS simulator
-    -> Sensor queue
-    -> Navigator
-    -> KalmanFilter measurement update
-    -> measurement statistics
-    -> CSV/JSON logs
-    -> Python analysis
+selected control state (Navigator estimate by default)
+    -> Guidance acceleration/bank command
+    -> persistent body-specific-force/bank command filter
+    -> Autopilot attitude/body-rate command and response
+    -> Vehicle body-rate/specific-force response
+    -> ECI truth plant
+    -> IMU and GNSS simulators
+    -> Navigator buffers and ECEF INS propagation
+    -> KalmanFilter covariance/measurement updates
+    -> latest closed-loop control-state snapshot
+
+truth + diagnostics + estimates
+    -> runtime-selected CSV/JSON products
+    -> Python CSV/HDF5 analysis and plots
 ```
 
-The target flow will add richer aiding, multi-rate sensors, richer truth
-generation, history/replay support, and repeatable validation metrics. Those are
-roadmap items, not current behavior.
+The working filter remains a loosely coupled ECEF INS with GNSS position and
+velocity aiding. Later roadmap phases add richer aiding, history/replay,
+tightly coupled observables, and higher-fidelity vehicle dynamics.
 
 ## Current implementation boundaries
 

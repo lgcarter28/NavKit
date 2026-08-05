@@ -9,7 +9,7 @@
 #include "navkit/app_support/initialization/NavInitializationProviders.hpp"
 #include "navkit/app_support/initialization/TransferAlignmentProviders.hpp"
 #include "navkit/products/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
-#include "navkit/sim/ImuSimulator.hpp"
+#include "navkit/sim/sensors/ImuSimulator.hpp"
 
 #include <tuple>
 

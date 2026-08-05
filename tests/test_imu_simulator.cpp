@@ -6,7 +6,7 @@
 #include "navkit/core/environment/RotatingPlanetKinematics.hpp"
 #include "navkit/core/environment/gravity/J2.hpp"
 #include "navkit/core/environment/planet/Wgs84.hpp"
-#include "navkit/sim/ImuSimulator.hpp"
+#include "navkit/sim/sensors/ImuSimulator.hpp"
 #include "test_main.hpp"
 
 #include <Eigen/Geometry>
@@ -306,22 +306,22 @@ TEST_CASE("IMU runtime config parser accepts ideal and error-model shapes")
           {"seed", 12U},
           {"rate_hz", 200.0},
           {"gyro",
-           {{"bias_turnon_radps", {1.0, 2.0, 3.0}},
+           {{"bias_turnon_degps", {57.29577951308232, 114.59155902616465, 171.88733853924697}},
             {"bias_inrun_psd_rad2ps3", {0.0, 0.0, 0.0}},
             {"bias_correlation_rate_1ps", {0.1, 0.2, 0.3}},
             {"angle_random_walk_psd_rad2ps", {1.0e-6, 2.0e-6, 3.0e-6}},
             {"scale_factor", {0.1, 0.2, 0.3}},
-            {"misalignment_rad", {0.01, 0.02, 0.03}},
+            {"misalignment_deg", {0.5729577951308232, 1.1459155902616465, 1.7188733853924696}},
             {"nonorthogonality", {0.001, 0.002, 0.003}},
-            {"angular_rate_limit_radps", {0.0, 0.0, 0.0}},
-            {"quantization_rad", {0.0, 0.0, 0.0}}}},
+            {"angular_rate_limit_degps", {0.0, 0.0, 0.0}},
+            {"quantization_deg", {0.0, 0.0, 0.0}}}},
           {"accel",
            {{"bias_turnon_mps2", {4.0, 5.0, 6.0}},
             {"bias_inrun_psd_m2ps5", {0.0, 0.0, 0.0}},
             {"bias_correlation_rate_1ps", {0.4, 0.5, 0.6}},
             {"velocity_random_walk_psd_m2ps3", {4.0e-6, 5.0e-6, 6.0e-6}},
             {"scale_factor", {0.4, 0.5, 0.6}},
-            {"misalignment_rad", {0.04, 0.05, 0.06}},
+            {"misalignment_deg", {2.291831180523293, 2.864788975654116, 3.437746770784939}},
             {"nonorthogonality", {0.004, 0.005, 0.006}},
             {"acceleration_limit_mps2", {0.0, 0.0, 0.0}},
             {"quantization_mps", {0.0, 0.0, 0.0}}}}}}};
@@ -368,15 +368,15 @@ TEST_CASE("IMU runtime config parser accepts seeded variance and covariance draw
             {"bias_inrun_psd_rad2ps3", {0.0, 0.0, 0.0}},
             {"angle_random_walk_psd_rad2ps", {0.0, 0.0, 0.0}},
             {"scale_factor_cov", {1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0}},
-            {"misalignment_rad", {0.0, 0.0, 0.0}},
+            {"misalignment_deg", {0.0, 0.0, 0.0}},
             {"nonorthogonality", {0.0, 0.0, 0.0}},
-            {"quantization_rad", {0.0, 0.0, 0.0}}}},
+            {"quantization_deg", {0.0, 0.0, 0.0}}}},
           {"accel",
            {{"bias_turnon_var_m2ps4", {1.0, 1.0, 1.0}},
             {"bias_inrun_psd_m2ps5", {0.0, 0.0, 0.0}},
             {"velocity_random_walk_psd_m2ps3", {0.0, 0.0, 0.0}},
             {"scale_factor", {0.0, 0.0, 0.0}},
-            {"misalignment_rad", {0.0, 0.0, 0.0}},
+            {"misalignment_deg", {0.0, 0.0, 0.0}},
             {"nonorthogonality_cov", {1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0}},
             {"quantization_mps", {0.0, 0.0, 0.0}}}}}}};
 
@@ -469,7 +469,7 @@ TEST_CASE("IMU runtime config parser rejects malformed error-model inputs")
     CHECK_THROWS_AS(
         validate_imu_runtime_config(nlohmann::json{{"imu",
                                                     {{"type", "error_model"},
-                                                     {"gyro", {{"bias_turnon_radps", {1.0, 2.0}}}},
+                                                     {"gyro", {{"bias_turnon_degps", {1.0, 2.0}}}},
                                                      {"accel", nlohmann::json::object()}}}}),
         std::runtime_error);
     CHECK_THROWS_AS(
@@ -486,7 +486,7 @@ TEST_CASE("IMU runtime config parser rejects malformed error-model inputs")
                                          {"seed", 1U},
                                          {"rate_hz", 100.0},
                                          {"gyro",
-                                          {{"bias_turnon_radps", {0.0, 0.0, 0.0}},
+                                          {{"bias_turnon_degps", {0.0, 0.0, 0.0}},
                                            {"bias_turnon_var_rad2ps2", {1.0, 1.0, 1.0}}}},
                                          {"accel", nlohmann::json::object()}}}}),
                     std::runtime_error);

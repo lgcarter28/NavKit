@@ -9,6 +9,7 @@ This phase moves robust status/error handling earlier than the broader embedded-
 - [ ] Define explicit status/error handling for numerical and data-quality failures in embedded-facing code.
 - [ ] Decide where exceptions are acceptable in desktop app/sim code and where status-return APIs are required.
 - [ ] Define the small status/result vocabulary needed by Navigator, filter, propagation, sensor, simulator, and runtime-validation seams without overbuilding a generic framework.
+- [ ] Migrate remaining silent value-return frame conveniences, including ECEF/LLA and ECEF/NED helpers that currently substitute zero or identity on failure, to explicit status propagation once logging, initialization, and simulator callers can surface those failures coherently.
 
 ## Pass 9.2: estimator and measurement robustness
 

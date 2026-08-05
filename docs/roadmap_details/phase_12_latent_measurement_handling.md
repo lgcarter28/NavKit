@@ -6,7 +6,14 @@ Latency and buffering come before transfer alignment/stationary modes because th
 
 ## Pass 12.1: measurement context snapshots
 
-- [ ] When latent/replay measurement handling is implemented, carry per-measurement model context alongside buffered measurements. Current GNSS velocity lever-arm support updates sensor context immediately, which is sufficient for the current no-latency simulation loop but should not become the delayed-measurement architecture.
+- [ ] When latent/replay measurement handling is implemented, make each
+  buffered event own an immutable measurement, timestamp, covariance/noise
+  description, and observation/model-context snapshot captured at measurement
+  time. Current GNSS velocity lever-arm support updates sensor context
+  immediately, which is sufficient for the current no-latency simulation loop
+  but should not become the delayed-measurement architecture; delayed
+  processing must never read angular-rate or lever-arm context from mutable
+  current sensor state.
 - [ ] Define the ownership boundary between Navigator buffering, measurement timestamps, observation context snapshots, and model-specific context such as GNSS antenna lever-arm state before adding delayed measurement processing.
 - [ ] Add tests showing that delayed/replayed measurements use the context snapshot from the measurement time rather than mutable current sensor context.
 

@@ -5,7 +5,7 @@
 
 #include "navkit/core/time/RationalRate.hpp"
 #include "navkit/io/LoggerPolicy.hpp"
-#include "navkit/sim/TruthSample.hpp"
+#include "navkit/sim/trajectory/TruthSample.hpp"
 
 #include <concepts>
 #include <nlohmann/json.hpp>

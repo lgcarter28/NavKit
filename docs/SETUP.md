@@ -265,6 +265,7 @@ These scripts provide a consistent cross-platform workflow and abstract away pla
 | `run_tests.py` | Execute the complete unit test suite |
 | `run_sim.py` | Run a selected runtime scenario with the built simulation executable |
 | `plot_run.py` | Generate the standard domain-aware plots from existing single-run logs |
+| `plot_trajectory.py` | Generate interactive ECEF/ECI/NED/body trajectory and command/response plots |
 | `run_scenario.py` | Run a scenario, optionally override output location, and generate plots |
 | `run_monte_carlo.py` | Run a seeded Monte Carlo campaign, package HDF5, and generate interactive aggregate plots/reports |
 | `plot_monte_carlo.py` | Regenerate selected Monte Carlo aggregate plots from existing campaign logs |
@@ -583,6 +584,17 @@ For the default stationary GNSS workflow:
 python tools/run_sim.py --build-type Debug
 python tools/plot_run.py output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal
 ```
+
+For a scenario with trajectory-inspection logging enabled, regenerate the
+interactive frame and command/response dashboards directly:
+
+```powershell
+python tools/plot_trajectory.py output/logs/<run_name> --renderer plotly --show
+```
+
+`run_scenario.py` invokes both the standard estimator plot suite and this
+trajectory suite automatically. The trajectory command exits successfully
+without writing figures when those optional logs are absent.
 
 Both commands update `timing.json` and print a compact timing summary for the
 operation they just ran. Add `--no-timing-report` to either command when script

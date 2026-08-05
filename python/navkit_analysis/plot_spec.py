@@ -49,6 +49,35 @@ class PlotSpec:
     metadata: Mapping[str, object] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class Plot3DTrace:
+    """One prepared three-dimensional trajectory line."""
+
+    x: np.ndarray
+    y: np.ndarray
+    z: np.ndarray
+    label: str
+    color: str
+    mode: str = "lines"
+    line_width: float = 2.0
+    marker_size: float = 5.0
+    opacity: float = 1.0
+
+
+@dataclass(frozen=True)
+class Plot3DSpec:
+    """Renderer-independent description of one three-dimensional trajectory."""
+
+    title: str
+    x_label: str
+    y_label: str
+    z_label: str
+    traces: tuple[Plot3DTrace, ...]
+    output_name: str
+    schema: str = PLOT_SPEC_SCHEMA
+    metadata: Mapping[str, object] = field(default_factory=dict)
+
+
 def quick_xy_plot_spec(
     x: np.ndarray,
     y: np.ndarray,

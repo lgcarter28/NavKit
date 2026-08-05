@@ -10,7 +10,7 @@
       "scale_factor_var": [1.0e-10, 1.0e-10, 1.0e-10],
       "misalignment_var_rad2": [1.0e-12, 1.0e-12, 1.0e-12],
       "nonorthogonality_var": [1.0e-12, 1.0e-12, 1.0e-12],
-      "angular_rate_limit_radps": [8.72665, 8.72665, 8.72665]
+      "angular_rate_limit_degps": [500.0, 500.0, 500.0]
     },
     "accel": {
       "bias_turnon_var_m2ps4": [9.6236e-9, 9.6236e-9, 9.6236e-9],

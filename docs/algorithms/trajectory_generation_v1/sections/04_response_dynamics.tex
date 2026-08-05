@@ -1,0 +1,278 @@
+\chapter{Autopilot and Vehicle Response}
+
+\section{Actual-IMU Angular-Rate Observation}
+
+Autopilot observes the actual configured simulated-IMU increments published by
+the application. It does not instantiate a second controller-only IMU and does
+not finite-difference noisy attitude. For a moving window $\mathcal{W}_k$ of
+the most recent increments, the interval-average measured body rate is
+\begin{equation}
+\overline{\boldsymbol{\omega}}_{ib,k}^{b}
+=
+\frac{
+  \displaystyle\sum_{\ell\in\mathcal{W}_k}
+  \Delta\boldsymbol{\theta}_{ib,\ell}^{b}
+}{
+  \displaystyle\sum_{\ell\in\mathcal{W}_k}
+  \Delta t_{\ell}
+}.
+\label{eq:imu_moving_average_rate}
+\end{equation}
+The fixed-capacity buffer maintains both rolling sums and removes the oldest
+increment and its matching duration when the selected window is full. Dividing
+by the accumulated duration, rather than by a nominal sample count and period,
+preserves the correct rate under exact rational timestamp spacing.
+
+Before the first valid window sample, the current controller-state body rate is
+the initialization fallback. Optional filtering before Navigator ingestion is
+a different product-core design decision and is outside this trajectory
+contract.
+
+\section{Exact First-Order Step}
+
+For scalar state $x$, constant command $u$ over one interval, and time
+constant $\tau>0$, every current first-order response uses the exact
+zero-order-hold solution
+\begin{equation}
+x_{k+1}
+=u_k+\exp\!\left(-\frac{\Delta t_k}{\tau}\right)(x_k-u_k).
+\label{eq:first_order_exact}
+\end{equation}
+The operation is applied independently by axis. Vector notation below uses
+$\mathcal{L}(\mathbf{x},\mathbf{u},\boldsymbol{\tau},\Delta t)$ for that
+componentwise operation. For any axis whose $\tau_j=0$,
+\begin{equation}
+x_{j,k+1}=u_{j,k}.
+\label{eq:zero_tau}
+\end{equation}
+Thus zero time constant is the explicit instantaneous-response limit.
+Negative or non-finite time constants are invalid.
+
+\section{Permanent Guidance Command Filter}
+\label{sec:guidance_command_filter}
+
+Guidance produces a raw total inertial-acceleration command and a raw NED bank
+command. After conversion by \cref{eq:guidance_acceleration_to_force}, a
+persistent command filter independently shapes body specific force and bank:
+\begin{align}
+\fb_{\mathrm{gflt},ib,k}^{b}
+&=
+\mathcal{L}\!\left(
+\fb_{\mathrm{gflt},ib,k-1}^{b},
+\fb_{\mathrm{gcmd},ib,k}^{b},
+\boldsymbol{\tau}_{f,\mathrm{g}},
+\Delta t_{\mathrm{g},k}
+\right),\\
+\phi_{\mathrm{gflt},k}
+&=
+\mathcal{L}\!\left(
+\phi_{\mathrm{gflt},k-1},
+\phi_{\mathrm{gcmd},k},
+\tau_{\phi,\mathrm{g}},
+\Delta t_{\mathrm{g},k}
+\right).
+\label{eq:guidance_command_filter}
+\end{align}
+The three entries of $\boldsymbol{\tau}_{f,\mathrm{g}}$ correspond to body
+$x$, $y$, and $z$; $\tau_{\phi,\mathrm{g}}$ is the bank/roll channel. A zero
+entry invokes the instantaneous bypass in \cref{eq:zero_tau} for only that
+channel.
+
+Each Guidance state may define nominal filter constants that override the
+trajectory-level defaults while that state is active. It may also define
+entry-window constants
+$\boldsymbol{\tau}_{f,\mathrm{entry},j}$,
+$\tau_{\phi,\mathrm{entry},j}$, and duration $T_{\mathrm{entry},j}$. When state
+$j$ is entered, those constants apply to the first sample in the new state and
+remain active until the accumulated Guidance intervals reach
+$T_{\mathrm{entry},j}$. The nominal constants then resume on the following
+Guidance update. Applying the entry constants immediately is necessary to
+shape the transition itself; delaying them would allow a zero or fast nominal
+constant to pass the new command before the entry window began. Selection
+precedence is therefore entry override, active-state nominal, then trajectory
+default. In all cases, the filtered specific-force and bank states persist and
+are never reset by a state transition or parameter change.
+
+\section{Autopilot Attitude and Rate Loop}
+
+When Autopilot is active and velocity alignment is well defined,
+\cref{eq:banked_velocity_attitude} supplies
+$\quat_{b,\mathrm{target}}^{i}$. The held target first passes through an exact
+quaternion command LPF:
+\begin{align}
+\alpha_k
+&=
+\begin{cases}
+1, & \tau_q=0,\\
+1-\exp(-\Delta t_{\mathrm{ap},k}/\tau_q), & \tau_q>0,
+\end{cases}\\
+\quat_{b,\mathrm{cmd},k}^{i}
+&=
+\operatorname{Slerp}
+\left(
+\quat_{b,\mathrm{cmd},k-1}^{i},
+\quat_{b,\mathrm{target},k}^{i},
+\alpha_k
+\right).
+\label{eq:autopilot_command_lpf}
+\end{align}
+The deterministic command kinematics provide desired body-rate feedforward:
+\begin{equation}
+\boldsymbol{\omega}_{\mathrm{ff},k}^{b}
+=
+C_{b_{k-1,\mathrm{cmd}}}^{b_{k,c}}
+\frac{
+\operatorname{Log}
+\left(
+\left(\quat_{b,\mathrm{cmd},k-1}^{i}\right)^{-1}
+\otimes
+\quat_{b,\mathrm{cmd},k}^{i}
+\right)
+}{
+\Delta t_{\mathrm{ap},k}
+}.
+\label{eq:autopilot_command_rate_feedforward}
+\end{equation}
+This is a discrete quaternion log between deterministic, filtered command
+samples. It is not finite differentiation of noisy truth, navigation, attitude,
+or IMU state. An analytic velocity-kinematics feedforward may replace it in a
+higher-fidelity trajectory model without changing the feedback boundary.
+
+The body-resolved attitude-error quaternion and rotation vector are
+\begin{align}
+\delta\quat_{\mathrm{err}}
+&=
+\left(\quat_{b,c}^{i}\right)^{-1}
+\otimes
+\quat_{b,\mathrm{cmd}}^{i},\\
+\phib_{\mathrm{err}}^{b}
+&=\operatorname{Log}(\delta\quat_{\mathrm{err}}),
+\label{eq:trajectory_attitude_error}
+\end{align}
+where the subscript $c$ identifies the source-agnostic controller-facing
+state, not necessarily truth.
+
+The current proportional attitude loop with desired-rate feedback is
+\begin{equation}
+\boldsymbol{\omega}_{\mathrm{cmd},ib}^{b}
+=
+\boldsymbol{\omega}_{\mathrm{ff}}^{b}
++
+\mathbf{K}_{\theta}
+\odot
+\phib_{\mathrm{err}}^{b}
++
+\mathbf{K}_{\omega}
+\odot
+\left(
+\boldsymbol{\omega}_{\mathrm{ff}}^{b}
+-
+\overline{\boldsymbol{\omega}}_{ib}^{b}
+\right),
+\label{eq:autopilot_rate_command}
+\end{equation}
+where $\odot$ is componentwise multiplication,
+$\mathbf{K}_{\theta}$ has units of inverse seconds, and
+$\mathbf{K}_{\omega}$ is dimensionless. No integral term is present.
+Autopilot's own independently
+configurable body-rate response is
+\begin{equation}
+\boldsymbol{\omega}_{\mathrm{ap},ib,k}^{b}
+=
+\mathcal{L}\!\left(
+\boldsymbol{\omega}_{\mathrm{ap},ib,k-1}^{b},
+\boldsymbol{\omega}_{\mathrm{cmd},ib,k}^{b},
+\boldsymbol{\tau}_{\omega,\mathrm{ap}},
+\Delta t_{\mathrm{ap},k}
+\right).
+\label{eq:autopilot_rate_response}
+\end{equation}
+
+Autopilot owns attitude tracking and body-rate command response only. It does
+not own translational acceleration or specific-force dynamics. When inactive,
+it retains the last well-defined/configured attitude and current body-rate
+state rather than generating an artificial transient.
+
+\section{Vehicle Internal Response and Final Limits}
+
+The Vehicle boundary receives
+$\boldsymbol{\omega}_{\mathrm{ap},ib}^{b}$ and the filtered body specific-force
+command $\fb_{\mathrm{gflt},ib}^{b}$ from
+\cref{eq:guidance_command_filter}. It owns the remaining plant response.
+
+\subsection{Body-Rate Response}
+
+The realized body rate has a second lag, distinct from the Autopilot response:
+\begin{equation}
+\boldsymbol{\omega}_{\mathrm{raw},ib,k}^{b}
+=
+\mathcal{L}\!\left(
+\boldsymbol{\omega}_{ib,k-1}^{b},
+\boldsymbol{\omega}_{\mathrm{ap},ib,k}^{b},
+\boldsymbol{\tau}_{\omega,\mathrm{veh}},
+\Delta t_{\mathrm{phys},k}
+\right).
+\label{eq:vehicle_rate}
+\end{equation}
+The two angular-rate time-constant vectors therefore model separate
+Autopilot/actuation and body-response bandwidths; they are not roll, pitch, and
+yaw Euler-angle time constants.
+
+\subsection{Specific-Force Response}
+
+Both translational response stages remain inside the Vehicle boundary. An
+internal command/actuator response is followed by the body response:
+\begin{align}
+\fb_{\mathrm{cmdrsp},ib,k}^{b}
+&=
+\mathcal{L}\!\left(
+\fb_{\mathrm{cmdrsp},ib,k-1}^{b},
+\fb_{\mathrm{cmd},ib,k}^{b},
+\boldsymbol{\tau}_{f,\mathrm{cmd}},
+\Delta t_{\mathrm{phys},k}
+\right),
+\label{eq:vehicle_force_actuator}\\
+\fb_{\mathrm{raw},ib,k}^{b}
+&=
+\mathcal{L}\!\left(
+\fb_{ib,k-1}^{b},
+\fb_{\mathrm{cmdrsp},ib,k}^{b},
+\boldsymbol{\tau}_{f,\mathrm{rsp}},
+\Delta t_{\mathrm{phys},k}
+\right).
+\label{eq:vehicle_force_body}
+\end{align}
+This preserves the agreed two-bandwidth acceleration response without moving
+specific-force ownership into Autopilot.
+
+\subsection{Post-Response Limits}
+
+Optional limits are applied only after all first-order response stages:
+\begin{align}
+\omega_{ib,j,k}^{b}
+&=
+\clamp\!\left(
+\omega_{\mathrm{raw},j,k}^{b},
+-\omega_{\max,j},
+\omega_{\max,j}
+\right),
+\label{eq:rate_limit}\\
+f_{ib,j,k}^{b}
+&=
+\clamp\!\left(
+f_{\mathrm{raw},j,k}^{b},
+-f_{\max,j},
+f_{\max,j}
+\right).
+\label{eq:force_limit}
+\end{align}
+Limits must be finite and strictly positive when enabled. The final limited
+values are retained as the Vehicle states for the next interval and drive the
+ECI plant through \cref{eq:force_to_realized_acceleration}.
+
+\begin{warningbox}
+Setting response time constants to zero makes those stages instantaneous but
+does not disable configured limits. Per-axis constants and limits refer to
+body $p$, $q$, $r$ and body $x$, $y$, $z$, not to NED roll, pitch, and yaw
+angles.
+\end{warningbox}

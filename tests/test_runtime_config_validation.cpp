@@ -12,18 +12,21 @@
 #include "navkit/app_support/initialization/FilterInitialization.hpp"
 #include "navkit/app_support/initialization/NavInitializationProviderPolicy.hpp"
 #include "navkit/app_support/initialization/TransferAlignmentProviderPolicy.hpp"
+#include "navkit/app_support/logging/RuntimeLogger.hpp"
 #include "navkit/app_support/runtime/JsonInput.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigValidation.hpp"
 #include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
 #include "navkit/core/math/Quaternion.hpp"
 #include "navkit/io/RunLogger.hpp"
-#include "navkit/sim/ImuSimulatorPolicy.hpp"
+#include "navkit/sim/sensors/ImuSimulatorPolicy.hpp"
 #include "test_main.hpp"
 
+#include <array>
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <numbers>
 #include <stdexcept>
 #include <tuple>
 #include <type_traits>
@@ -37,11 +40,11 @@ namespace
 
 using EcefInsGnssAppConfig =
     navkit::config::apps::navkit_sim::EcefInsGnssLcGyroAccelBiasDefaultConfig;
+using AppRuntimeLogger = RuntimeLogger<EcefInsGnssAppConfig::NavKit>;
 
 struct DuplicateSensorIdConfig
 {
     using NavKit = EcefInsGnssAppConfig::NavKit;
-    using Logger = EcefInsGnssAppConfig::Logger;
     using ImuSimulator = EcefInsGnssAppConfig::ImuSimulator;
     using EmulatorBindings =
         std::tuple<navkit::app_support::EmulatorBinding<navkit::app_support::GnssEmulator<0U>,
@@ -58,7 +61,6 @@ struct UnknownSensor
 struct MissingTargetSensorConfig
 {
     using NavKit = EcefInsGnssAppConfig::NavKit;
-    using Logger = EcefInsGnssAppConfig::Logger;
     using ImuSimulator = EcefInsGnssAppConfig::ImuSimulator;
     using EmulatorBindings =
         std::tuple<navkit::app_support::EmulatorBinding<navkit::app_support::GnssEmulator<99U>,
@@ -76,7 +78,10 @@ struct NotABinding
     return {
         {"run_name", "ecef_ins_gnss_demo"},
         {"output_dir", "output/logs/ecef_ins_gnss_demo"},
-        {"application", {{"clock", "simulated"}, {"rate_hz", 1000.0}}},
+        {"application",
+         {{"clock", "simulated"},
+          {"control_state_source", "navigation_estimate"},
+          {"rate_hz", 1000.0}}},
         {"logging",
          {{"console", {{"enabled", true}, {"rate_hz", 1.0}}},
           {"truth", {{"enabled", true}, {"rate_hz", 10.0}}},
@@ -89,17 +94,17 @@ struct NotABinding
         {"trajectory",
          {{"type", "stationary"},
           {"duration_s", 60.0},
-          {"rate_hz", 1000.0},
+          {"dynamics_rate_hz", 1000.0},
           {"p_lla_deg_m", {0.0, 0.0, 0.0}},
           {"v_n_mps", {0.0, 0.0, 0.0}},
-          {"rpy_b2n_rad", {0.0, 0.0, 0.0}},
-          {"w_nb_b_radps", {0.0, 0.0, 0.0}}}},
+          {"rpy_b2n_deg", {0.0, 0.0, 0.0}},
+          {"w_nb_b_degps", {0.0, 0.0, 0.0}}}},
         {"imu", {{"type", "ideal"}, {"rate_hz", 1000.0}, {"seed", 42U}}},
         {"gnss",
          {{"dt_s", 1.0},
           {"position_cov", {{"frame", "ned"}, {"diag", {{"pos_m2", {9.0, 9.0, 25.0}}}}}},
           {"velocity_cov", {{"frame", "ned"}, {"diag", {{"vel_m2ps2", {0.04, 0.04, 0.04}}}}}},
-          {"p_b_ant_b_m", {0.0, 0.0, 0.0}},
+          {"p_b_ant_b_m", {1.0, 0.25, -0.15}},
           {"seed", 42U},
           {"noise_enabled", true}}},
         {"pva_initialization",
@@ -132,6 +137,17 @@ TEST_CASE("Runtime JSON clock parser accepts only supported app-support modes")
     CHECK(mode == ClockMode::Realtime);
     CHECK_FALSE(detail::clock_mode_from_json(invalid, "clock", mode));
     CHECK_FALSE(detail::clock_mode_from_json(simulated, "missing", mode));
+}
+
+TEST_CASE("Runtime control-state source parser accepts only explicit source selections")
+{
+    ControlStateSourceMode mode{};
+
+    REQUIRE(control_state_source_mode_from_string("navigation_estimate", mode));
+    CHECK(mode == ControlStateSourceMode::NavigationEstimate);
+    REQUIRE(control_state_source_mode_from_string("truth_passthrough", mode));
+    CHECK(mode == ControlStateSourceMode::TruthPassthrough);
+    CHECK_FALSE(control_state_source_mode_from_string("truth", mode));
 }
 
 [[nodiscard]] std::vector<double> identity_pva_cov_full()
@@ -188,8 +204,77 @@ TEST_CASE("Runtime JSON clock parser accepts only supported app-support modes")
                                     {"pva_error",
                                      {{"p_n_m", {25.0, -15.0, 10.0}},
                                       {"v_n_mps", {0.0, 0.0, 0.0}},
-                                      {"rotvec_b2n_rad", {0.0, 0.0, 0.0}}}}};
+                                      {"rotvec_b2n_deg", {0.0, 0.0, 0.0}}}}};
     return cfg;
+}
+
+[[nodiscard]] nlohmann::json valid_guidance_state(const std::string& id)
+{
+    return {
+        {"id", id},
+        {"plant", {{"constraint", "none"}}},
+        {"guidance",
+         {{"enabled", true},
+          {"translation",
+           {{"reference", {{"type", "current_state"}}},
+            {"acceleration",
+             nlohmann::json::array({{{"type", "body_specific_force"},
+                                     {"specific_force_ib_b_mps2", {0.0, 0.0, 0.0}}}})}}},
+          {"bank", {{"type", "zero"}}},
+          {"body_y_specific_force_enabled", true}}},
+        {"autopilot", {{"enabled", true}}},
+        {"terminal", {{"behavior", "run_until_trajectory_termination"}}},
+    };
+}
+
+[[nodiscard]] nlohmann::json valid_state_machine_runtime_config()
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("trajectory") = {
+        {"type", "state_machine"},
+        {"duration_s", 10.0},
+        {"dynamics_rate_hz", 1000.0},
+        {"guidance_rate_hz", 100.0},
+        {"autopilot_rate_hz", 500.0},
+        {"translational_integration", "trapezoidal_predictor_corrector"},
+        {"termination", {{"type", "configured_duration"}}},
+        {"guidance_command_filter",
+         {{"specific_force_time_constant_b_s", {0.2, 0.3, 0.4}}, {"bank_time_constant_s", 0.5}}},
+        {"autopilot",
+         {{"type", "first_order"},
+          {"controller_rate_time_constant_pqr_s", {0.0, 0.0, 0.0}},
+          {"attitude_command_time_constant_s", 0.1},
+          {"attitude_error_gain_pqr_per_s", {1.0, 1.0, 1.0}},
+          {"angular_rate_feedback_gain_pqr", {0.0, 0.0, 0.0}},
+          {"velocity_alignment_speed_threshold_mps", 1.0},
+          {"initial_velocity_alignment_tolerance_deg", 5.0},
+          {"gyro_moving_average_window_samples", 10U}}},
+        {"maximum_bank_angle_deg", 45.0},
+        {"vehicle_response",
+         {{"type", "first_order"},
+          {"vehicle_rate_time_constant_pqr_s", {0.0, 0.0, 0.0}},
+          {"specific_force_command_time_constant_b_s", {0.0, 0.0, 0.0}},
+          {"specific_force_response_time_constant_b_s", {0.0, 0.0, 0.0}}}},
+        {"state_machine",
+         {{"initial_state_id", "active"},
+          {"cycle_policy", "reject"},
+          {"states", nlohmann::json::array({valid_guidance_state("active")})}}},
+        {"p_lla_deg_m", {35.0, -106.0, 1500.0}},
+        {"v_n_mps", {100.0, 0.0, 0.0}},
+        {"rpy_b2n_deg", {0.0, 0.0, 0.0}},
+    };
+    return cfg;
+}
+
+void make_guidance_state_nonterminal(nlohmann::json& state,
+                                     const std::string& target,
+                                     const std::size_t priority = 0U)
+{
+    state.erase("terminal");
+    state["transitions"] = nlohmann::json::array(
+        {{{"to", target},
+          {"priority", priority},
+          {"when", {{"type", "elapsed_in_state"}, {"greater_equal_s", 1.0}}}}});
 }
 
 } // namespace
@@ -204,16 +289,16 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts the documented input shape")
     static_assert(!SimulationAppConfigPolicy<MissingTargetSensorConfig>);
     static_assert(EmulatorPolicy<EcefInsGnssAppConfig::PrimaryGnssPositionEmulator,
                                  EcefInsGnssAppConfig::PrimaryGnssPositionSensor,
-                                 EcefInsGnssAppConfig::Logger>);
+                                 AppRuntimeLogger>);
     static_assert(!EmulatorPolicy<NotAnEmulator,
                                   EcefInsGnssAppConfig::PrimaryGnssPositionSensor,
-                                  EcefInsGnssAppConfig::Logger>);
-    static_assert(EmulatorBindingPolicy<EcefInsGnssAppConfig::PrimaryGnssPositionBinding,
-                                        EcefInsGnssAppConfig::Logger>);
-    static_assert(!EmulatorBindingPolicy<NotABinding, EcefInsGnssAppConfig::Logger>);
+                                  AppRuntimeLogger>);
+    static_assert(
+        EmulatorBindingPolicy<EcefInsGnssAppConfig::PrimaryGnssPositionBinding, AppRuntimeLogger>);
+    static_assert(!EmulatorBindingPolicy<NotABinding, AppRuntimeLogger>);
     static_assert(EmulatorBindingTuplePolicy<EcefInsGnssAppConfig::EmulatorBindings,
                                              EcefInsGnssAppConfig::NavKit::Sensors,
-                                             EcefInsGnssAppConfig::Logger>);
+                                             AppRuntimeLogger>);
     static_assert(NavInitializationProviderPolicy<EcefInsGnssAppConfig::NavInitializationProvider>);
     static_assert(TransferAlignmentProviderPolicy<EcefInsGnssAppConfig::TransferAlignmentProvider,
                                                   EcefInsGnssAppConfig::NavKit::Navigator>);
@@ -229,10 +314,10 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts the documented input shape")
                   EcefInsGnssAppConfig::NavKit::PropagationConfig::ImuBiasDynamics>);
     static_assert(!EmulatorBindingTuplePolicy<DuplicateSensorIdConfig::EmulatorBindings,
                                               DuplicateSensorIdConfig::NavKit::Sensors,
-                                              DuplicateSensorIdConfig::Logger>);
+                                              RuntimeLogger<DuplicateSensorIdConfig::NavKit>>);
     static_assert(!EmulatorBindingTuplePolicy<MissingTargetSensorConfig::EmulatorBindings,
                                               MissingTargetSensorConfig::NavKit::Sensors,
-                                              MissingTargetSensorConfig::Logger>);
+                                              RuntimeLogger<MissingTargetSensorConfig::NavKit>>);
     static_assert(emulator_binding_ids_unique_v<EcefInsGnssAppConfig::EmulatorBindings>);
     static_assert(
         std::is_same_v<EmulatorFromId_t<EcefInsGnssAppConfig::PrimaryGnssPositionEmulator::Id,
@@ -240,6 +325,41 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts the documented input shape")
                        GnssEmulator<EcefInsGnssAppConfig::PrimaryGnssPositionEmulator::Id>>);
 
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+    const navkit::sim::GnssSimulatorConfig gnss =
+        detail::gnss_runtime_config_from_json(cfg, "gnss");
+    CHECK(gnss.p_b_ant_b_m.isApprox(core::Vec3{1.0, 0.25, -0.15}));
+
+    const navkit::sim::GnssSimulatorConfig position_gnss =
+        EcefInsGnssAppConfig::PrimaryGnssPositionEmulator::runtime_config_from_json(cfg);
+    const navkit::sim::GnssSimulatorConfig velocity_gnss =
+        EcefInsGnssAppConfig::PrimaryGnssVelocityEmulator::runtime_config_from_json(cfg);
+    CHECK(position_gnss.seed ==
+          navkit::sim::derive_random_stream_seed(
+              gnss.seed, static_cast<std::uint32_t>(detail::GnssRandomStream::Position)));
+    CHECK(velocity_gnss.seed ==
+          navkit::sim::derive_random_stream_seed(
+              gnss.seed, static_cast<std::uint32_t>(detail::GnssRandomStream::Velocity)));
+    CHECK(position_gnss.seed != velocity_gnss.seed);
+    CHECK(position_gnss.seed ==
+          EcefInsGnssAppConfig::PrimaryGnssPositionEmulator::runtime_config_from_json(cfg).seed);
+    CHECK(velocity_gnss.seed ==
+          EcefInsGnssAppConfig::PrimaryGnssVelocityEmulator::runtime_config_from_json(cfg).seed);
+}
+
+TEST_CASE("Default compile-time attitude covariance is symmetric in ECEF")
+{
+    using NavKit = EcefInsGnssAppConfig::NavKit;
+    using Error = NavKit::StateDef::Error;
+
+    const NavKit::InitialCovariance::InitialCovariance_t& covariance =
+        NavKit::InitialCovariance::initial_covariance;
+    const core::Scalar_t attitude_variance = covariance(Error::AttRotVec::i, Error::AttRotVec::i);
+
+    CHECK(attitude_variance > 0.0);
+    CHECK(covariance(Error::AttRotVec::i + 1, Error::AttRotVec::i + 1) ==
+          doctest::Approx(attitude_variance));
+    CHECK(covariance(Error::AttRotVec::i + 2, Error::AttRotVec::i + 2) ==
+          doctest::Approx(attitude_variance));
 }
 
 TEST_CASE("ECEF INS GNSS runtime validator accepts a CSV trajectory source")
@@ -252,67 +372,205 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts a CSV trajectory source")
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
 
-TEST_CASE("ECEF INS GNSS runtime validator accepts generated trajectory profiles")
+TEST_CASE("ECEF INS GNSS runtime validator accepts a Guidance state-machine trajectory")
 {
-    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("trajectory") = {{"type", "ballistic"},
-                            {"duration_s", 30.0},
-                            {"rate_hz", 1000.0},
-                            {"p_lla_deg_m", {0.0, 0.0, 0.0}},
-                            {"v_n_mps", {0.0, 0.0, 0.0}},
-                            {"rpy_b2n_rad", {0.0, 0.5, 0.0}},
-                            {"launch_pad_duration_s", 5.0},
-                            {"boost_duration_s", 10.0},
-                            {"boost_acceleration_b_x_mps2", 30.0}};
-    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+    nlohmann::json cfg = valid_state_machine_runtime_config();
+    const sim::StateMachineTrajectoryConfig inherited_filter_trajectory =
+        state_machine_trajectory_config_from_json(cfg);
+    REQUIRE(inherited_filter_trajectory.state_machine.states.size() == 1U);
+    CHECK(inherited_filter_trajectory.state_machine.states.front()
+              .guidance_command_filter.specific_force_time_constant_b_s.isApprox(
+                  core::Vec3{0.2, 0.3, 0.4}));
+    CHECK(inherited_filter_trajectory.state_machine.states.front()
+              .guidance_command_filter.bank_time_constant_s == doctest::Approx(0.5));
 
-    cfg.at("trajectory") = {{"type", "constant_altitude"},
-                            {"duration_s", 30.0},
-                            {"rate_hz", 1000.0},
-                            {"p_lla_deg_m", {35.0, -106.0, 1500.0}},
-                            {"rpy_b2n_rad", {0.0, 0.0, 0.5}},
-                            {"speed_mps", 120.0}};
-    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+    nlohmann::json& configured_state = cfg.at("trajectory").at("state_machine").at("states").at(0U);
+    configured_state["guidance_command_filter"] = {
+        {"specific_force_time_constant_b_s", {0.6, 0.7, 0.8}}, {"bank_time_constant_s", 0.9}};
+    configured_state["on_entry"] = {{"guidance_command_filter",
+                                     {{"specific_force_time_constant_b_s", {1.0, 1.1, 1.2}},
+                                      {"bank_time_constant_s", 1.3},
+                                      {"duration_s", 2.0}}}};
 
-    cfg.at("trajectory") = {{"type", "calibration"},
-                            {"duration_s", 30.0},
-                            {"rate_hz", 1000.0},
-                            {"p_lla_deg_m", {35.0, -106.0, 1500.0}},
-                            {"rpy_b2n_rad", {0.0, 0.0, 0.5}},
-                            {"maneuver", "horizontal_s_turn"},
-                            {"speed_mps", 120.0},
-                            {"amplitude_rad", 0.2},
-                            {"period_s", 20.0}};
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
-
-    cfg.at("trajectory") = {
-        {"type", "waypoint"},
-        {"duration_s", 30.0},
-        {"rate_hz", 1000.0},
-        {"p_lla_deg_m", {35.0, -106.0, 1500.0}},
-        {"rpy_b2n_rad", {0.0, 0.0, 0.5}},
-        {"waypoints_lla_deg_m", {{35.001, -106.0, 1500.0}, {35.001, -105.999, 1500.0}}},
-        {"speed_mps", 120.0},
-        {"bank_limit_rad", 0.3},
-        {"acceptance_radius_m", 25.0}};
-    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+    const sim::StateMachineTrajectoryConfig trajectory =
+        state_machine_trajectory_config_from_json(cfg);
+    REQUIRE(trajectory.state_machine.states.size() == 1U);
+    CHECK(trajectory.state_machine.initial_state_id == "active");
+    CHECK(trajectory.state_machine.states.front().id == "active");
+    CHECK(trajectory.state_machine.states.front().terminal);
+    CHECK(trajectory.state_machine.states.front()
+              .guidance_command_filter.specific_force_time_constant_b_s.isApprox(
+                  core::Vec3{0.6, 0.7, 0.8}));
+    CHECK(trajectory.state_machine.states.front()
+              .on_entry_guidance_command_filter.specific_force_time_constant_b_s.isApprox(
+                  core::Vec3{1.0, 1.1, 1.2}));
+    CHECK(trajectory.state_machine.states.front().on_entry_guidance_command_filter.enabled);
 }
 
-TEST_CASE("ECEF INS GNSS runtime validator rejects unused generated profile inputs")
+TEST_CASE("ECEF INS GNSS runtime validator rejects malformed Guidance command filters")
+{
+    nlohmann::json cfg = valid_state_machine_runtime_config();
+    cfg.at("trajectory").at("guidance_command_filter").at("specific_force_time_constant_b_s") = {
+        0.2, -0.1, 0.4};
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_state_machine_runtime_config();
+    nlohmann::json& state = cfg.at("trajectory").at("state_machine").at("states").at(0U);
+    state["on_entry"] = {{"guidance_command_filter",
+                          {{"specific_force_time_constant_b_s", {0.8, 0.9, 1.0}},
+                           {"bank_time_constant_s", 1.1},
+                           {"duration_s", 0.0}}}};
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+}
+
+TEST_CASE("ECEF INS GNSS runtime validator rejects invalid Guidance graph topology")
+{
+    SUBCASE("duplicate state IDs")
+    {
+        nlohmann::json cfg = valid_state_machine_runtime_config();
+        cfg.at("trajectory")
+            .at("state_machine")
+            .at("states")
+            .push_back(valid_guidance_state("active"));
+        CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+    }
+
+    SUBCASE("unknown transition target")
+    {
+        nlohmann::json cfg = valid_state_machine_runtime_config();
+        nlohmann::json& active = cfg.at("trajectory").at("state_machine").at("states").at(0U);
+        make_guidance_state_nonterminal(active, "missing");
+        CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+    }
+
+    SUBCASE("duplicate transition priorities")
+    {
+        nlohmann::json cfg = valid_state_machine_runtime_config();
+        nlohmann::json& machine = cfg.at("trajectory").at("state_machine");
+        nlohmann::json& active = machine.at("states").at(0U);
+        make_guidance_state_nonterminal(active, "done");
+        active.at("transitions")
+            .push_back({{"to", "done"},
+                        {"priority", 0U},
+                        {"when", {{"type", "elapsed_in_state"}, {"greater_equal_s", 2.0}}}});
+        machine.at("states").push_back(valid_guidance_state("done"));
+        CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+    }
+
+    SUBCASE("nonpositive elapsed transition threshold")
+    {
+        nlohmann::json cfg = valid_state_machine_runtime_config();
+        nlohmann::json& machine = cfg.at("trajectory").at("state_machine");
+        nlohmann::json& active = machine.at("states").at(0U);
+        make_guidance_state_nonterminal(active, "done");
+        active.at("transitions").at(0U).at("when").at("greater_equal_s") = 0.0;
+        machine.at("states").push_back(valid_guidance_state("done"));
+        CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+    }
+
+    SUBCASE("unreachable state")
+    {
+        nlohmann::json cfg = valid_state_machine_runtime_config();
+        cfg.at("trajectory")
+            .at("state_machine")
+            .at("states")
+            .push_back(valid_guidance_state("orphan"));
+        CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+    }
+
+    SUBCASE("cycle rejected by policy")
+    {
+        nlohmann::json cfg = valid_state_machine_runtime_config();
+        nlohmann::json& machine = cfg.at("trajectory").at("state_machine");
+        nlohmann::json& first = machine.at("states").at(0U);
+        first.at("id") = "first";
+        machine.at("initial_state_id") = "first";
+        make_guidance_state_nonterminal(first, "second");
+        nlohmann::json second = valid_guidance_state("second");
+        make_guidance_state_nonterminal(second, "first");
+        machine.at("states").push_back(std::move(second));
+        CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+    }
+}
+
+TEST_CASE("ECEF INS GNSS runtime validator rejects unknown trajectory model discriminators")
+{
+    nlohmann::json trajectory{
+        {"translational_integration", "trapezoidal_predictor_corrector"},
+        {"autopilot", {{"type", "second_order"}}},
+        {"vehicle_response", {{"type", "first_order"}}},
+    };
+    CHECK_THROWS_AS(static_cast<void>(autopilot_model_type_from_json(trajectory)),
+                    std::runtime_error);
+
+    trajectory.at("autopilot").at("type") = "first_order";
+    trajectory.at("vehicle_response").at("type") = "six_dof";
+    CHECK_THROWS_AS(static_cast<void>(vehicle_response_model_type_from_json(trajectory)),
+                    std::runtime_error);
+
+    trajectory.at("translational_integration") = "rk4";
+    CHECK_THROWS_AS(static_cast<void>(translational_integration_method_from_json(trajectory)),
+                    std::runtime_error);
+}
+
+TEST_CASE("ECEF INS GNSS runtime validator accepts every trajectory attitude form")
+{
+    const nlohmann::json q_identity{1.0, 0.0, 0.0, 0.0};
+    const nlohmann::json dcm_identity{1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
+    const nlohmann::json rpy_zero{0.0, 0.0, 0.0};
+    const std::array<std::pair<std::string, nlohmann::json>, 18> attitude_forms{{
+        {"q_b2e", q_identity},
+        {"dcm_b2e", dcm_identity},
+        {"rpy_b2e_deg", rpy_zero},
+        {"q_e2b", q_identity},
+        {"dcm_e2b", dcm_identity},
+        {"rpy_e2b_deg", rpy_zero},
+        {"q_b2i", q_identity},
+        {"dcm_b2i", dcm_identity},
+        {"rpy_b2i_deg", rpy_zero},
+        {"q_i2b", q_identity},
+        {"dcm_i2b", dcm_identity},
+        {"rpy_i2b_deg", rpy_zero},
+        {"q_b2n", q_identity},
+        {"dcm_b2n", dcm_identity},
+        {"rpy_b2n_deg", rpy_zero},
+        {"q_n2b", q_identity},
+        {"dcm_n2b", dcm_identity},
+        {"rpy_n2b_deg", rpy_zero},
+    }};
+
+    for (const std::pair<std::string, nlohmann::json>& attitude_form : attitude_forms) {
+        nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+        cfg.at("trajectory").erase("rpy_b2n_deg");
+        cfg.at("trajectory").emplace(attitude_form.first, attitude_form.second);
+        CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+    }
+
+    nlohmann::json missing = valid_ecef_ins_gnss_runtime_config();
+    missing.at("trajectory").erase("rpy_b2n_deg");
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(missing), std::runtime_error);
+
+    nlohmann::json ambiguous = valid_ecef_ins_gnss_runtime_config();
+    ambiguous.at("trajectory").emplace("q_b2e", q_identity);
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(ambiguous), std::runtime_error);
+}
+
+TEST_CASE("Generated trajectory common validation accepts initial velocity and rejects body rate")
 {
     nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
     cfg.at("trajectory") = {{"type", "constant_altitude"},
                             {"duration_s", 30.0},
-                            {"rate_hz", 1000.0},
+                            {"dynamics_rate_hz", 1000.0},
                             {"p_lla_deg_m", {35.0, -106.0, 1500.0}},
-                            {"rpy_b2n_rad", {0.0, 0.0, 0.5}},
+                            {"rpy_b2n_deg", {0.0, 0.0, 28.64788975654116}},
                             {"speed_mps", 120.0},
                             {"v_n_mps", {120.0, 0.0, 0.0}}};
-    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+    CHECK_NOTHROW(detail::validate_generated_trajectory_common(cfg.at("trajectory"), true, false));
 
-    cfg.at("trajectory").erase("v_n_mps");
-    cfg.at("trajectory").emplace("w_ib_b_radps", nlohmann::json{0.0, 0.0, 0.0});
-    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+    cfg.at("trajectory").emplace("w_ib_b_degps", nlohmann::json{0.0, 0.0, 0.0});
+    CHECK_THROWS_AS(detail::validate_generated_trajectory_common(cfg.at("trajectory"), true, false),
+                    std::runtime_error);
 }
 
 TEST_CASE("ECEF INS GNSS runtime validator accepts GNSS full covariance")
@@ -363,7 +621,7 @@ TEST_CASE("Runtime JSON components merge relative to the scenario master")
         component_file << R"({
   "trajectory": {
     "duration_s": 60.0,
-    "rate_hz": 1000.0
+    "dynamics_rate_hz": 1000.0
   },
   "gnss": {
     "position_cov": {
@@ -394,7 +652,7 @@ TEST_CASE("Runtime JSON components merge relative to the scenario master")
     CHECK_FALSE(cfg.contains("components"));
     CHECK(cfg.at("run_name").get<std::string>() == "json_component_test");
     CHECK(cfg.at("trajectory").at("duration_s").get<double>() == doctest::Approx(5.0));
-    CHECK(cfg.at("trajectory").at("rate_hz").get<double>() == doctest::Approx(1000.0));
+    CHECK(cfg.at("trajectory").at("dynamics_rate_hz").get<double>() == doctest::Approx(1000.0));
     CHECK(cfg.at("gnss").at("position_cov").at("diag").at("pos_m2").at(0).get<double>() ==
           doctest::Approx(9.0));
 
@@ -427,7 +685,7 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects missing runtime-owned app set
 TEST_CASE("ECEF INS GNSS runtime validator rejects missing runtime-owned cadences")
 {
     auto cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("trajectory").erase("rate_hz");
+    cfg.at("trajectory").erase("dynamics_rate_hz");
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 
     cfg = valid_ecef_ins_gnss_runtime_config();
@@ -443,23 +701,35 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects missing runtime-owned cadence
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 
     cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("application")["clock"] = "realtime";
+    cfg.at("application").at("clock") = "realtime";
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
 
     cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("application")["clock"] = "invalid";
+    cfg.at("application").at("clock") = "invalid";
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 
     cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("application") = {{"clock", "simulated"}, {"rate_hz", 600.0}};
+    cfg.at("application").erase("control_state_source");
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("application").at("control_state_source") = "truth";
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("application") = {{"clock", "simulated"},
+                             {"control_state_source", "navigation_estimate"},
+                             {"rate_hz", 600.0}};
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 
     cfg = valid_ecef_ins_gnss_runtime_config();
     cfg.at("gnss").erase("dt_s");
-    cfg.at("gnss")["rate_hz"] = 600.0;
+    cfg.at("gnss").emplace("rate_hz", 600.0);
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 
-    cfg.at("application") = {{"clock", "simulated"}, {"rate_hz", 3000.0}};
+    cfg.at("application") = {{"clock", "simulated"},
+                             {"control_state_source", "navigation_estimate"},
+                             {"rate_hz", 3000.0}};
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
 
     cfg = valid_ecef_ins_gnss_runtime_config();
@@ -483,6 +753,43 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects missing runtime-owned simulat
 
     cfg = valid_ecef_ins_gnss_runtime_config();
     cfg.at("gnss").erase("position_cov");
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+}
+
+TEST_CASE("ECEF INS GNSS runtime validator accepts sorted non-overlapping active windows")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("gnss").emplace("active_windows",
+                           nlohmann::json::array({
+                               {{"start_s", 10.0}, {"end_s", 20.0}},
+                               {{"start_s", 30.0}, {"end_s", 35.0}},
+                           }));
+
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+    const navkit::sim::GnssSimulatorConfig gnss =
+        detail::gnss_runtime_config_from_json(cfg, "gnss");
+    REQUIRE(gnss.active_windows.size() == 2U);
+    CHECK(gnss.active_windows.at(0U).start_s == doctest::Approx(10.0));
+    CHECK(gnss.active_windows.at(1U).end_s == doctest::Approx(35.0));
+}
+
+TEST_CASE("ECEF INS GNSS runtime validator rejects malformed active windows")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("gnss").emplace("active_windows", nlohmann::json::object());
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("gnss").emplace("active_windows",
+                           nlohmann::json::array({{{"start_s", 10.0}, {"end_s", 10.0}}}));
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("gnss").emplace("active_windows",
+                           nlohmann::json::array({
+                               {{"start_s", 10.0}, {"end_s", 20.0}},
+                               {{"start_s", 19.0}, {"end_s", 25.0}},
+                           }));
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
 
@@ -747,7 +1054,7 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects invalid trajectory shape")
 TEST_CASE("ECEF INS GNSS runtime validator rejects ambiguous runtime rates")
 {
     auto cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("trajectory").emplace("dt_s", 0.001);
+    cfg.at("trajectory").emplace("dynamics_dt_s", 0.001);
 
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
@@ -768,6 +1075,21 @@ TEST_CASE("ECEF INS GNSS runtime validator requires enabled logging cadence")
 
     cfg.at("logging").at("imu_debug") = {{"enabled", true}};
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+}
+
+TEST_CASE("trajectory inspection logs are optional and require cadence when enabled")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+
+    cfg.at("logging").emplace("trajectory_kinematics_eci", nlohmann::json{{"enabled", false}});
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+
+    cfg.at("logging").at("trajectory_kinematics_eci") = {{"enabled", true}};
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg.at("logging").at("trajectory_kinematics_eci").emplace("rate_hz", 20.0);
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
 }
 
 TEST_CASE("ECEF INS GNSS runtime validator rejects unsupported covariance log modes")
@@ -793,11 +1115,11 @@ TEST_CASE("Trajectory w_nb_b initialization includes Earth and local transport r
     nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
     cfg.at("trajectory") = {{"type", "stationary"},
                             {"duration_s", 1.0},
-                            {"rate_hz", 1.0},
+                            {"dynamics_rate_hz", 1.0},
                             {"p_lla_deg_m", {0.0, 0.0, 0.0}},
                             {"v_n_mps", {0.0, 100.0, 0.0}},
-                            {"rpy_b2n_rad", {0.0, 0.0, 0.0}},
-                            {"w_nb_b_radps", {0.0, 0.0, 0.0}}};
+                            {"rpy_b2n_deg", {0.0, 0.0, 0.0}},
+                            {"w_nb_b_degps", {0.0, 0.0, 0.0}}};
 
     const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
     const core::Scalar_t expected_x_radps =
@@ -830,12 +1152,13 @@ TEST_CASE("Explicit PVA initialization provider applies configured errors")
 TEST_CASE("Direct PVA initialization provider uses configured values")
 {
     nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("pva_initialization") = {{"type", "pva_direct"},
-                                    {"pva",
-                                     {{"time_s", 12.5},
-                                      {"p_e_m", {1.0, 2.0, 3.0}},
-                                      {"v_e_mps", {4.0, 5.0, 6.0}},
-                                      {"rpy_b2e_rad", {0.1, 0.2, 0.3}}}}};
+    cfg.at("pva_initialization") = {
+        {"type", "pva_direct"},
+        {"pva",
+         {{"time_s", 12.5},
+          {"p_e_m", {1.0, 2.0, 3.0}},
+          {"v_e_mps", {4.0, 5.0, 6.0}},
+          {"rpy_b2e_deg", {5.729577951308233, 11.459155902616466, 17.188733853924695}}}}};
     const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
 
     static_assert(NavInitializationProviderPolicy<PvaDirectInitializationProvider>);
@@ -931,7 +1254,7 @@ TEST_CASE("Runtime covariance floor populates and clamps the Navigator filter co
     const PvaInitialization pva_init = PvaRandomInitializationProvider::initialize(cfg, trajectory);
 
     std::unique_ptr<NavKit::Navigator> navigator = std::make_unique<NavKit::Navigator>();
-    typename NavKit::Filter::P_t covariance = NavKit::Filter::P_t::Zero();
+    NavKit::Filter::P_t covariance = NavKit::Filter::P_t::Zero();
     navigator->filter().set_covariance(covariance);
     navigator->filter().set_covariance_floor(detail::covariance_floor_from_json<StateDef>(
         cfg, NavKit::CovarianceFloor::covariance_floor, core::estimation::pos_e_m(pva_init.pva)));
@@ -1106,10 +1429,8 @@ TEST_CASE("Initial estimate error applies against the simulation truth reference
         PvaExplicitInitializationProvider::initialize(cfg, trajectory);
     InitialTruthReference<StateDef> reference{};
     populate_initial_pva_from_truth<StateDef>(trajectory.initial_truth, reference);
-    core::estimation::segment<typename Nominal::GyroB>(reference.truth_state) =
-        core::Vec3{0.01, 0.02, 0.03};
-    core::estimation::segment<typename Nominal::AccB>(reference.truth_state) =
-        core::Vec3{0.1, 0.2, 0.3};
+    core::estimation::segment<Nominal::GyroB>(reference.truth_state) = core::Vec3{0.01, 0.02, 0.03};
+    core::estimation::segment<Nominal::AccB>(reference.truth_state) = core::Vec3{0.1, 0.2, 0.3};
 
     std::unique_ptr<NavKit::Navigator> navigator = std::make_unique<NavKit::Navigator>();
     initialize_navigator<NavKit>(pva_init, cfg, reference, *navigator);

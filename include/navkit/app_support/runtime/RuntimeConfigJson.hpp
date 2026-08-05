@@ -6,6 +6,7 @@
 #include "navkit/app_support/runtime/RuntimeConfigError.hpp"
 #include "navkit/app_support/time/ClockMode.hpp"
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <nlohmann/json.hpp>
@@ -89,6 +90,15 @@ inline void require_bool(const nlohmann::json& cfg, std::string_view path)
         throw_runtime_config_error("missing required boolean " + quoted_path(path));
     }
     require_optional_bool(cfg, path);
+}
+
+inline void require_optional_number(const nlohmann::json& cfg, std::string_view path)
+{
+    const nlohmann::json::const_iterator iter = cfg.find(std::string(path));
+    if (iter != cfg.end() && (!iter->is_number() || !std::isfinite(iter->get<double>()))) {
+        throw_runtime_config_error("expected " + quoted_path(path) +
+                                   " to be a finite numeric value");
+    }
 }
 
 inline void require_optional_positive_number(const nlohmann::json& cfg, std::string_view path)

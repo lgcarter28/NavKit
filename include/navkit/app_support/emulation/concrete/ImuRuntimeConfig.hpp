@@ -6,7 +6,7 @@
 #include "navkit/app_support/runtime/JsonInput.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
 #include "navkit/app_support/runtime/RuntimeRate.hpp"
-#include "navkit/sim/ImuSimulator.hpp"
+#include "navkit/sim/sensors/ImuSimulator.hpp"
 
 #include <Eigen/Eigenvalues>
 #include <nlohmann/json.hpp>
@@ -21,6 +21,7 @@ namespace detail
 
 struct ImuTriadRuntimeKeys
 {
+    bool output_is_angular;
     std::string_view bias_turnon;
     std::string_view bias_turnon_var;
     std::string_view bias_turnon_cov;
@@ -123,7 +124,7 @@ inline void validate_imu_triad_config(const nlohmann::json& triad,
                                    "scale_factor",
                                    keys.scale_factor_var,
                                    keys.scale_factor_cov,
-                                   "misalignment_rad",
+                                   "misalignment_deg",
                                    keys.misalignment_var,
                                    keys.misalignment_cov,
                                    "nonorthogonality",
@@ -140,7 +141,7 @@ inline void validate_imu_triad_config(const nlohmann::json& triad,
     validate_direct_or_random_vec3(
         triad, "scale_factor", keys.scale_factor_var, keys.scale_factor_cov);
     validate_direct_or_random_vec3(
-        triad, "misalignment_rad", keys.misalignment_var, keys.misalignment_cov);
+        triad, "misalignment_deg", keys.misalignment_var, keys.misalignment_cov);
     validate_direct_or_random_vec3(
         triad, "nonorthogonality", keys.nonorthogonality_var, keys.nonorthogonality_cov);
     require_optional_nonnegative_vec3(triad, keys.quantization);
@@ -196,10 +197,16 @@ inline sim::ImuTriadErrorConfig imu_triad_error_config_from_json(const nlohmann:
         optional_vec3_from_json(triad, keys.bias_correlation_rate_1ps);
     config.output_random_walk_psd = optional_vec3_from_json(triad, keys.output_random_walk_psd);
     config.scale_factor = optional_vec3_from_json(triad, "scale_factor");
-    config.misalignment_rad = optional_vec3_from_json(triad, "misalignment_rad");
+    config.misalignment_rad =
+        radians_from_degrees(optional_vec3_from_json(triad, "misalignment_deg"));
     config.nonorthogonality = optional_vec3_from_json(triad, "nonorthogonality");
     config.quantization = optional_vec3_from_json(triad, keys.quantization);
     config.limit = optional_vec3_from_json(triad, keys.limit);
+    if (keys.output_is_angular) {
+        config.bias_turnon = radians_from_degrees(config.bias_turnon);
+        config.quantization = radians_from_degrees(config.quantization);
+        config.limit = radians_from_degrees(config.limit);
+    }
     return config;
 }
 
@@ -220,7 +227,8 @@ imu_triad_stochastic_config_from_json(const nlohmann::json& triad, const ImuTria
 
 [[nodiscard]] inline ImuTriadRuntimeKeys gyro_runtime_keys()
 {
-    return {.bias_turnon = "bias_turnon_radps",
+    return {.output_is_angular = true,
+            .bias_turnon = "bias_turnon_degps",
             .bias_turnon_var = "bias_turnon_var_rad2ps2",
             .bias_turnon_cov = "bias_turnon_cov_rad2ps2",
             .bias_inrun_psd = "bias_inrun_psd_rad2ps3",
@@ -232,13 +240,14 @@ imu_triad_stochastic_config_from_json(const nlohmann::json& triad, const ImuTria
             .misalignment_cov = "misalignment_cov_rad2",
             .nonorthogonality_var = "nonorthogonality_var",
             .nonorthogonality_cov = "nonorthogonality_cov",
-            .quantization = "quantization_rad",
-            .limit = "angular_rate_limit_radps"};
+            .quantization = "quantization_deg",
+            .limit = "angular_rate_limit_degps"};
 }
 
 [[nodiscard]] inline ImuTriadRuntimeKeys accel_runtime_keys()
 {
-    return {.bias_turnon = "bias_turnon_mps2",
+    return {.output_is_angular = false,
+            .bias_turnon = "bias_turnon_mps2",
             .bias_turnon_var = "bias_turnon_var_m2ps4",
             .bias_turnon_cov = "bias_turnon_cov_m2ps4",
             .bias_inrun_psd = "bias_inrun_psd_m2ps5",

@@ -57,7 +57,8 @@ Target data flow adds richer aiding, multi-rate sensor simulation, replay/latenc
 ```text
 include/navkit/core/  Reusable product-core public headers
 include/navkit/api/   User-facing compile-time configuration API contracts
-include/navkit/sim/   Simulation support public headers
+include/navkit/sim/   Simulation support public headers, grouped into sensors,
+                       trajectory/guidance/control, and shared simulation math
 include/navkit/io/    Desktop logging/file/JSON public headers, including log
                        products and payload boundaries
 include/navkit/app_support/
@@ -66,7 +67,8 @@ include/navkit/app_support/
                        trajectory, and initialization boundaries
 config/               Compile-time configurations and runtime input bundles
 cmake/targets/        Header-only/interface CMake target definitions
-src/sim/              Compiled simulator implementation
+src/sim/              Compiled simulator implementation with matching domain
+                       subdirectories
 apps/                 Simulation and replay applications
 tests/                Doctest unit and compile-time tests
 python/               Offline analysis package

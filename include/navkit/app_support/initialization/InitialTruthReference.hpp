@@ -7,7 +7,7 @@
 #include "navkit/core/estimation/state/State.hpp"
 #include "navkit/core/estimation/state/StateDefPolicy.hpp"
 #include "navkit/core/time/Timestamp.hpp"
-#include "navkit/sim/TruthSample.hpp"
+#include "navkit/sim/trajectory/TruthSample.hpp"
 
 #include <tuple>
 #include <type_traits>

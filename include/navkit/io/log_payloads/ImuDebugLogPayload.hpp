@@ -5,7 +5,7 @@
 
 #include "navkit/core/estimation/navigator/ImuIncrement.hpp"
 #include "navkit/core/math/Types.hpp"
-#include "navkit/sim/ImuSimulator.hpp"
+#include "navkit/sim/sensors/ImuSimulator.hpp"
 
 namespace navkit::io
 {

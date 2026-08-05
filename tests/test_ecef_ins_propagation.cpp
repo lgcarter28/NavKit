@@ -12,9 +12,9 @@
 #include "navkit/core/frames/LocalLevel.hpp"
 #include "navkit/core/math/Quaternion.hpp"
 #include "navkit/core/math/Skew.hpp"
-#include "navkit/sim/ImuSimulator.hpp"
-#include "navkit/sim/TrajectoryAttitude.hpp"
-#include "navkit/sim/TrajectoryProfiles.hpp"
+#include "navkit/sim/sensors/ImuSimulator.hpp"
+#include "navkit/sim/trajectory/TrajectoryAttitude.hpp"
+#include "navkit/sim/trajectory/TrajectoryProfiles.hpp"
 #include "test_main.hpp"
 
 #include <numbers>

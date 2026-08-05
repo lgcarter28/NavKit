@@ -1,13 +1,124 @@
 {
   "trajectory": {
-    "type": "ballistic",
-    "duration_s": 60.0,
-    "rate_hz": 1000.0,
-    "launch_pad_duration_s": 5.0,
-    "boost_duration_s": 10.0,
-    "boost_acceleration_b_x_mps2": 30.0,
+    "type": "state_machine",
+    "duration_s": 180.0,
+    "dynamics_rate_hz": 1000.0,
+    "guidance_rate_hz": 100.0,
+    "autopilot_rate_hz": 500.0,
+    "translational_integration": "trapezoidal_predictor_corrector",
+    "termination": { "type": "ground_impact" },
+    "autopilot": {
+      "type": "first_order",
+      "attitude_command_time_constant_s": 0.1,
+      "controller_rate_time_constant_pqr_s": [0.02, 0.02, 0.02],
+      "attitude_error_gain_pqr_per_s": [2.0, 2.0, 2.0],
+      "angular_rate_feedback_gain_pqr": [0.2, 0.2, 0.2],
+      "velocity_alignment_speed_threshold_mps": 50.0,
+      "initial_velocity_alignment_tolerance_deg": 5.0,
+      "gyro_moving_average_window_samples": 20
+    },
+    "maximum_bank_angle_deg": 60.0,
+    "guidance_command_filter": {
+      "specific_force_time_constant_b_s": [0.05, 0.05, 0.05],
+      "bank_time_constant_s": 0.05
+    },
+    "vehicle_response": {
+      "type": "first_order",
+      "vehicle_rate_time_constant_pqr_s": [0.05, 0.05, 0.05],
+      "specific_force_command_time_constant_b_s": [0.03, 0.03, 0.03],
+      "specific_force_response_time_constant_b_s": [0.08, 0.08, 0.08],
+      "angular_rate_limit_pqr_degps": [114.591559, 114.591559, 114.591559],
+      "specific_force_limit_b_mps2": [100.0, 100.0, 100.0]
+    },
     "p_lla_deg_m": [0.0, 0.0, 0.0],
     "v_n_mps": [0.0, 0.0, 0.0],
-    "rpy_b2n_rad": [0.0, 0.5235987756, 0.0]
+    "rpy_b2n_deg": [0.0, 75.0, 0.0],
+    "state_machine": {
+      "initial_state_id": "launch_pad",
+      "cycle_policy": "reject",
+      "states": [
+        {
+          "id": "launch_pad",
+          "plant": { "constraint": "hold_initial_ecef" },
+          "guidance": {
+            "enabled": false,
+            "translation": {
+              "reference": { "type": "current_state" },
+              "acceleration": [
+                {
+                  "type": "body_specific_force",
+                  "specific_force_ib_b_mps2": [0.0, 0.0, 0.0]
+                }
+              ]
+            },
+            "bank": { "type": "zero" },
+            "body_y_specific_force_enabled": true
+          },
+          "autopilot": { "enabled": false },
+          "transitions": [
+            {
+              "to": "boost",
+              "priority": 0,
+              "when": { "type": "elapsed_in_state", "greater_equal_s": 5.0 }
+            }
+          ]
+        },
+        {
+          "id": "boost",
+          "plant": { "constraint": "none" },
+          "guidance": {
+            "enabled": true,
+            "translation": {
+              "reference": { "type": "current_state" },
+              "acceleration": [
+                {
+                  "type": "body_specific_force",
+                  "specific_force_ib_b_mps2": [49.03325, 0.0, 0.0]
+                }
+              ]
+            },
+            "bank": { "type": "zero" },
+            "body_y_specific_force_enabled": true
+          },
+          "autopilot": { "enabled": true },
+          "on_entry": {
+            "guidance_command_filter": {
+              "specific_force_time_constant_b_s": [0.75, 0.75, 0.75],
+              "bank_time_constant_s": 0.75,
+              "duration_s": 2.0
+            }
+          },
+          "transitions": [
+            {
+              "to": "gravity_turn",
+              "priority": 0,
+              "when": { "type": "elapsed_in_state", "greater_equal_s": 18.0 }
+            }
+          ]
+        },
+        {
+          "id": "gravity_turn",
+          "plant": { "constraint": "none" },
+          "guidance": {
+            "enabled": true,
+            "translation": {
+              "reference": { "type": "current_state" },
+              "acceleration": [{ "type": "free_fall" }]
+            },
+            "bank": { "type": "zero" },
+            "body_y_specific_force_enabled": true
+          },
+          "autopilot": { "enabled": true },
+          "on_entry": {
+            "guidance_command_filter": {
+              "specific_force_time_constant_b_s": [0.35, 0.35, 0.35],
+              "bank_time_constant_s": 0.35,
+              "duration_s": 1.0
+            }
+          },
+          "terminal": { "behavior": "run_until_trajectory_termination" }
+        }
+      ]
+    }
   }
 }

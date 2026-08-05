@@ -1,0 +1,104 @@
+\chapter{Attitude Representation and Input Contract}
+
+\section{Canonical Quaternions}
+
+Runtime trajectory configuration is converted to the passive quaternion
+$\quat_b^e$, which satisfies
+\begin{equation}
+\mathbf{x}^{e}=\quat_b^e\otimes\mathbf{x}^{b}.
+\label{eq:q_b2e_meaning}
+\end{equation}
+The dynamic integrator stores $\quat_b^i$. The two are related by
+\begin{align}
+\quat_b^i &= \quat_e^i\otimes\quat_b^e,\\
+\quat_b^e &= \quat_i^e\otimes\quat_b^i.
+\label{eq:attitude_eci_ecef}
+\end{align}
+
+Quaternions are serialized scalar first:
+\begin{equation}
+\quat=
+\begin{bmatrix}q_w&q_x&q_y&q_z\end{bmatrix}^{T}.
+\end{equation}
+Every accepted quaternion must be finite and nonzero. It is normalized, and
+the equivalent representation with $q_w\geq 0$ is selected. A DCM must be
+finite, proper, and orthonormal:
+\begin{equation}
+C^{T}C=\I,\qquad \det C=+1,
+\label{eq:dcm_validity}
+\end{equation}
+within the implementation tolerance.
+
+\section{Aerospace Roll, Pitch, and Yaw}
+
+For every supported start-to-end frame pair, the JSON vector is
+\begin{equation}
+\mathbf{rpy}_a^b
+=
+\begin{bmatrix}\phi&\theta&\psi\end{bmatrix}^{T},
+\end{equation}
+where $\phi$, $\theta$, and $\psi$ are roll, pitch, and yaw. NavKit uses the
+3-2-1 yaw-pitch-roll composition
+\begin{equation}
+C_a^b
+=R_3(\psi)R_2(\theta)R_1(\phi).
+\label{eq:rpy_321}
+\end{equation}
+The payload order remains roll, pitch, yaw even though the matrix product is
+written yaw, pitch, roll. The Euler angles of
+$C_b^a=\left(C_a^b\right)^{T}$ are not, in
+general, obtained by negating the three input values component by component.
+
+\section{Supported Runtime Inputs}
+
+Exactly one of the following 18 keys is required:
+
+\begin{center}
+\small
+\begin{tabular}{llll}
+\toprule
+Direction & Quaternion & DCM & RPY \\
+\midrule
+body to ECEF &
+\texttt{q\_b2e} & \texttt{dcm\_b2e} & \texttt{rpy\_b2e\_deg} \\
+ECEF to body &
+\texttt{q\_e2b} & \texttt{dcm\_e2b} & \texttt{rpy\_e2b\_deg} \\
+body to ECI &
+\texttt{q\_b2i} & \texttt{dcm\_b2i} & \texttt{rpy\_b2i\_deg} \\
+ECI to body &
+\texttt{q\_i2b} & \texttt{dcm\_i2b} & \texttt{rpy\_i2b\_deg} \\
+body to NED &
+\texttt{q\_b2n} & \texttt{dcm\_b2n} & \texttt{rpy\_b2n\_deg} \\
+NED to body &
+\texttt{q\_n2b} & \texttt{dcm\_n2b} & \texttt{rpy\_n2b\_deg} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Quaternion arrays have four scalar-first entries, DCM arrays have nine
+row-major entries, and RPY arrays have three entries in degrees. Runtime input
+is converted once to radians before the equations in this document are used. Reverse
+directions are inverted with the quaternion conjugate or DCM transpose.
+
+After representation conversion and direction inversion, the canonical
+conversion is
+\begin{align}
+\quat_b^e
+&=\quat_{b,\mathrm{input}}^e,
+&&\text{ECEF input},\\
+\quat_b^e
+&=\quat_n^e(\pb^{e})\otimes\quat_b^n,
+&&\text{NED input},\\
+\quat_b^e
+&=\quat_i^e(t,t_0)\otimes\quat_b^i,
+&&\text{ECI input}.
+\label{eq:attitude_input_conversion}
+\end{align}
+NED input therefore requires a valid, noncentral ECEF position. ECI input
+requires valid, compatible $t$ and $t_0$ timestamps.
+
+\begin{warningbox}
+The accepted JSON representation is flexible; the internal convention is not.
+All downstream consumers receive a normalized $\quat_b^e$, and dynamic
+propagation uses $\quat_b^i$. Frame direction is always encoded in the key.
+\end{warningbox}

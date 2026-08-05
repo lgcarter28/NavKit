@@ -18,8 +18,9 @@ links a NavKit config to an app runner.
 
 Provided `NAVKIT_CONFIG` selections:
 
-- `apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp`: default stationary GNSS demo app using
-  the unprofiled NavKit GNSS library config.
+- `apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp`: default
+  scenario-agnostic simulation app using the unprofiled NavKit GNSS library
+  config.
 - `apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp`: same app shape, but consumes a
   profiled NavKit GNSS library config with a host microsecond clock,
   fixed-capacity profiling ring-buffer sink, and scoped profiler so the app
@@ -56,18 +57,14 @@ struct ExampleAppConfig
 
     using EmulatorBindings = std::tuple<PrimaryBinding>;
 
-    using PrimaryStatistics = navkit::core::estimation::MeasurementStatistics<PrimarySensor>;
-    using Logger =
-        navkit::io::RunLogger<navkit::io::TruthLogProduct,
-                              navkit::io::GnssPositionLogProduct,
-                              navkit::io::NavEstimateLogProduct,
-                              navkit::io::GnssPositionUpdateLogProduct<PrimaryStatistics>>;
     using App = navkit::app_support::SimulationApp<ExampleAppConfig>;
 };
 ```
 
-`navkit::io::RunLogger<...>` is a generic compile-time logger façade. App
-configs select their concrete log-product set explicitly.
+`SimulationApp` uses `navkit::app_support::RuntimeLogger<NavKit>` to expose the
+simulation log-product catalog. Runtime scenario logging settings select which
+non-embedded products are enabled and at what rates; the compile-time NavKit
+product config remains focused on the embedded-facing estimator graph.
 
 Applications should include the generated `navkit/SelectedConfig.hpp` header and
 use `navkit::selected_config::Config` rather than including concrete config
