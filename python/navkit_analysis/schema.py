@@ -10,6 +10,8 @@ from typing import Mapping
 
 
 ANALYSIS_BUNDLE_SCHEMA = "navkit.analysis_bundle.v1"
+DETERMINISTIC_REGRESSION_REPORT_SCHEMA = "navkit.deterministic_regression_report.v1"
+DETERMINISTIC_REGRESSION_SUITE_SCHEMA = "navkit.deterministic_regression_suite.v1"
 MONTE_CARLO_CAMPAIGN_SCHEMA = "navkit.monte_carlo_campaign.v2"
 MONTE_CARLO_REPORT_SCHEMA = "navkit.monte_carlo_report.v1"
 MONTE_CARLO_RUN_SCHEMA = "navkit.monte_carlo_run.v1"

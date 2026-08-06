@@ -1,0 +1,7 @@
+{
+  "application": {
+    "clock": "simulated",
+    "control_state_source": "truth_passthrough",
+    "rate_hz": 1000.0
+  }
+}

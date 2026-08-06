@@ -13,6 +13,8 @@ deliberate error rather than a best-effort parse.
 
 | Artifact | Current schema |
 | --- | --- |
+| Deterministic regression suite | `navkit.deterministic_regression_suite.v1` |
+| Deterministic regression report | `navkit.deterministic_regression_report.v1` |
 | Monte Carlo campaign config/manifest | `navkit.monte_carlo_campaign.v2` |
 | Per-run Monte Carlo manifest | `navkit.monte_carlo_run.v1` |
 | Aggregate Monte Carlo report | `navkit.monte_carlo_report.v1` |
@@ -22,7 +24,7 @@ deliberate error rather than a best-effort parse.
 Existing raw CSV logs intentionally remain unversioned legacy inputs. They can
 be packaged through the explicit CSV compatibility path, which records their
 source paths and derivation assumptions in the resulting bundle. New generated
-campaign and report JSON must declare their schemas.
+regression-suite, campaign, and report JSON must declare their schemas.
 
 ## HDF5 bundle layout
 
@@ -72,6 +74,7 @@ job:
 | --- | --- |
 | `run_scenario.py` | Run one scenario and immediately generate its standard analysis |
 | `run_sim.py` | Run only the C++ simulation |
+| `run_regression.py` | Execute a versioned deterministic regression suite and emit compact pass/fail evidence |
 | `plot_run.py` | Render the standard domain-aware suite for an existing single run |
 | `plot_trajectory.py` | Render available frame-explicit truth, Guidance, Autopilot/Vehicle, tracking-error, and 3-D trajectory dashboards |
 | `run_monte_carlo.py` | Execute, package, report, and plot a seeded campaign |
@@ -82,9 +85,9 @@ job:
 | `plot_field.py` | Quickly inspect arbitrary named CSV/HDF5 fields |
 | `profile/benchmark_analysis_scaling.py` | Measure identical HDF5-backed plotting workloads at multiple Plotly worker counts |
 
-`run_scenario.py` and `run_monte_carlo.py` are the normal entry points.
-Lower-level tools are useful when simulation is already complete or when
-iterating on analysis without paying simulation cost again.
+`run_scenario.py`, `run_regression.py`, and `run_monte_carlo.py` are the normal
+entry points. Lower-level tools are useful when simulation is already complete
+or when iterating on analysis without paying simulation cost again.
 
 ## Single-run workflow
 
@@ -235,6 +238,130 @@ output/logs/<run_name>/
 
 The desktop simulation has a centralized typed product list; the exact emitted
 products depend on the runtime `logging` configuration.
+
+## Deterministic regression workflow
+
+Deterministic regression suites run ordinary runtime scenarios through the
+normal `run_sim.py` path, then evaluate a declared numerical contract. The
+supplied regression suite covers stationary free-inertial reconstruction,
+stationary GNSS-aided reconstruction, ballistic flight, and a horizontal
+bank-to-turn maneuver:
+
+```powershell
+python tools/run_regression.py `
+  config/runtime/regression/ecef_ins_truth_reconstruction.json
+```
+
+The selected compile-time product must already be built. The runner requires
+and validates its build manifest so a mismatched build directory cannot be
+reported as the requested product or build type.
+
+The suite document uses schema `navkit.deterministic_regression_suite.v1` and
+has this shape:
+
+```json
+{
+  "schema": "navkit.deterministic_regression_suite.v1",
+  "suite_name": "ecef_ins_truth_reconstruction",
+  "execution": {
+    "build_type": "Release",
+    "navkit_config": "apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
+  },
+  "output": {
+    "root": "output/regression/ecef_ins_truth_reconstruction"
+  },
+  "cases": [
+    {
+      "name": "stationary_free_inertial",
+      "scenario": "../navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_free_inertial_truth_reconstruction.json",
+      "minimum_duration_s": 59.9,
+      "minimum_sample_count": 2500,
+      "thresholds": {
+        "position_max_norm_m": 1e-8,
+        "position_rms_norm_m": 5e-9,
+        "velocity_max_norm_mps": 1e-9,
+        "velocity_rms_norm_mps": 5e-10,
+        "attitude_max_norm_rad": 1e-12,
+        "attitude_rms_norm_rad": 5e-13
+      },
+      "sensor_update_counts": {
+        "gnss_position": { "minimum": 0, "maximum": 0 },
+        "gnss_velocity": { "minimum": 0, "maximum": 0 }
+      }
+    }
+  ]
+}
+```
+
+Scenario paths are resolved relative to the suite file. `execution` selects the
+default build type and compile-time product, while command-line values can
+override them. `output.root` is the exact suite output directory; it is
+repository-relative unless an absolute path inside the repository is supplied.
+Each case declares minimum duration/sample coverage, maximum allowed position,
+velocity, and attitude error norms, and explicit GNSS update-count contracts.
+An update count is the number of distinct measurement timestamps whose logged
+filter statistic has `accepted == 1`; repeated snapshots of sticky statistics
+and rejected observations do not increase it. Both update CSV products must
+exist with the required `time_s` and `accepted` columns, so a header-only file
+is valid evidence of zero updates but a missing logging product is an
+infrastructure failure. The free-inertial case requires zero position and
+velocity updates; the aided cases require enough of both update families to
+prove that a passing truth reconstruction exercised the intended aiding paths
+rather than merely running the same ideal-IMU case under another name.
+
+Truth alignment is deliberately stricter than the general-purpose plotting
+path:
+
+- truth and Navigator timestamps must be finite and strictly increasing;
+- the truth log must bracket the first and final Navigator output epochs, so
+  endpoint extrapolation is rejected rather than silently clamped;
+- ECEF position and velocity truth are linearly interpolated to each Navigator
+  output timestamp;
+- body-to-ECEF truth quaternions are interpolated with quaternion SLERP;
+- attitude error is the rotation vector of the relative rotation from the
+  estimated body-to-ECEF attitude to truth, making the metric invariant to the
+  quaternion sign representation;
+- maximum error is the largest Euclidean norm over the aligned history, and RMS
+  error is the root mean square of those per-epoch norms.
+
+Run a subset by repeating `--case`, or preserve passing-case logs explicitly:
+
+```powershell
+python tools/run_regression.py `
+  config/runtime/regression/ecef_ins_truth_reconstruction.json `
+  --case stationary_free_inertial `
+  --case ballistic
+
+python tools/run_regression.py `
+  config/runtime/regression/ecef_ins_truth_reconstruction.json `
+  --retain-artifacts
+```
+
+`--build-type`, `--navkit-config`, `--build-dir`, `--generator`, and
+`--output-dir` provide the corresponding execution overrides. Unknown case
+names and output paths outside the repository are rejected.
+
+After a suite completes, its report is written atomically to:
+
+```text
+<output.root>/report.json
+```
+
+It uses schema `navkit.deterministic_regression_report.v1` and records the suite
+path and digest, selected compile-time product and build manifest, host/Python
+information, each scenario's source and resolved-effective-config digests, the
+executed command, measured metrics, declared thresholds, individual checks,
+elapsed time, and aggregate pass/fail status. Every case runs in a temporary
+directory. Passing raw logs are deleted after their metrics enter the report;
+failed runs are copied under `<output.root>/artifacts/<case_name>/` with a
+non-destructive suffix when needed. `--retain-artifacts` applies the same
+retention to passing cases for directed debugging or qualification evidence.
+Once a valid suite and output root are resolved, the runner removes an older
+report before validating the selected cases/build and executing the suite, so a
+later infrastructure failure cannot leave stale passing evidence at that
+output path. The report is intentionally compact provenance, not a complete
+archival reproduction bundle; Phase 8.4 owns qualification-baseline and CI
+artifact policy.
 
 ## Monte Carlo workflow
 

@@ -1,0 +1,85 @@
+{
+  "schema": "navkit.deterministic_regression_suite.v1",
+  "suite_name": "ecef_ins_truth_reconstruction",
+  "execution": {
+    "build_type": "Release",
+    "navkit_config": "apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
+  },
+  "output": {
+    "root": "output/regression/ecef_ins_truth_reconstruction"
+  },
+  "cases": [
+    {
+      "name": "stationary_free_inertial",
+      "scenario": "../navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_free_inertial_truth_reconstruction.json",
+      "minimum_duration_s": 59.9,
+      "minimum_sample_count": 2500,
+      "thresholds": {
+        "position_max_norm_m": 1e-8,
+        "position_rms_norm_m": 5e-9,
+        "velocity_max_norm_mps": 1e-9,
+        "velocity_rms_norm_mps": 5e-10,
+        "attitude_max_norm_rad": 1e-12,
+        "attitude_rms_norm_rad": 5e-13
+      },
+      "sensor_update_counts": {
+        "gnss_position": { "minimum": 0, "maximum": 0 },
+        "gnss_velocity": { "minimum": 0, "maximum": 0 }
+      }
+    },
+    {
+      "name": "stationary_gnss_aided",
+      "scenario": "../navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_gnss_aided_truth_reconstruction.json",
+      "minimum_duration_s": 59.9,
+      "minimum_sample_count": 2500,
+      "thresholds": {
+        "position_max_norm_m": 1e-8,
+        "position_rms_norm_m": 5e-9,
+        "velocity_max_norm_mps": 1e-9,
+        "velocity_rms_norm_mps": 5e-10,
+        "attitude_max_norm_rad": 1e-12,
+        "attitude_rms_norm_rad": 5e-13
+      },
+      "sensor_update_counts": {
+        "gnss_position": { "minimum": 50 },
+        "gnss_velocity": { "minimum": 50 }
+      }
+    },
+    {
+      "name": "ballistic",
+      "scenario": "../navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_ballistic_truth_reconstruction.json",
+      "minimum_duration_s": 150.0,
+      "minimum_sample_count": 5000,
+      "thresholds": {
+        "position_max_norm_m": 0.005,
+        "position_rms_norm_m": 0.002,
+        "velocity_max_norm_mps": 0.0005,
+        "velocity_rms_norm_mps": 0.0002,
+        "attitude_max_norm_rad": 0.00002,
+        "attitude_rms_norm_rad": 0.000005
+      },
+      "sensor_update_counts": {
+        "gnss_position": { "minimum": 140 },
+        "gnss_velocity": { "minimum": 140 }
+      }
+    },
+    {
+      "name": "horizontal_s_turn_bank_to_turn",
+      "scenario": "../navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_calibration_horizontal_s_turn_bank_to_turn_truth_reconstruction.json",
+      "minimum_duration_s": 59.9,
+      "minimum_sample_count": 2500,
+      "thresholds": {
+        "position_max_norm_m": 0.001,
+        "position_rms_norm_m": 0.0005,
+        "velocity_max_norm_mps": 0.0005,
+        "velocity_rms_norm_mps": 0.0001,
+        "attitude_max_norm_rad": 0.00002,
+        "attitude_rms_norm_rad": 0.000005
+      },
+      "sensor_update_counts": {
+        "gnss_position": { "minimum": 50 },
+        "gnss_velocity": { "minimum": 50 }
+      }
+    }
+  ]
+}

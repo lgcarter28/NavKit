@@ -267,6 +267,7 @@ These scripts provide a consistent cross-platform workflow and abstract away pla
 | `plot_run.py` | Generate the standard domain-aware plots from existing single-run logs |
 | `plot_trajectory.py` | Generate interactive ECEF/ECI/NED/body trajectory and command/response plots |
 | `run_scenario.py` | Run a scenario, optionally override output location, and generate plots |
+| `run_regression.py` | Execute a versioned deterministic regression suite and emit compact pass/fail evidence |
 | `run_monte_carlo.py` | Run a seeded Monte Carlo campaign, package HDF5, and generate interactive aggregate plots/reports |
 | `plot_monte_carlo.py` | Regenerate selected Monte Carlo aggregate plots from existing campaign logs |
 | `plot_consistency.py` | Generate or refresh joint NEES/NIS dashboards and reports from a campaign HDF5 bundle |
@@ -559,6 +560,18 @@ Run a Monte Carlo campaign with:
 ```bash
 python tools/run_monte_carlo.py config/runtime/monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_stationary_smoke_mc.json --build-type Release
 ```
+
+Run the deterministic truth-reconstruction regression matrix with:
+
+```bash
+python tools/run_regression.py config/runtime/regression/ecef_ins_truth_reconstruction.json
+```
+
+Build the suite's selected compile-time product first. The suite then writes a
+compact JSON report under `output/regression/` and retains full simulation logs
+only for failed cases unless `--retain-artifacts` is specified. See
+[`ANALYSIS.md`](ANALYSIS.md) for suite fields, metric semantics, case selection,
+provenance, and artifact-retention details.
 
 Single-run logs normally live under `output/logs/<run_name>/`; Monte Carlo
 campaigns normally live under `output/monte_carlo/<campaign_name>/`.

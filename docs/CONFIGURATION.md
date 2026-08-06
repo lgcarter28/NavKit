@@ -743,12 +743,16 @@ product-core NavKit configuration.
 
 ### Runtime configuration layout and naming
 
-Runtime JSON has two intentional roles:
+Runtime JSON is organized into runnable simulation inputs and analysis workflow
+inputs:
 
 ```text
-config/runtime/navkit_sim/
-  components/  # reusable physical, estimator, and initialization fragments
-  scenario/    # complete runnable simulation compositions
+config/runtime/
+  navkit_sim/
+    components/  # reusable physical, estimator, and initialization fragments
+    scenario/    # complete runnable simulation compositions
+  monte_carlo/   # seeded campaigns that reference ordinary scenarios
+  regression/    # versioned deterministic suites that reference ordinary scenarios
 ```
 
 Scenario filenames use lowercase `snake_case` and follow:
@@ -803,6 +807,19 @@ variants share a family folder; for example,
 `EcefInsGnssLcGyroAccelBias*` variants. Reusable compile-time slices live under
 `products/components/<owner>/` and use a PascalCase domain-role name such as
 `filter/InsGyroAccelBiasInitialCovarianceDefault.hpp`.
+
+Deterministic regression suites live under `config/runtime/regression/`. A
+suite is a versioned analysis contract, not another simulation configuration:
+it references ordinary files under `navkit_sim/scenario/`, selects the expected
+compile-time product/build mode, and declares duration, sample-count, and
+numerical thresholds plus required accepted sensor-update counts. Name a suite
+for the acceptance contract it owns, such as
+`ecef_ins_truth_reconstruction.json`; keep each referenced scenario on the
+normal `<product>_<trajectory>_<purpose>.json` convention. Scenario paths are
+resolved relative to the suite file, which keeps the suite relocatable with the
+runtime-config tree. See the deterministic regression workflow in
+[`ANALYSIS.md`](ANALYSIS.md#deterministic-regression-workflow) for the complete
+suite contract and command-line behavior.
 
 Scenario files link reusable runtime components through explicit role-to-path
 entries. Component paths are resolved relative to the scenario file, loaded

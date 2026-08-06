@@ -14,6 +14,7 @@ failure behavior, and numerical expectations hard to misunderstand.
 | Environment/model tests | Verify policy capabilities and physics/model semantics at a stable tolerance. | planet/gravity policy tests |
 | Simulation and IO tests | Verify executable support code produces expected data contracts. | trajectory generation, CSV writer behavior |
 | End-to-end smoke tests | Verify the configured app/demo still runs and analysis can consume its logs. | `tools/run_sim.py`, `tools/plot_run.py`, `tools/run_scenario.py` |
+| Deterministic estimator regressions | Verify complete selected products reconstruct truth across declared static/dynamic scenarios and aiding paths within versioned numerical contracts. | `tools/run_regression.py`, `config/runtime/regression/ecef_ins_truth_reconstruction.json` |
 
 ## Standards for new tests
 

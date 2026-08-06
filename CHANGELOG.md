@@ -14,6 +14,12 @@ This project follows
 
 ### Added
 
+- Pass 8.1 adds a versioned deterministic truth-reconstruction regression
+  runner, compact provenance-rich JSON reports, strict ECEF/SLERP time
+  alignment, failure-only artifact retention, and stationary free-inertial,
+  stationary truth-GNSS, ballistic, and bank-to-turn acceptance scenarios with
+  evidence-calibrated position, velocity, and attitude tolerances plus explicit
+  free-inertial versus aided GNSS update-count contracts.
 - Runtime JSON now uses degrees for direct angular values and degrees per
   second for direct angular rates while retaining radian-based covariance and
   PSD terms. Trajectory physics cadence is explicitly named

@@ -1,39 +1,48 @@
 # Phase 8 - Estimator Validation and Consistency
 
-**Status:** active. Pass 8.1 is maintained in `docs/ROADMAP.md`; Passes 8.2 and
-8.3 remain future backlog detail here.
+**Status:** active. The current Phase 8 passes are maintained in
+`docs/ROADMAP.md`. This file preserves only the completed validation foundation
+and the design intent behind the active phase.
 
-## Pass 8.1: deterministic estimator regression baselines
+## Active pass intent
 
-Active ownership is maintained in `docs/ROADMAP.md`.
+- Pass 8.2 adds runtime chi-square measurement rejection and proves exact
+  correction logging across same-epoch accepted updates.
+- Pass 8.3 adds state-definition-aware local-linear and empirical observability
+  analysis with reusable HDF5 derivations and interactive Python
+  visualizations.
+- Pass 8.4 turns existing Monte Carlo consistency and observability products
+  into declared qualification criteria and diagnoses the remaining joint-NEES
+  findings.
+- Pass 8.5 creates CI-facing qualification reports and baseline management.
 
-## Pass 8.2: innovation and covariance consistency
+## Completed passes
 
-- [ ] Add per-axis and state-family innovation/residual summaries: mean, covariance, standard deviation, RMS, and sample count over explicit analysis windows.
-- [ ] Add standardized and jointly whitened innovation time histories.
-- [ ] Add Gaussian overlays and QQ diagnostics for standardized/whitened innovations.
-- [ ] Add lagged innovation autocorrelation and statistically justified whiteness tests.
-- [ ] Define stochastic pass/fail thresholds and required campaign sizes explicitly; never treat one stochastic run as proof of consistency.
-- [ ] Diagnose the Phase 7 dynamic-profile full-state joint-NEES failures, including cross-correlation, reset, linearization, process-noise, and numerical covariance effects, while retaining the state-family and NIS evidence that already behaves credibly.
-- [ ] Make filter-correction logs exact under multiple accepted updates at one
-  epoch. Either emit one correction/injection event per accepted update or
-  record explicit cycle-start/cycle-end nominal states and compose attitude
-  corrections multiplicatively; do not present a first-order vector sum of
-  small-angle corrections as an exact nonlinear cycle correction. Add a
-  replay/reconstruction test.
-- [ ] Add maneuver- and state-family observability diagnostics that expose
-  information growth for attitude and modeled IMU biases across static,
-  ballistic, calibration, and turning trajectories. Preserve the intentional
-  high-fidelity simulator versus lower-order estimator-state mismatch while
-  evaluating consider-state methods and justified process-noise inflation
-  before expanding the filter state.
+### Pass 8.1: deterministic truth-reconstruction regressions
 
-## Pass 8.3: validation reports
+- [x] Added stationary free-inertial reconstruction from exact initial PVA and
+  ideal IMU increments with GNSS availability explicitly outside the run.
+- [x] Added stationary truth-GNSS position/velocity reconstruction from exact
+  initial PVA and ideal IMU increments.
+- [x] Added ballistic and horizontal bank-to-turn dynamic reconstruction using
+  truth-passthrough control so the estimator cannot perturb its own oracle.
+- [x] Added strict finite/monotonic timestamp validation, truth coverage checks,
+  ECEF position/velocity interpolation, quaternion SLERP, relative-rotation
+  attitude error, and focused numerical-contract tests.
+- [x] Added one versioned regression command and report with compile-time
+  product, build, suite, scenario, effective-config, metric, threshold, and
+  pass/fail provenance. Passing logs are temporary; failures and explicit
+  `--retain-artifacts` runs preserve complete evidence.
+- [x] Added explicit sensor-path evidence: required statistics products count
+  distinct accepted GNSS position/velocity timestamps, the free-inertial
+  contract requires zero, and aided contracts require both observation
+  families throughout their declared windows.
+- [x] Verified all four Release cases against evidence-calibrated contracts.
+  Stationary reconstruction remained near floating-point precision; ballistic
+  and bank-to-turn maximum position errors remained below 0.8 mm and 0.14 mm,
+  respectively.
 
-- [ ] Produce machine-readable qualification/regression reports with named threshold results, pass/fail status, schema/build/config provenance, and baseline deltas.
-- [ ] Produce concise human-readable qualification reports and CI summaries with links to retained diagnostic artifacts.
-
-## Phase 8 completed foundation
+## Earlier completed validation foundation
 
 - [x] Basic plots, innovation histories, NIS/p-value plots, histograms, ECEF/NED covariance/error plots, and dashboard plots exist.
 - [x] Current scenario tooling can run simulations and generate analysis artifacts from one command.

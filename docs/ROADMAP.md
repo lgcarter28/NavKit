@@ -47,6 +47,10 @@ Detailed historical phase notes are preserved under `docs/roadmap_details/`. Thi
 - [x] `tools/run_scenario.py` provides a one-liner sim-plus-plot workflow.
 - [x] `tools/run_monte_carlo.py` provides a seeded campaign workflow with replayable generated run configs and first-pass aggregate covariance plots.
 - [x] Versioned Monte Carlo HDF5 bundles cache time-indexed joint NEES/NIS and marginal per-axis series and support interactive consistency dashboards plus machine-readable reports.
+- [x] A versioned deterministic regression runner covers stationary
+  free-inertial, stationary truth-GNSS, ballistic, and bank-to-turn truth
+  reconstruction with strict time alignment, declared numerical contracts,
+  compact reports, and failure-only artifact retention.
 - [x] LaTeX algorithm references exist for ECEF navigator v1 and IMU emulator v1.
 - [x] Setup, configuration, architecture, naming, founding, license, changelog, copyright, profiling, and roadmap documentation exists.
 - [x] Compile-time and runtime tests cover the current policy, config, simulation, logging, and initialization seams.
@@ -82,54 +86,92 @@ These are preserved at high level so the roadmap stays readable. Detailed pass-b
   Pass 7.14 replaces profile-owned transition branches with a validated runtime
   Guidance state graph, separates Guidance, Autopilot, and Vehicle ownership,
   and preserves the accepted seven-scenario Release output suite.
+- [x] Phase 8.1: deterministic stationary and dynamic truth-reconstruction
+  regressions, compact reports, and failure-only artifact retention completed.
 
 ## Current phase
 
-Phase 8.1: deterministic estimator regression baselines is active. Phase 7.1
-through 7.14 are complete with repeatable static and dynamic trajectories, closed-loop
-source-agnostic Guidance/Autopilot/Vehicle behavior, corrected
-truth-minus-estimate and same-epoch aiding semantics, rotating-Earth and
-midpoint-attitude consistency, full single-run diagnostics, and six verified
-post-Pass-7.12 500-run Monte Carlo campaigns. Pass 7.13 adds seven updated
-500-run campaigns spanning ballistic, constant-altitude, horizontal
-skid-to-turn, horizontal bank-to-turn, vertical S-turn, half-pipe Dutch roll,
-and waypoint bank-to-turn. All 3,500 runs completed successfully with full
-analysis bundles and consistency products. Pass 7.14 preserves those accepted
-profiles through one runtime-configurable Guidance state machine and explicit
-Guidance-to-Autopilot-to-Vehicle contracts. Phase 8 now turns the complete
-evidence sequence into deterministic regressions, explicit thresholds,
-statistical diagnosis, and qualification reports.
+Phase 8 turns the existing single-run, Monte Carlo, HDF5, and interactive
+consistency evidence into deterministic estimator regressions, runtime
+measurement acceptance, explicit qualification criteria, and diagnosis of the
+remaining dynamic-profile consistency findings. Phase 7.1 through 7.14 provide
+the repeatable static and dynamic truth sources required for this work.
 
-## Pass 8.1: deterministic estimator regression baselines
+## Pass 8.2: runtime innovation acceptance and correction integrity
 
-- [ ] Establish named baseline scenarios, supported compile-time
-  product/config combinations, numerical metrics, and explicit pass/fail
-  thresholds.
-- [ ] Add a single regression command for the default ECEF INS/GNSS simulation
-  and analysis pipeline, with machine-readable results suitable for CI.
-- [ ] Add a free-inertial truth-reconstruction regression using truth initial
-  PVA and ideal IMU increments with GNSS disabled.
-- [ ] Add a GNSS-aided truth-reconstruction regression using truth initial PVA,
-  ideal IMU increments, and truth GNSS position/velocity measurements.
-- [ ] Run both regressions on static trajectories long enough to expose
-  cadence/interpolation defects. Interpolate truth to Navigator output
-  timestamps and compare ECEF position, velocity, and attitude using justified
-  numerical integration tolerances rather than bitwise equality.
-- [ ] Preserve the existing perfect/truth-reconstruction runtime inputs and
-  execute the applicable regression matrix for each supported selected product
-  configuration.
-- [ ] Carry the Phase 7 dynamic-trajectory Monte Carlo findings into
-  qualification. The earlier six 1,000-run campaigns, the post-Pass-7.11 six
-  500-run campaigns, and the post-Pass-7.12 six 500-run campaigns all
-  completed. The latest evidence shows generally healthy PVA families and GNSS
-  NIS, while constant-altitude and waypoint cases retain elevated full-state
-  NEES associated with accelerometer-bias/cross-covariance behavior and weak
-  gyro-z observability. Treat this as evidence to diagnose, not as a passing
-  consistency result. The seven post-Pass-7.13 campaigns completed 3,500 of
-  3,500 runs and produced the full report, HDF5, covariance, NEES, and NIS
-  product set. Preserve the skid-to-turn versus bank-to-turn comparison and
-  the added sustained horizontal/vertical Dutch-roll excitation as distinct
-  qualification evidence.
+- [ ] Add configurable chi-square innovation gates for each GNSS observation
+  family. Evaluate the gate before measurement injection, reject invalid
+  observations deterministically, and log the threshold, NIS, and accepted
+  status.
+- [ ] Add unit and end-to-end tests for accepted and rejected position and
+  velocity observations, including sequential position/velocity updates at one
+  epoch.
+- [ ] Add a replay/reconstruction regression proving filter-correction logging
+  is exact when multiple accepted updates occur at one epoch: emit one event
+  per injection or record an equivalent exact composed result.
+
+## Pass 8.3: observability analysis and interactive visualization
+
+- [ ] Define a versioned, state-definition-aware observability data contract
+  for Python analysis. Preserve state labels/order, frames, units, reference
+  epochs, measurement families/timestamps, measurement covariance or whitened
+  Jacobians, and the discrete state transitions needed to transport each
+  measurement sensitivity through a declared analysis window. Add only the
+  runtime-enabled analysis logging needed to populate that contract; do not
+  burden the embedded hot path with desktop visualization concerns.
+- [ ] Implement numerically scaled local-linear observability/information
+  analysis. Form measurement-whitened sensitivities, retain full cross-state
+  coupling, and support cumulative and sliding finite windows, individual
+  sensors, sensor combinations, and maneuver/state-machine intervals. Use
+  SVD/QR or equivalent stable factorizations to report effective rank,
+  singular spectrum, condition, information growth, and strongest/weakest
+  observable modes without confusing mixed state units with observability.
+- [ ] Add an explicitly separate empirical observability mode based on paired,
+  deterministically seeded state perturbations and central-difference output
+  sensitivities. Use it to cross-check the local linearized result on nonlinear
+  trajectories; do not present either finite-window diagnostic as proof of
+  global nonlinear or structural observability.
+- [ ] Add reusable HDF5-backed Python derivations and responsive Plotly views
+  for singular-value/rank history, cumulative and sliding-window information,
+  state/state-family sensitivity heatmaps, mode-composition heatmaps,
+  weakest-mode evolution, per-sensor information contribution, and
+  maneuver-to-maneuver comparison. Provide interactive epoch/window and state
+  selection plus publication-quality Matplotlib export from the same derived
+  data rather than duplicating analysis logic.
+- [ ] Validate the tooling against small systems with known observable and
+  unobservable modes, rank tolerances, state rescaling, sensor combinations,
+  and window boundaries. Apply it to stationary, ballistic, S-turn,
+  Dutch-roll, and waypoint cases to quantify attitude and IMU-bias
+  observability—especially yaw and gyro-z—rather than inferring observability
+  solely from covariance contraction.
+- [ ] Document the equations, scaling/whitening conventions, numerical rank
+  policy, interpretation limits, required logs, and interactive workflow in
+  the analysis documentation, with a future standalone LaTeX treatment if the
+  reference grows beyond a concise implementation contract.
+
+## Pass 8.4: stochastic qualification and dynamic-profile diagnosis
+
+- [ ] Define named Monte Carlo campaign sizes, analysis windows, and
+  statistically justified pass/fail criteria. Existing NEES/NIS, coverage,
+  CDF/PIT, QQ, and interactive products are the evidence surface; do not
+  duplicate them with another plotting stack.
+- [ ] Diagnose elevated full-state NEES in the constant-altitude and waypoint
+  profiles, beginning with accelerometer-bias cross-covariance, reset,
+  linearization, process-noise, and numerical covariance effects while
+  preserving the credible PVA-family and GNSS-NIS evidence.
+- [ ] Use the Pass 8.3 observability products alongside covariance and
+  consistency evidence to explain maneuver-dependent attitude and modeled
+  IMU-bias behavior rather than treating covariance contraction alone as
+  observability proof.
+
+## Pass 8.5: qualification reports and CI baseline management
+
+- [ ] Produce a compact qualification report from deterministic and stochastic
+  results: threshold outcomes, configuration/build/schema provenance, baseline
+  deltas, diagnostic-artifact links, and explicit disposition of known
+  consistency findings.
+- [ ] Integrate the deterministic regression matrix into CI and retain only
+  failure artifacts plus explicitly requested qualification bundles.
 
 ## Future phase details
 
