@@ -383,15 +383,12 @@ public:
         m_filtered_guidance_command.specific_force_command_ib_b_mps2 =
             m_guidance_filter_output.specific_force_filtered_ib_b_mps2;
 
-        if (!m_autopilot->advance(m_filtered_guidance_command,
-                                  autopilot_state_from(control_state, control_environment),
-                                  autopilot_execution_from(m_guidance_output.execution),
-                                  physics_dt_s,
-                                  m_vehicle_command,
-                                  m_autopilot_output)) {
-            return false;
-        }
-        return true;
+        return m_autopilot->advance(m_filtered_guidance_command,
+                                    autopilot_state_from(control_state, control_environment),
+                                    autopilot_execution_from(m_guidance_output.execution),
+                                    physics_dt_s,
+                                    m_vehicle_command,
+                                    m_autopilot_output);
     }
 
     [[nodiscard]] bool advance_guidance_filter(const TrajectoryEnvironment& plant_environment,

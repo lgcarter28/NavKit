@@ -13,15 +13,16 @@ template<FilterCorrectionPolicy Filter>
 struct UpdatePostFilter
 {
     template<SensorPolicy Sensor>
-    static void sensor_update(Filter&, const Sensor&)
+    [[nodiscard]] static typename Filter::AppliedCorrection_t sensor_update(Filter&, const Sensor&)
     {
-        // default: do nothing after each sensor
+        return {};
     }
 
-    static void filter_update(Filter& filter)
+    [[nodiscard]] static typename Filter::AppliedCorrection_t filter_update(Filter& filter)
     {
-        filter.inject();
+        const typename Filter::AppliedCorrection_t correction = filter.inject();
         filter.reset();
+        return correction;
     }
 };
 
@@ -29,20 +30,20 @@ template<FilterCorrectionPolicy Filter>
 struct UpdateAfterEachSensor
 {
     template<SensorPolicy Sensor>
-    static void sensor_update(Filter& filter, const Sensor&)
+    [[nodiscard]] static typename Filter::AppliedCorrection_t sensor_update(Filter& filter,
+                                                                            const Sensor&)
     {
-        if constexpr (requires { filter.pending_correction_valid(); }) {
-            if (!filter.pending_correction_valid()) {
-                return;
-            }
+        if (!filter.pending_correction_valid()) {
+            return {};
         }
-        filter.inject();
+        const typename Filter::AppliedCorrection_t correction = filter.inject();
         filter.reset();
+        return correction;
     }
 
-    static void filter_update(Filter&)
+    [[nodiscard]] static typename Filter::AppliedCorrection_t filter_update(Filter&)
     {
-        // no-op
+        return {};
     }
 };
 

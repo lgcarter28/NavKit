@@ -217,7 +217,7 @@ TEST_CASE("Guidance command filter preserves state through an entry override and
                            first_entry_step));
     const core::Scalar_t first_entry_expected =
         before_transition_expected +
-        (2.0 - before_transition_expected) * (1.0 - std::exp(-0.25 / 2.0));
+        ((2.0 - before_transition_expected) * (1.0 - std::exp(-0.25 / 2.0)));
     CHECK(first_entry_step.specific_force_filtered_ib_b_mps2.x() ==
           doctest::Approx(first_entry_expected));
     CHECK(first_entry_step.bank_filtered_n_rad == doctest::Approx(first_entry_expected));
@@ -232,7 +232,7 @@ TEST_CASE("Guidance command filter preserves state through an entry override and
                            0.25,
                            final_entry_step));
     const core::Scalar_t final_entry_expected =
-        first_entry_expected + (2.0 - first_entry_expected) * (1.0 - std::exp(-0.25 / 2.0));
+        first_entry_expected + ((2.0 - first_entry_expected) * (1.0 - std::exp(-0.25 / 2.0)));
     CHECK(final_entry_step.specific_force_filtered_ib_b_mps2.x() ==
           doctest::Approx(final_entry_expected));
     CHECK(filter.active_config().specific_force_time_constant_b_s.x() == doctest::Approx(0.5));
@@ -246,7 +246,7 @@ TEST_CASE("Guidance command filter preserves state through an entry override and
                            0.25,
                            nominal_step));
     const core::Scalar_t nominal_expected =
-        final_entry_expected + (2.0 - final_entry_expected) * (1.0 - std::exp(-0.25 / 0.5));
+        final_entry_expected + ((2.0 - final_entry_expected) * (1.0 - std::exp(-0.25 / 0.5)));
     CHECK(nominal_step.specific_force_filtered_ib_b_mps2.x() == doctest::Approx(nominal_expected));
     CHECK(nominal_step.bank_filtered_n_rad == doctest::Approx(nominal_expected));
 }

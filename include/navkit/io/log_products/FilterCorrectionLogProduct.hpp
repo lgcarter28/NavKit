@@ -14,7 +14,7 @@
 namespace navkit::io
 {
 
-template<typename StateDef, typename Filter>
+template<typename StateDef>
 class FilterCorrectionLogProduct
 {
 public:
@@ -26,10 +26,10 @@ public:
                    detail::state_error_value_header<Error>("correction_"));
     }
 
-    void log(const FilterCorrectionLogPayload<StateDef, Filter>& payload)
+    void log(const FilterCorrectionLogPayload<StateDef>& payload)
     {
         m_csv.write_row_values(
-            detail::state_error_value_row<Error>(payload.time_s, payload.filter.last_correction()));
+            detail::state_error_value_row<Error>(payload.time_s, payload.correction));
     }
 
     void flush()
@@ -39,13 +39,16 @@ public:
 
     nlohmann::json metadata() const
     {
-        return {{"schema", "filter_correction_ecef_v1"},
+        return {{"schema", "filter_correction_ecef_v2"},
                 {"file", "filter_correction_ecef.csv"},
                 {"covariance", "none"},
                 {"state_dimension", Error::N},
                 {"description",
-                 "Event log for actual filter correction vectors captured before injection/reset. "
-                 "Covariance bounds are read from the nominal estimate/covariance log."}};
+                 "Event log for exact filter corrections captured before injection/reset. "
+                 "Corrections accepted sequentially at one Navigator epoch are composed in "
+                 "application order; additive states sum and attitude uses quaternion "
+                 "composition. Covariance bounds are read from the nominal "
+                 "estimate/covariance log."}};
     }
 
     static nlohmann::json manifest_entry()

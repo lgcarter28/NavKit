@@ -7,6 +7,7 @@
 #include "navkit/core/models/GnssPosModel.hpp"
 #include "test_main.hpp"
 
+#include <cmath>
 #include <tuple>
 
 namespace navkit::core::estimation::test
@@ -108,6 +109,11 @@ void check_common_statistics(const MeasurementStatistics<Sensor>& stats,
 {
     CHECK(stats.valid);
     CHECK(stats.accepted == accepted);
+    CHECK(stats.innovation_covariance_valid);
+    CHECK_FALSE(stats.gate_enabled);
+    CHECK(stats.gate_probability == doctest::Approx(1.0));
+    CHECK(std::isinf(stats.gate_threshold));
+    CHECK(stats.gate_dof == 3U);
     CHECK(timestamp_seconds(stats.t) == doctest::Approx(expected_time));
     CHECK(stats.innovation.isApprox(expected_innovation(), 1.0e-12));
     CHECK(stats.measurement_covariance.isApprox(expected_measurement_covariance(), 1.0e-12));
@@ -115,6 +121,63 @@ void check_common_statistics(const MeasurementStatistics<Sensor>& stats,
     CHECK(stats.jacobian_h.isApprox(expected_jacobian(), 1.0e-12));
     CHECK(stats.kalman_gain.isApprox(expected_gain(), 1.0e-12));
     CHECK(stats.nis == doctest::Approx(expected_nis()));
+}
+
+TEST_CASE("innovation gate rejection records diagnostics without mutating filter state")
+{
+    StatisticsFixture fixture{};
+    Sensor sensor{};
+    REQUIRE(sensor.configure_innovation_gate_probability(0.5));
+    sensor.observation_context() = fixture.noise;
+    fixture.sensor_measurement.z << 1000.0, -1000.0, 1000.0;
+    CHECK(sensor.push(fixture.sensor_measurement));
+
+    fixture.filter.process_sensor(sensor);
+
+    const MeasurementStatistics<Sensor>& stats = fixture.filter.measurement_statistics<Sensor>();
+    CHECK(stats.valid);
+    CHECK_FALSE(stats.accepted);
+    CHECK(stats.innovation_covariance_valid);
+    CHECK(stats.gate_enabled);
+    CHECK(stats.gate_probability == doctest::Approx(0.5));
+    CHECK(stats.gate_dof == 3U);
+    CHECK(stats.nis > stats.gate_threshold);
+    CHECK(fixture.filter.error_state().isApprox(fixture.initial_error_state, 1.0e-12));
+    CHECK(fixture.filter.covariance().isApprox(fixture.initial_covariance, 1.0e-12));
+}
+
+TEST_CASE("measurement statistics validity is scoped to the current update cycle")
+{
+    StatisticsFixture fixture{};
+    Sensor sensor{};
+    sensor.observation_context() = fixture.noise;
+    CHECK(sensor.push(fixture.sensor_measurement));
+
+    fixture.filter.process_sensor(sensor);
+    CHECK(fixture.filter.measurement_statistics_available<Sensor>());
+
+    fixture.filter.clear_measurement_statistics();
+    CHECK_FALSE(fixture.filter.measurement_statistics_available<Sensor>());
+}
+
+TEST_CASE("invalid innovation covariance rejects deterministically without filter mutation")
+{
+    StatisticsFixture fixture{};
+    Sensor sensor{};
+    sensor.observation_context() = fixture.noise;
+    sensor.observation_context().R_e_m2 = -101.0 * navkit::core::Mat3::Identity();
+    CHECK(sensor.push(fixture.sensor_measurement));
+
+    fixture.filter.process_sensor(sensor);
+
+    const MeasurementStatistics<Sensor>& stats = fixture.filter.measurement_statistics<Sensor>();
+    CHECK(stats.valid);
+    CHECK_FALSE(stats.accepted);
+    CHECK_FALSE(stats.innovation_covariance_valid);
+    CHECK(std::isnan(stats.nis));
+    CHECK(stats.kalman_gain.isZero(0.0));
+    CHECK(fixture.filter.error_state().isApprox(fixture.initial_error_state, 1.0e-12));
+    CHECK(fixture.filter.covariance().isApprox(fixture.initial_covariance, 1.0e-12));
 }
 
 } // namespace
@@ -147,12 +210,12 @@ TEST_CASE("direct model update does not record sensor-keyed statistics")
 
     Timestamp t{};
     REQUIRE(timestamp_from_seconds(update_time, TimeScale::Monotonic, t));
-    fixture.filter.observation_update<Model>(fixture.measurement, t, fixture.noise, false);
+    fixture.filter.observation_update<Model>(fixture.measurement, t, fixture.noise);
 
     CHECK_FALSE(fixture.filter.measurement_statistics_available<Sensor>());
 
-    CHECK(fixture.filter.error_state().isApprox(fixture.initial_error_state, 1.0e-12));
-    CHECK(fixture.filter.covariance().isApprox(fixture.initial_covariance, 1.0e-12));
+    CHECK_FALSE(fixture.filter.error_state().isApprox(fixture.initial_error_state, 1.0e-12));
+    CHECK_FALSE(fixture.filter.covariance().isApprox(fixture.initial_covariance, 1.0e-12));
 }
 
 TEST_CASE("sensor diagnostics can disable measurement statistics storage")

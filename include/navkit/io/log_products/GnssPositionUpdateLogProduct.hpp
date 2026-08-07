@@ -30,7 +30,7 @@ public:
 
     void log(const MeasurementStatisticsLogPayload<Statistics>& payload)
     {
-        const auto& stats = payload.statistics;
+        const Statistics& stats = payload.statistics;
 
         static_assert(M == 3, "GNSS position update statistics must have measurement dimension 3.");
         static_assert(Statistics::H_t::RowsAtCompileTime == M,
@@ -40,7 +40,12 @@ public:
 
         std::vector<double> row = {core::timestamp_seconds(stats.t),
                                    stats.accepted ? 1.0 : 0.0,
+                                   stats.innovation_covariance_valid ? 1.0 : 0.0,
                                    stats.nis,
+                                   stats.gate_enabled ? 1.0 : 0.0,
+                                   stats.gate_probability,
+                                   static_cast<double>(stats.gate_dof),
+                                   stats.gate_threshold,
                                    stats.innovation(0),
                                    stats.innovation(1),
                                    stats.innovation(2),
@@ -64,7 +69,7 @@ public:
 
     static nlohmann::json metadata()
     {
-        return {{"schema", "gnss_pos_update_v1"},
+        return {{"schema", "gnss_pos_update_v2"},
                 {"file", "gnss_pos_update.csv"},
                 {"model", "gnss_pos"},
                 {"measurement_dimension", M},
@@ -76,11 +81,13 @@ public:
                   {"measurement_covariance", "m^2"},
                   {"jacobian_h", "mixed"},
                   {"kalman_gain", "mixed"},
-                  {"nis", "dimensionless"}}},
+                  {"nis", "dimensionless"},
+                  {"gate_probability", "dimensionless"},
+                  {"gate_threshold", "dimensionless"}}},
                 {"description",
                  "GNSS position measurement update statistics. The CSV includes innovation, S, R, "
-                 "H, K, "
-                 "NIS, timestamp, and accepted flag."}};
+                 "H, K, NIS, innovation-covariance validity, configured chi-square acceptance "
+                 "probability, model-derived DOF and threshold, timestamp, and accepted flag."}};
     }
 
     static nlohmann::json manifest_entry()
@@ -96,7 +103,12 @@ private:
     {
         std::vector<std::string> result = {"time_s",
                                            "accepted",
+                                           "innovation_covariance_valid",
                                            "nis",
+                                           "gate_enabled",
+                                           "gate_probability",
+                                           "gate_dof",
+                                           "gate_threshold",
                                            "nu_p_e_x_m",
                                            "nu_p_e_y_m",
                                            "nu_p_e_z_m",

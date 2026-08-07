@@ -3,6 +3,7 @@
 
 #include "navkit/core/estimation/measurement/Measurement.hpp"
 #include "navkit/core/estimation/sensor/Sensor.hpp"
+#include "navkit/core/estimation/sensor/SensorPolicy.hpp"
 #include "navkit/core/estimation/state/StateDefs.hpp"
 #include "navkit/core/models/GnssPosModel.hpp"
 #include "test_main.hpp"
@@ -15,6 +16,14 @@ namespace
 
 using SensorTestModel = navkit::core::models::GnssPosModel<InsGyroAccelBiasStateDef>;
 using SensorTestMeasurement = Measurement<SensorTestModel::M>;
+
+struct WrongInnovationGateSensor : Sensor<0U, SensorTestModel, 1U>
+{
+    using InnovationGate_t = InnovationGate<2>;
+};
+
+static_assert(SensorPolicy<Sensor<0U, SensorTestModel, 1U>>);
+static_assert(!SensorPolicy<WrongInnovationGateSensor>);
 
 struct MeasurementDrivenNoisePolicy
 {

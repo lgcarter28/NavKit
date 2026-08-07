@@ -88,6 +88,10 @@ These are preserved at high level so the roadmap stays readable. Detailed pass-b
   and preserves the accepted seven-scenario Release output suite.
 - [x] Phase 8.1: deterministic stationary and dynamic truth-reconstruction
   regressions, compact reports, and failure-only artifact retention completed.
+- [x] Phase 8.2: runtime-configured chi-square innovation acceptance for
+  separate GNSS position and velocity observations, deterministic pre-mutation
+  rejection diagnostics, and exact composed same-epoch correction logging
+  completed.
 
 ## Current phase
 
@@ -96,19 +100,6 @@ consistency evidence into deterministic estimator regressions, runtime
 measurement acceptance, explicit qualification criteria, and diagnosis of the
 remaining dynamic-profile consistency findings. Phase 7.1 through 7.14 provide
 the repeatable static and dynamic truth sources required for this work.
-
-## Pass 8.2: runtime innovation acceptance and correction integrity
-
-- [ ] Add configurable chi-square innovation gates for each GNSS observation
-  family. Evaluate the gate before measurement injection, reject invalid
-  observations deterministically, and log the threshold, NIS, and accepted
-  status.
-- [ ] Add unit and end-to-end tests for accepted and rejected position and
-  velocity observations, including sequential position/velocity updates at one
-  epoch.
-- [ ] Add a replay/reconstruction regression proving filter-correction logging
-  is exact when multiple accepted updates occur at one epoch: emit one event
-  per injection or record an equivalent exact composed result.
 
 ## Pass 8.3: observability analysis and interactive visualization
 
@@ -142,7 +133,7 @@ the repeatable static and dynamic truth sources required for this work.
   unobservable modes, rank tolerances, state rescaling, sensor combinations,
   and window boundaries. Apply it to stationary, ballistic, S-turn,
   Dutch-roll, and waypoint cases to quantify attitude and IMU-bias
-  observability—especially yaw and gyro-z—rather than inferring observability
+  observability, especially yaw and gyro-z, rather than inferring observability
   solely from covariance contraction.
 - [ ] Document the equations, scaling/whitening conventions, numerical rank
   policy, interpretation limits, required logs, and interactive workflow in

@@ -72,6 +72,36 @@ struct InsInjectionPolicy
         }
     }
 
+    /**
+     * Composes two error-state corrections in their application order.
+     *
+     * Applying `first` and then `second` to the same nominal state is
+     * equivalent to applying `composed` once. Additive states sum, while the
+     * left-global attitude correction must retain quaternion multiplication
+     * order rather than adding rotation vectors.
+     */
+    template<typename ErrorState_t>
+    static void
+    compose(const ErrorState_t& first, const ErrorState_t& second, ErrorState_t& composed)
+    {
+        composed = first + second;
+        if constexpr (requires {
+                          typename Nominal::AttQuat;
+                          typename Error::AttRotVec;
+                      }) {
+            const Eigen::Quaternion<Scalar_t> first_delta_q =
+                navkit::core::math::quaternion_from_rotvec_rad(
+                    segment<typename Error::AttRotVec>(first));
+            const Eigen::Quaternion<Scalar_t> second_delta_q =
+                navkit::core::math::quaternion_from_rotvec_rad(
+                    segment<typename Error::AttRotVec>(second));
+            const Eigen::Quaternion<Scalar_t> composed_delta_q =
+                navkit::core::math::normalized_with_positive_scalar(second_delta_q * first_delta_q);
+            segment<typename Error::AttRotVec>(composed) =
+                navkit::core::math::rotvec_rad_from_quaternion(composed_delta_q);
+        }
+    }
+
 private:
     template<typename NominalSegment,
              typename ErrorSegment,

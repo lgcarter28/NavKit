@@ -688,6 +688,66 @@ non-overlapping, with `end_s > start_s`. Due epochs outside every active window
 are consumed but not published, so GNSS retains its original schedule phase.
 Omit the array for continuous availability.
 
+### GNSS innovation acceptance
+
+The GNSS runtime component configures position and velocity innovation
+acceptance independently. The `chi_square_acceptance` object and both
+observation-family entries are required. An enabled family must provide an
+acceptance probability strictly between zero and one:
+
+```json
+{
+  "gnss": {
+    "chi_square_acceptance": {
+      "position": {
+        "enabled": true,
+        "probability": 0.9973
+      },
+      "velocity": {
+        "enabled": false
+      }
+    }
+  }
+}
+```
+
+For each family, the only accepted keys are `enabled` and `probability`. An
+enabled family must provide `probability`. A disabled family may omit it; a
+valid inherited value is ignored so a scenario overlay can disable a gate by
+setting only `enabled: false` after component-object deep merging. Any present
+probability must remain strictly inside `(0, 1)`. Missing family entries,
+invalid probabilities, and unknown fields are runtime configuration errors.
+
+The probability is the user-facing contract, not a threshold literal. For a
+measurement model with dimension `M`, NavKit derives the innovation-gate
+degrees of freedom from `M` and computes the threshold as the corresponding
+chi-square quantile. The current separate GNSS position and velocity models
+each have `M = 3`. Runtime configuration must not provide either a threshold
+or degrees of freedom, so those values cannot drift away from the selected
+measurement model.
+
+The filter forms the innovation covariance and normalized innovation squared
+(NIS) before making the acceptance decision. An observation is accepted only
+when the innovation covariance is numerically valid, the NIS is finite and
+nonnegative, and either the gate is disabled or the NIS does not exceed the
+derived threshold. The acceptance decision occurs before any persistent
+error-state correction accumulation, covariance replacement, or nominal-state
+injection. Consequently, a rejected position observation cannot alter the
+state seen by a same-epoch velocity observation, while an accepted position
+update does participate in the normal sequential-update lifecycle.
+
+The versioned `gnss_pos_update_v2` and `gnss_vel_update_v2` diagnostic products
+expose the decision associated with each logged position or velocity update.
+In addition to the innovation, innovation covariance, measurement covariance,
+Jacobian, and Kalman gain, their CSV fields include `accepted`,
+`innovation_covariance_valid`, `nis`, `gate_enabled`, `gate_probability`,
+`gate_dof`, and `gate_threshold`. Use `innovation_covariance_valid` to
+distinguish a numerical rejection from a statistically valid observation that
+failed its configured chi-square gate. A disabled gate reports the explicit
+sentinels `gate_probability = 1` and `gate_threshold = +infinity`; consumers
+must use `gate_enabled` rather than interpreting those values as an active
+statistical contract.
+
 Compile-time product choices such as selected state definitions, fixed buffer
 sizes, covariance cadence, and initial-covariance policy slices belong in the
 selected compile-time config. Reusable embedded-library defaults may live inside

@@ -75,6 +75,37 @@ inline void validate_gnss_active_windows(const nlohmann::json& gnss)
     }
 }
 
+inline void validate_gnss_chi_square_gate(const nlohmann::json& acceptance,
+                                          const std::string_view observation_family)
+{
+    const nlohmann::json& gate = require_object(acceptance, observation_family);
+    reject_unknown_top_level_keys(gate, {"enabled", "probability"});
+    require_bool(gate, "enabled");
+    require_optional_number(gate, "probability");
+    const bool enabled = gate.at("enabled").get<bool>();
+    if (!enabled && !gate.contains("probability")) {
+        return;
+    }
+
+    if (!gate.contains("probability")) {
+        throw_runtime_config_error("gnss.chi_square_acceptance." + std::string(observation_family) +
+                                   " must specify probability when enabled");
+    }
+    const core::Scalar_t probability = gate.at("probability").get<core::Scalar_t>();
+    if (probability <= 0.0 || probability >= 1.0) {
+        throw_runtime_config_error("gnss.chi_square_acceptance." + std::string(observation_family) +
+                                   ".probability must be strictly between 0 and 1");
+    }
+}
+
+inline void validate_gnss_chi_square_acceptance(const nlohmann::json& gnss)
+{
+    const nlohmann::json& acceptance = require_object(gnss, "chi_square_acceptance");
+    reject_unknown_top_level_keys(acceptance, {"position", "velocity"});
+    validate_gnss_chi_square_gate(acceptance, "position");
+    validate_gnss_chi_square_gate(acceptance, "velocity");
+}
+
 inline void validate_gnss_runtime_config(const nlohmann::json& cfg, std::string_view runtime_key)
 {
     const nlohmann::json& gnss = require_object(cfg, runtime_key);
@@ -88,8 +119,26 @@ inline void validate_gnss_runtime_config(const nlohmann::json& cfg, std::string_
         require_object(gnss, "velocity_cov"), "gnss.velocity_cov", "vel_m2ps2");
     require_optional_vec3(gnss, "p_b_ant_b_m");
     validate_gnss_active_windows(gnss);
+    validate_gnss_chi_square_acceptance(gnss);
     require_unsigned_integer(gnss, "seed");
     require_bool(gnss, "noise_enabled");
+}
+
+template<typename Sensor>
+inline void configure_gnss_innovation_gate(const nlohmann::json& cfg,
+                                           const std::string_view observation_family,
+                                           Sensor& sensor)
+{
+    const nlohmann::json& gate = cfg.at("gnss").at("chi_square_acceptance").at(observation_family);
+    if (!gate.at("enabled").get<bool>()) {
+        sensor.disable_innovation_gate();
+        return;
+    }
+    const core::Scalar_t probability = gate.at("probability").get<core::Scalar_t>();
+    if (!sensor.configure_innovation_gate_probability(probability)) {
+        throw_runtime_config_error("failed to configure GNSS " + std::string(observation_family) +
+                                   " innovation-acceptance probability");
+    }
 }
 
 inline void validate_gnss_covariance_frame(const nlohmann::json& covariance, std::string_view path)
@@ -275,6 +324,7 @@ struct GnssEmulator
         if (gnss_cfg.position_covariance_frame == sim::GnssCovarianceFrame::Ecef) {
             sensor.observation_context().R_e_m2 = gnss_cfg.position_cov_m2;
         }
+        detail::configure_gnss_innovation_gate(cfg, "position", sensor);
         // NED covariance requires the current truth position; update_sensor_context() transforms it
         // to ECEF immediately before the measurement update.
     }
@@ -379,6 +429,7 @@ struct GnssVelocityEmulator
         if (gnss_cfg.velocity_covariance_frame == sim::GnssCovarianceFrame::Ecef) {
             sensor.observation_context().R_e_m2ps2 = gnss_cfg.velocity_cov_m2ps2;
         }
+        detail::configure_gnss_innovation_gate(cfg, "velocity", sensor);
         // NED covariance requires the current truth position; update_sensor_context() transforms it
         // to ECEF immediately before the measurement update.
     }

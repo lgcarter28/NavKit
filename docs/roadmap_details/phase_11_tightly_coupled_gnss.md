@@ -8,7 +8,7 @@ The first tightly coupled pass should assume clean/current observable timing. Fu
 
 ## Pass 11.1: tightly coupled GNSS algorithm document
 
-- [ ] Create a complete standalone LaTeX algorithm document for tightly coupled GNSS before implementation. It should fully specify observables, state definitions, clock modeling, measurement equations, Jacobians, covariance/noise models, validity/sanitization logic, constellation/receiver-specific data contracts, and simulation/emulator requirements with enough detail to implement from the document.
+- [ ] Create a complete standalone LaTeX algorithm document for tightly coupled GNSS before implementation. It should fully specify observables, state definitions, clock modeling, measurement equations, Jacobians, covariance/noise models, validity/sanitization logic, constellation/receiver-specific data contracts, and simulation/emulator requirements with enough detail to implement from the document. Define innovation-gate degrees of freedom from the valid scalar observables participating in each test, including per-SV and whole-epoch tests whose dimensions vary as satellites and observable types enter or leave the solution.
 
 ## Pass 11.2: raw/semi-raw observable models
 
@@ -25,4 +25,7 @@ The first tightly coupled pass should assume clean/current observable timing. Fu
 ## Pass 11.4: integrity and ultra-tight-coupling investigation
 
 - [ ] Add tightly coupled sanitization and integrity checks: per-SV chi-squared rejection, RAIM-style consistency checks, measurement quality gating, and backup least-squares receiver solutions for monitoring or fallback.
+- [ ] Extend the current fixed-dimension `InnovationGate<M>` design with a bounded runtime-DOF gate for tightly coupled observations. Preserve probability-based runtime configuration, compute the effective DOF from the actual valid pseudorange, Doppler, carrier-phase, or other scalar residuals in the tested innovation vector, and expose the resolved DOF, threshold, probability, NIS, and decision in diagnostics.
+- [ ] Precompute or cache chi-square thresholds for every supported DOF when configuring the receiver so embedded runtime gating performs a bounded lookup rather than an inverse-distribution calculation at each epoch. Retain the fixed-size gate for fixed-dimension measurement models.
+- [ ] Do not count padded or inactive maximum-capacity observation rows as degrees of freedom. The gate threshold must correspond to the residuals actually included in the NIS; per-SV joint tests and whole-epoch tests must explicitly document how many valid scalar observables contribute and whether estimated nuisance parameters alter the applicable statistical test.
 - [ ] Investigate ultra-tightly coupled GNSS/INS support and the receiver-aiding message requirements needed for embedded integration.

@@ -12,8 +12,14 @@ namespace navkit::core::estimation
 {
 
 template<typename Candidate>
-concept FilterCorrectionPolicy = requires(Candidate& filter) {
-    { filter.inject() } -> std::same_as<void>;
+concept FilterCorrectionPolicy = requires(Candidate& filter,
+                                          const typename Candidate::AppliedCorrection_t& first,
+                                          const typename Candidate::AppliedCorrection_t& second) {
+    typename Candidate::AppliedCorrection_t;
+    { filter.inject() } -> std::same_as<typename Candidate::AppliedCorrection_t>;
+    {
+        Candidate::compose_applied_corrections(first, second)
+    } -> std::same_as<typename Candidate::AppliedCorrection_t>;
     { filter.reset() } -> std::same_as<void>;
 };
 

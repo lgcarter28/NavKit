@@ -4,10 +4,12 @@
 find_package(doctest REQUIRED CONFIG)
 
 add_executable(navkit_tests
+    test_chi_square.cpp
     test_covariance_health.cpp
     test_main.cpp
     test_config_policy.cpp
     test_injection_reset_policy.cpp
+    test_innovation_gate.cpp
     test_log_product_policy.cpp
     test_measurement_model_policy.cpp
     test_measurement_statistics.cpp

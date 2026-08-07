@@ -38,6 +38,7 @@ public:
     using Propagation_t = Propagation;
     using Update_t = Update;
     using Profiler_t = Profiler;
+    using AppliedCorrection_t = typename Filter_t::AppliedCorrection_t;
     using ImuBuffer_t =
         navkit::core::containers::RingBuffer<ImuIncrement, Propagation_t::imu_buffer_capacity>;
     struct CovarianceStep
@@ -90,7 +91,13 @@ public:
     void process_one_sensor(Sensor& sensor_obj)
     {
         m_filter.process_sensor(sensor_obj);
-        Update_t::template sensor_update<Sensor>(m_filter, sensor_obj);
+        accumulate_applied_correction(
+            Update_t::template sensor_update<Sensor>(m_filter, sensor_obj));
+    }
+
+    [[nodiscard]] const AppliedCorrection_t& last_applied_correction() const
+    {
+        return m_last_applied_correction;
     }
 
     [[nodiscard]] bool push_imu(const ImuIncrement& increment)
@@ -164,15 +171,13 @@ public:
             Profiler::profile(navkit::core::profiling::ProfilePoint::NavigatorProcessMeasurements);
         static_cast<void>(profile_scope);
 
-        if constexpr (requires { m_filter.begin_measurement_update_cycle(); }) {
-            m_filter.begin_measurement_update_cycle();
+        m_last_applied_correction = {};
+        if constexpr (requires { m_filter.clear_measurement_statistics(); }) {
+            m_filter.clear_measurement_statistics();
         }
         std::apply([this](auto&... sensor_obj) { (this->process_one_sensor(sensor_obj), ...); },
                    m_sensors);
-        Update_t::filter_update(m_filter);
-        if constexpr (requires { m_filter.end_measurement_update_cycle(); }) {
-            m_filter.end_measurement_update_cycle();
-        }
+        accumulate_applied_correction(Update_t::filter_update(m_filter));
     }
 
     bool update()
@@ -202,6 +207,12 @@ public:
     }
 
 private:
+    void accumulate_applied_correction(const AppliedCorrection_t& correction)
+    {
+        m_last_applied_correction =
+            Filter_t::compose_applied_corrections(m_last_applied_correction, correction);
+    }
+
     [[nodiscard]] bool awaiting_imu_pair() const
     {
         if constexpr (Propagation_t::apply_coning_sculling_compensation) {
@@ -315,6 +326,7 @@ private:
     ImuBuffer_t m_imu_buffer{};
     CovarianceHistory_t m_covariance_history{};
     CovarianceStep m_pending_covariance_step{};
+    AppliedCorrection_t m_last_applied_correction{};
     Vec3 m_latest_omega_ib_b_meas_radps{Vec3::Zero()};
     bool m_has_pending_covariance_step{false};
     bool m_last_propagation_success{true};

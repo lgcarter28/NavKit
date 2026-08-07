@@ -14,6 +14,7 @@
 #include "navkit/sim/sensors/GnssSimulator.hpp"
 #include "test_main.hpp"
 
+#include <cmath>
 #include <tuple>
 
 namespace
@@ -92,7 +93,7 @@ TEST_CASE("GNSS position update moves state toward measurement")
     ctx.R_e_m2 = navkit::core::Mat3::Identity();
 
     kf.observation_update<Model>(z, ctx);
-    kf.inject();
+    static_cast<void>(kf.inject());
     kf.reset();
 
     CHECK(kf.state()(Nominal::Pos::i) < 10.0);
@@ -111,10 +112,10 @@ TEST_CASE("Direct filter injection reports its accepted measurement correction")
     measurement.x() = 2.0;
 
     filter.observation_update<Model>(measurement, ctx);
-    filter.inject();
+    const decltype(filter)::AppliedCorrection_t correction = filter.inject();
 
-    CHECK(filter.last_correction_valid());
-    CHECK(filter.last_correction()(Error::Pos::i) == doctest::Approx(1.0));
+    CHECK(correction.valid);
+    CHECK(correction.value(Error::Pos::i) == doctest::Approx(1.0));
 }
 
 TEST_CASE("GNSS position Jacobian follows truth-minus-estimate error convention")
@@ -261,34 +262,116 @@ TEST_CASE("Sequential GNSS position and velocity inject between sensor updates")
     using PositionSensor = navkit::core::estimation::Sensor<0U, PositionModel, 2U>;
     using VelocitySensor = navkit::core::estimation::Sensor<1U, VelocityModel, 2U>;
     using Sensors = std::tuple<PositionSensor, VelocitySensor>;
-    using Filter = navkit::core::estimation::KalmanFilter<StateDef>;
+    using Filter = navkit::core::estimation::KalmanFilter<
+        StateDef,
+        navkit::core::estimation::DefaultInjectionPolicy<StateDef>,
+        navkit::core::estimation::DefaultResetPolicy<StateDef>,
+        Sensors>;
     using Update = navkit::core::estimation::UpdateAfterEachSensor<Filter>;
     using Navigator = navkit::core::estimation::
         Navigator<Filter, Sensors, navkit::core::estimation::NoOpPropagation, Update>;
 
     Navigator navigator{};
+    Filter::State_t initial_state = Filter::State_t::Zero();
+    initial_state(Nominal::AttQuat::i) = 1.0;
+    navigator.filter().set_state(initial_state);
     Filter::P_t covariance = Filter::P_t::Identity();
-    covariance(Error::Pos::i, Error::Vel::i) = 0.5;
-    covariance(Error::Vel::i, Error::Pos::i) = 0.5;
+    covariance(Error::Pos::i, Error::Vel::i) = 0.2;
+    covariance(Error::Vel::i, Error::Pos::i) = 0.2;
+    covariance(Error::AttRotVec::i, Error::Pos::i) = 0.15;
+    covariance(Error::Pos::i, Error::AttRotVec::i) = 0.15;
+    covariance(Error::AttRotVec::i + 1, Error::Vel::i) = -0.1;
+    covariance(Error::Vel::i, Error::AttRotVec::i + 1) = -0.1;
     navigator.filter().set_covariance(covariance);
     navigator.template sensor<0>().observation_context().R_e_m2 = navkit::core::Mat3::Identity();
     navigator.template sensor<1>().observation_context().R_e_m2ps2 = navkit::core::Mat3::Identity();
 
     navkit::core::estimation::Measurement<3> position{};
-    position.z.x() = 10.0;
+    REQUIRE(
+        navkit::core::timestamp_from_seconds(10.0, navkit::core::TimeScale::Monotonic, position.t));
+    position.z.x() = 2.0;
     navkit::core::estimation::Measurement<3> velocity{};
-    velocity.z.x() = 2.5;
+    velocity.t = position.t;
+    velocity.z.x() = -3.0;
     REQUIRE(navigator.template sensor<0>().push(position));
     REQUIRE(navigator.template sensor<1>().push(velocity));
 
     navigator.process_measurements();
 
-    CHECK(navigator.filter().state()(Nominal::Pos::i) == doctest::Approx(5.0));
-    CHECK(navigator.filter().state()(Nominal::Vel::i) == doctest::Approx(2.5));
+    CHECK(navigator.filter().measurement_statistics<PositionSensor>().accepted);
+    CHECK(navigator.filter().measurement_statistics<VelocitySensor>().accepted);
+    CHECK(std::abs(navigator.filter().state()(Nominal::Pos::i)) > 0.0);
+    CHECK(std::abs(navigator.filter().state()(Nominal::Vel::i)) > 0.0);
     CHECK(navigator.filter().error_state().isZero(1.0e-15));
-    CHECK(navigator.filter().last_correction_valid());
-    CHECK(navigator.filter().last_correction()(Error::Pos::i) == doctest::Approx(5.0));
-    CHECK(navigator.filter().last_correction()(Error::Vel::i) == doctest::Approx(2.5));
+    CHECK(navigator.last_applied_correction().valid);
+
+    Filter::State_t replayed_state = initial_state;
+    navkit::core::estimation::DefaultInjectionPolicy<StateDef>::apply(
+        replayed_state, navigator.last_applied_correction().value);
+    CHECK(replayed_state.isApprox(navigator.filter().state(), 1.0e-12));
+    CHECK(std::abs(navigator.last_applied_correction().value(Error::AttRotVec::i)) > 0.0);
+    CHECK(std::abs(navigator.last_applied_correction().value(Error::AttRotVec::i + 1)) > 0.0);
+}
+
+TEST_CASE("Rejected same-epoch GNSS velocity leaves accepted position correction intact")
+{
+    using StateDef = navkit::core::estimation::InsGyroAccelBiasStateDef;
+    using Nominal = StateDef::Nominal;
+    using PositionModel = navkit::core::models::GnssPosModel<StateDef>;
+    using VelocityModel = navkit::core::models::GnssVelModel<StateDef>;
+    using PositionSensor = navkit::core::estimation::Sensor<0U, PositionModel, 2U>;
+    using VelocitySensor = navkit::core::estimation::Sensor<1U, VelocityModel, 2U>;
+    using Sensors = std::tuple<PositionSensor, VelocitySensor>;
+    using Filter = navkit::core::estimation::KalmanFilter<
+        StateDef,
+        navkit::core::estimation::DefaultInjectionPolicy<StateDef>,
+        navkit::core::estimation::DefaultResetPolicy<StateDef>,
+        Sensors>;
+    using Update = navkit::core::estimation::UpdateAfterEachSensor<Filter>;
+    using Navigator = navkit::core::estimation::
+        Navigator<Filter, Sensors, navkit::core::estimation::NoOpPropagation, Update>;
+
+    Navigator gated_navigator{};
+    Navigator position_only_navigator{};
+    Filter::State_t initial_state = Filter::State_t::Zero();
+    initial_state(Nominal::AttQuat::i) = 1.0;
+    gated_navigator.filter().set_state(initial_state);
+    position_only_navigator.filter().set_state(initial_state);
+    gated_navigator.filter().set_covariance(Filter::P_t::Identity());
+    position_only_navigator.filter().set_covariance(Filter::P_t::Identity());
+
+    for (Navigator* navigator : {&gated_navigator, &position_only_navigator}) {
+        navigator->template sensor<0>().observation_context().R_e_m2 =
+            navkit::core::Mat3::Identity();
+        navigator->template sensor<1>().observation_context().R_e_m2ps2 =
+            navkit::core::Mat3::Identity();
+        REQUIRE(navigator->template sensor<0>().configure_innovation_gate_probability(0.99));
+        REQUIRE(navigator->template sensor<1>().configure_innovation_gate_probability(0.95));
+    }
+
+    navkit::core::estimation::Measurement<3> position{};
+    REQUIRE(
+        navkit::core::timestamp_from_seconds(10.0, navkit::core::TimeScale::Monotonic, position.t));
+    position.z.x() = 1.0;
+    navkit::core::estimation::Measurement<3> rejected_velocity{};
+    rejected_velocity.t = position.t;
+    rejected_velocity.z.x() = 1000.0;
+
+    REQUIRE(gated_navigator.template sensor<0>().push(position));
+    REQUIRE(gated_navigator.template sensor<1>().push(rejected_velocity));
+    REQUIRE(position_only_navigator.template sensor<0>().push(position));
+
+    gated_navigator.process_measurements();
+    position_only_navigator.process_measurements();
+
+    CHECK(gated_navigator.filter().measurement_statistics<PositionSensor>().accepted);
+    CHECK_FALSE(gated_navigator.filter().measurement_statistics<VelocitySensor>().accepted);
+    CHECK(gated_navigator.filter().state().isApprox(position_only_navigator.filter().state(),
+                                                    1.0e-13));
+    CHECK(gated_navigator.filter().covariance().isApprox(
+        position_only_navigator.filter().covariance(), 1.0e-13));
+    CHECK(gated_navigator.last_applied_correction().value.isApprox(
+        position_only_navigator.last_applied_correction().value, 1.0e-13));
 }
 
 TEST_CASE("GNSS simulator publishes due samples only in configured active windows")

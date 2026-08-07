@@ -74,6 +74,13 @@ struct LocalInjection
     {
         x -= dx;
     }
+
+    static void compose(const ErrorState<MeasurementModelPolicyTestStateDef>& first,
+                        const ErrorState<MeasurementModelPolicyTestStateDef>& second,
+                        ErrorState<MeasurementModelPolicyTestStateDef>& composed)
+    {
+        composed = first + second;
+    }
 };
 
 struct LocalReset

@@ -349,7 +349,7 @@ TEST_CASE("KalmanFilter observation update emits the configured profile point")
 
     Timestamp t{};
     REQUIRE(timestamp_from_seconds(1.0, TimeScale::Monotonic, t));
-    filter.observation_update<ProfiledModel>(z, t, ctx, true);
+    filter.observation_update<ProfiledModel>(z, t, ctx);
 
     REQUIRE(FixedSink::count == 1U);
     const auto& record = FixedSink::first_record();

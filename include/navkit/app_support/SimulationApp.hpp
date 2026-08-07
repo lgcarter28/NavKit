@@ -141,7 +141,7 @@ public:
             std::printf("Trajectory diagnostics logging failed at initialization time\n");
             return 6;
         }
-        run_logger.log_filter_if_due(t_start, filter);
+        run_logger.log_filter_if_due(t_start, navigator);
 
         bool navigator_finalized = false;
         while (!trajectory.source->is_complete()) {
@@ -217,7 +217,7 @@ public:
                 return 6;
             }
             run_logger.log_imu_if_due(truth, imu_sample);
-            run_logger.log_filter_if_due(t_curr, filter);
+            run_logger.log_filter_if_due(t_curr, navigator);
         }
 
         if (!navigator_finalized && !navigator.finalize()) {

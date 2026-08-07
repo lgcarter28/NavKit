@@ -41,10 +41,25 @@ struct ValidInjection
     {
         x += dx;
     }
+
+    static void compose(const ErrorState<PolicyTestStateDef>& first,
+                        const ErrorState<PolicyTestStateDef>& second,
+                        ErrorState<PolicyTestStateDef>& composed)
+    {
+        composed = first + second;
+    }
 };
 
 struct MissingInjectionApply
 {};
+
+struct MissingInjectionCompose
+{
+    static void apply(NominalState<PolicyTestStateDef>& x, const ErrorState<PolicyTestStateDef>& dx)
+    {
+        x += dx;
+    }
+};
 
 struct MutableErrorInjection
 {
@@ -105,6 +120,7 @@ TEST_CASE("InjectionPolicy accepts compatible policies")
 TEST_CASE("InjectionPolicy rejects incompatible policies")
 {
     static_assert(!InjectionPolicy<MissingInjectionApply, PolicyTestStateDef>);
+    static_assert(!InjectionPolicy<MissingInjectionCompose, PolicyTestStateDef>);
     static_assert(!InjectionPolicy<MutableErrorInjection, PolicyTestStateDef>);
 
     CHECK(true);
@@ -190,6 +206,44 @@ TEST_CASE("Default INS injection maps ECEF attitude-error correction to stored q
     const Eigen::Quaterniond actual_q_b2e{q_segment(0), q_segment(1), q_segment(2), q_segment(3)};
 
     CHECK(actual_q_b2e.coeffs().isApprox(expected_q_b2e.coeffs(), 1.0e-12));
+}
+
+TEST_CASE("Default INS correction composition exactly replays sequential injections")
+{
+    using StateDef = InsGyroAccelBiasStateDef;
+    using Nominal = StateDef::Nominal;
+    using Error = StateDef::Error;
+
+    NominalState<StateDef> sequential_state = NominalState<StateDef>::Zero();
+    const Eigen::Quaterniond initial_q_b2e =
+        navkit::core::math::quaternion_from_rpy_rad(Eigen::Vector3d{0.2, -0.1, 0.3});
+    segment<Nominal::AttQuat>(sequential_state) << initial_q_b2e.w(), initial_q_b2e.x(),
+        initial_q_b2e.y(), initial_q_b2e.z();
+    segment<Nominal::Pos>(sequential_state) << 1.0, 2.0, 3.0;
+
+    ErrorState<StateDef> first = ErrorState<StateDef>::Zero();
+    ErrorState<StateDef> second = ErrorState<StateDef>::Zero();
+    segment<Error::Pos>(first) << 4.0, -2.0, 1.0;
+    segment<Error::Pos>(second) << -1.0, 3.0, 2.0;
+    segment<Error::AttRotVec>(first) << 0.08, -0.03, 0.02;
+    segment<Error::AttRotVec>(second) << -0.01, 0.06, -0.04;
+
+    DefaultInjectionPolicy<StateDef>::apply(sequential_state, first);
+    DefaultInjectionPolicy<StateDef>::apply(sequential_state, second);
+
+    ErrorState<StateDef> composed = ErrorState<StateDef>::Zero();
+    DefaultInjectionPolicy<StateDef>::compose(first, second, composed);
+    NominalState<StateDef> replayed_state = NominalState<StateDef>::Zero();
+    segment<Nominal::AttQuat>(replayed_state) << initial_q_b2e.w(), initial_q_b2e.x(),
+        initial_q_b2e.y(), initial_q_b2e.z();
+    segment<Nominal::Pos>(replayed_state) << 1.0, 2.0, 3.0;
+    DefaultInjectionPolicy<StateDef>::apply(replayed_state, composed);
+
+    CHECK(replayed_state.isApprox(sequential_state, 1.0e-13));
+    CHECK(segment<Error::Pos>(composed).isApprox(
+        segment<Error::Pos>(first) + segment<Error::Pos>(second), 1.0e-15));
+    CHECK_FALSE(segment<Error::AttRotVec>(composed).isApprox(
+        segment<Error::AttRotVec>(first) + segment<Error::AttRotVec>(second), 1.0e-6));
 }
 
 TEST_CASE("Default reset maps covariance through the left-global attitude reset Jacobian")

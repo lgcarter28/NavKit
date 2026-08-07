@@ -13,8 +13,11 @@ This phase moves robust status/error handling earlier than the broader embedded-
 
 ## Pass 9.2: estimator and measurement robustness
 
-- [ ] Add innovation gating, fault detection, and measurement rejection policies.
-- [ ] Add covariance health checks where practical, including symmetry and positive-semidefinite diagnostics.
+- [ ] Extend the existing per-sensor GNSS chi-square innovation gate into
+  reusable fault-detection and rejection policies for additional measurement
+  models and richer fault modes.
+- [ ] Connect the existing covariance symmetry and positive-semidefinite health
+  diagnostics to explicit runtime status and fault handling where practical.
 - [ ] Revisit attitude covariance reset mapping and covariance health diagnostics once richer attitude/error-state tests are in place.
 
 ## Pass 9.3: tests and diagnostics

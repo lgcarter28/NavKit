@@ -43,7 +43,7 @@ velocity_derivative_n_to_acceleration_i(const core::Vec3& velocity_derivative_co
                                      core::Vec3& rpy_b2n_rad);
 
 /** Recover WGS-84 ellipsoid height from an ECEF position. */
-[[nodiscard]] bool altitude_m(const core::Vec3& position_e_m, core::Scalar_t& altitude_m);
+[[nodiscard]] bool altitude_m(const core::Vec3& position_e_m, core::Scalar_t& altitude_output_m);
 
 /** Wrap an angle to the principal interval centered on zero. */
 [[nodiscard]] core::Scalar_t wrap_angle_rad(core::Scalar_t angle_rad);

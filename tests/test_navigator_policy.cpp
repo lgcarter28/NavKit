@@ -49,6 +49,7 @@ struct MissingSensorProcessing
     using StateDef_t = NavigatorPolicyStateDef;
     using State_t = NavigatorPolicyFilter::State_t;
     using ErrorState_t = NavigatorPolicyFilter::ErrorState_t;
+    using AppliedCorrection_t = NavigatorPolicyFilter::AppliedCorrection_t;
     using P_t = NavigatorPolicyFilter::P_t;
 
     [[nodiscard]] State_t& state();
@@ -60,7 +61,9 @@ struct MissingSensorProcessing
     void propagate_covariance(const P_t&, const P_t&);
     void set_covariance_floor(const P_t&);
     [[nodiscard]] const P_t& covariance_floor() const;
-    void inject();
+    [[nodiscard]] AppliedCorrection_t inject();
+    [[nodiscard]] static AppliedCorrection_t
+    compose_applied_corrections(const AppliedCorrection_t&, const AppliedCorrection_t&);
     void reset();
 };
 

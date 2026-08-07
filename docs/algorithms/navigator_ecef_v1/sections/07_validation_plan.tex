@@ -70,6 +70,9 @@ Equation coverage:
     \item verify residual, innovation covariance, Kalman gain, correction, and
     Joseph covariance update against
     \cref{eq:v1_measurement_residual,eq:v1_innovation_covariance,eq:v1_kalman_gain,eq:v1_error_state_correction,eq:v1_joseph_covariance_update};
+    \item verify NIS, model-derived degrees of freedom, probability-to-threshold
+    conversion, boundary acceptance, and pre-mutation rejection against
+    \cref{eq:v1_nis,eq:v1_chi_square_gate_threshold,eq:v1_chi_square_gate_acceptance};
     \item verify quaternion injection and covariance reset against
     \cref{eq:v1_quat_injection,eq:v1_reset_covariance_update,eq:v1_attitude_reset_block,eq:v1_full_reset_jacobian};
     \item verify GNSS position and velocity Jacobians, including antenna lever

@@ -14,6 +14,11 @@ This project follows
 
 ### Added
 
+- Runtime-configured chi-square innovation acceptance for separate GNSS
+  position and velocity observations, with measurement-model-derived degrees
+  of freedom and thresholds, rejection before persistent filter mutation, and
+  versioned diagnostics that log NIS, gate configuration, numerical validity,
+  and the acceptance decision.
 - Pass 8.1 adds a versioned deterministic truth-reconstruction regression
   runner, compact provenance-rich JSON reports, strict ECEF/SLERP time
   alignment, failure-only artifact retention, and stationary free-inertial,
@@ -187,6 +192,14 @@ This project follows
 
 ### Changed
 
+- Moved applied-correction cycle ownership from `KalmanFilter` to `Navigator`:
+  filter injection now returns a filter-domain correction value, Navigator
+  composes sequential sensor corrections in injection order, and correction
+  logging consumes the completed Navigator-owned result without filter-side
+  logging bookkeeping.
+- GNSS position and velocity consistency figures now show the runtime gate in
+  both equivalent forms: the configured chi-square NIS acceptance threshold
+  and its upper-tail p-value rejection threshold.
 - Preserved configured physical mission references independently from the
   runtime-selected control-state feedback source, so navigation-estimate
   initialization errors no longer redefine commanded altitude, heading, or

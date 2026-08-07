@@ -57,6 +57,60 @@ K R K^T.
 \label{eq:v1_joseph_covariance_update}
 \end{equation}
 
+\section{Chi-Square Innovation Acceptance}
+\label{sec:v1_chi_square_innovation_acceptance}
+
+Innovation acceptance is a generic statistical filter capability, independent
+of the sensor or observation model that produced the residual. For a
+measurement model of dimension $m$, define the normalized innovation squared
+(NIS)
+\begin{equation}
+\epsilon
+=
+\mathbf{r}^T S^{-1}\mathbf{r}.
+\label{eq:v1_nis}
+\end{equation}
+Under the linearized Gaussian measurement hypothesis,
+$\epsilon\sim\chi^2_m$. For a configured cumulative acceptance probability
+$p_{\mathrm{acc}}$, with $0<p_{\mathrm{acc}}<1$, define the threshold
+\begin{equation}
+\gamma
+=
+F_{\chi^2_m}^{-1}\!\left(p_{\mathrm{acc}}\right).
+\label{eq:v1_chi_square_gate_threshold}
+\end{equation}
+The degrees of freedom $m$ are derived from the selected observation model;
+they are not an independent runtime input. The implementation likewise
+computes $\gamma$ from the configured probability rather than accepting a raw
+threshold literal.
+
+Let $g_{\mathrm{enabled}}$ indicate whether statistical gating is enabled for
+the observation. The complete acceptance condition is
+\begin{equation}
+\boxed{
+\operatorname{accept}
+=
+\operatorname{valid}(S)
+\land
+\operatorname{finite}(\epsilon)
+\land
+\left(\epsilon\geq 0\right)
+\land
+\left(\neg g_{\mathrm{enabled}}\lor\epsilon\leq\gamma\right).
+}
+\label{eq:v1_chi_square_gate_acceptance}
+\end{equation}
+Disabling the statistical gate removes only the threshold comparison. A
+numerically invalid innovation covariance or NIS is always rejected. The
+decision is evaluated before persistent filter mutation: only an accepted
+observation may accumulate an error-state correction or replace the covariance
+used by a subsequent observation.
+
+Every processed observation must retain diagnostics sufficient to reproduce
+the decision: timestamp, acceptance status, innovation-covariance validity,
+NIS, gate-enabled status, configured probability, model-derived degrees of
+freedom, and computed threshold.
+
 \section{Nominal-State Injection}
 
 After an aiding update estimates $\delta\hat{\xb}^{+}$, apply translational and

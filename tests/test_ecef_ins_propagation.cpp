@@ -68,16 +68,19 @@ struct NonrotatingTestPlanet
     using InertialFrame = navkit::core::frames::PlanetCenteredInertial;
     using FixedFrame = navkit::core::frames::PlanetCenteredPlanetFixed;
 
+    // These spellings are part of the planet policy contract.
+    // NOLINTNEXTLINE(readability-identifier-naming)
     static constexpr Scalar_t mu_m3_s2 = 0.0;
+    // NOLINTNEXTLINE(readability-identifier-naming)
     static constexpr Scalar_t omega_rad_s = 0.0;
 };
 
 struct ZeroTestGravity
 {
     using Planet_t = NonrotatingTestPlanet;
-    using Frame_t = typename Planet_t::FixedFrame;
+    using Frame_t = Planet_t::FixedFrame;
 
-    [[nodiscard]] static Vec3 acceleration(const Vec3&)
+    [[nodiscard]] static Vec3 acceleration(const Vec3& /* position_e_m */)
     {
         return Vec3::Zero();
     }
@@ -255,13 +258,13 @@ TEST_CASE("Midpoint mechanization reconstructs a high-specific-force ballistic t
     config.profile.autopilot_rate = config.profile.rate;
     config.profile.p_e_m = Vec3{Wgs84::a_m, 0.0, 0.0};
 
-    Mat3 C_e2n{};
-    REQUIRE(core::frames::ecef_to_ned_matrix(config.profile.p_e_m, C_e2n));
+    Mat3 c_e2n{};
+    REQUIRE(core::frames::ecef_to_ned_matrix(config.profile.p_e_m, c_e2n));
     Eigen::Quaternion<Scalar_t> q_b2n{};
     REQUIRE(
         sim::velocity_aligned_attitude_b2n(Vec3{0.5, 0.0, -std::sqrt(0.75)}, Vec3::UnitZ(), q_b2n));
     config.profile.q_b2e = navkit::core::math::normalized_with_positive_scalar(
-        Eigen::Quaternion<Scalar_t>{C_e2n.transpose()} * q_b2n);
+        Eigen::Quaternion<Scalar_t>{c_e2n.transpose()} * q_b2n);
     config.launch_pad_duration_s = 0.0;
     config.boost_duration_s = config.profile.duration_s;
     config.boost_acceleration_b_x_mps2 = 500.0;
@@ -304,18 +307,18 @@ TEST_CASE("ECEF INS covariance dynamics use the same midpoint attitude as delta 
     interval.delta_theta_eb_b_rad = Vec3{0.0, 0.0, 0.5 * std::numbers::pi};
     interval.specific_force_ib_b_mps2 = Vec3::UnitX();
 
-    const StationaryFilter::P_t F =
+    const StationaryFilter::P_t system_matrix =
         MidpointPropagation::build_f_matrix<InsGyroAccelBiasStateDef>(state, interval);
-    const Eigen::Matrix3d C_b2e_mid =
+    const Eigen::Matrix3d c_b2e_mid =
         Eigen::AngleAxisd(0.25 * std::numbers::pi, Vec3::UnitZ()).toRotationMatrix();
-    const Vec3 f_ib_e = C_b2e_mid * Vec3::UnitX();
+    const Vec3 f_ib_e = c_b2e_mid * Vec3::UnitX();
 
-    CHECK(F.block<3, 3>(ErrorStateDef::Vel::i, ErrorStateDef::AttRotVec::i)
+    CHECK(system_matrix.block<3, 3>(ErrorStateDef::Vel::i, ErrorStateDef::AttRotVec::i)
               .isApprox(-navkit::core::math::skew_symmetric(f_ib_e), 1.0e-12));
-    CHECK(
-        F.block<3, 3>(ErrorStateDef::Vel::i, ErrorStateDef::AccB::i).isApprox(-C_b2e_mid, 1.0e-12));
-    CHECK(F.block<3, 3>(ErrorStateDef::AttRotVec::i, ErrorStateDef::GyroB::i)
-              .isApprox(-C_b2e_mid, 1.0e-12));
+    CHECK(system_matrix.block<3, 3>(ErrorStateDef::Vel::i, ErrorStateDef::AccB::i)
+              .isApprox(-c_b2e_mid, 1.0e-12));
+    CHECK(system_matrix.block<3, 3>(ErrorStateDef::AttRotVec::i, ErrorStateDef::GyroB::i)
+              .isApprox(-c_b2e_mid, 1.0e-12));
 }
 
 TEST_CASE("Internally compensated IMU intervals are mechanized sequentially")

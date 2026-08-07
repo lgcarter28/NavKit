@@ -16,7 +16,7 @@ core::Scalar_t exact_first_order_step(const core::Scalar_t previous,
     if (time_constant_s == 0.0) {
         return command;
     }
-    return command + std::exp(-dt_s / time_constant_s) * (previous - command);
+    return command + (std::exp(-dt_s / time_constant_s) * (previous - command));
 }
 
 core::Vec3 exact_first_order_step(const core::Vec3& previous,

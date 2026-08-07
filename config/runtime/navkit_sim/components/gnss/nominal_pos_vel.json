@@ -13,6 +13,16 @@
         "vel_m2ps2": [0.04, 0.04, 0.04]
       }
     },
+    "chi_square_acceptance": {
+      "position": {
+        "enabled": true,
+        "probability": 0.9973
+      },
+      "velocity": {
+        "enabled": true,
+        "probability": 0.9973
+      }
+    },
     "p_b_ant_b_m": [1.0, 0.25, -0.15],
     "seed": 42,
     "noise_enabled": true

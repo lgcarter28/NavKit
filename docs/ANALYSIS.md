@@ -300,8 +300,8 @@ repository-relative unless an absolute path inside the repository is supplied.
 Each case declares minimum duration/sample coverage, maximum allowed position,
 velocity, and attitude error norms, and explicit GNSS update-count contracts.
 An update count is the number of distinct measurement timestamps whose logged
-filter statistic has `accepted == 1`; repeated snapshots of sticky statistics
-and rejected observations do not increase it. Both update CSV products must
+filter statistic has `accepted == 1`; duplicate rows at one timestamp and
+rejected observations do not increase it. Both update CSV products must
 exist with the required `time_s` and `accepted` columns, so a header-only file
 is valid evidence of zero updates but a missing logging product is an
 infrastructure failure. The free-inertial case requires zero position and

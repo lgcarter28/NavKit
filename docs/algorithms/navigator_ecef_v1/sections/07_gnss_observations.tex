@@ -76,6 +76,15 @@ This attitude sensitivity is the main practical reason the lever arm belongs
 in the first implementation even though IMU lever arms and multiple IMUs are
 deferred.
 
+\subsection{Position Chi-Square Check}
+
+The position observation instantiates
+\cref{sec:v1_chi_square_innovation_acceptance} with $m_p=3$,
+$S_p=H_pP^-H_p^T+R_p$, and
+$\epsilon_p=\mathbf{r}_p^TS_p^{-1}\mathbf{r}_p$. Its independently configured
+acceptance probability $p_{\mathrm{acc},p}$ determines the position threshold
+$\gamma_p=F_{\chi^2_3}^{-1}(p_{\mathrm{acc},p})$.
+
 \section{Velocity Update}
 
 For an ECEF GNSS velocity measurement $\tilde{\vb}_{eg,gnss}^{e}$, define the
@@ -142,6 +151,17 @@ angular rate is not passed into the filter observation context.
 If this sign convention changes, the velocity lever-arm Jacobian must change
 with it.
 
+\subsection{Velocity Chi-Square Check}
+
+The velocity observation independently instantiates
+\cref{sec:v1_chi_square_innovation_acceptance} with $m_v=3$,
+$S_v=H_vP^-H_v^T+R_v$, and
+$\epsilon_v=\mathbf{r}_v^TS_v^{-1}\mathbf{r}_v$. Its configured probability
+$p_{\mathrm{acc},v}$ determines
+$\gamma_v=F_{\chi^2_3}^{-1}(p_{\mathrm{acc},v})$. Position acceptance does not
+implicitly accept velocity, or vice versa, even when both observations share a
+timestamp.
+
 \section{Combined Position/Velocity Update}
 
 If a receiver provides time-aligned position and velocity, the combined
@@ -188,3 +208,12 @@ R_{pv}^T & R_v
 The first implementation may use block-diagonal $R_{gnss}$ when the runtime
 receiver/noise model does not provide position--velocity cross covariance, but
 the schema should not make correlated GNSS errors impossible to express later.
+
+\subsection{Combined Position/Velocity Chi-Square Check}
+
+When all six position and velocity components are processed as one joint
+observation, the generic gate uses $m_{gnss}=6$ and the full joint innovation
+covariance. Its threshold is therefore
+$F_{\chi^2_6}^{-1}(p_{\mathrm{acc},gnss})$, not either 3-DOF family threshold.
+If only position or only velocity is valid, the corresponding 3-DOF model and
+gate must be used instead of treating missing components as a 6-DOF update.

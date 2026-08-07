@@ -5,6 +5,7 @@
 
 #include "navkit/core/containers/RingBuffer.hpp"
 #include "navkit/core/estimation/measurement/Measurement.hpp"
+#include "navkit/core/estimation/sensor/InnovationGate.hpp"
 #include "navkit/core/estimation/sensor/SensorDiagnosticsPolicy.hpp"
 #include "navkit/core/estimation/sensor/SensorId.hpp"
 #include "navkit/core/estimation/sensor/noise/NoisePolicies.hpp"
@@ -31,6 +32,7 @@ public:
     using R_t = typename MeasurementModel_t::R_t;
     using Measurement_t = Measurement<MeasurementModel_t::M>;
     using ObservationContext_t = typename MeasurementModel_t::ObservationContext;
+    using InnovationGate_t = InnovationGate<MeasurementModel_t::M>;
     using Diagnostics_t = Diagnostics;
 
     bool push(const Measurement_t& meas)
@@ -63,9 +65,25 @@ public:
         Noise::update(m_observation_ctx, meas);
     }
 
+    [[nodiscard]] bool configure_innovation_gate_probability(const Scalar_t probability)
+    {
+        return m_innovation_gate.configure_probability(probability);
+    }
+
+    void disable_innovation_gate()
+    {
+        m_innovation_gate.disable();
+    }
+
+    [[nodiscard]] const InnovationGate_t& innovation_gate() const
+    {
+        return m_innovation_gate;
+    }
+
 private:
     navkit::core::containers::RingBuffer<Measurement_t, BufferSize> m_buffer{};
     ObservationContext_t m_observation_ctx{};
+    InnovationGate_t m_innovation_gate{};
 };
 
 } // namespace navkit::core::estimation

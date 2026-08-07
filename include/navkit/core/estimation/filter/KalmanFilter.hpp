@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "navkit/core/estimation/filter/AppliedCorrection.hpp"
 #include "navkit/core/estimation/filter/CovarianceFloor.hpp"
 #include "navkit/core/estimation/filter/CovarianceHealth.hpp"
 #include "navkit/core/estimation/filter/MeasurementStatistics.hpp"
@@ -12,6 +13,7 @@
 #include "navkit/core/estimation/filter/reset/ResetPolicies.hpp"
 #include "navkit/core/estimation/filter/reset/ResetPolicy.hpp"
 #include "navkit/core/estimation/measurement/MeasurementModelPolicy.hpp"
+#include "navkit/core/estimation/sensor/InnovationGate.hpp"
 #include "navkit/core/estimation/sensor/SensorTuplePolicy.hpp"
 #include "navkit/core/estimation/sensor/SensorTupleTraits.hpp"
 #include "navkit/core/estimation/state/Segment.hpp"
@@ -23,6 +25,8 @@
 #include "navkit/core/time/Timestamp.hpp"
 
 #include <Eigen/Dense>
+#include <cmath>
+#include <limits>
 #include <tuple>
 #include <type_traits>
 
@@ -43,6 +47,7 @@ public:
     using Sensors_t = Sensors;
     using State_t = NominalState<StateDef>;
     using ErrorState_t = ErrorState<StateDef>;
+    using AppliedCorrection_t = AppliedCorrection<StateDef>;
     using P_t = ErrorStateCov<StateDef>;
     using MeasurementStatisticsTuple_t = MeasurementStatisticsStorage_t<Sensors>;
     using Profiler_t = Profiler;
@@ -81,34 +86,16 @@ public:
         return m_dx;
     }
 
-    [[nodiscard]] const ErrorState_t& last_correction() const
-    {
-        return m_last_correction;
-    }
-
-    [[nodiscard]] bool last_correction_valid() const
-    {
-        return m_last_correction_valid;
-    }
-
     [[nodiscard]] bool pending_correction_valid() const
     {
         return m_pending_correction_valid;
     }
 
-    /** Starts a Navigator correction cycle and clears its first-order correction total. */
-    void begin_measurement_update_cycle()
+    /** Clears the per-sensor measurement diagnostics for a new processing cycle. */
+    void clear_measurement_statistics()
     {
-        m_cycle_correction.setZero();
-        m_last_correction.setZero();
-        m_last_correction_valid = false;
-        m_measurement_update_cycle_active = true;
-    }
-
-    /** Ends correction accumulation; direct Filter injection then reports one correction. */
-    void end_measurement_update_cycle()
-    {
-        m_measurement_update_cycle_active = false;
+        std::apply([](auto&... statistics) { ((statistics.valid = false), ...); },
+                   m_measurement_stats);
     }
 
     P_t& covariance()
@@ -196,36 +183,64 @@ public:
     }
 
     template<MeasurementModelPolicy<StateDef> MeasurementModel>
-    void covariance_update(const P_t& P_i,
-                           const typename MeasurementModel::H_t& H,
-                           const typename MeasurementModel::R_t& R,
-                           const typename MeasurementModel::O_t& innovation,
-                           typename MeasurementModel::R_t& S,
-                           typename MeasurementModel::K_t& K,
-                           ErrorState_t& dx,
-                           P_t& P_f)
+    [[nodiscard]] bool covariance_update(const P_t& P_i,
+                                         const typename MeasurementModel::H_t& H,
+                                         const typename MeasurementModel::R_t& R,
+                                         const typename MeasurementModel::O_t& innovation,
+                                         typename MeasurementModel::R_t& S,
+                                         typename MeasurementModel::K_t& K,
+                                         ErrorState_t& dx,
+                                         P_t& P_f,
+                                         Scalar_t& nis)
     {
+        K.setZero();
+        dx.setZero();
+        P_f = P_i;
+        nis = std::numeric_limits<Scalar_t>::quiet_NaN();
+
         S = H * P_i * H.transpose() + R;
-        K = P_i * H.transpose() * S.ldlt().solve(MeasurementModel::R_t::Identity());
+        const Eigen::LDLT<typename MeasurementModel::R_t> decomposition{S};
+        if (decomposition.info() != Eigen::Success || !decomposition.isPositive()) {
+            return false;
+        }
+        const typename MeasurementModel::O_t whitened_innovation = decomposition.solve(innovation);
+        const typename MeasurementModel::R_t inverse_s =
+            decomposition.solve(MeasurementModel::R_t::Identity());
+        if (decomposition.info() != Eigen::Success || !whitened_innovation.allFinite() ||
+            !inverse_s.allFinite()) {
+            return false;
+        }
+        nis = innovation.dot(whitened_innovation);
+        if (!std::isfinite(nis) || nis < 0.0) {
+            return false;
+        }
+        K = P_i * H.transpose() * inverse_s;
         dx = K * innovation;
         const P_t IKH = I() - K * H;
         P_f = IKH * P_i * IKH.transpose() + K * R * K.transpose();
+        if (!K.allFinite() || !dx.allFinite() || !P_f.allFinite()) {
+            K.setZero();
+            dx.setZero();
+            P_f = P_i;
+            return false;
+        }
+        return true;
     }
 
     template<MeasurementModelPolicy<StateDef> MeasurementModel>
     void observation_update(const typename MeasurementModel::O_t& z,
                             const Timestamp& t,
-                            const typename MeasurementModel::ObservationContext& ctx,
-                            bool accepted = true)
+                            const typename MeasurementModel::ObservationContext& ctx)
     {
-        observation_update_impl<MeasurementModel, void>(z, t, ctx, accepted);
+        const InnovationGate<MeasurementModel::M> disabled_gate{};
+        observation_update_impl<MeasurementModel, void>(z, t, ctx, disabled_gate);
     }
 
     template<MeasurementModelPolicy<StateDef> MeasurementModel>
     void observation_update(const typename MeasurementModel::O_t& z,
                             const typename MeasurementModel::ObservationContext& ctx)
     {
-        observation_update<MeasurementModel>(z, Timestamp{}, ctx, true);
+        observation_update<MeasurementModel>(z, Timestamp{}, ctx);
     }
 
     template<SensorPolicy Sensor>
@@ -240,24 +255,30 @@ public:
             }
             sensor.update_observation_context(meas);
             observation_update_impl<MeasurementModel, Sensor>(
-                meas.z, meas.t, sensor.observation_context(), true);
+                meas.z, meas.t, sensor.observation_context(), sensor.innovation_gate());
         }
     }
 
-    void inject()
+    [[nodiscard]] AppliedCorrection_t inject()
     {
-        if (m_measurement_update_cycle_active && m_pending_correction_valid) {
-            // Corrections from sequential sensors are expressed at successive
-            // linearization points. Their sum is the first-order cycle-total
-            // error-state correction exposed to the existing once-per-cycle log.
-            m_cycle_correction += m_dx;
-            m_last_correction = m_cycle_correction;
-        }
-        else {
-            m_last_correction = m_dx;
-        }
-        m_last_correction_valid = m_pending_correction_valid;
+        const AppliedCorrection_t applied{.value = m_dx, .valid = m_pending_correction_valid};
         Injection::apply(m_x, m_dx);
+        return applied;
+    }
+
+    [[nodiscard]] static AppliedCorrection_t
+    compose_applied_corrections(const AppliedCorrection_t& first, const AppliedCorrection_t& second)
+    {
+        if (!first.valid) {
+            return second;
+        }
+        if (!second.valid) {
+            return first;
+        }
+
+        AppliedCorrection_t composed{.valid = true};
+        Injection::compose(first.value, second.value, composed.value);
+        return composed;
     }
 
     void reset()
@@ -288,7 +309,7 @@ private:
     void observation_update_impl(const typename MeasurementModel::O_t& z,
                                  const Timestamp& t,
                                  const typename MeasurementModel::ObservationContext& ctx,
-                                 bool accepted)
+                                 const InnovationGate<MeasurementModel::M>& gate)
     {
         auto profile_scope =
             Profiler::profile(navkit::core::profiling::ProfilePoint::KalmanObservationUpdate);
@@ -302,13 +323,15 @@ private:
         typename MeasurementModel::K_t K{};
         ErrorState_t dx{};
         P_t P_f{};
+        Scalar_t nis = std::numeric_limits<Scalar_t>::quiet_NaN();
 
-        covariance_update<MeasurementModel>(m_P, H, R, innov, S, K, dx, P_f);
-
-        const Scalar_t nis = innov.dot(S.ldlt().solve(innov));
+        const bool innovation_covariance_valid =
+            covariance_update<MeasurementModel>(m_P, H, R, innov, S, K, dx, P_f, nis);
+        const bool accepted = innovation_covariance_valid && gate.accepts(nis);
 
         if constexpr (!std::is_void_v<Sensor>) {
-            record_measurement_statistics<Sensor>(t, accepted, innov, S, R, H, K, nis);
+            record_measurement_statistics<Sensor>(
+                t, accepted, innovation_covariance_valid, gate, innov, S, R, H, K, nis);
         }
 
         if (accepted) {
@@ -323,6 +346,8 @@ private:
         requires MeasurementModelPolicy<typename Sensor::MeasurementModel_t, StateDef>
     void record_measurement_statistics(const Timestamp& t,
                                        const bool accepted,
+                                       const bool innovation_covariance_valid,
+                                       const InnovationGate<Sensor::MeasurementModel_t::M>& gate,
                                        const typename Sensor::MeasurementModel_t::O_t& innovation,
                                        const typename Sensor::MeasurementModel_t::R_t& S,
                                        const typename Sensor::MeasurementModel_t::R_t& R,
@@ -335,6 +360,8 @@ private:
             auto& stats = measurement_statistics<Sensor>();
             stats.valid = true;
             stats.accepted = accepted;
+            stats.innovation_covariance_valid = innovation_covariance_valid;
+            stats.gate_enabled = gate.enabled();
             stats.t = t;
             stats.innovation = innovation;
             stats.innovation_covariance = S;
@@ -342,19 +369,61 @@ private:
             stats.jacobian_h = H;
             stats.kalman_gain = K;
             stats.nis = nis;
+            stats.gate_probability = gate.probability();
+            stats.gate_threshold = gate.threshold();
+            stats.gate_dof = gate.dof;
         }
     }
 
+    /**
+     * \brief Current nominal state estimate.
+     *
+     * \details Contains the nominal state after all completed error-state
+     * injections.
+     */
     State_t m_x{};
+
+    /**
+     * \brief Pending error-state correction accumulated since the most recent
+     * reset.
+     *
+     * \details Accepted observations add their corrections to this value.
+     * Injection applies it to `m_x`, after which reset returns it to zero.
+     * Under the current `UpdateAfterEachSensor` policy, it normally contains
+     * the correction from one sensor's processed measurement buffer.
+     */
     ErrorState_t m_dx{};
-    ErrorState_t m_last_correction{};
-    ErrorState_t m_cycle_correction{};
+
+    /**
+     * \brief Current error-state covariance.
+     *
+     * \details Contains the covariance associated with the filter error state.
+     */
     P_t m_P{};
+
+    /**
+     * \brief Configured elementwise diagonal covariance floor.
+     *
+     * \details Applied to the diagonal of `m_P` to enforce the configured
+     * minimum variances.
+     */
     P_t m_covariance_floor{P_t::Zero()};
+
+    /**
+     * \brief Latest measurement-update diagnostics for each sensor.
+     *
+     * \details Stores measurement statistics independently for every sensor in
+     * the configured sensor tuple.
+     */
     MeasurementStatisticsTuple_t m_measurement_stats{};
+
+    /**
+     * \brief Indicates whether an accepted correction is awaiting injection.
+     *
+     * \details Set when at least one accepted measurement update has contributed
+     * to `m_dx`; cleared after injection and reset.
+     */
     bool m_pending_correction_valid{false};
-    bool m_last_correction_valid{false};
-    bool m_measurement_update_cycle_active{false};
 };
 
 } // namespace navkit::core::estimation

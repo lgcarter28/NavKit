@@ -104,6 +104,9 @@ struct NotABinding
          {{"dt_s", 1.0},
           {"position_cov", {{"frame", "ned"}, {"diag", {{"pos_m2", {9.0, 9.0, 25.0}}}}}},
           {"velocity_cov", {{"frame", "ned"}, {"diag", {{"vel_m2ps2", {0.04, 0.04, 0.04}}}}}},
+          {"chi_square_acceptance",
+           {{"position", {{"enabled", true}, {"probability", 0.9973}}},
+            {"velocity", {{"enabled", true}, {"probability", 0.9973}}}}},
           {"p_b_ant_b_m", {1.0, 0.25, -0.15}},
           {"seed", 42U},
           {"noise_enabled", true}}},
@@ -271,17 +274,18 @@ void make_guidance_state_nonterminal(nlohmann::json& state,
                                      const std::size_t priority = 0U)
 {
     state.erase("terminal");
-    state["transitions"] = nlohmann::json::array(
-        {{{"to", target},
-          {"priority", priority},
-          {"when", {{"type", "elapsed_in_state"}, {"greater_equal_s", 1.0}}}}});
+    state.emplace("transitions",
+                  nlohmann::json::array(
+                      {{{"to", target},
+                        {"priority", priority},
+                        {"when", {{"type", "elapsed_in_state"}, {"greater_equal_s", 1.0}}}}}));
 }
 
 } // namespace
 
 TEST_CASE("ECEF INS GNSS runtime validator accepts the documented input shape")
 {
-    const auto cfg = valid_ecef_ins_gnss_runtime_config();
+    const nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
 
     static_assert(SimulationAppConfigPolicy<EcefInsGnssAppConfig>);
     static_assert(navkit::sim::ImuSimulatorPolicy<EcefInsGnssAppConfig::ImuSimulator>);
@@ -344,6 +348,19 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts the documented input shape")
           EcefInsGnssAppConfig::PrimaryGnssPositionEmulator::runtime_config_from_json(cfg).seed);
     CHECK(velocity_gnss.seed ==
           EcefInsGnssAppConfig::PrimaryGnssVelocityEmulator::runtime_config_from_json(cfg).seed);
+
+    EcefInsGnssAppConfig::PrimaryGnssPositionSensor position_sensor{};
+    EcefInsGnssAppConfig::PrimaryGnssVelocitySensor velocity_sensor{};
+    EcefInsGnssAppConfig::PrimaryGnssPositionEmulator::configure_sensor(position_sensor, cfg);
+    EcefInsGnssAppConfig::PrimaryGnssVelocityEmulator::configure_sensor(velocity_sensor, cfg);
+    CHECK(position_sensor.innovation_gate().enabled());
+    CHECK(position_sensor.innovation_gate().probability() == doctest::Approx(0.9973));
+    CHECK(EcefInsGnssAppConfig::PrimaryGnssPositionSensor::InnovationGate_t::dof == 3U);
+    CHECK(position_sensor.innovation_gate().threshold() > 0.0);
+    CHECK(velocity_sensor.innovation_gate().enabled());
+    CHECK(velocity_sensor.innovation_gate().probability() == doctest::Approx(0.9973));
+    CHECK(EcefInsGnssAppConfig::PrimaryGnssVelocitySensor::InnovationGate_t::dof == 3U);
+    CHECK(velocity_sensor.innovation_gate().threshold() > 0.0);
 }
 
 TEST_CASE("Default compile-time attitude covariance is symmetric in ECEF")
@@ -385,12 +402,14 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts a Guidance state-machine traj
               .guidance_command_filter.bank_time_constant_s == doctest::Approx(0.5));
 
     nlohmann::json& configured_state = cfg.at("trajectory").at("state_machine").at("states").at(0U);
-    configured_state["guidance_command_filter"] = {
-        {"specific_force_time_constant_b_s", {0.6, 0.7, 0.8}}, {"bank_time_constant_s", 0.9}};
-    configured_state["on_entry"] = {{"guidance_command_filter",
-                                     {{"specific_force_time_constant_b_s", {1.0, 1.1, 1.2}},
-                                      {"bank_time_constant_s", 1.3},
-                                      {"duration_s", 2.0}}}};
+    configured_state.emplace("guidance_command_filter",
+                             nlohmann::json{{"specific_force_time_constant_b_s", {0.6, 0.7, 0.8}},
+                                            {"bank_time_constant_s", 0.9}});
+    configured_state.emplace("on_entry",
+                             nlohmann::json{{"guidance_command_filter",
+                                             {{"specific_force_time_constant_b_s", {1.0, 1.1, 1.2}},
+                                              {"bank_time_constant_s", 1.3},
+                                              {"duration_s", 2.0}}}});
 
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
     const sim::StateMachineTrajectoryConfig trajectory =
@@ -417,10 +436,11 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects malformed Guidance command fi
 
     cfg = valid_state_machine_runtime_config();
     nlohmann::json& state = cfg.at("trajectory").at("state_machine").at("states").at(0U);
-    state["on_entry"] = {{"guidance_command_filter",
-                          {{"specific_force_time_constant_b_s", {0.8, 0.9, 1.0}},
-                           {"bank_time_constant_s", 1.1},
-                           {"duration_s", 0.0}}}};
+    state.emplace("on_entry",
+                  nlohmann::json{{"guidance_command_filter",
+                                  {{"specific_force_time_constant_b_s", {0.8, 0.9, 1.0}},
+                                   {"bank_time_constant_s", 1.1},
+                                   {"duration_s", 0.0}}}});
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
 
@@ -754,6 +774,52 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects missing runtime-owned simulat
     cfg = valid_ecef_ins_gnss_runtime_config();
     cfg.at("gnss").erase("position_cov");
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+}
+
+TEST_CASE("GNSS innovation acceptance requires probabilities strictly between zero and one")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+
+    cfg.at("gnss").at("chi_square_acceptance").at("position").at("probability") = 0.0;
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("gnss").at("chi_square_acceptance").at("velocity").at("probability") = 1.0;
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("gnss").at("chi_square_acceptance").at("position").erase("probability");
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+
+    cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg.at("gnss").at("chi_square_acceptance").at("position") = {{"enabled", false}};
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+
+    cfg.at("gnss").at("chi_square_acceptance").at("position").emplace("probability", 0.99);
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+
+    EcefInsGnssAppConfig::PrimaryGnssPositionSensor position_sensor{};
+    EcefInsGnssAppConfig::PrimaryGnssPositionEmulator::configure_sensor(position_sensor, cfg);
+    CHECK_FALSE(position_sensor.innovation_gate().enabled());
+
+    cfg.at("gnss").at("chi_square_acceptance").at("position").at("probability") = -0.1;
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+}
+
+TEST_CASE("GNSS innovation gate can be disabled by a deep-merged scenario overlay")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    const nlohmann::json overlay{
+        {"gnss", {{"chi_square_acceptance", {{"position", {{"enabled", false}}}}}}}};
+    detail::merge_json_object(overlay, cfg);
+
+    CHECK(cfg.at("gnss").at("chi_square_acceptance").at("position").contains("probability"));
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+
+    EcefInsGnssAppConfig::PrimaryGnssPositionSensor position_sensor{};
+    EcefInsGnssAppConfig::PrimaryGnssPositionEmulator::configure_sensor(position_sensor, cfg);
+    CHECK_FALSE(position_sensor.innovation_gate().enabled());
 }
 
 TEST_CASE("ECEF INS GNSS runtime validator accepts sorted non-overlapping active windows")

@@ -40,7 +40,7 @@ namespace
                                     std::size_t& state_index)
 {
     for (std::size_t index = 0U; index < definition.states.size(); ++index) {
-        if (definition.states[index].id == id) {
+        if (definition.states.at(index).id == id) {
             state_index = index;
             return true;
         }
@@ -135,19 +135,19 @@ graph_has_cycle_from(const GuidanceStateMachineDefinition& definition,
                      const std::size_t state_index,
                      std::vector<unsigned char>& visit_state)
 {
-    visit_state[state_index] = 1U;
-    const GuidanceStateDefinition& state = definition.states[state_index];
+    visit_state.at(state_index) = 1U;
+    const GuidanceStateDefinition& state = definition.states.at(state_index);
     for (const GuidanceElapsedTransition& transition : state.transitions) {
         const std::size_t target_index = state_index_by_id.at(transition.to);
-        if (visit_state[target_index] == 1U) {
+        if (visit_state.at(target_index) == 1U) {
             return true;
         }
-        if (visit_state[target_index] == 0U &&
+        if (visit_state.at(target_index) == 0U &&
             graph_has_cycle_from(definition, state_index_by_id, target_index, visit_state)) {
             return true;
         }
     }
-    visit_state[state_index] = 2U;
+    visit_state.at(state_index) = 2U;
     return false;
 }
 
@@ -165,7 +165,7 @@ bool guidance_state_machine_definition_is_valid(const GuidanceStateMachineDefini
     std::unordered_map<std::string, std::size_t> state_index_by_id{};
     state_index_by_id.reserve(definition.states.size());
     for (std::size_t index = 0U; index < definition.states.size(); ++index) {
-        const GuidanceStateDefinition& state = definition.states[index];
+        const GuidanceStateDefinition& state = definition.states.at(index);
         if (state.id.empty() || !state_index_by_id.emplace(state.id, index).second) {
             diagnostic = "Guidance state IDs must be nonempty and unique";
             return false;
@@ -211,22 +211,22 @@ bool guidance_state_machine_definition_is_valid(const GuidanceStateMachineDefini
 
     std::vector<bool> reachable(definition.states.size(), false);
     std::vector<std::size_t> pending{initial_iterator->second};
-    reachable[initial_iterator->second] = true;
+    reachable.at(initial_iterator->second) = true;
     bool reachable_terminal = false;
     while (!pending.empty()) {
         const std::size_t state_index = pending.back();
         pending.pop_back();
-        const GuidanceStateDefinition& state = definition.states[state_index];
+        const GuidanceStateDefinition& state = definition.states.at(state_index);
         reachable_terminal = reachable_terminal || state.terminal;
         for (const GuidanceElapsedTransition& transition : state.transitions) {
             const std::size_t target_index = state_index_by_id.at(transition.to);
-            if (!reachable[target_index]) {
-                reachable[target_index] = true;
+            if (!reachable.at(target_index)) {
+                reachable.at(target_index) = true;
                 pending.push_back(target_index);
             }
         }
     }
-    if (std::find(reachable.begin(), reachable.end(), false) != reachable.end()) {
+    if (std::ranges::find(reachable, false) != reachable.end()) {
         diagnostic = "Guidance state graph contains an unreachable/orphan state";
         return false;
     }
@@ -315,17 +315,19 @@ std::size_t GuidanceStateMachine::active_state_index() const
 
 const std::string& GuidanceStateMachine::active_state_id() const
 {
-    static const std::string empty{};
+    // Local static value constants use snake_case by project convention.
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static const std::string empty_state_id{};
     if (!m_initialized || m_active_state_index >= m_definition.states.size()) {
-        return empty;
+        return empty_state_id;
     }
-    return m_definition.states[m_active_state_index].id;
+    return m_definition.states.at(m_active_state_index).id;
 }
 
 bool GuidanceStateMachine::active_state_is_terminal() const
 {
     return m_initialized && m_active_state_index < m_definition.states.size() &&
-           m_definition.states[m_active_state_index].terminal;
+           m_definition.states.at(m_active_state_index).terminal;
 }
 
 bool GuidanceStateMachine::enter_state(const std::size_t state_index,
@@ -335,7 +337,7 @@ bool GuidanceStateMachine::enter_state(const std::size_t state_index,
     if (state_index >= m_definition.states.size()) {
         return false;
     }
-    GuidanceStateDefinition& entered_state = m_definition.states[state_index];
+    GuidanceStateDefinition& entered_state = m_definition.states.at(state_index);
     if (entered_state.translation.reference &&
         !entered_state.translation.reference->enter(state, environment)) {
         return false;
@@ -364,7 +366,7 @@ bool GuidanceStateMachine::evaluate_transitions(const TrajectoryControlState& st
     if (m_active_state_index >= m_definition.states.size()) {
         return false;
     }
-    const GuidanceStateDefinition& active_state = m_definition.states[m_active_state_index];
+    const GuidanceStateDefinition& active_state = m_definition.states.at(m_active_state_index);
     if (active_state.terminal) {
         return true;
     }
@@ -404,7 +406,7 @@ bool GuidanceStateMachine::evaluate_active_state(const TrajectoryControlState& s
     if (m_active_state_index >= m_definition.states.size()) {
         return false;
     }
-    GuidanceStateDefinition& active_state = m_definition.states[m_active_state_index];
+    GuidanceStateDefinition& active_state = m_definition.states.at(m_active_state_index);
     output.execution.state_index = m_active_state_index;
     output.execution.state_entered = state_entered;
     output.execution.filter_config = active_state.guidance_command_filter;

@@ -4,15 +4,16 @@
 #pragma once
 
 #include "navkit/core/config/Types.hpp"
+#include "navkit/core/estimation/state/State.hpp"
 
 namespace navkit::io
 {
 
-template<typename StateDef, typename Filter>
+template<typename StateDef>
 struct FilterCorrectionLogPayload
 {
     core::Time_t time_s{};
-    const Filter& filter;
+    const core::estimation::ErrorState<StateDef>& correction;
 };
 
 } // namespace navkit::io

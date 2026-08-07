@@ -36,6 +36,7 @@ public:
     using NavKit = NavKitConfig_t<Config>;
     using StateDef = typename NavKit::StateDef;
     using Filter = typename NavKit::Filter;
+    using Navigator = typename NavKit::Navigator;
     using Planet = typename NavKit::PropagationConfig::Planet;
     using Logger = RuntimeLogger<NavKit>;
 
@@ -191,8 +192,9 @@ public:
         return true;
     }
 
-    void log_filter_if_due(const core::Timestamp& t, const Filter& filter)
+    void log_filter_if_due(const core::Timestamp& t, const Navigator& navigator)
     {
+        const Filter& filter = navigator.filter();
         if (m_run_settings.logging.measurement_statistics_enabled &&
             m_measurement_statistics_schedule.due(t)) {
             log_measurement_statistics<typename NavKit::Sensors>(m_logger, filter);
@@ -203,11 +205,12 @@ public:
                 .filter = filter,
             });
         }
-        if (filter.last_correction_valid() && m_run_settings.logging.filter_correction_enabled &&
+        if (navigator.last_applied_correction().valid &&
+            m_run_settings.logging.filter_correction_enabled &&
             m_filter_correction_schedule.due(t)) {
-            log_if_supported(io::FilterCorrectionLogPayload<StateDef, Filter>{
+            log_if_supported(io::FilterCorrectionLogPayload<StateDef>{
                 .time_s = core::timestamp_seconds(t),
-                .filter = filter,
+                .correction = navigator.last_applied_correction().value,
             });
         }
         if (m_run_settings.logging.console_enabled && m_console_schedule.due(t)) {

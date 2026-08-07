@@ -6,8 +6,6 @@ and the design intent behind the active phase.
 
 ## Active pass intent
 
-- Pass 8.2 adds runtime chi-square measurement rejection and proves exact
-  correction logging across same-epoch accepted updates.
 - Pass 8.3 adds state-definition-aware local-linear and empirical observability
   analysis with reusable HDF5 derivations and interactive Python
   visualizations.
@@ -41,6 +39,21 @@ and the design intent behind the active phase.
   Stationary reconstruction remained near floating-point precision; ballistic
   and bank-to-turn maximum position errors remained below 0.8 mm and 0.14 mm,
   respectively.
+
+### Pass 8.2: runtime innovation acceptance and correction integrity
+
+- [x] Added runtime-configured chi-square innovation gates for separate GNSS
+  position and velocity observations. Gate degrees of freedom come from the
+  measurement-model dimension, thresholds are derived from configured
+  probabilities, and invalid or over-threshold observations are rejected
+  before persistent filter mutation.
+- [x] Added unit, runtime-configuration, and end-to-end coverage for accepted
+  and rejected observations, including sequential position/velocity updates
+  at one Navigator epoch.
+- [x] Made filter-correction logging exact for multiple accepted updates in one
+  Navigator cycle by composing corrections in injection order, including
+  quaternion composition for attitude, and added CSV replay coverage for the
+  composed result.
 
 ## Earlier completed validation foundation
 

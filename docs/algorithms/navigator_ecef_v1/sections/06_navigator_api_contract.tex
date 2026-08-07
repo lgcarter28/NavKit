@@ -108,9 +108,9 @@ Specific-force input to $F_k$ & \cref{eq:v1_interval_average_specific_force} & R
 Build $F_k$ and $G_k$ & \cref{eq:v1_fk_matrix,eq:v1_gk_matrix} & No hidden derivation is allowed in code. \\
 STM and process noise & \cref{eq:v1_phi_first_order,eq:v1_qd_integral,eq:v1_qd_series,eq:v1_qd_first_order} & First-order is the v1 baseline and must be validated. \\
 Covariance prediction & \cref{eq:v1_covariance_prediction} & Uses the same $\Ph_k$ and $\mathbf{Q}_{d,k}$ products buffered by prediction history. \\
-EKF correction & \cref{eq:v1_measurement_residual,eq:v1_innovation_covariance,eq:v1_kalman_gain,eq:v1_error_state_correction,eq:v1_joseph_covariance_update} & Measurement models own $\hat{\mathbf{z}}$, $H$, and $R$. \\
+EKF correction and acceptance & \cref{eq:v1_measurement_residual,eq:v1_innovation_covariance,eq:v1_kalman_gain,eq:v1_error_state_correction,eq:v1_joseph_covariance_update,eq:v1_nis,eq:v1_chi_square_gate_threshold,eq:v1_chi_square_gate_acceptance} & Measurement models own $\hat{\mathbf{z}}$, $H$, $R$, and the observation dimension that determines gate degrees of freedom. \\
 Injection/reset & \cref{eq:v1_quat_injection,eq:v1_reset_covariance_update,eq:v1_attitude_reset_block,eq:v1_full_reset_jacobian} & Injection and covariance reset are one convention-locked unit. \\
-GNSS aiding & \cref{eq:v1_gnss_pos_pred,eq:v1_gnss_pos_h,eq:v1_gnss_vel_pred,eq:v1_gnss_vel_h,eq:v1_gnss_vel_perturbation} & Includes antenna lever arm for position and velocity. \\
+GNSS aiding & \cref{eq:v1_gnss_pos_pred,eq:v1_gnss_pos_h,eq:v1_gnss_vel_pred,eq:v1_gnss_vel_h,eq:v1_gnss_vel_perturbation} & Includes antenna lever arm and separate position/velocity instantiations of the generic chi-square acceptance contract. \\
 \bottomrule
 \end{tabular}
 \end{center}

@@ -36,7 +36,7 @@ using RuntimeLogger = navkit::io::RunLogger<
     navkit::io::NavEstimateLogProduct<typename NavKit::StateDef, typename NavKit::Filter>,
     navkit::io::ImuIncrementLogProduct,
     navkit::io::ImuDebugLogProduct,
-    navkit::io::FilterCorrectionLogProduct<typename NavKit::StateDef, typename NavKit::Filter>,
+    navkit::io::FilterCorrectionLogProduct<typename NavKit::StateDef>,
     navkit::io::GnssPositionUpdateLogProduct<navkit::core::estimation::MeasurementStatistics<
         typename NavKit::PrimaryGnssPositionSensor>>,
     navkit::io::GnssVelocityUpdateLogProduct<navkit::core::estimation::MeasurementStatistics<

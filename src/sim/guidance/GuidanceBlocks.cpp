@@ -3,6 +3,7 @@
 
 #include "navkit/sim/guidance/GuidanceBlocks.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <numbers>
 #include <utility>
@@ -84,7 +85,7 @@ bool CurrentStateGuidanceReference::advance(const TrajectoryControlState& state,
 
 ConstantSpeedGuidanceReference::ConstantSpeedGuidanceReference(
     ConstantSpeedGuidanceReferenceConfig config)
-    : m_config(std::move(config))
+    : m_config(config)
 {}
 
 GuidanceReferenceRole ConstantSpeedGuidanceReference::role() const
@@ -153,12 +154,9 @@ bool WaypointGuidanceReference::config_is_valid() const
         m_config.heading_error_gain_mps2_per_rad < 0.0) {
         return false;
     }
-    for (const core::Vec3& waypoint_e_m : m_config.waypoint_e_m) {
-        if (!waypoint_e_m.allFinite() || waypoint_e_m.norm() <= 0.0) {
-            return false;
-        }
-    }
-    return true;
+    return std::ranges::all_of(m_config.waypoint_e_m, [](const core::Vec3& waypoint_e_m) {
+        return waypoint_e_m.allFinite() && waypoint_e_m.norm() > 0.0;
+    });
 }
 
 bool WaypointGuidanceReference::initialize(const TrajectoryControlState& initial_state,
@@ -236,7 +234,7 @@ bool WaypointGuidanceReference::advance(const TrajectoryControlState& state,
 
 HorizontalSinusoidalGuidanceReferenceModifier::HorizontalSinusoidalGuidanceReferenceModifier(
     SinusoidalGuidanceReferenceModifierConfig config)
-    : m_config(std::move(config))
+    : m_config(config)
 {}
 
 bool HorizontalSinusoidalGuidanceReferenceModifier::config_is_valid() const
@@ -278,7 +276,7 @@ bool HorizontalSinusoidalGuidanceReferenceModifier::apply(const TrajectoryContro
 
 VerticalSinusoidalGuidanceReferenceModifier::VerticalSinusoidalGuidanceReferenceModifier(
     SinusoidalGuidanceReferenceModifierConfig config)
-    : m_config(std::move(config))
+    : m_config(config)
 {}
 
 bool VerticalSinusoidalGuidanceReferenceModifier::config_is_valid() const
@@ -402,7 +400,7 @@ bool VelocityTrackingGuidanceAcceleration::advance(const TrajectoryControlState&
 
 AltitudeHoldPdGuidanceAcceleration::AltitudeHoldPdGuidanceAcceleration(
     AltitudeHoldPdGuidanceAccelerationConfig config)
-    : m_config(std::move(config))
+    : m_config(config)
 {}
 
 GuidanceAccelerationRole AltitudeHoldPdGuidanceAcceleration::role() const
@@ -443,7 +441,7 @@ bool AltitudeHoldPdGuidanceAcceleration::enter(const TrajectoryControlState& sta
 
 bool AltitudeHoldPdGuidanceAcceleration::advance(const TrajectoryControlState& state,
                                                  const TrajectoryEnvironment& environment,
-                                                 const GuidanceReferenceOutput&,
+                                                 const GuidanceReferenceOutput& /*reference*/,
                                                  const core::Time_t elapsed_in_state_s,
                                                  const core::Time_t dt_s,
                                                  core::Vec3& contribution)
@@ -530,7 +528,7 @@ bool ZeroBankGuidancePolicy::bank_to_turn_active() const
 
 CoordinatedBankToTurnGuidancePolicy::CoordinatedBankToTurnGuidancePolicy(
     CoordinatedBankToTurnGuidancePolicyConfig config)
-    : m_config(std::move(config))
+    : m_config(config)
 {}
 
 bool CoordinatedBankToTurnGuidancePolicy::config_is_valid() const
