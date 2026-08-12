@@ -40,19 +40,19 @@ struct PvaRuntimeInitializationProvider
     }
 
     [[nodiscard]] static PvaInitialization initialize(const nlohmann::json& cfg,
-                                                      const TrajectoryRun& trajectory)
+                                                      const SimulationRun& simulation)
     {
         const nlohmann::json& initialization = cfg.at("pva_initialization");
         const std::string type = detail::pva_initialization_type_from_json(initialization);
 
         if (type == PvaRandomInitializationProvider::runtime_type) {
-            return PvaRandomInitializationProvider::initialize(cfg, trajectory);
+            return PvaRandomInitializationProvider::initialize(cfg, simulation);
         }
         if (type == PvaExplicitInitializationProvider::runtime_type) {
-            return PvaExplicitInitializationProvider::initialize(cfg, trajectory);
+            return PvaExplicitInitializationProvider::initialize(cfg, simulation);
         }
         if (type == PvaDirectInitializationProvider::runtime_type) {
-            return PvaDirectInitializationProvider::initialize(cfg, trajectory);
+            return PvaDirectInitializationProvider::initialize(cfg, simulation);
         }
 
         detail::throw_runtime_config_error("unsupported pva_initialization.type '" + type + "'");

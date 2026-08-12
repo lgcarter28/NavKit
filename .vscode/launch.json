@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/apps/navkit_sim/navkit_sim.exe",
             "args": [
-                "${workspaceFolder}/config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json"
+                "${workspaceFolder}/config/runtime/navkit/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json"
             ],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
@@ -27,7 +27,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled/apps/navkit_sim/navkit_sim.exe",
             "args": [
-                "${workspaceFolder}/config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json"
+                "${workspaceFolder}/config/runtime/navkit/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json"
             ],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
@@ -38,7 +38,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/apps/navkit_sim/navkit_sim",
             "args": [
-                "${workspaceFolder}/config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json"
+                "${workspaceFolder}/config/runtime/navkit/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json"
             ],
             "cwd": "${workspaceFolder}",
             "MIMode": "gdb",
@@ -62,7 +62,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled/apps/navkit_sim/navkit_sim",
             "args": [
-                "${workspaceFolder}/config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json"
+                "${workspaceFolder}/config/runtime/navkit/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json"
             ],
             "cwd": "${workspaceFolder}",
             "MIMode": "gdb",

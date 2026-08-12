@@ -1,0 +1,8 @@
+{
+  "source": {
+    "type": "stationary"
+  },
+  "dynamics": {
+    "rate_hz": 1000.0
+  }
+}

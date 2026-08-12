@@ -1,0 +1,14 @@
+{
+  "sensors": {
+    "primary_gnss_position": {
+      "chi_square_acceptance": {
+        "enabled": false
+      }
+    },
+    "primary_gnss_velocity": {
+      "chi_square_acceptance": {
+        "enabled": false
+      }
+    }
+  }
+}

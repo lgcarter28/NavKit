@@ -35,6 +35,7 @@ concept SensorPolicy =
         sensor.update_observation_context(measurement);
         sensor.observation_context();
         { sensor.configure_innovation_gate_probability(probability) } -> std::same_as<bool>;
+        { sensor.set_innovation_gate_enabled(true) } -> std::same_as<bool>;
         sensor.disable_innovation_gate();
         {
             const_sensor.innovation_gate()

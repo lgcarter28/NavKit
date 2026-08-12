@@ -78,10 +78,7 @@ struct NotABinding
     return {
         {"run_name", "ecef_ins_gnss_demo"},
         {"output_dir", "output/logs/ecef_ins_gnss_demo"},
-        {"application",
-         {{"clock", "simulated"},
-          {"control_state_source", "navigation_estimate"},
-          {"rate_hz", 1000.0}}},
+        {"execution_target", {{"type", "swil"}, {"clock", "simulated"}, {"rate_hz", 1000.0}}},
         {"logging",
          {{"console", {{"enabled", true}, {"rate_hz", 1.0}}},
           {"truth", {{"enabled", true}, {"rate_hz", 10.0}}},
@@ -91,14 +88,32 @@ struct NotABinding
           {"imu_debug", {{"enabled", true}, {"rate_hz", 10.0}}},
           {"filter_correction",
            {{"enabled", true}, {"rate_hz", 10.0}, {"covariance", "diagonal"}}}}},
-        {"trajectory",
-         {{"type", "stationary"},
-          {"duration_s", 60.0},
-          {"dynamics_rate_hz", 1000.0},
-          {"p_lla_deg_m", {0.0, 0.0, 0.0}},
-          {"v_n_mps", {0.0, 0.0, 0.0}},
-          {"rpy_b2n_deg", {0.0, 0.0, 0.0}},
-          {"w_nb_b_degps", {0.0, 0.0, 0.0}}}},
+        {"mission",
+         {{"duration_s", 60.0},
+          {"termination", {{"type", "configured_duration"}}},
+          {"initial_phase_id", "stationary"},
+          {"cycle_policy", "reject"},
+          {"phases",
+           nlohmann::json::array(
+               {{{"id", "stationary"},
+                 {"navigation",
+                  {{"sensors",
+                    {{"primary_gnss_position", {{"chi_square_acceptance", {{"enabled", true}}}}},
+                     {"primary_gnss_velocity",
+                      {{"chi_square_acceptance", {{"enabled", true}}}}}}}}},
+                 {"guidance", nlohmann::json::object()},
+                 {"autopilot", nlohmann::json::object()},
+                 {"terminal", {{"behavior", "run_until_mission_termination"}}}}})}}},
+        {"simulation",
+         {{"source", {{"type", "stationary"}}},
+          {"dynamics", {{"rate_hz", 1000.0}}},
+          {"initial_truth",
+           {{"p_lla_deg_m", {0.0, 0.0, 0.0}},
+            {"v_n_mps", {0.0, 0.0, 0.0}},
+            {"rpy_b2n_deg", {0.0, 0.0, 0.0}},
+            {"w_nb_b_degps", {0.0, 0.0, 0.0}}}},
+          {"phase_behavior", {{"stationary", {{"constraint", "hold_initial_ecef"}}}}},
+          {"control_state_source", "navigation_estimate"}}},
         {"imu", {{"type", "ideal"}, {"rate_hz", 1000.0}, {"seed", 42U}}},
         {"gnss",
          {{"dt_s", 1.0},
@@ -140,6 +155,22 @@ TEST_CASE("Runtime JSON clock parser accepts only supported app-support modes")
     CHECK(mode == ClockMode::Realtime);
     CHECK_FALSE(detail::clock_mode_from_json(invalid, "clock", mode));
     CHECK_FALSE(detail::clock_mode_from_json(simulated, "missing", mode));
+}
+
+TEST_CASE("Runtime execution-target parser fails closed beyond SWIL")
+{
+    const nlohmann::json swil{
+        {"execution_target", {{"type", "swil"}, {"clock", "simulated"}, {"rate_hz", 1000.0}}},
+    };
+    CHECK(execution_target_settings_from_json(swil).type == ExecutionTargetType::NavKitSwil);
+
+    nlohmann::json unsupported = swil;
+    unsupported.at("execution_target").at("type") = "hwil";
+    CHECK_THROWS_AS(static_cast<void>(execution_target_settings_from_json(unsupported)),
+                    std::runtime_error);
+    unsupported.at("execution_target").at("type") = "flight";
+    CHECK_THROWS_AS(static_cast<void>(execution_target_settings_from_json(unsupported)),
+                    std::runtime_error);
 }
 
 TEST_CASE("Runtime control-state source parser accepts only explicit source selections")
@@ -211,60 +242,75 @@ TEST_CASE("Runtime control-state source parser accepts only explicit source sele
     return cfg;
 }
 
-[[nodiscard]] nlohmann::json valid_guidance_state(const std::string& id)
+[[nodiscard]] nlohmann::json valid_guidance_phase()
 {
     return {
-        {"id", id},
-        {"plant", {{"constraint", "none"}}},
-        {"guidance",
-         {{"enabled", true},
-          {"translation",
-           {{"reference", {{"type", "current_state"}}},
-            {"acceleration",
-             nlohmann::json::array({{{"type", "body_specific_force"},
-                                     {"specific_force_ib_b_mps2", {0.0, 0.0, 0.0}}}})}}},
-          {"bank", {{"type", "zero"}}},
-          {"body_y_specific_force_enabled", true}}},
-        {"autopilot", {{"enabled", true}}},
-        {"terminal", {{"behavior", "run_until_trajectory_termination"}}},
+        {"enabled", true},
+        {"translation",
+         {{"reference", {{"type", "current_state"}}},
+          {"acceleration",
+           nlohmann::json::array({{{"type", "body_specific_force"},
+                                   {"specific_force_ib_b_mps2", {0.0, 0.0, 0.0}}}})}}},
+        {"bank", {{"type", "zero"}}},
+        {"body_y_specific_force_enabled", true},
     };
+}
+
+[[nodiscard]] nlohmann::json valid_mission_phase(const std::string& id)
+{
+    return {{"id", id},
+            {"navigation",
+             {{"sensors",
+               {{"primary_gnss_position", {{"chi_square_acceptance", {{"enabled", true}}}}},
+                {"primary_gnss_velocity", {{"chi_square_acceptance", {{"enabled", true}}}}}}}}},
+            {"guidance", valid_guidance_phase()},
+            {"autopilot", {{"enabled", true}}},
+            {"terminal", {{"behavior", "run_until_mission_termination"}}}};
 }
 
 [[nodiscard]] nlohmann::json valid_state_machine_runtime_config()
 {
     nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("trajectory") = {
-        {"type", "state_machine"},
+    cfg.at("mission") = {
         {"duration_s", 10.0},
-        {"dynamics_rate_hz", 1000.0},
-        {"guidance_rate_hz", 100.0},
-        {"autopilot_rate_hz", 500.0},
-        {"translational_integration", "trapezoidal_predictor_corrector"},
         {"termination", {{"type", "configured_duration"}}},
-        {"guidance_command_filter",
-         {{"specific_force_time_constant_b_s", {0.2, 0.3, 0.4}}, {"bank_time_constant_s", 0.5}}},
-        {"autopilot",
-         {{"type", "first_order"},
-          {"controller_rate_time_constant_pqr_s", {0.0, 0.0, 0.0}},
-          {"attitude_command_time_constant_s", 0.1},
-          {"attitude_error_gain_pqr_per_s", {1.0, 1.0, 1.0}},
-          {"angular_rate_feedback_gain_pqr", {0.0, 0.0, 0.0}},
-          {"velocity_alignment_speed_threshold_mps", 1.0},
-          {"initial_velocity_alignment_tolerance_deg", 5.0},
-          {"gyro_moving_average_window_samples", 10U}}},
-        {"maximum_bank_angle_deg", 45.0},
+        {"gnc",
+         {{"guidance",
+           {{"rate_hz", 100.0},
+            {"maximum_bank_angle_deg", 45.0},
+            {"command_filter",
+             {{"specific_force_time_constant_b_s", {0.2, 0.3, 0.4}},
+              {"bank_time_constant_s", 0.5}}}}},
+          {"autopilot",
+           {{"rate_hz", 500.0},
+            {"model",
+             {{"type", "first_order"},
+              {"controller_rate_time_constant_pqr_s", {0.0, 0.0, 0.0}},
+              {"attitude_command_time_constant_s", 0.1},
+              {"attitude_error_gain_pqr_per_s", {1.0, 1.0, 1.0}},
+              {"angular_rate_feedback_gain_pqr", {0.0, 0.0, 0.0}},
+              {"velocity_alignment_speed_threshold_mps", 1.0},
+              {"initial_velocity_alignment_tolerance_deg", 5.0},
+              {"gyro_moving_average_window_samples", 10U}}}}}}},
+        {"initial_phase_id", "active"},
+        {"cycle_policy", "reject"},
+        {"phases", nlohmann::json::array({valid_mission_phase("active")})},
+    };
+    cfg.at("simulation") = {
+        {"source", {{"type", "generated"}}},
+        {"dynamics",
+         {{"rate_hz", 1000.0}, {"translational_integration", "trapezoidal_predictor_corrector"}}},
+        {"initial_truth",
+         {{"p_lla_deg_m", {35.0, -106.0, 1500.0}},
+          {"v_n_mps", {100.0, 0.0, 0.0}},
+          {"rpy_b2n_deg", {0.0, 0.0, 0.0}}}},
         {"vehicle_response",
          {{"type", "first_order"},
           {"vehicle_rate_time_constant_pqr_s", {0.0, 0.0, 0.0}},
           {"specific_force_command_time_constant_b_s", {0.0, 0.0, 0.0}},
           {"specific_force_response_time_constant_b_s", {0.0, 0.0, 0.0}}}},
-        {"state_machine",
-         {{"initial_state_id", "active"},
-          {"cycle_policy", "reject"},
-          {"states", nlohmann::json::array({valid_guidance_state("active")})}}},
-        {"p_lla_deg_m", {35.0, -106.0, 1500.0}},
-        {"v_n_mps", {100.0, 0.0, 0.0}},
-        {"rpy_b2n_deg", {0.0, 0.0, 0.0}},
+        {"phase_behavior", {{"active", {{"constraint", "none"}}}}},
+        {"control_state_source", "navigation_estimate"},
     };
     return cfg;
 }
@@ -382,10 +428,10 @@ TEST_CASE("Default compile-time attitude covariance is symmetric in ECEF")
 TEST_CASE("ECEF INS GNSS runtime validator accepts a CSV trajectory source")
 {
     nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("trajectory") = {{"type", "csv"}, {"csv_path", "truth/example.csv"}};
+    cfg.at("simulation").at("source") = {{"type", "csv"}, {"csv_path", "truth/example.csv"}};
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
 
-    cfg.at("trajectory").erase("csv_path");
+    cfg.at("simulation").at("source").erase("csv_path");
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
 
@@ -401,15 +447,17 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts a Guidance state-machine traj
     CHECK(inherited_filter_trajectory.state_machine.states.front()
               .guidance_command_filter.bank_time_constant_s == doctest::Approx(0.5));
 
-    nlohmann::json& configured_state = cfg.at("trajectory").at("state_machine").at("states").at(0U);
-    configured_state.emplace("guidance_command_filter",
-                             nlohmann::json{{"specific_force_time_constant_b_s", {0.6, 0.7, 0.8}},
-                                            {"bank_time_constant_s", 0.9}});
-    configured_state.emplace("on_entry",
-                             nlohmann::json{{"guidance_command_filter",
-                                             {{"specific_force_time_constant_b_s", {1.0, 1.1, 1.2}},
-                                              {"bank_time_constant_s", 1.3},
-                                              {"duration_s", 2.0}}}});
+    nlohmann::json& configured_guidance = cfg.at("mission").at("phases").at(0U).at("guidance");
+    configured_guidance.emplace(
+        "guidance_command_filter",
+        nlohmann::json{{"specific_force_time_constant_b_s", {0.6, 0.7, 0.8}},
+                       {"bank_time_constant_s", 0.9}});
+    configured_guidance.emplace(
+        "on_entry",
+        nlohmann::json{{"guidance_command_filter",
+                        {{"specific_force_time_constant_b_s", {1.0, 1.1, 1.2}},
+                         {"bank_time_constant_s", 1.3},
+                         {"duration_s", 2.0}}}});
 
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
     const sim::StateMachineTrajectoryConfig trajectory =
@@ -430,17 +478,86 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts a Guidance state-machine traj
 TEST_CASE("ECEF INS GNSS runtime validator rejects malformed Guidance command filters")
 {
     nlohmann::json cfg = valid_state_machine_runtime_config();
-    cfg.at("trajectory").at("guidance_command_filter").at("specific_force_time_constant_b_s") = {
-        0.2, -0.1, 0.4};
+    cfg.at("mission")
+        .at("gnc")
+        .at("guidance")
+        .at("command_filter")
+        .at("specific_force_time_constant_b_s") = {0.2, -0.1, 0.4};
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 
     cfg = valid_state_machine_runtime_config();
-    nlohmann::json& state = cfg.at("trajectory").at("state_machine").at("states").at(0U);
-    state.emplace("on_entry",
-                  nlohmann::json{{"guidance_command_filter",
-                                  {{"specific_force_time_constant_b_s", {0.8, 0.9, 1.0}},
-                                   {"bank_time_constant_s", 1.1},
-                                   {"duration_s", 0.0}}}});
+    nlohmann::json& guidance = cfg.at("mission").at("phases").at(0U).at("guidance");
+    guidance.emplace("on_entry",
+                     nlohmann::json{{"guidance_command_filter",
+                                     {{"specific_force_time_constant_b_s", {0.8, 0.9, 1.0}},
+                                      {"bank_time_constant_s", 1.1},
+                                      {"duration_s", 0.0}}}});
+    CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+}
+
+TEST_CASE("SWIL simulation phase behavior must exactly cover the mission phase graph")
+{
+    SUBCASE("generated source")
+    {
+        nlohmann::json missing = valid_state_machine_runtime_config();
+        missing.at("simulation").at("phase_behavior").erase("active");
+        CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(missing), std::runtime_error);
+
+        nlohmann::json extra = valid_state_machine_runtime_config();
+        extra.at("simulation").at("phase_behavior")["unknown"] = {{"constraint", "none"}};
+        CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(extra), std::runtime_error);
+    }
+
+    SUBCASE("stationary source")
+    {
+        nlohmann::json missing = valid_ecef_ins_gnss_runtime_config();
+        missing.at("simulation").at("phase_behavior").erase("stationary");
+        CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(missing), std::runtime_error);
+
+        nlohmann::json extra = valid_ecef_ins_gnss_runtime_config();
+        extra.at("simulation").at("phase_behavior")["unknown"] = {{"constraint", "none"}};
+        CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(extra), std::runtime_error);
+    }
+
+    SUBCASE("CSV source")
+    {
+        nlohmann::json missing = valid_ecef_ins_gnss_runtime_config();
+        missing.at("simulation").at("source") = {{"type", "csv"},
+                                                 {"csv_path", "truth/example.csv"}};
+        missing.at("simulation").at("phase_behavior").erase("stationary");
+        CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(missing), std::runtime_error);
+
+        nlohmann::json extra = valid_ecef_ins_gnss_runtime_config();
+        extra.at("simulation").at("source") = {{"type", "csv"}, {"csv_path", "truth/example.csv"}};
+        extra.at("simulation").at("phase_behavior")["unknown"] = {{"constraint", "none"}};
+        CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(extra), std::runtime_error);
+    }
+}
+
+TEST_CASE("Stationary and CSV SWIL sources reject unsupported multi-phase missions")
+{
+    for (const std::string& source_type : {std::string{"stationary"}, std::string{"csv"}}) {
+        nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+        cfg.at("simulation").at("source") = {{"type", source_type}};
+        if (source_type == "csv") {
+            cfg.at("simulation").at("source")["csv_path"] = "truth/example.csv";
+        }
+
+        nlohmann::json& first = cfg.at("mission").at("phases").at(0U);
+        make_guidance_state_nonterminal(first, "second");
+        cfg.at("mission").at("phases").push_back(valid_mission_phase("second"));
+        cfg.at("simulation").at("phase_behavior")["second"] = {{"constraint", "none"}};
+
+        CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
+    }
+}
+
+TEST_CASE("Stationary SWIL sources validate mission topology before source adaptation")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    nlohmann::json& phase = cfg.at("mission").at("phases").at(0U);
+    make_guidance_state_nonterminal(phase, "missing");
+
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
 
@@ -449,17 +566,14 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects invalid Guidance graph topolo
     SUBCASE("duplicate state IDs")
     {
         nlohmann::json cfg = valid_state_machine_runtime_config();
-        cfg.at("trajectory")
-            .at("state_machine")
-            .at("states")
-            .push_back(valid_guidance_state("active"));
+        cfg.at("mission").at("phases").push_back(valid_mission_phase("active"));
         CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
     }
 
     SUBCASE("unknown transition target")
     {
         nlohmann::json cfg = valid_state_machine_runtime_config();
-        nlohmann::json& active = cfg.at("trajectory").at("state_machine").at("states").at(0U);
+        nlohmann::json& active = cfg.at("mission").at("phases").at(0U);
         make_guidance_state_nonterminal(active, "missing");
         CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
     }
@@ -467,49 +581,52 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects invalid Guidance graph topolo
     SUBCASE("duplicate transition priorities")
     {
         nlohmann::json cfg = valid_state_machine_runtime_config();
-        nlohmann::json& machine = cfg.at("trajectory").at("state_machine");
-        nlohmann::json& active = machine.at("states").at(0U);
+        nlohmann::json& machine = cfg.at("mission");
+        nlohmann::json& active = machine.at("phases").at(0U);
         make_guidance_state_nonterminal(active, "done");
         active.at("transitions")
             .push_back({{"to", "done"},
                         {"priority", 0U},
                         {"when", {{"type", "elapsed_in_state"}, {"greater_equal_s", 2.0}}}});
-        machine.at("states").push_back(valid_guidance_state("done"));
+        machine.at("phases").push_back(valid_mission_phase("done"));
+        cfg.at("simulation").at("phase_behavior")["done"] = {{"constraint", "none"}};
         CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
     }
 
     SUBCASE("nonpositive elapsed transition threshold")
     {
         nlohmann::json cfg = valid_state_machine_runtime_config();
-        nlohmann::json& machine = cfg.at("trajectory").at("state_machine");
-        nlohmann::json& active = machine.at("states").at(0U);
+        nlohmann::json& machine = cfg.at("mission");
+        nlohmann::json& active = machine.at("phases").at(0U);
         make_guidance_state_nonterminal(active, "done");
         active.at("transitions").at(0U).at("when").at("greater_equal_s") = 0.0;
-        machine.at("states").push_back(valid_guidance_state("done"));
+        machine.at("phases").push_back(valid_mission_phase("done"));
+        cfg.at("simulation").at("phase_behavior")["done"] = {{"constraint", "none"}};
         CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
     }
 
     SUBCASE("unreachable state")
     {
         nlohmann::json cfg = valid_state_machine_runtime_config();
-        cfg.at("trajectory")
-            .at("state_machine")
-            .at("states")
-            .push_back(valid_guidance_state("orphan"));
+        cfg.at("mission").at("phases").push_back(valid_mission_phase("orphan"));
+        cfg.at("simulation").at("phase_behavior")["orphan"] = {{"constraint", "none"}};
         CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
     }
 
     SUBCASE("cycle rejected by policy")
     {
         nlohmann::json cfg = valid_state_machine_runtime_config();
-        nlohmann::json& machine = cfg.at("trajectory").at("state_machine");
-        nlohmann::json& first = machine.at("states").at(0U);
+        nlohmann::json& machine = cfg.at("mission");
+        nlohmann::json& first = machine.at("phases").at(0U);
         first.at("id") = "first";
-        machine.at("initial_state_id") = "first";
+        machine.at("initial_phase_id") = "first";
+        cfg.at("simulation").at("phase_behavior").erase("active");
+        cfg.at("simulation").at("phase_behavior")["first"] = {{"constraint", "none"}};
         make_guidance_state_nonterminal(first, "second");
-        nlohmann::json second = valid_guidance_state("second");
+        nlohmann::json second = valid_mission_phase("second");
         make_guidance_state_nonterminal(second, "first");
-        machine.at("states").push_back(std::move(second));
+        machine.at("phases").push_back(std::move(second));
+        cfg.at("simulation").at("phase_behavior")["second"] = {{"constraint", "none"}};
         CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
     }
 }
@@ -562,34 +679,34 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts every trajectory attitude for
 
     for (const std::pair<std::string, nlohmann::json>& attitude_form : attitude_forms) {
         nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
-        cfg.at("trajectory").erase("rpy_b2n_deg");
-        cfg.at("trajectory").emplace(attitude_form.first, attitude_form.second);
+        cfg.at("simulation").at("initial_truth").erase("rpy_b2n_deg");
+        cfg.at("simulation").at("initial_truth").emplace(attitude_form.first, attitude_form.second);
         CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
     }
 
     nlohmann::json missing = valid_ecef_ins_gnss_runtime_config();
-    missing.at("trajectory").erase("rpy_b2n_deg");
+    missing.at("simulation").at("initial_truth").erase("rpy_b2n_deg");
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(missing), std::runtime_error);
 
     nlohmann::json ambiguous = valid_ecef_ins_gnss_runtime_config();
-    ambiguous.at("trajectory").emplace("q_b2e", q_identity);
+    ambiguous.at("simulation").at("initial_truth").emplace("q_b2e", q_identity);
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(ambiguous), std::runtime_error);
 }
 
 TEST_CASE("Generated trajectory common validation accepts initial velocity and rejects body rate")
 {
     nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("trajectory") = {{"type", "constant_altitude"},
-                            {"duration_s", 30.0},
-                            {"dynamics_rate_hz", 1000.0},
-                            {"p_lla_deg_m", {35.0, -106.0, 1500.0}},
-                            {"rpy_b2n_deg", {0.0, 0.0, 28.64788975654116}},
-                            {"speed_mps", 120.0},
-                            {"v_n_mps", {120.0, 0.0, 0.0}}};
-    CHECK_NOTHROW(detail::validate_generated_trajectory_common(cfg.at("trajectory"), true, false));
+    cfg.at("mission") = {{"type", "constant_altitude"},
+                         {"duration_s", 30.0},
+                         {"dynamics_rate_hz", 1000.0},
+                         {"p_lla_deg_m", {35.0, -106.0, 1500.0}},
+                         {"rpy_b2n_deg", {0.0, 0.0, 28.64788975654116}},
+                         {"speed_mps", 120.0},
+                         {"v_n_mps", {120.0, 0.0, 0.0}}};
+    CHECK_NOTHROW(detail::validate_generated_trajectory_common(cfg.at("mission"), true, false));
 
-    cfg.at("trajectory").emplace("w_ib_b_degps", nlohmann::json{0.0, 0.0, 0.0});
-    CHECK_THROWS_AS(detail::validate_generated_trajectory_common(cfg.at("trajectory"), true, false),
+    cfg.at("mission").emplace("w_ib_b_degps", nlohmann::json{0.0, 0.0, 0.0});
+    CHECK_THROWS_AS(detail::validate_generated_trajectory_common(cfg.at("mission"), true, false),
                     std::runtime_error);
 }
 
@@ -625,23 +742,46 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects malformed GNSS covariance")
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
 
-TEST_CASE("Runtime JSON components merge relative to the scenario master")
+TEST_CASE("Runtime JSON references resolve relative to their containing file")
 {
     const std::filesystem::path temp_root =
-        std::filesystem::temp_directory_path() / "navkit_json_component_test";
-    const std::filesystem::path component_dir = temp_root / "components";
+        std::filesystem::temp_directory_path() / "navkit_json_reference_test";
+    const std::filesystem::path component_dir = temp_root / "components" / "mission";
+    const std::filesystem::path filter_dir = temp_root / "components" / "filters";
     const std::filesystem::path component_path = component_dir / "base.json";
+    const std::filesystem::path filter_path = filter_dir / "default.json";
     const std::filesystem::path master_path = temp_root / "scenario.json";
 
     std::filesystem::remove_all(temp_root);
     std::filesystem::create_directories(component_dir);
+    std::filesystem::create_directories(filter_dir);
+
+    {
+        std::ofstream filter_file{filter_path};
+        filter_file << R"({
+  "time_constant_s": 0.25
+})";
+    }
 
     {
         std::ofstream component_file{component_path};
         component_file << R"({
-  "trajectory": {
-    "duration_s": 60.0,
-    "dynamics_rate_hz": 1000.0
+  "duration_s": 60.0,
+  "guidance_filter": {
+    "config": "../filters/default.json"
+  }
+})";
+    }
+
+    {
+        std::ofstream master_file{master_path};
+        master_file << R"({
+  "run_name": "json_component_test",
+  "mission": {
+    "config": "components/mission/base.json",
+    "overrides": {
+      "duration_s": 5.0
+    }
   },
   "gnss": {
     "position_cov": {
@@ -654,27 +794,127 @@ TEST_CASE("Runtime JSON components merge relative to the scenario master")
 })";
     }
 
-    {
-        std::ofstream master_file{master_path};
-        master_file << R"({
-  "components": {
-    "base": "components/base.json"
-  },
-  "run_name": "json_component_test",
-  "trajectory": {
-    "duration_s": 5.0
-  }
-})";
-    }
-
     const nlohmann::json cfg = load_json_file(master_path);
 
-    CHECK_FALSE(cfg.contains("components"));
     CHECK(cfg.at("run_name").get<std::string>() == "json_component_test");
-    CHECK(cfg.at("trajectory").at("duration_s").get<double>() == doctest::Approx(5.0));
-    CHECK(cfg.at("trajectory").at("dynamics_rate_hz").get<double>() == doctest::Approx(1000.0));
+    CHECK(cfg.at("mission").at("duration_s").get<double>() == doctest::Approx(5.0));
+    CHECK(cfg.at("mission").at("guidance_filter").at("time_constant_s").get<double>() ==
+          doctest::Approx(0.25));
     CHECK(cfg.at("gnss").at("position_cov").at("diag").at("pos_m2").at(0).get<double>() ==
           doctest::Approx(9.0));
+
+    std::filesystem::remove_all(temp_root);
+}
+
+TEST_CASE("Runtime JSON loader rejects legacy component assembly")
+{
+    const std::filesystem::path path =
+        std::filesystem::temp_directory_path() / "navkit_legacy_component_test.json";
+    {
+        std::ofstream file{path};
+        file << R"({"components": {"mission": "mission.json"}})";
+    }
+
+    CHECK_THROWS_AS(static_cast<void>(load_json_file(path)), std::runtime_error);
+    std::filesystem::remove(path);
+}
+
+TEST_CASE("Runtime JSON loader rejects invalid explicit reference graphs")
+{
+    const std::filesystem::path temp_root =
+        std::filesystem::temp_directory_path() / "navkit_json_reference_failure_tests";
+    std::filesystem::remove_all(temp_root);
+    std::filesystem::create_directories(temp_root);
+
+    SUBCASE("reference cycle")
+    {
+        const std::filesystem::path first_path = temp_root / "cycle_first.json";
+        const std::filesystem::path second_path = temp_root / "cycle_second.json";
+        {
+            std::ofstream first_file{first_path};
+            first_file << R"({"mission": {"config": "cycle_second.json"}})";
+        }
+        {
+            std::ofstream second_file{second_path};
+            second_file << R"({"config": "cycle_first.json"})";
+        }
+        CHECK_THROWS_AS(static_cast<void>(load_json_file(first_path)), std::runtime_error);
+    }
+
+    SUBCASE("missing referenced file")
+    {
+        const std::filesystem::path path = temp_root / "missing_reference.json";
+        {
+            std::ofstream file{path};
+            file << R"({"mission": {"config": "does_not_exist.json"}})";
+        }
+        CHECK_THROWS_AS(static_cast<void>(load_json_file(path)), std::runtime_error);
+    }
+
+    SUBCASE("nonobject root")
+    {
+        const std::filesystem::path path = temp_root / "nonobject_root.json";
+        {
+            std::ofstream file{path};
+            file << R"([1, 2, 3])";
+        }
+        CHECK_THROWS_AS(static_cast<void>(load_json_file(path)), std::runtime_error);
+    }
+
+    SUBCASE("reference mixed with inline fields")
+    {
+        const std::filesystem::path component_path = temp_root / "component.json";
+        const std::filesystem::path path = temp_root / "mixed_reference.json";
+        {
+            std::ofstream component_file{component_path};
+            component_file << R"({"duration_s": 10.0})";
+        }
+        {
+            std::ofstream file{path};
+            file << R"({
+  "mission": {
+    "config": "component.json",
+    "duration_s": 20.0
+  }
+})";
+        }
+        CHECK_THROWS_AS(static_cast<void>(load_json_file(path)), std::runtime_error);
+    }
+
+    SUBCASE("overrides without a reference")
+    {
+        const std::filesystem::path path = temp_root / "orphan_overrides.json";
+        {
+            std::ofstream file{path};
+            file << R"({"mission": {"overrides": {"duration_s": 20.0}}})";
+        }
+        CHECK_THROWS_AS(static_cast<void>(load_json_file(path)), std::runtime_error);
+    }
+
+    SUBCASE("nonstring config path")
+    {
+        const std::filesystem::path path = temp_root / "bad_config_shape.json";
+        {
+            std::ofstream file{path};
+            file << R"({"mission": {"config": 42}})";
+        }
+        CHECK_THROWS_AS(static_cast<void>(load_json_file(path)), std::runtime_error);
+    }
+
+    SUBCASE("nonobject overrides")
+    {
+        const std::filesystem::path component_path = temp_root / "override_component.json";
+        const std::filesystem::path path = temp_root / "bad_overrides_shape.json";
+        {
+            std::ofstream component_file{component_path};
+            component_file << R"({"duration_s": 10.0})";
+        }
+        {
+            std::ofstream file{path};
+            file << R"({"mission": {"config": "override_component.json", "overrides": []}})";
+        }
+        CHECK_THROWS_AS(static_cast<void>(load_json_file(path)), std::runtime_error);
+    }
 
     std::filesystem::remove_all(temp_root);
 }
@@ -705,41 +945,39 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects missing runtime-owned app set
 TEST_CASE("ECEF INS GNSS runtime validator rejects missing runtime-owned cadences")
 {
     auto cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("trajectory").erase("dynamics_rate_hz");
+    cfg.at("simulation").at("dynamics").erase("rate_hz");
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 
     cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("trajectory").erase("duration_s");
+    cfg.at("mission").erase("duration_s");
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 
     cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.erase("application");
+    cfg.erase("execution_target");
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 
     cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("application").erase("clock");
+    cfg.at("execution_target").erase("clock");
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 
     cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("application").at("clock") = "realtime";
+    cfg.at("execution_target").at("clock") = "realtime";
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
 
     cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("application").at("clock") = "invalid";
+    cfg.at("execution_target").at("clock") = "invalid";
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 
     cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("application").erase("control_state_source");
+    cfg.at("simulation").erase("control_state_source");
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 
     cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("application").at("control_state_source") = "truth";
+    cfg.at("simulation").at("control_state_source") = "truth";
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 
     cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("application") = {{"clock", "simulated"},
-                             {"control_state_source", "navigation_estimate"},
-                             {"rate_hz", 600.0}};
+    cfg.at("execution_target") = {{"type", "swil"}, {"clock", "simulated"}, {"rate_hz", 600.0}};
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 
     cfg = valid_ecef_ins_gnss_runtime_config();
@@ -747,9 +985,7 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects missing runtime-owned cadence
     cfg.at("gnss").emplace("rate_hz", 600.0);
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 
-    cfg.at("application") = {{"clock", "simulated"},
-                             {"control_state_source", "navigation_estimate"},
-                             {"rate_hz", 3000.0}};
+    cfg.at("execution_target") = {{"type", "swil"}, {"clock", "simulated"}, {"rate_hz", 3000.0}};
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
 
     cfg = valid_ecef_ins_gnss_runtime_config();
@@ -794,6 +1030,13 @@ TEST_CASE("GNSS innovation acceptance requires probabilities strictly between ze
 
     cfg = valid_ecef_ins_gnss_runtime_config();
     cfg.at("gnss").at("chi_square_acceptance").at("position") = {{"enabled", false}};
+    cfg.at("mission")
+        .at("phases")
+        .at(0U)
+        .at("navigation")
+        .at("sensors")
+        .at("primary_gnss_position")
+        .at("chi_square_acceptance") = {{"enabled", false}};
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
 
     cfg.at("gnss").at("chi_square_acceptance").at("position").emplace("probability", 0.99);
@@ -820,6 +1063,31 @@ TEST_CASE("GNSS innovation gate can be disabled by a deep-merged scenario overla
     EcefInsGnssAppConfig::PrimaryGnssPositionSensor position_sensor{};
     EcefInsGnssAppConfig::PrimaryGnssPositionEmulator::configure_sensor(position_sensor, cfg);
     CHECK_FALSE(position_sensor.innovation_gate().enabled());
+}
+
+TEST_CASE("GNSS gate configured initially disabled retains configuration for runtime enable")
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    nlohmann::json& position_gate = cfg.at("gnss").at("chi_square_acceptance").at("position");
+    position_gate.at("enabled") = false;
+    const core::Scalar_t configured_probability =
+        position_gate.at("probability").get<core::Scalar_t>();
+
+    CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+
+    EcefInsGnssAppConfig::PrimaryGnssPositionSensor position_sensor{};
+    EcefInsGnssAppConfig::PrimaryGnssPositionEmulator::configure_sensor(position_sensor, cfg);
+    const core::Scalar_t configured_threshold = position_sensor.innovation_gate().threshold();
+    CHECK_FALSE(position_sensor.innovation_gate().enabled());
+    CHECK(position_sensor.innovation_gate().probability() ==
+          doctest::Approx(configured_probability));
+    CHECK(std::isfinite(configured_threshold));
+
+    REQUIRE(position_sensor.set_innovation_gate_enabled(true));
+    CHECK(position_sensor.innovation_gate().enabled());
+    CHECK(position_sensor.innovation_gate().probability() ==
+          doctest::Approx(configured_probability));
+    CHECK(position_sensor.innovation_gate().threshold() == configured_threshold);
 }
 
 TEST_CASE("ECEF INS GNSS runtime validator accepts sorted non-overlapping active windows")
@@ -1109,10 +1377,10 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects unsupported IMU configuration
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
 
-TEST_CASE("ECEF INS GNSS runtime validator rejects invalid trajectory shape")
+TEST_CASE("ECEF INS GNSS runtime validator rejects invalid mission shape")
 {
     auto cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("trajectory").at("p_lla_deg_m") = {1.0, 2.0};
+    cfg.at("simulation").at("initial_truth").at("p_lla_deg_m") = {1.0, 2.0};
 
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
@@ -1120,7 +1388,7 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects invalid trajectory shape")
 TEST_CASE("ECEF INS GNSS runtime validator rejects ambiguous runtime rates")
 {
     auto cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("trajectory").emplace("dynamics_dt_s", 0.001);
+    cfg.at("simulation").at("dynamics").emplace("dt_s", 0.001);
 
     CHECK_THROWS_AS(validate_runtime_config<EcefInsGnssAppConfig>(cfg), std::runtime_error);
 }
@@ -1169,7 +1437,7 @@ TEST_CASE("ECEF INS GNSS runtime validator rejects unsupported covariance log mo
 TEST_CASE("ECEF INS GNSS runtime validator keeps numeric tuning runtime-configurable")
 {
     nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("trajectory").at("duration_s") = 5.0;
+    cfg.at("mission").at("duration_s") = 5.0;
     cfg.at("gnss").at("position_cov").at("diag").at("pos_m2") = {0.0, 0.0, 0.0};
     cfg.at("pva_initialization").at("pva_error_cov").at("diag").at(0) = 0.0;
 
@@ -1179,15 +1447,14 @@ TEST_CASE("ECEF INS GNSS runtime validator keeps numeric tuning runtime-configur
 TEST_CASE("Trajectory w_nb_b initialization includes Earth and local transport rates")
 {
     nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
-    cfg.at("trajectory") = {{"type", "stationary"},
-                            {"duration_s", 1.0},
-                            {"dynamics_rate_hz", 1.0},
-                            {"p_lla_deg_m", {0.0, 0.0, 0.0}},
-                            {"v_n_mps", {0.0, 100.0, 0.0}},
-                            {"rpy_b2n_deg", {0.0, 0.0, 0.0}},
-                            {"w_nb_b_degps", {0.0, 0.0, 0.0}}};
+    cfg.at("mission").at("duration_s") = 1.0;
+    cfg.at("simulation").at("dynamics").at("rate_hz") = 1.0;
+    cfg.at("simulation").at("initial_truth") = {{"p_lla_deg_m", {0.0, 0.0, 0.0}},
+                                                {"v_n_mps", {0.0, 100.0, 0.0}},
+                                                {"rpy_b2n_deg", {0.0, 0.0, 0.0}},
+                                                {"w_nb_b_degps", {0.0, 0.0, 0.0}}};
 
-    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
+    const SimulationRun trajectory = simulation_run_from_json(cfg);
     const core::Scalar_t expected_x_radps =
         core::environment::Wgs84::omega_rad_s + (100.0 / core::environment::Wgs84::a_m);
     CHECK(trajectory.initial_truth.w_ib_b_radps.x() == doctest::Approx(expected_x_radps));
@@ -1198,7 +1465,7 @@ TEST_CASE("Trajectory w_nb_b initialization includes Earth and local transport r
 TEST_CASE("Explicit PVA initialization provider applies configured errors")
 {
     const nlohmann::json cfg = explicit_pva_runtime_config();
-    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
+    const SimulationRun trajectory = simulation_run_from_json(cfg);
 
     static_assert(NavInitializationProviderPolicy<PvaExplicitInitializationProvider>);
     CHECK_NOTHROW(PvaExplicitInitializationProvider::validate_runtime_config(cfg));
@@ -1225,7 +1492,7 @@ TEST_CASE("Direct PVA initialization provider uses configured values")
           {"p_e_m", {1.0, 2.0, 3.0}},
           {"v_e_mps", {4.0, 5.0, 6.0}},
           {"rpy_b2e_deg", {5.729577951308233, 11.459155902616466, 17.188733853924695}}}}};
-    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
+    const SimulationRun trajectory = simulation_run_from_json(cfg);
 
     static_assert(NavInitializationProviderPolicy<PvaDirectInitializationProvider>);
     CHECK_NOTHROW(PvaDirectInitializationProvider::validate_runtime_config(cfg));
@@ -1251,7 +1518,7 @@ TEST_CASE("Full row-major filter initial covariance populates the Kalman filter"
     cfg.emplace("filter_initialization",
                 nlohmann::json{{"initial_covariance", {{"full", full_cov}}}});
 
-    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
+    const SimulationRun trajectory = simulation_run_from_json(cfg);
     const PvaInitialization pva_init = PvaRandomInitializationProvider::initialize(cfg, trajectory);
 
     std::unique_ptr<NavKit::Navigator> navigator = std::make_unique<NavKit::Navigator>();
@@ -1276,7 +1543,7 @@ TEST_CASE("Frame-aware PVA initial covariance populates the full filter covarian
                            {"vel_m2ps2", {4.0, 5.0, 6.0}},
                            {"att_rotvec_rad2", {7.0, 8.0, 9.0}}}},
                          {"remaining_error_state_diag", {10.0, 11.0, 12.0, 13.0, 14.0, 15.0}}}}});
-    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
+    const SimulationRun trajectory = simulation_run_from_json(cfg);
     const PvaInitialization pva_init = PvaRandomInitializationProvider::initialize(cfg, trajectory);
 
     std::unique_ptr<NavKit::Navigator> navigator = std::make_unique<NavKit::Navigator>();
@@ -1316,7 +1583,7 @@ TEST_CASE("Runtime covariance floor populates and clamps the Navigator filter co
                            {"vel_m2ps2", {4.0, 5.0, 6.0}},
                            {"att_rotvec_rad2", {7.0, 8.0, 9.0}}}},
                          {"remaining_error_state_diag", {10.0, 11.0, 12.0, 13.0, 14.0, 15.0}}}}});
-    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
+    const SimulationRun trajectory = simulation_run_from_json(cfg);
     const PvaInitialization pva_init = PvaRandomInitializationProvider::initialize(cfg, trajectory);
 
     std::unique_ptr<NavKit::Navigator> navigator = std::make_unique<NavKit::Navigator>();
@@ -1360,7 +1627,7 @@ TEST_CASE("Runtime propagation override populates the Navigator propagation poli
 TEST_CASE("Random PVA initialization provider produces deterministic colored draws")
 {
     const nlohmann::json cfg = random_pva_runtime_config();
-    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
+    const SimulationRun trajectory = simulation_run_from_json(cfg);
 
     static_assert(NavInitializationProviderPolicy<PvaRandomInitializationProvider>);
     CHECK_NOTHROW(PvaRandomInitializationProvider::validate_runtime_config(cfg));
@@ -1381,7 +1648,7 @@ TEST_CASE("Random PVA initialization provider accepts NED covariance frame")
     cfg.at("pva_initialization").at("pva_error_frame") = "ned";
     cfg.at("pva_initialization").at("pva_error_cov") = {
         {"diag", {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0}}};
-    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
+    const SimulationRun trajectory = simulation_run_from_json(cfg);
 
     CHECK_NOTHROW(PvaRandomInitializationProvider::validate_runtime_config(cfg));
     const PvaInitialization pva_init = PvaRandomInitializationProvider::initialize(cfg, trajectory);
@@ -1423,7 +1690,7 @@ TEST_CASE("NavInitialization maps into the configured Navigator filter state")
         .emplace(
             "nominal_state",
             nlohmann::json{{"non_pva_values", {1.0e-4, 2.0e-4, 3.0e-4, 1.0e-3, 2.0e-3, 3.0e-3}}});
-    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
+    const SimulationRun trajectory = simulation_run_from_json(cfg);
     const PvaInitialization nav_init =
         PvaExplicitInitializationProvider::initialize(cfg, trajectory);
     const Eigen::Quaternion<core::Scalar_t> expected_q_b2e =
@@ -1490,7 +1757,7 @@ TEST_CASE("Initial estimate error applies against the simulation truth reference
                                    1.0e-3,
                                    2.0e-3,
                                    3.0e-3}}}}});
-    const TrajectoryRun trajectory = trajectory_run_from_json(cfg);
+    const SimulationRun trajectory = simulation_run_from_json(cfg);
     const PvaInitialization pva_init =
         PvaExplicitInitializationProvider::initialize(cfg, trajectory);
     InitialTruthReference<StateDef> reference{};

@@ -1,0 +1,37 @@
+{
+  "source": {
+    "type": "generated"
+  },
+  "dynamics": {
+    "rate_hz": 1000.0,
+    "translational_integration": "trapezoidal_predictor_corrector"
+  },
+  "vehicle_response": {
+    "type": "first_order",
+    "vehicle_rate_time_constant_pqr_s": [
+      0.05,
+      0.05,
+      0.05
+    ],
+    "specific_force_command_time_constant_b_s": [
+      0.03,
+      0.03,
+      0.03
+    ],
+    "specific_force_response_time_constant_b_s": [
+      0.08,
+      0.08,
+      0.08
+    ],
+    "angular_rate_limit_pqr_degps": [
+      114.591559,
+      114.591559,
+      114.591559
+    ],
+    "specific_force_limit_b_mps2": [
+      100.0,
+      100.0,
+      100.0
+    ]
+  }
+}

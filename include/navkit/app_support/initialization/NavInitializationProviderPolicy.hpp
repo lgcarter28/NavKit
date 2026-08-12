@@ -14,9 +14,9 @@ namespace navkit::app_support
 
 template<typename Candidate>
 concept NavInitializationProviderPolicy =
-    requires(const nlohmann::json& cfg, const TrajectoryRun& trajectory) {
+    requires(const nlohmann::json& cfg, const SimulationRun& simulation) {
         { Candidate::validate_runtime_config(cfg) } -> std::same_as<void>;
-        { Candidate::initialize(cfg, trajectory) } -> std::same_as<PvaInitialization>;
+        { Candidate::initialize(cfg, simulation) } -> std::same_as<PvaInitialization>;
     };
 
 } // namespace navkit::app_support

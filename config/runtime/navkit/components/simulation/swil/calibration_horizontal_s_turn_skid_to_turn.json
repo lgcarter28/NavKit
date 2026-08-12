@@ -1,0 +1,17 @@
+{
+  "config": "../models/generated_first_order_1000hz.json",
+  "overrides": {
+    "initial_truth": {
+      "config": "../initial_truth/calibration_northbound.json"
+    },
+    "control_state_source": "navigation_estimate",
+    "phase_behavior": {
+      "horizontal_s_turn_acquisition": {
+        "constraint": "none"
+      },
+      "horizontal_s_turn": {
+        "constraint": "none"
+      }
+    }
+  }
+}

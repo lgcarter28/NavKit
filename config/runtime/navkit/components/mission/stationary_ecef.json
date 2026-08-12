@@ -1,0 +1,52 @@
+{
+  "duration_s": 60.0,
+  "termination": {
+    "type": "configured_duration"
+  },
+  "gnc": {
+    "guidance": {
+      "config": "../gnc/guidance/point_mass_default.json"
+    },
+    "autopilot": {
+      "config": "../gnc/autopilot/first_order_default.json"
+    }
+  },
+  "initial_phase_id": "stationary",
+  "cycle_policy": "reject",
+  "phases": [
+    {
+      "id": "stationary",
+      "navigation": {
+        "config": "../gnc/navigation/operational.json"
+      },
+      "guidance": {
+        "enabled": false,
+        "translation": {
+          "reference": {
+            "type": "current_state"
+          },
+          "acceleration": [
+            {
+              "type": "body_specific_force",
+              "specific_force_ib_b_mps2": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          ]
+        },
+        "bank": {
+          "type": "zero"
+        },
+        "body_y_specific_force_enabled": true
+      },
+      "autopilot": {
+        "enabled": false
+      },
+      "terminal": {
+        "behavior": "run_until_mission_termination"
+      }
+    }
+  ]
+}

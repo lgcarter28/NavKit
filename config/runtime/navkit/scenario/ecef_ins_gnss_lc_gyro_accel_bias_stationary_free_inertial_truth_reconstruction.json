@@ -1,0 +1,61 @@
+{
+  "run_name": "ecef_ins_gnss_lc_gyro_accel_bias_stationary_free_inertial_truth_reconstruction",
+  "output_dir": "output/logs/regression/ecef_ins_gnss_lc_gyro_accel_bias_stationary_free_inertial_truth_reconstruction",
+  "mission": {
+    "config": "../components/mission/stationary_ecef.json"
+  },
+  "execution_target": {
+    "config": "../components/execution/swil_simulated_1000hz.json"
+  },
+  "simulation": {
+    "config": "../components/simulation/swil/stationary_ecef.json",
+    "overrides": {
+      "control_state_source": "truth_passthrough"
+    }
+  },
+  "imu": {
+    "config": "../components/simulation/sensors/imu/ideal_raw.json"
+  },
+  "gnss": {
+    "config": "../components/simulation/sensors/gnss/truth_pos_vel.json",
+    "overrides": {
+      "active_windows": [
+        {
+          "start_s": 61.0,
+          "end_s": 62.0
+        }
+      ]
+    }
+  },
+  "pva_initialization": {
+    "config": "../components/gnc/navigation/initialization/pva/pva_no_errors.json"
+  },
+  "logging": {
+    "console": {
+      "enabled": false
+    },
+    "truth": {
+      "enabled": true,
+      "rate_hz": 80.0
+    },
+    "nav_estimate": {
+      "enabled": true,
+      "rate_hz": 50.0,
+      "covariance": "diagonal"
+    },
+    "imu": {
+      "enabled": false
+    },
+    "imu_debug": {
+      "enabled": false
+    },
+    "filter_correction": {
+      "enabled": false,
+      "covariance": "diagonal"
+    },
+    "measurement_statistics": {
+      "enabled": true,
+      "rate_hz": 1.0
+    }
+  }
+}

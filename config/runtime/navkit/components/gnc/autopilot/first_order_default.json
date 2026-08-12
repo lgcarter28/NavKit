@@ -1,0 +1,25 @@
+{
+  "rate_hz": 500.0,
+  "model": {
+    "type": "first_order",
+    "attitude_command_time_constant_s": 0.1,
+    "controller_rate_time_constant_pqr_s": [
+      0.02,
+      0.02,
+      0.02
+    ],
+    "attitude_error_gain_pqr_per_s": [
+      2.0,
+      2.0,
+      2.0
+    ],
+    "angular_rate_feedback_gain_pqr": [
+      0.2,
+      0.2,
+      0.2
+    ],
+    "velocity_alignment_speed_threshold_mps": 1.0,
+    "initial_velocity_alignment_tolerance_deg": 5.0,
+    "gyro_moving_average_window_samples": 20
+  }
+}

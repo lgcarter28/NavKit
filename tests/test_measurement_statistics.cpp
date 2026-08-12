@@ -164,6 +164,8 @@ TEST_CASE("invalid innovation covariance rejects deterministically without filte
 {
     StatisticsFixture fixture{};
     Sensor sensor{};
+    REQUIRE(sensor.configure_innovation_gate_probability(0.95));
+    REQUIRE(sensor.set_innovation_gate_enabled(false));
     sensor.observation_context() = fixture.noise;
     sensor.observation_context().R_e_m2 = -101.0 * navkit::core::Mat3::Identity();
     CHECK(sensor.push(fixture.sensor_measurement));
@@ -174,6 +176,9 @@ TEST_CASE("invalid innovation covariance rejects deterministically without filte
     CHECK(stats.valid);
     CHECK_FALSE(stats.accepted);
     CHECK_FALSE(stats.innovation_covariance_valid);
+    CHECK_FALSE(stats.gate_enabled);
+    CHECK(stats.gate_probability == doctest::Approx(0.95));
+    CHECK(std::isfinite(stats.gate_threshold));
     CHECK(std::isnan(stats.nis));
     CHECK(stats.kalman_gain.isZero(0.0));
     CHECK(fixture.filter.error_state().isApprox(fixture.initial_error_state, 1.0e-12));

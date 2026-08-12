@@ -14,6 +14,7 @@ add_executable(navkit_tests
     test_measurement_model_policy.cpp
     test_measurement_statistics.cpp
     test_noise_policy.cpp
+    test_navigation_phase.cpp
     test_profile_csv_writer.cpp
     test_profiling_policy.cpp
     test_ring_buffer.cpp

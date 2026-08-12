@@ -80,13 +80,13 @@ inline void require_finite_numeric_array(const nlohmann::json& value,
                                          const std::string_view key)
 {
     if (!value.is_array() || value.size() != expected_size) {
-        throw_runtime_config_error("trajectory attitude '" + std::string{key} +
+        throw_runtime_config_error("mission attitude '" + std::string{key} +
                                    "' must contain exactly " + std::to_string(expected_size) +
                                    " numeric entries");
     }
     for (const nlohmann::json& entry : value) {
         if (!entry.is_number() || !std::isfinite(entry.get<core::Scalar_t>())) {
-            throw_runtime_config_error("trajectory attitude '" + std::string{key} +
+            throw_runtime_config_error("mission attitude '" + std::string{key} +
                                        "' entries must be finite numbers");
         }
     }
@@ -113,8 +113,8 @@ trajectory_attitude_frame_pair(const std::string_view key)
     if (key.find("n2b") != std::string_view::npos) {
         return TrajectoryAttitudeFramePair::NedToBody;
     }
-    throw_runtime_config_error("unsupported trajectory attitude frame pair in '" +
-                               std::string{key} + "'");
+    throw_runtime_config_error("unsupported mission attitude frame pair in '" + std::string{key} +
+                               "'");
 }
 
 [[nodiscard]] inline Eigen::Quaternion<core::Scalar_t>
@@ -132,7 +132,7 @@ trajectory_attitude_quaternion_from_json(const nlohmann::json& trajectory,
             value.at(3).get<core::Scalar_t>(),
         };
         if (!core::math::normalize_quaternion(q, q_start2end)) {
-            throw_runtime_config_error("trajectory attitude '" + std::string{key} +
+            throw_runtime_config_error("mission attitude '" + std::string{key} +
                                        "' must be a finite nonzero quaternion");
         }
         return q_start2end;
@@ -147,7 +147,7 @@ trajectory_attitude_quaternion_from_json(const nlohmann::json& trajectory,
             value.at(6).get<core::Scalar_t>(), value.at(7).get<core::Scalar_t>(),
             value.at(8).get<core::Scalar_t>();
         if (!core::math::quaternion_from_dcm(C_start2end, q_start2end)) {
-            throw_runtime_config_error("trajectory attitude '" + std::string{key} +
+            throw_runtime_config_error("mission attitude '" + std::string{key} +
                                        "' must be a proper orthonormal DCM");
         }
         return q_start2end;
@@ -158,7 +158,7 @@ trajectory_attitude_quaternion_from_json(const nlohmann::json& trajectory,
     const Eigen::Quaternion<core::Scalar_t> q =
         core::math::quaternion_from_rpy_rad(rpy_start2end_rad);
     if (!core::math::normalize_quaternion(q, q_start2end)) {
-        throw_runtime_config_error("trajectory attitude '" + std::string{key} +
+        throw_runtime_config_error("mission attitude '" + std::string{key} +
                                    "' could not be converted to a finite quaternion");
     }
     return q_start2end;
@@ -169,7 +169,7 @@ inline void validate_trajectory_attitude_json(const nlohmann::json& trajectory)
     const int count = trajectory_attitude_input_count(trajectory);
     if (count != 1) {
         throw_runtime_config_error(
-            "trajectory must specify exactly one supported attitude convention");
+            "mission must specify exactly one supported attitude convention");
     }
     const std::string_view key = trajectory_attitude_input_key(trajectory);
     (void)trajectory_attitude_quaternion_from_json(trajectory, key);
@@ -206,7 +206,7 @@ trajectory_attitude_b2e_from_json(const nlohmann::json& trajectory,
         core::Mat3 C_n2e{};
         if (!core::frames::ned_to_ecef_matrix(p_e_m, C_n2e)) {
             throw_runtime_config_error(
-                "trajectory NED attitude requires a valid noncentral ECEF position");
+                "mission NED attitude requires a valid noncentral ECEF position");
         }
         const Eigen::Quaternion<core::Scalar_t> q_n2e{C_n2e};
         const Eigen::Quaternion<core::Scalar_t> q_b2n =
@@ -218,7 +218,7 @@ trajectory_attitude_b2e_from_json(const nlohmann::json& trajectory,
         core::Mat3 C_i2e{};
         if (!core::frames::inertial_to_fixed_matrix<core::environment::Wgs84>(t, t_epoch, C_i2e)) {
             throw_runtime_config_error(
-                "trajectory inertial attitude requires compatible valid timestamps");
+                "mission inertial attitude requires compatible valid timestamps");
         }
         const Eigen::Quaternion<core::Scalar_t> q_i2e{C_i2e};
         const Eigen::Quaternion<core::Scalar_t> q_b2i =
@@ -230,7 +230,7 @@ trajectory_attitude_b2e_from_json(const nlohmann::json& trajectory,
     Eigen::Quaternion<core::Scalar_t> q_b2e_normalized{};
     if (!core::math::normalize_quaternion(q_b2e, q_b2e_normalized)) {
         throw_runtime_config_error(
-            "trajectory attitude conversion produced an invalid body-to-ECEF quaternion");
+            "mission attitude conversion produced an invalid body-to-ECEF quaternion");
     }
     return q_b2e_normalized;
 }

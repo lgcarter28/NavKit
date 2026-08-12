@@ -24,7 +24,7 @@ struct PvaDirectInitializationProvider
     }
 
     [[nodiscard]] static PvaInitialization initialize(const nlohmann::json& cfg,
-                                                      const TrajectoryRun&)
+                                                      const SimulationRun&)
     {
         return detail::pva_direct_from_json(cfg.at("pva_initialization"));
     }

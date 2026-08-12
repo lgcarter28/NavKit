@@ -83,4 +83,24 @@ TEST_CASE("Sensor noise policy can update context from the measurement sample")
     CHECK(sensor.observation_context().R_e_m2(2, 2) == doctest::Approx(11.0));
 }
 
+TEST_CASE("Sensor forwards innovation gate runtime state changes")
+{
+    Sensor<0U, SensorTestModel, 1> sensor{};
+    CHECK_FALSE(sensor.set_innovation_gate_enabled(true));
+
+    REQUIRE(sensor.configure_innovation_gate_probability(0.95));
+    const Scalar_t configured_probability = sensor.innovation_gate().probability();
+    const Scalar_t configured_threshold = sensor.innovation_gate().threshold();
+
+    REQUIRE(sensor.set_innovation_gate_enabled(false));
+    CHECK_FALSE(sensor.innovation_gate().enabled());
+    CHECK(sensor.innovation_gate().probability() == configured_probability);
+    CHECK(sensor.innovation_gate().threshold() == configured_threshold);
+
+    REQUIRE(sensor.set_innovation_gate_enabled(true));
+    CHECK(sensor.innovation_gate().enabled());
+    CHECK(sensor.innovation_gate().probability() == configured_probability);
+    CHECK(sensor.innovation_gate().threshold() == configured_threshold);
+}
+
 } // namespace navkit::core::estimation::test

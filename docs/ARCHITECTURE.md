@@ -70,7 +70,10 @@ include/navkit/
     config/
     emulation/
       concrete/
+    execution/
+    navigation/
     runtime/
+    simulation/
     time/
     initialization/
     logging/
@@ -83,7 +86,9 @@ config/
     apps/
       navkit_sim/
   runtime/
-    navkit_sim/
+    navkit/
+      components/
+      scenario/
 
 src/
   sim/
@@ -199,16 +204,20 @@ applicable controller tick. Current semantics deliberately use the latest
 available estimate without delayed-state replay.
 
 The generated source uses exact independent Physics, Autopilot, and Guidance
-schedules. One runtime JSON graph selects named Guidance states and composes
-typed reference, acceleration, bank, plant-constraint, and transition blocks;
-trajectory names such as ballistic or waypoint no longer select bespoke C++
-Guidance classes. Guidance emits total inertial acceleration plus a NED bank
+schedules. The target-independent mission graph owns one authoritative ordered
+phase array. Each phase owns its Navigation, Guidance, and Autopilot selection
+inline or through an explicit reference; app support does not join parallel
+subsystem phase catalogs. Phase-owned Guidance payloads compose typed reference,
+acceleration, and bank blocks, while mission-level GNC configuration and the
+simulation model separately own persistent controller tuning and plant behavior.
+Trajectory names such as ballistic or waypoint no longer select bespoke C++ Guidance classes. Guidance
+emits total inertial acceleration plus a NED bank
 intent in a `GuidanceOutput`; the physical plant boundary converts that intent
 to a complete minimal `GuidanceCommand`. A persistent Guidance-output filter
 independently shapes body-X/Y/Z specific force and bank using global,
 state-nominal, or temporary state-entry time constants without resetting its
-command state. Runtime diagnostics log
-the generic `guidance_state_index`, not an obsolete fixed mode enumeration.
+command state. Runtime diagnostics expose the active mission-phase index rather
+than coupling other subsystems to a Guidance-specific state identity.
 Autopilot forms attitude and body-rate commands, consuming the actual
 configured IMU increments through a fixed-capacity moving-window
 `sum(delta_theta) / sum(dt)` observation. Vehicle response owns final body
@@ -216,6 +225,15 @@ rate, its two internal specific-force response stages, post-response limits,
 and the conversion back to realized ECI acceleration. Only the ECI plant
 integrates truth. This runtime-polymorphic simulation boundary is intentionally
 outside the statically composed embedded product core.
+
+Sensor-specific Navigation actions live directly in each mission phase, either
+inline or through a reference into `components/gnc/navigation`. Those actions do
+not enter `GuidanceCommand`, the Autopilot, the Vehicle, or embedded NavKit
+policy configuration. App support observes the active mission phase and applies
+its resolved Navigation action atomically before publishing measurements at that
+planned epoch. Current actions control per-sensor innovation gates and optional
+chi-square acceptance-probability overrides; phase timing remains application
+orchestration.
 
 Guidance blocks that author acceleration relative to NED or ECEF apply the
 appropriate local-frame transport, Coriolis, and centripetal terms before
@@ -231,9 +249,9 @@ epochs. Runtime diagnostics sampled at Physics or logging cadence repeat the
 held values until the next producer update rather than interpolating commands
 or implying extra controller executions.
 
-`SimulationApp` owns the planned master cadence and a runtime-selected
-app-support `Clock`. Its configured application
-rate must be an integer multiple of every synthetic producer rate, so each
+`SimulationApp` owns the planned master cadence selected by the runtime
+`execution_target` component and a matching app-support `Clock`. Its configured
+execution rate must be an integer multiple of every synthetic producer rate, so each
 consumer deadline is visited exactly. At each planned timestamp, the app
 advances the source and prepares synthetic emulator updates before the deadline,
 then calls `wait_until(t)`, publishes those prepared updates to Navigator-visible
@@ -244,8 +262,8 @@ clock, but publication—and all real hardware acquisition—remains post-deadli
 
 `Clock` is intentionally virtual only in app support: `SimulatedClock` adopts
 planned time immediately, while `RealtimeClock` waits against a steady-clock
-deadline. The selected `"simulated"` or `"realtime"` mode is runtime JSON, not
-an embedded NavKit policy. Exact planned timestamps come from `RationalTimeline`;
+deadline. The selected `"simulated"` or `"realtime"` mode belongs to the runtime
+`execution_target`, not an embedded NavKit policy. Exact planned timestamps come from `RationalTimeline`;
 consumer-side `RationalSchedule` remains solely the due-time gate for log and
 synthetic-emulator cadences.
 
@@ -275,11 +293,50 @@ not become a universal include for every concrete component choice.
 See [`CONFIGURATION.md`](CONFIGURATION.md) for the user-facing configuration
 mental model, example config contracts, and the selected-config build workflow.
 
-Runtime scenario inputs for executables live outside public headers, such as
-`config/runtime/navkit_sim`. This avoids mixing "what product are we compiling?"
+Runtime scenario inputs for executables live outside public headers under
+`config/runtime/navkit`. This avoids mixing "what product are we compiling?"
 with "what scenario are we running today?" It also avoids overly ceremonial names
 such as `navkit::core::environment::planet::Wgs84` until a leaf domain becomes
 independently meaningful.
+
+Runtime composition is one explicit object graph. A moderately complex object
+can be authored inline or referenced with `{"config": "relative/path.json"}`
+and optional explicit `overrides`. Paths resolve relative to the containing
+file, references resolve recursively, and cycles or ambiguous mixed
+reference/inline objects fail validation. The resolved runtime artifact is
+self-contained; app support never performs a hidden join of disconnected
+catalogs.
+
+Ownership is deliberately narrow:
+
+- `mission` owns one ordered phase graph, transitions, mission commands, and
+  each phase's resolved Navigation, Guidance, and Autopilot selections. It may
+  link persistent GNC implementation/tuning objects, but it does not own
+  synthetic truth, plant implementation, clocks, or logging.
+- `simulation` owns synthetic initial truth, trajectory-source selection,
+  environment, dynamics/integration, plant models, and truth-versus-navigation
+  feedback wiring. Its `phase_behavior` mapping is keyed by stable mission phase IDs and
+  must match the mission exactly; missing and orphaned mappings are errors.
+- `execution_target` owns the application adapter, clock, and planned cadence.
+  The only implemented target is currently the NavKit-owned `swil` adapter.
+- `scenario` is the thin final composition root selecting mission, target,
+  simulation, sensor models, estimator initialization, logging, and explicit
+  local overrides.
+
+This separation avoids parallel mission and scenario trees: one mission can be
+reused by multiple scenarios, simulation models, sensor suites, and execution targets.
+Internal trajectory-source, truth-trajectory, and trajectory-analysis types keep
+their domain names; `mission` is an application-level phase plan, not a replacement
+for trajectory mathematics.
+
+Future HWIL, flight, or external-framework integrations should be separate
+application adapters rather than conditionals embedded throughout
+`SimulationApp`. For example, an ArduPilot adapter can map externally owned
+mission/mode events to the same Navigation phase contract, feed hardware or
+transport-provided measurements to `Navigator`, and return the navigation
+solution without constructing synthetic truth or a `TrajectorySource`.
+External target names remain unsupported runtime values until their transport
+and lifecycle contracts are implemented; this keeps target selection fail-closed.
 
 ## Target kinds
 

@@ -1,0 +1,7 @@
+{
+  "rate_hz": 100.0,
+  "maximum_bank_angle_deg": 60.0,
+  "command_filter": {
+    "config": "../filters/guidance_command_default.json"
+  }
+}

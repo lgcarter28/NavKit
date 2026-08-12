@@ -1,0 +1,79 @@
+{
+  "type": "error_model",
+  "rate_hz": 1000.0,
+  "seed": 43,
+  "gyro": {
+    "bias_turnon_degps": [
+      0.00114591559,
+      -0.000859436693,
+      0.00171887339
+    ],
+    "bias_inrun_psd_rad2ps3": [
+      1e-12,
+      1e-12,
+      1e-12
+    ],
+    "angle_random_walk_psd_rad2ps": [
+      1e-09,
+      1e-09,
+      1e-09
+    ],
+    "scale_factor": [
+      0.0001,
+      -8e-05,
+      0.00012
+    ],
+    "misalignment_deg": [
+      0.0114591559,
+      -0.00572957795,
+      0.00859436693
+    ],
+    "nonorthogonality": [
+      0.0001,
+      -0.00015,
+      0.00012
+    ],
+    "quantization_deg": [
+      5.72957795e-06,
+      5.72957795e-06,
+      5.72957795e-06
+    ]
+  },
+  "accel": {
+    "bias_turnon_mps2": [
+      0.001,
+      -0.0015,
+      0.002
+    ],
+    "bias_inrun_psd_m2ps5": [
+      1e-08,
+      1e-08,
+      1e-08
+    ],
+    "velocity_random_walk_psd_m2ps3": [
+      1e-05,
+      1e-05,
+      1e-05
+    ],
+    "scale_factor": [
+      0.00015,
+      -0.00012,
+      9e-05
+    ],
+    "misalignment_deg": [
+      -0.00859436693,
+      0.0114591559,
+      -0.00572957795
+    ],
+    "nonorthogonality": [
+      0.00012,
+      0.0001,
+      -0.00014
+    ],
+    "quantization_mps": [
+      1e-05,
+      1e-05,
+      1e-05
+    ]
+  }
+}

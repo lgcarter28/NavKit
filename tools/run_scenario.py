@@ -41,7 +41,7 @@ def main() -> int:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path("config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json"),
+        default=Path("config/runtime/navkit/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json"),
     )
     parser.add_argument(
         "--output-dir",

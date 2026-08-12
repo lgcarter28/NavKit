@@ -34,15 +34,25 @@ public:
         }
         m_probability = probability;
         m_threshold = threshold;
+        m_configured = true;
         m_enabled = true;
         return true;
     }
 
+    /** Changes runtime gate state without changing its configured probability or threshold. */
+    [[nodiscard]] bool set_enabled(const bool enabled)
+    {
+        if (enabled && !m_configured) {
+            return false;
+        }
+        m_enabled = enabled;
+        return true;
+    }
+
+    /** Disables acceptance gating while preserving any configured gate for later reuse. */
     void disable()
     {
-        m_enabled = false;
-        m_probability = 1.0;
-        m_threshold = std::numeric_limits<Scalar_t>::infinity();
+        static_cast<void>(set_enabled(false));
     }
 
     [[nodiscard]] bool accepts(const Scalar_t nis) const
@@ -68,6 +78,7 @@ public:
 private:
     Scalar_t m_probability{1.0};
     Scalar_t m_threshold{std::numeric_limits<Scalar_t>::infinity()};
+    bool m_configured{false};
     bool m_enabled{false};
 };
 

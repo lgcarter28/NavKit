@@ -1,0 +1,145 @@
+{
+  "duration_s": 60.0,
+  "termination": {
+    "type": "configured_duration"
+  },
+  "gnc": {
+    "guidance": {
+      "config": "../gnc/guidance/point_mass_default.json"
+    },
+    "autopilot": {
+      "config": "../gnc/autopilot/first_order_default.json"
+    }
+  },
+  "initial_phase_id": "vertical_s_turn_acquisition",
+  "cycle_policy": "reject",
+  "phases": [
+    {
+      "id": "vertical_s_turn_acquisition",
+      "navigation": {
+        "config": "../gnc/navigation/acquisition.json"
+      },
+      "guidance": {
+        "enabled": true,
+        "translation": {
+          "reference": {
+            "type": "local_flight_path",
+            "speed": {
+              "type": "constant",
+              "value_mps": 100.0
+            },
+            "heading": {
+              "type": "constant",
+              "value_deg": 0.0
+            },
+            "flight_path": {
+              "type": "sine",
+              "center_deg": 0.0,
+              "amplitude_deg": 10.0,
+              "period_s": 20.0,
+              "phase_deg": 0.0
+            }
+          },
+          "acceleration": [
+            {
+              "type": "path_feedforward"
+            },
+            {
+              "type": "velocity_hold",
+              "gain_n_1ps": [
+                0.5,
+                0.5,
+                0.75
+              ]
+            },
+            {
+              "type": "altitude_hold_pd",
+              "target": {
+                "type": "initial_altitude"
+              },
+              "proportional_gain_1ps2": 0.05,
+              "derivative_gain_1ps": 0.1
+            }
+          ]
+        },
+        "bank": {
+          "type": "zero"
+        },
+        "body_y_specific_force_enabled": true
+      },
+      "autopilot": {
+        "enabled": true
+      },
+      "transitions": [
+        {
+          "to": "vertical_s_turn",
+          "priority": 0,
+          "when": {
+            "type": "elapsed_in_state",
+            "greater_equal_s": 10.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "vertical_s_turn",
+      "navigation": {
+        "config": "../gnc/navigation/operational.json"
+      },
+      "guidance": {
+        "enabled": true,
+        "translation": {
+          "reference": {
+            "type": "local_flight_path",
+            "speed": {
+              "type": "constant",
+              "value_mps": 100.0
+            },
+            "heading": {
+              "type": "constant",
+              "value_deg": 0.0
+            },
+            "flight_path": {
+              "type": "sine",
+              "center_deg": 0.0,
+              "amplitude_deg": 10.0,
+              "period_s": 20.0,
+              "phase_deg": 180.0
+            }
+          },
+          "acceleration": [
+            {
+              "type": "path_feedforward"
+            },
+            {
+              "type": "velocity_hold",
+              "gain_n_1ps": [
+                0.5,
+                0.5,
+                0.75
+              ]
+            },
+            {
+              "type": "altitude_hold_pd",
+              "target": {
+                "type": "initial_altitude"
+              },
+              "proportional_gain_1ps2": 0.05,
+              "derivative_gain_1ps": 0.1
+            }
+          ]
+        },
+        "bank": {
+          "type": "zero"
+        },
+        "body_y_specific_force_enabled": true
+      },
+      "autopilot": {
+        "enabled": true
+      },
+      "terminal": {
+        "behavior": "run_until_mission_termination"
+      }
+    }
+  ]
+}

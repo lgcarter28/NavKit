@@ -13,10 +13,10 @@ namespace navkit::app_support
 
 template<typename Candidate, typename Navigator>
 concept TransferAlignmentProviderPolicy =
-    requires(Navigator& navigator, const nlohmann::json& cfg, const TrajectoryRun& trajectory) {
+    requires(Navigator& navigator, const nlohmann::json& cfg, const SimulationRun& simulation) {
         { Candidate::validate_runtime_config(cfg) } -> std::same_as<void>;
         {
-            Candidate::template transfer_align<Navigator>(navigator, cfg, trajectory)
+            Candidate::template transfer_align<Navigator>(navigator, cfg, simulation)
         } -> std::same_as<void>;
     };
 

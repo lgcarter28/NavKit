@@ -237,8 +237,8 @@ generates the one-time nominal PVA message consumed by the Navigator, while
 covariance. This keeps simulator truth/error generation separate from the
 filter's covariance belief.
 Reusable runtime component JSON follows the same split under
-`config/runtime/navkit_sim/components/initialization/pva` and
-`config/runtime/navkit_sim/components/initialization/filter`.
+`config/runtime/navkit/components/gnc/navigation/initialization/pva` and
+`config/runtime/navkit/components/gnc/filters/initialization`.
 
 The built-in PVA initialization providers currently support deterministic
 `"type": "pva_error"` inputs, seeded random `"type": "pva_random_error"` draws
@@ -303,7 +303,7 @@ config/
       navkit_sim/
     targets/          # planned
   runtime/
-    navkit_sim/
+    navkit/
 ```
 
 The selected concrete config header provides `navkit::config::SelectedConfig`.
@@ -327,78 +327,163 @@ unit-bearing keys such as `*_var_rad2`, `*_cov_rad2`, and `*_psd_rad2ps` remain
 the authority. Logged algorithm data likewise keeps its documented output
 units and is not governed by this runtime-input convention.
 
-General cadence accepts exactly one of `rate_hz` or `dt_s`. Trajectory physics
-cadence uses the more descriptive `dynamics_rate_hz` or `dynamics_dt_s` pair.
-The parser canonicalizes
-either form to a rational samples-per-second representation for phase-stable
-scheduling. Prefer `rate_hz` for rates such as 600 Hz whose period has a
-repeating decimal representation; retain `dt_s` only when the period is the
-more natural scenario input. Every runnable scenario must also select an
-`application` cadence. Its rate must be an integer multiple of the IMU and
-each configured synthetic emulator rate, so the application reaches every
-producer deadline exactly. For example, an application that serves both a
-1000 Hz IMU and a 600 Hz sensor must run at 3000 Hz or another common integer
-multiple, not merely at the numerically faster 1000 Hz rate.
+Every cadence object accepts exactly one of `rate_hz` or `dt_s`, including the
+nested `simulation.dynamics` object. The parser canonicalizes either form to a
+rational samples-per-second representation for phase-stable scheduling. Prefer `rate_hz` for rates such as
+600 Hz whose period has a repeating decimal representation; retain `dt_s` only
+when the period is the more natural scenario input.
 
-The same `application` component selects the app-support clock mode. Use
-`"clock": "simulated"` for deterministic SWIL, which immediately adopts every
-planned timestamp. Use `"clock": "realtime"` when planned timestamps must map
-to steady-clock deadlines for an HWIL-style loop. This runtime selection does
-not alter embedded NavKit algorithms.
-
-The required `"control_state_source"` selects only the application wiring into
-source-agnostic Guidance and Autopilot:
+Every runnable scenario selects an `execution_target`. The currently supported
+target is the NavKit-owned software-in-the-loop adapter:
 
 ```json
 {
-  "application": {
+  "execution_target": {
+    "type": "swil",
     "clock": "simulated",
-    "control_state_source": "navigation_estimate",
     "rate_hz": 1000.0
   }
 }
 ```
 
-`"navigation_estimate"` is the closed-loop default used by supported scenario
-components. After each `Navigator::update()`, the latest timestamped navigation
-state is supplied to the generated trajectory source for its next applicable
-controller tick. `"truth_passthrough"` is the explicit override for controlled
-reference studies. Guidance and Autopilot see the same typed
-`TrajectoryControlState` in either case; they never inspect the selected source.
+Its rate must be an integer multiple of the IMU and every configured synthetic
+producer rate, so the application reaches every producer deadline exactly. For
+example, a target that serves both a 1000 Hz IMU and a 600 Hz sensor must run at
+3000 Hz or another common integer multiple, not merely at the numerically faster
+1000 Hz rate. Use `"clock": "simulated"` for deterministic SWIL, which
+immediately adopts every planned timestamp. Use `"clock": "realtime"` to map
+the same NavKit-owned loop to steady-clock deadlines. No HWIL, flight, or
+external-framework target type is accepted until its real adapter and transport
+contract exist.
 
-### Trajectory sources and timing
+The simulation component separately owns controller-feedback wiring. Its
+`control_state_source` is `"navigation_estimate"` for the closed-loop default or
+`"truth_passthrough"` for controlled reference studies. After each
+`Navigator::update()`, the selected timestamped state is supplied to the
+simulation's generated source for its next applicable controller tick. Guidance
+and Autopilot see the same typed `TrajectoryControlState` either way; neither
+algorithm inspects which source was selected.
 
-The `trajectory` component selects one source that feeds the same typed truth
-contract used by initialization, IMU emulation, sensor emulation, logging, and
-the Navigator. A separate `application` component provides the master planned
-loop cadence:
+### Explicit runtime references
+
+Runtime configuration is one explicit object graph. Any moderately complex
+field can be authored inline or replaced by a reference object:
 
 ```json
 {
-  "components": {
-    "trajectory": "../components/trajectory/stationary_ecef_1000hz.json",
-    "application": "../components/application/default_1000hz.json"
+  "mission": {
+    "config": "../components/mission/calibration_horizontal_s_turn_bank_to_turn.json",
+    "overrides": {
+      "duration_s": 120.0
+    }
   }
 }
 ```
 
-There is no separate playback application or driver. The application advances
-the selected source through each planned timestamp. Synthetic IMU/GNSS runtimes
-query the source while preparing their updates; the app publishes them to the
-Navigator only after the selected clock reaches that timestamp. This executes
-immediately for SWIL and retains the same scheduling boundary for future
-real-time/HWIL clocks.
+`config` paths are resolved relative to the file that contains the reference.
+This rule applies recursively, so a mission can link a reusable Guidance block
+without depending on the process working directory or the top-level scenario's
+location. `overrides` is optional and is deep-merged only after the referenced
+object resolves. Nested objects merge recursively; arrays and scalar values are
+replaced wholesale rather than concatenated. A reference object may contain
+only `config` and `overrides`;
+mixing arbitrary inline members beside `config`, supplying `overrides` without
+`config`, missing a referenced file, or introducing a cycle is a configuration
+error with a reference-chain diagnostic.
 
-- `"type": "stationary"` generates ECEF truth lazily from the configured
-  duration, cadence, initial position/velocity/attitude, and optional angular
-  rate.
-- `"type": "state_machine"` selects the one generic generated-trajectory
-  source. Named runtime states compose reusable reference, acceleration, bank,
-  Autopilot-activity, plant-constraint, command-filter, and transition blocks.
-  Ballistic, constant-altitude, horizontal/vertical calibration, Dutch-roll,
-  and waypoint scenarios are data configurations of this same runtime graph;
-  they are not separate C++ trajectory source types.
-- `"type": "csv"` loads `csv_path`, resolved relative to the main scenario
+The old generic `components` merge table is intentionally unsupported. It made
+the application infer which disconnected files formed one logical object and
+allowed parallel configuration trees to drift. The scenario now names every
+selected role directly:
+
+```json
+{
+  "run_name": "ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal",
+  "output_dir": "output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal",
+  "mission": { "config": "../components/mission/stationary_ecef.json" },
+  "execution_target": {
+    "config": "../components/execution/swil_simulated_1000hz.json"
+  },
+  "simulation": {
+    "config": "../components/simulation/swil/stationary_ecef.json"
+  },
+  "imu": { "config": "../components/simulation/sensors/imu/specs/hg1700_tactical.json" },
+  "gnss": { "config": "../components/simulation/sensors/gnss/nominal_pos_vel.json" },
+  "pva_initialization": {
+    "config": "../components/gnc/navigation/initialization/pva/pva_random_error_default.json"
+  },
+  "logging": {
+    "console": { "enabled": true, "rate_hz": 1.0 }
+  }
+}
+```
+
+The resolved `effective_runtime_config.json` is the authoritative replay input
+for the executable. It contains no unresolved references.
+
+### Missions, target adapters, and simulation ownership
+
+`mission` is the target-independent phase plan. One ordered `mission.phases`
+array is authoritative: it owns phase IDs, transitions, and each phase's
+Navigation, Guidance, and Autopilot selections. Each selection may be inline or
+an explicit reference. There are no separate Navigation, Guidance, Autopilot,
+or plant phase catalogs for app support to join by string ID.
+
+Persistent GNC model selection and tuning may live under the mission's `gnc`
+object and be linked from `components/gnc/{guidance,navigation,autopilot,filters}`.
+Phase-local values live with the phase that selects them. Sensor-specific
+Navigation actions remain legal there because the mission phase is the central
+runtime orchestration point; embedded NavKit sees only the resolved action, not
+the mission graph.
+
+Synthetic plant implementation does not belong to mission intent. `simulation`
+owns source type, Dynamics cadence and integration, initial truth, Vehicle/plant
+models, feedback wiring, and a phase-behavior mapping keyed by the stable mission
+phase ID. Runtime validation requires that mapping to cover the mission exactly:
+missing and orphaned simulation-phase IDs are errors. Phase IDs, initial-phase
+selection, transition targets, reachability, and cycle policy are validated
+before any source-specific adaptation. Current source types are `stationary`,
+`generated`, and `csv`; a CSV source additionally provides `csv_path`.
+
+```json
+{
+  "phase_behavior": {
+    "launch_pad": { "constraint": "hold_initial_ecef" },
+    "boost": { "constraint": "free_flight" }
+  }
+}
+```
+
+`execution_target` owns only adapter selection, clock, and planned cadence.
+`swil` is the sole implemented adapter. Unsupported target types, including
+future `hwil` and `flight` targets, fail closed until their transport and
+lifecycle contracts exist.
+
+The current SWIL adapter executes multi-phase missions only with the
+`generated` source, whose trajectory state machine supplies the phase events.
+Stationary and CSV sources support one-phase missions and reject multi-phase
+graphs explicitly. A future target-independent mission runtime will own phase
+advancement for stationary alignment sequences and HWIL/flight adapters.
+
+Future HWIL, flight, or external-framework adapters reuse the same mission and
+Navigation phase contracts without importing synthetic truth into NavKit. An
+ArduPilot adapter, for example, can translate externally owned mode or mission
+events into Navigation-phase selections, publish hardware or transport-provided
+sensor measurements to `Navigator`, and return the navigation solution to the
+host. Such an adapter does not construct a simulated plant or `TrajectorySource`.
+Unsupported execution-target names remain runtime errors until those interfaces
+are implemented.
+
+- `simulation.source.type: "stationary"` generates ECEF truth lazily for the
+  mission duration using the configured Dynamics cadence, initial truth, and
+  optional angular rate.
+- `simulation.source.type: "generated"` selects the generic generated-trajectory
+  adapter. The mission's selected phase payloads plus its GNC configuration and
+  the simulation phase mapping compose references, acceleration, bank,
+  Autopilot, and plant behavior. Ballistic, constant-altitude, horizontal/vertical calibration,
+  Dutch-roll, and waypoint scenarios remain data configurations rather than
+  separate C++ trajectory-source types.
+- `simulation.source.type: "csv"` loads `csv_path`, resolved relative to the main scenario
   JSON file. A v1 CSV source uses monotonic `time_s` and strictly increasing
   rows. It must provide `p_e_x_m`, `p_e_y_m`, `p_e_z_m`, `v_e_x_mps`,
   `v_e_y_mps`, `v_e_z_mps`, and scalar-first `q_b2e_w`, `q_b2e_x`,
@@ -406,113 +491,80 @@ real-time/HWIL clocks.
   `w_ib_b_{x,y,z}_radps` columns; otherwise NavKit derives the angular rate
   from adjacent truth attitudes and Earth rate.
 
-Every generated state-machine trajectory selects its ECI translational
-integrator and its simulation-only Guidance, Autopilot, and Vehicle
-cadences/models explicitly. The graph is a named-state contract, for example:
+The target-independent mission graph owns the single phase sequence. A concise
+mission looks like:
 
 ```json
 {
-  "trajectory": {
-    "type": "state_machine",
-    "duration_s": 180.0,
-    "dynamics_rate_hz": 1000.0,
-    "autopilot_rate_hz": 500.0,
-    "guidance_rate_hz": 100.0,
-    "translational_integration": "trapezoidal_predictor_corrector",
-    "termination": { "type": "ground_impact" },
-    "maximum_bank_angle_deg": 60.0,
-    "guidance_command_filter": {
-      "specific_force_time_constant_b_s": [0.2, 0.3, 0.4],
-      "bank_time_constant_s": 0.25
-    },
-    "autopilot": {
-      "type": "first_order",
-      "controller_rate_time_constant_pqr_s": [0.02, 0.02, 0.02],
-      "attitude_command_time_constant_s": 0.1,
-      "attitude_error_gain_pqr_per_s": [2.0, 2.0, 2.0],
-      "angular_rate_feedback_gain_pqr": [0.2, 0.2, 0.2],
-      "velocity_alignment_speed_threshold_mps": 1.0,
-      "initial_velocity_alignment_tolerance_deg": 5.0,
-      "gyro_moving_average_window_samples": 20
-    },
-    "vehicle_response": {
-      "type": "first_order",
-      "vehicle_rate_time_constant_pqr_s": [0.05, 0.05, 0.05],
-      "specific_force_command_time_constant_b_s": [0.03, 0.03, 0.03],
-      "specific_force_response_time_constant_b_s": [0.08, 0.08, 0.08],
-      "angular_rate_limit_pqr_degps": [114.591559, 114.591559, 114.591559],
-      "specific_force_limit_b_mps2": [100.0, 100.0, 100.0]
-    },
-    "state_machine": {
-      "initial_state_id": "launch_pad",
-      "cycle_policy": "reject",
-      "states": [
-        {
-          "id": "launch_pad",
-          "plant": { "constraint": "hold_initial_ecef" },
-          "guidance": {
-            "enabled": false,
-            "translation": {
-              "reference": { "type": "current_state" },
-              "acceleration": [{
-                "type": "body_specific_force",
-                "specific_force_ib_b_mps2": [0.0, 0.0, 0.0]
-              }]
-            },
-            "bank": { "type": "zero" },
-            "body_y_specific_force_enabled": true
-          },
-          "autopilot": { "enabled": false },
-          "transitions": [{
-            "to": "boost",
-            "priority": 0,
-            "when": { "type": "elapsed_in_state", "greater_equal_s": 5.0 }
+  "duration_s": 180.0,
+  "termination": { "type": "ground_impact" },
+  "gnc": {
+    "guidance": { "config": "../gnc/guidance/point_mass_default.json" },
+    "autopilot": { "config": "../gnc/autopilot/first_order_default.json" }
+  },
+  "initial_phase_id": "launch_pad",
+  "cycle_policy": "reject",
+  "phases": [
+    {
+      "id": "launch_pad",
+      "navigation": { "config": "../gnc/navigation/acquisition.json" },
+      "guidance": {
+        "enabled": false,
+        "translation": {
+          "reference": { "type": "current_state" },
+          "acceleration": [{
+            "type": "body_specific_force",
+            "specific_force_ib_b_mps2": [0.0, 0.0, 0.0]
           }]
         },
-        {
-          "id": "boost",
-          "plant": { "constraint": "none" },
-          "guidance": {
-            "enabled": true,
-            "translation": {
-              "reference": { "type": "current_state" },
-              "acceleration": [{
-                "type": "body_specific_force",
-                "specific_force_ib_b_mps2": [49.03325, 0.0, 0.0]
-              }]
-            },
-            "bank": { "type": "zero" },
-            "body_y_specific_force_enabled": true
-          },
-          "autopilot": { "enabled": true },
-          "guidance_command_filter": {
-            "specific_force_time_constant_b_s": [0.05, 0.05, 0.05],
-            "bank_time_constant_s": 0.05
-          },
-          "on_entry": { "guidance_command_filter": {
-            "specific_force_time_constant_b_s": [0.75, 0.75, 0.75],
-            "bank_time_constant_s": 0.75,
-            "duration_s": 2.0
-          }},
-          "terminal": { "behavior": "run_until_trajectory_termination" }
-        }
-      ]
+        "bank": { "type": "zero" }
+      },
+      "autopilot": { "enabled": false },
+      "transitions": [{
+        "to": "boost",
+        "priority": 0,
+        "when": { "type": "elapsed_in_state", "greater_equal_s": 5.0 }
+      }]
+    },
+    {
+      "id": "boost",
+      "navigation": { "config": "../gnc/navigation/operational.json" },
+      "guidance": {
+        "enabled": true,
+        "translation": {
+          "reference": { "type": "current_state" },
+          "acceleration": [{
+            "type": "body_specific_force",
+            "specific_force_ib_b_mps2": [49.03325, 0.0, 0.0]
+          }]
+        },
+        "bank": { "type": "zero" }
+      },
+      "autopilot": { "enabled": true },
+      "terminal": { "behavior": "run_until_mission_termination" }
     }
-  }
+  ]
 }
 ```
 
-`initial_state_id` must name exactly one state. State IDs must be unique;
-transition targets must exist; transition priorities within a state must be
-unique; all states must be reachable; and cycles are rejected unless
-`cycle_policy` explicitly allows them. Each state is either terminal or owns a
+`initial_phase_id` must name exactly one mission phase. Phase IDs must be unique;
+transition targets must exist; transition priorities within a phase must be
+unique; all phases must be reachable; and cycles are rejected unless
+`cycle_policy` explicitly allows them. Each phase is either terminal or owns a
 nonempty transition list. The v1 transition predicate is
 `elapsed_in_state.greater_equal_s`. When multiple predicates are true, the
 lowest numeric priority wins and at most one transition occurs on that
-Guidance epoch. A newly entered state produces the command for that same epoch.
+Guidance epoch. A newly entered phase produces the command for that same epoch.
 
-Each state's translation pipeline contains exactly one primary reference and
-an ordered list of additive acceleration blocks. Current supported references
+Each phase's `navigation` object resolves directly to sensor-role-specific
+actions. Those actions may enable or disable a particular sensor's innovation
+gate and may override its chi-square acceptance probability. The runtime
+validator rejects sensor roles unsupported by the selected compile-time product
+and incomplete actions. A mission transition applies one complete Navigation
+phase atomically before same-epoch measurements are published.
+
+Each named Guidance phase's translation pipeline contains exactly one primary
+reference and an ordered list of additive acceleration blocks. Current supported references
 are `current_state`, `local_flight_path`, and `waypoint_path`. Reusable
 acceleration blocks include `path_feedforward`, `velocity_hold`,
 `altitude_hold_pd`, `body_specific_force`, and `free_fall`; bank policy is
@@ -520,12 +572,12 @@ acceleration blocks include `path_feedforward`, `velocity_hold`,
 blocks. They do not route execution through a profile-specific `if`/`else`
 chain.
 
-`translational_integration` accepts `"semi_implicit_euler"` or
-`"trapezoidal_predictor_corrector"`. The trajectory
-`dynamics_rate_hz`/`dynamics_dt_s` is the
-Physics cadence. Guidance and Autopilot each require exactly one corresponding
-`*_rate_hz` or `*_dt_s`; Physics must be an integer multiple of Autopilot, and
-Autopilot an integer multiple of Guidance. The application master cadence must
+`simulation.dynamics.translational_integration` accepts
+`"semi_implicit_euler"` or `"trapezoidal_predictor_corrector"`.
+`simulation.dynamics.rate_hz`/`dt_s` is the Physics cadence. Guidance and
+Autopilot each require exactly one `rate_hz` or `dt_s` in their corresponding
+`gnc` object; Physics must be an integer multiple of Autopilot, and
+Autopilot an integer multiple of Guidance. The execution-target cadence must
 still visit every producer deadline.
 
 The first-order Autopilot owns attitude tracking, one body-`p/q/r` response,
@@ -549,23 +601,23 @@ IMU truth. The complete equations are in
 `docs/algorithms/trajectory_generation_v1/`.
 
 Bank angles are represented on `[-pi, pi]` (`[-180, 180]` degrees).
-`maximum_bank_angle_deg` is the common positive command limit used by all
+`mission.gnc.guidance.maximum_bank_angle_deg` is the common positive command limit used by all
 generated maneuver and waypoint modes; it may not exceed 60 degrees, so the
 largest supported command range is `[-60, 60]` degrees and the default uses
 that full range.
-`guidance_command_filter` configures a permanent stateful LPF at the Guidance
+`mission.gnc.guidance.command_filter` configures a permanent stateful LPF at the Guidance
 output boundary. `specific_force_time_constant_b_s` independently filters the
 body-X/Y/Z specific-force commands, and `bank_time_constant_s` filters the NED
 roll/bank command before it reaches Autopilot. Each channel uses the exact
 zero-order-hold first-order step. A time constant of `0.0` bypasses only that
 channel.
 
-Filter selection has explicit precedence. The trajectory-level object is the
-global default. A state's own `guidance_command_filter` replaces that nominal
-selection while the state is active. Its optional
+Filter selection has explicit precedence. `mission.gnc.guidance.command_filter` is the
+global default. A mission Guidance phase's own `guidance_command_filter`
+replaces that nominal selection while the phase is active. Its optional
 `on_entry.guidance_command_filter` temporarily has highest precedence for the
 configured positive `duration_s`, then the state nominal selection resumes.
-State entry changes filter parameters without resetting its filtered command
+Mission-phase entry changes filter parameters without resetting its filtered command
 state; the new constants shape the first command produced by the entered state.
 The command therefore remains continuous without requiring artificial
 intermediate states solely to slow a transition.
@@ -625,8 +677,10 @@ w_ib_b = C_e2b w_ie_e + C_n2b w_en_n + w_nb_b
 ```
 
 Here `w_ie_e` is Earth rate resolved in ECEF and `w_en_n` is local transport
-rate resolved in NED. All angular-rate fields use rad/s and their full frame
-meaning is encoded in the JSON key.
+rate resolved in NED. Direct JSON angular inputs use degrees and direct angular
+rates use degrees per second unless a field explicitly carries a different
+unit suffix; covariance and PSD inputs retain their documented squared-radian
+units. Every field's complete frame and unit meaning is encoded in its key.
 
 Generated trajectories can expose a compact frame-explicit inspection suite
 through optional run-level logging entries:
@@ -718,6 +772,14 @@ setting only `enabled: false` after component-object deep merging. Any present
 probability must remain strictly inside `(0, 1)`. Missing family entries,
 invalid probabilities, and unknown fields are runtime configuration errors.
 
+Each mission phase then selects the final enabled state independently for each
+configured sensor role under `navigation.sensors`. A phase may also override
+that role's probability. When the phase omits `probability`, app support resolves
+the corresponding GNSS component probability as the baseline; an enabled phase
+must resolve a valid value. A disabled phase may omit the value. The resolved
+phase action is complete and never inherits the probability or enabled state
+left behind by the previously active phase.
+
 The probability is the user-facing contract, not a threshold literal. For a
 measurement model with dimension `M`, NavKit derives the innovation-gate
 degrees of freedom from `M` and computes the threshold as the corresponding
@@ -789,7 +851,7 @@ apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp
 ```
 
 Runtime JSON is still checked against the compiled app composition. For example,
-the ECEF INS/GNSS sim config currently requires `trajectory`, `imu`, `gnss`,
+the ECEF INS/GNSS sim config currently requires `mission`, `imu`, `gnss`,
 and `pva_initialization` sections, rejects unsupported `baro` and disabled
 `transfer_alignment` sections, and validates common numeric/vector fields before
 the simulation loop starts. The current default initializer uses
@@ -808,17 +870,22 @@ inputs:
 
 ```text
 config/runtime/
-  navkit_sim/
-    components/  # reusable physical, estimator, and initialization fragments
+  navkit/
+    components/  # reusable mission, subsystem, execution, and estimator inputs
+      mission/
+      gnc/{guidance,navigation,autopilot,filters}/
+      simulation/  # SWIL truth, plant, environment, and synthetic sensors
+      execution/
     scenario/    # complete runnable simulation compositions
   monte_carlo/   # seeded campaigns that reference ordinary scenarios
   regression/    # versioned deterministic suites that reference ordinary scenarios
+  qualification/ # deterministic/stochastic qualification suites and contracts
 ```
 
 Scenario filenames use lowercase `snake_case` and follow:
 
 ```text
-<product>_<trajectory>_<purpose>.json
+<product>_<mission>_<purpose>.json
 ```
 
 The `<product>` token identifies the selected navigation architecture, in this
@@ -870,31 +937,37 @@ variants share a family folder; for example,
 
 Deterministic regression suites live under `config/runtime/regression/`. A
 suite is a versioned analysis contract, not another simulation configuration:
-it references ordinary files under `navkit_sim/scenario/`, selects the expected
+it references ordinary files under `navkit/scenario/`, selects the expected
 compile-time product/build mode, and declares duration, sample-count, and
 numerical thresholds plus required accepted sensor-update counts. Name a suite
 for the acceptance contract it owns, such as
 `ecef_ins_truth_reconstruction.json`; keep each referenced scenario on the
-normal `<product>_<trajectory>_<purpose>.json` convention. Scenario paths are
+normal `<product>_<mission>_<purpose>.json` convention. Scenario paths are
 resolved relative to the suite file, which keeps the suite relocatable with the
 runtime-config tree. See the deterministic regression workflow in
 [`ANALYSIS.md`](ANALYSIS.md#deterministic-regression-workflow) for the complete
 suite contract and command-line behavior.
 
-Scenario files link reusable runtime components through explicit role-to-path
-entries. Component paths are resolved relative to the scenario file, loaded
-first, and then the scenario's inline values are merged on top:
+Scenario files link reusable runtime objects through the explicit reference
+contract described above. Each path is resolved relative to the file containing
+that reference; local changes belong under `overrides` rather than beside the
+`config` key:
 
 ```json
 {
   "run_name": "ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal",
   "output_dir": "output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal",
-    "components": {
-      "trajectory": "../components/trajectory/stationary_ecef_1000hz.json",
-      "application": "../components/application/default_1000hz.json",
-      "imu": "../components/imu/specs/hg1700_tactical.json",
-    "gnss": "../components/gnss/nominal_pos_vel.json",
-    "pva_initialization": "../components/initialization/pva/pva_random_error_default.json"
+  "mission": { "config": "../components/mission/stationary_ecef.json" },
+  "execution_target": {
+    "config": "../components/execution/swil_simulated_1000hz.json"
+  },
+  "simulation": {
+    "config": "../components/simulation/swil/stationary_ecef.json"
+  },
+  "imu": { "config": "../components/simulation/sensors/imu/specs/hg1700_tactical.json" },
+  "gnss": { "config": "../components/simulation/sensors/gnss/nominal_pos_vel.json" },
+  "pva_initialization": {
+    "config": "../components/gnc/navigation/initialization/pva/pva_random_error_default.json"
   },
   "logging": {
     "console": {
@@ -905,10 +978,9 @@ first, and then the scenario's inline values are merged on top:
 }
 ```
 
-The component keys document each fragment's scenario role and improve
-diagnostics. Logging is intentionally a run-level sibling of `components`
-because it describes what the scenario records, not the physical or estimator
-configuration of an individual component.
+The named fields document each object's scenario role and improve diagnostics.
+Logging remains a run-level field because it describes what the run records,
+not the physical or estimator configuration of an individual object.
 
 Filter initial covariance is a separate product/runtime boundary. The compiled
 NavKit product config selects an initial-covariance component:
@@ -1196,7 +1268,7 @@ Example:
   "schema": "navkit.monte_carlo_campaign.v2",
   "type": "monte_carlo_campaign",
   "campaign_name": "ecef_ins_gnss_lc_gyro_accel_bias_stationary_smoke_mc",
-  "nominal_config": "../navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_monte_carlo.json",
+  "nominal_config": "../navkit/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_monte_carlo.json",
   "runs": {
     "count": 3,
     "start_index": 0
@@ -1261,7 +1333,7 @@ aggregate merging, manifests, and reports remain single-owner.
 
 Monte Carlo scenarios should inline a lean run-level `logging` block in the
 nominal runtime scenario, as in
-`config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_monte_carlo.json`. Aggregate
+`config/runtime/navkit/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_monte_carlo.json`. Aggregate
 state/covariance plots need truth trajectory, navigation estimate with
 triangular covariance, and a low-rate IMU nominal log when bias truth-error plots
 are desired. High-rate IMU increment logs, IMU debug logs, filter correction

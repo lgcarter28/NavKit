@@ -4,8 +4,6 @@
 #pragma once
 
 #include "navkit/app_support/runtime/RuntimeRate.hpp"
-#include "navkit/app_support/time/ClockMode.hpp"
-#include "navkit/app_support/trajectory/ControlStateSourceMode.hpp"
 #include "navkit/core/config/Types.hpp"
 
 #include <filesystem>
@@ -54,9 +52,6 @@ struct RunSettings
     std::filesystem::path output_dir;
     std::filesystem::path data_dir;
     std::filesystem::path figures_dir;
-    core::RationalRate application_rate{};
-    ClockMode clock_mode{ClockMode::Simulated};
-    ControlStateSourceMode control_state_source{ControlStateSourceMode::NavigationEstimate};
     LoggingSchedule logging;
 };
 
@@ -161,21 +156,6 @@ inline RunSettings run_settings_from_json(const nlohmann::json& cfg)
     const std::filesystem::path output_dir = cfg.at("output_dir").get<std::string>();
     const std::filesystem::path data_dir = output_dir / "data";
     const std::filesystem::path figures_dir = output_dir / "figures";
-    const nlohmann::json& application = detail::require_object(cfg, "application");
-    const core::RationalRate application_rate =
-        rational_rate_from_required_runtime_rate(application, "application");
-    ClockMode clock_mode{};
-    if (!detail::clock_mode_from_json(application, "clock", clock_mode)) {
-        detail::throw_runtime_config_error("application.clock must be 'simulated' or 'realtime'");
-    }
-    ControlStateSourceMode control_state_source{};
-    if (!control_state_source_mode_from_string(
-            application.at("control_state_source").get<std::string>(), control_state_source)) {
-        detail::throw_runtime_config_error(
-            "application.control_state_source must be 'navigation_estimate' or "
-            "'truth_passthrough'");
-    }
-
     LoggingSchedule logging{};
     const auto& logging_json = detail::require_object(cfg, "logging");
     logging.console_enabled = logging_enabled_from_json(logging_json, "console");
@@ -225,9 +205,6 @@ inline RunSettings run_settings_from_json(const nlohmann::json& cfg)
             .output_dir = output_dir,
             .data_dir = data_dir,
             .figures_dir = figures_dir,
-            .application_rate = application_rate,
-            .clock_mode = clock_mode,
-            .control_state_source = control_state_source,
             .logging = logging};
 }
 

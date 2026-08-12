@@ -3,9 +3,13 @@
 
 #pragma once
 
+#include "navkit/app_support/navigation/NavigationPhase.hpp"
+#include "navkit/app_support/navigation/NavigationPhaseJson.hpp"
 #include "navkit/app_support/runtime/JsonInput.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
 #include "navkit/app_support/runtime/RuntimeRate.hpp"
+#include "navkit/app_support/simulation/SwilMissionAdapter.hpp"
+#include "navkit/app_support/trajectory/ControlStateSourceMode.hpp"
 #include "navkit/app_support/trajectory/GuidanceStateMachineJson.hpp"
 #include "navkit/app_support/trajectory/TrajectoryAttitudeJson.hpp"
 #include "navkit/core/config/Types.hpp"
@@ -36,14 +40,24 @@
 #include <string_view>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 namespace navkit::app_support
 {
 
-struct TrajectoryRun
+/**
+ * \brief SWIL-owned trajectory source and runtime phase selections for one simulation run.
+ *
+ * \details This object is deliberately simulation-specific. Mission and Navigation phase
+ * contracts remain independent of synthetic truth so future HWIL, flight, and third-party
+ * adapters can consume them without constructing a trajectory source.
+ */
+struct SimulationRun
 {
     std::unique_ptr<sim::TrajectorySource> source{};
     sim::TruthSample initial_truth{};
+    std::vector<NavigationPhase> navigation_phases{};
+    ControlStateSourceMode control_state_source{ControlStateSourceMode::NavigationEstimate};
 };
 
 namespace detail
@@ -67,19 +81,19 @@ inline void require_exactly_one_if_any(const nlohmann::json& cfg,
 {
     const int count = count_present(cfg, keys);
     if (count > 1) {
-        throw_runtime_config_error("trajectory must specify at most one " + group_name +
-                                   " convention");
+        throw_runtime_config_error("simulation.initial_truth must specify at most one " +
+                                   group_name + " convention");
     }
 }
 
 inline void require_numeric_array_value(const nlohmann::json& value, const std::size_t count)
 {
     if (!value.is_array() || value.size() != count) {
-        throw_runtime_config_error("trajectory numeric array has unexpected size");
+        throw_runtime_config_error("runtime numeric array has unexpected size");
     }
     for (const nlohmann::json& entry : value) {
         if (!entry.is_number()) {
-            throw_runtime_config_error("trajectory numeric array entries must be numeric");
+            throw_runtime_config_error("runtime numeric array entries must be numeric");
         }
     }
 }
@@ -88,10 +102,12 @@ inline void require_numeric_array_value(const nlohmann::json& value, const std::
 {
     const int position_count = count_present(trajectory, {"p_e_m", "p_lla_deg_m"});
     if (position_count == 0) {
-        throw_runtime_config_error("trajectory must specify one of 'p_e_m' or 'p_lla_deg_m'");
+        throw_runtime_config_error(
+            "simulation.initial_truth must specify one of 'p_e_m' or 'p_lla_deg_m'");
     }
     if (position_count > 1) {
-        throw_runtime_config_error("trajectory must specify only one position convention");
+        throw_runtime_config_error(
+            "simulation.initial_truth must specify only one position convention");
     }
 
     if (trajectory.contains("p_e_m")) {
@@ -101,7 +117,8 @@ inline void require_numeric_array_value(const nlohmann::json& value, const std::
     core::Vec3 p_e_m{};
     if (!core::frames::lla_deg_m_to_ecef_m(p_lla_deg_m, p_e_m)) {
         throw_runtime_config_error(
-            "trajectory 'p_lla_deg_m' must contain finite latitude, longitude, and height");
+            "simulation.initial_truth.p_lla_deg_m must contain finite latitude, longitude, and "
+            "height");
     }
     return p_e_m;
 }
@@ -117,7 +134,8 @@ inline void require_numeric_array_value(const nlohmann::json& value, const std::
         core::Mat3 C_n2e{};
         if (!core::frames::ned_to_ecef_matrix(p_e_m, C_n2e)) {
             throw_runtime_config_error(
-                "trajectory NED velocity requires a valid noncentral ECEF position");
+                "simulation.initial_truth NED velocity requires a valid noncentral ECEF "
+                "position");
         }
         return C_n2e * vec3_from_json<core::Vec3>(trajectory.at("v_n_mps"));
     }
@@ -147,7 +165,8 @@ angular_rate_ib_b_from_json(const nlohmann::json& trajectory,
         if (!core::frames::ecef_to_ned_matrix(p_e_m, C_e2n) ||
             !core::frames::transport_rate_en_n_radps(p_e_m, v_e_mps, w_en_n_radps)) {
             throw_runtime_config_error(
-                "trajectory NED angular rate requires valid ECEF position and velocity");
+                "simulation.initial_truth NED angular rate requires valid ECEF position and "
+                "velocity");
         }
         const Eigen::Quaternion<core::Scalar_t> q_e2n{C_e2n};
         const Eigen::Quaternion<core::Scalar_t> q_b2n =
@@ -281,11 +300,11 @@ truth_trajectory_from_csv(const std::filesystem::path& path)
 inline sim::StationaryTrajectoryConfig
 stationary_trajectory_config_from_json(const nlohmann::json& cfg)
 {
-    const nlohmann::json& trajectory_config = cfg.at("trajectory");
+    const nlohmann::json trajectory_config = detail::swil_trajectory_config_from_json(cfg);
     sim::StationaryTrajectoryConfig traj_cfg;
     traj_cfg.duration_s = trajectory_config.at("duration_s").get<core::Time_t>();
     traj_cfg.rate = rational_rate_from_required_named_runtime_rate(
-        trajectory_config, "dynamics_rate_hz", "dynamics_dt_s", "trajectory.dynamics");
+        trajectory_config, "dynamics_rate_hz", "dynamics_dt_s", "simulation.dynamics");
     traj_cfg.p_e = detail::position_e_m_from_json(trajectory_config);
     traj_cfg.v_e = detail::velocity_e_mps_from_json(trajectory_config, traj_cfg.p_e);
     traj_cfg.q_b2e = detail::trajectory_attitude_b2e_from_json(
@@ -306,7 +325,7 @@ translational_integration_method_from_json(const nlohmann::json& trajectory_conf
         return sim::TranslationalIntegrationMethod::TrapezoidalPredictorCorrector;
     }
     detail::throw_runtime_config_error(
-        "trajectory.translational_integration must be 'semi_implicit_euler' or "
+        "simulation.dynamics.translational_integration must be 'semi_implicit_euler' or "
         "'trapezoidal_predictor_corrector'");
 }
 
@@ -316,11 +335,8 @@ trajectory_subsystem_rate_from_json(const nlohmann::json& trajectory_config,
 {
     const std::string rate_key = std::string{subsystem} + "_rate_hz";
     const std::string period_key = std::string{subsystem} + "_dt_s";
-    return rational_rate_from_required_named_runtime_rate(trajectory_config,
-                                                          rate_key,
-                                                          period_key,
-                                                          std::string{"trajectory."} +
-                                                              std::string{subsystem});
+    return rational_rate_from_required_named_runtime_rate(
+        trajectory_config, rate_key, period_key, std::string{"gnc."} + std::string{subsystem});
 }
 
 [[nodiscard]] inline sim::FirstOrderAutopilotConfig
@@ -328,7 +344,7 @@ autopilot_config_from_json(const nlohmann::json& trajectory_config)
 {
     const nlohmann::json& config = trajectory_config.at("autopilot");
     if (config.at("type").get<std::string>() != "first_order") {
-        detail::throw_runtime_config_error("trajectory.autopilot.type must be 'first_order'");
+        detail::throw_runtime_config_error("gnc.autopilot.model.type must be 'first_order'");
     }
     sim::FirstOrderAutopilotConfig result{
         .attitude_command_time_constant_s =
@@ -348,7 +364,7 @@ autopilot_config_from_json(const nlohmann::json& trajectory_config)
     };
     if (!sim::first_order_autopilot_config_is_valid(result)) {
         detail::throw_runtime_config_error(
-            "trajectory first-order Autopilot time constants, gains, alignment settings, and "
+            "gnc.autopilot.model time constants, gains, alignment settings, and "
             "moving-average window are invalid");
     }
     return result;
@@ -365,7 +381,7 @@ guidance_command_filter_config_from_json(const nlohmann::json& trajectory_config
     };
     if (!sim::guidance_command_filter_config_is_valid(result)) {
         detail::throw_runtime_config_error(
-            "trajectory Guidance command-filter time constants must be finite and nonnegative");
+            "gnc.guidance.command_filter time constants must be finite and nonnegative");
     }
     return result;
 }
@@ -377,7 +393,7 @@ autopilot_model_type_from_json(const nlohmann::json& trajectory_config)
     if (type == "first_order") {
         return sim::AutopilotModelType::FirstOrder;
     }
-    detail::throw_runtime_config_error("trajectory.autopilot.type must be 'first_order'");
+    detail::throw_runtime_config_error("gnc.autopilot.model.type must be 'first_order'");
 }
 
 [[nodiscard]] inline sim::FirstOrderVehicleResponseConfig
@@ -386,7 +402,7 @@ vehicle_response_config_from_json(const nlohmann::json& trajectory_config)
     const nlohmann::json& config = trajectory_config.at("vehicle_response");
     if (config.at("type").get<std::string>() != "first_order") {
         detail::throw_runtime_config_error(
-            "trajectory.vehicle_response.type must be 'first_order'");
+            "simulation.vehicle_response.type must be 'first_order'");
     }
     sim::FirstOrderVehicleResponseConfig result{
         .vehicle_rate_time_constant_pqr_s =
@@ -408,7 +424,7 @@ vehicle_response_config_from_json(const nlohmann::json& trajectory_config)
     }
     if (!sim::first_order_vehicle_response_config_is_valid(result)) {
         detail::throw_runtime_config_error(
-            "trajectory first-order vehicle-response time constants must be finite and "
+            "simulation.vehicle_response time constants must be finite and "
             "nonnegative, and configured limits must be finite and positive");
     }
     return result;
@@ -421,17 +437,16 @@ vehicle_response_model_type_from_json(const nlohmann::json& trajectory_config)
     if (type == "first_order") {
         return sim::VehicleResponseModelType::FirstOrder;
     }
-    detail::throw_runtime_config_error("trajectory.vehicle_response.type must be 'first_order'");
+    detail::throw_runtime_config_error("simulation.vehicle_response.type must be 'first_order'");
 }
 
 [[nodiscard]] inline sim::TrajectoryProfileConfig
-trajectory_profile_config_from_json(const nlohmann::json& cfg)
+trajectory_profile_config_from_compiled_json(const nlohmann::json& trajectory_config)
 {
-    const nlohmann::json& trajectory_config = cfg.at("trajectory");
     sim::TrajectoryProfileConfig profile{};
     profile.duration_s = trajectory_config.at("duration_s").get<core::Time_t>();
     profile.rate = rational_rate_from_required_named_runtime_rate(
-        trajectory_config, "dynamics_rate_hz", "dynamics_dt_s", "trajectory.dynamics");
+        trajectory_config, "dynamics_rate_hz", "dynamics_dt_s", "simulation.dynamics");
     profile.guidance_rate = trajectory_subsystem_rate_from_json(trajectory_config, "guidance");
     profile.autopilot_rate = trajectory_subsystem_rate_from_json(trajectory_config, "autopilot");
     profile.p_e_m = detail::position_e_m_from_json(trajectory_config);
@@ -452,12 +467,19 @@ trajectory_profile_config_from_json(const nlohmann::json& cfg)
     return profile;
 }
 
+[[nodiscard]] inline sim::TrajectoryProfileConfig
+trajectory_profile_config_from_json(const nlohmann::json& cfg)
+{
+    return trajectory_profile_config_from_compiled_json(
+        detail::swil_trajectory_config_from_json(cfg));
+}
+
 [[nodiscard]] inline sim::StateMachineTrajectoryConfig
 state_machine_trajectory_config_from_json(const nlohmann::json& cfg)
 {
-    const nlohmann::json& trajectory_config = cfg.at("trajectory");
+    const nlohmann::json trajectory_config = detail::swil_trajectory_config_from_json(cfg);
     sim::StateMachineTrajectoryConfig result{};
-    result.profile = trajectory_profile_config_from_json(cfg);
+    result.profile = trajectory_profile_config_from_compiled_json(trajectory_config);
     result.state_machine =
         detail::guidance_state_machine_from_json(trajectory_config,
                                                  result.profile.guidance_command_filter,
@@ -470,18 +492,38 @@ state_machine_trajectory_config_from_json(const nlohmann::json& cfg)
     return result;
 }
 
-inline TrajectoryRun trajectory_run_from_json(const nlohmann::json& cfg,
+[[nodiscard]] inline ControlStateSourceMode
+simulation_control_state_source_from_json(const nlohmann::json& cfg)
+{
+    const nlohmann::json& simulation = detail::require_object(cfg, "simulation");
+    detail::require_string(simulation, "control_state_source");
+    ControlStateSourceMode mode{};
+    if (!control_state_source_mode_from_string(
+            simulation.at("control_state_source").get<std::string>(), mode)) {
+        detail::throw_runtime_config_error(
+            "simulation.control_state_source must be 'navigation_estimate' or "
+            "'truth_passthrough'");
+    }
+    return mode;
+}
+
+inline SimulationRun simulation_run_from_json(const nlohmann::json& cfg,
                                               const std::filesystem::path& source_base_dir = {})
 {
-    const nlohmann::json& trajectory_config = cfg.at("trajectory");
+    const nlohmann::json trajectory_config = detail::swil_trajectory_config_from_json(cfg);
     const std::string type = trajectory_config.value("type", "stationary");
+    std::vector<NavigationPhase> navigation_phases = navigation_phases_from_mission_json(cfg);
+    const ControlStateSourceMode control_state_source =
+        simulation_control_state_source_from_json(cfg);
     if (type == "csv") {
         const std::filesystem::path csv_path =
             source_base_dir / trajectory_config.at("csv_path").get<std::string>();
         sim::TruthTrajectory truth = detail::truth_trajectory_from_csv(csv_path);
         const sim::TruthSample initial_truth = truth.first();
         return {.source = std::make_unique<sim::TabulatedTrajectorySource>(std::move(truth)),
-                .initial_truth = initial_truth};
+                .initial_truth = initial_truth,
+                .navigation_phases = std::move(navigation_phases),
+                .control_state_source = control_state_source};
     }
 
     if (type == "stationary") {
@@ -495,7 +537,9 @@ inline TrajectoryRun trajectory_run_from_json(const nlohmann::json& cfg,
             .w_ib_b_radps = trajectory.w_ib_b_radps,
         };
         return {.source = std::make_unique<sim::StationaryTrajectorySource>(trajectory),
-                .initial_truth = initial_truth};
+                .initial_truth = initial_truth,
+                .navigation_phases = std::move(navigation_phases),
+                .control_state_source = control_state_source};
     }
 
     std::unique_ptr<sim::TrajectorySource> source{};
@@ -505,7 +549,7 @@ inline TrajectoryRun trajectory_run_from_json(const nlohmann::json& cfg,
     }
     else {
         detail::throw_runtime_config_error(
-            "trajectory.type must be 'stationary', 'csv', or 'state_machine'");
+            "simulation.source.type must be 'stationary', 'csv', or 'generated'");
     }
 
     if (!source || !source->advance_to(source->t_start())) {
@@ -517,7 +561,10 @@ inline TrajectoryRun trajectory_run_from_json(const nlohmann::json& cfg,
         detail::throw_runtime_config_error(
             "trajectory generation did not provide its initial truth sample");
     }
-    return {.source = std::move(source), .initial_truth = initial_truth};
+    return {.source = std::move(source),
+            .initial_truth = initial_truth,
+            .navigation_phases = std::move(navigation_phases),
+            .control_state_source = control_state_source};
 }
 
 } // namespace navkit::app_support

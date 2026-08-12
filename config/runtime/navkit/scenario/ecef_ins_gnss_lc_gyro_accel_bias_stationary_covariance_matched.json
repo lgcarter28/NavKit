@@ -1,0 +1,67 @@
+{
+  "run_name": "ecef_ins_gnss_lc_gyro_accel_bias_stationary_covariance_matched",
+  "output_dir": "output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_covariance_matched",
+  "mission": {
+    "config": "../components/mission/stationary_ecef.json"
+  },
+  "execution_target": {
+    "config": "../components/execution/swil_simulated_1000hz.json"
+  },
+  "simulation": {
+    "config": "../components/simulation/swil/stationary_ecef.json"
+  },
+  "imu": {
+    "config": "../components/simulation/sensors/imu/specs/hg1700_tactical.json"
+  },
+  "gnss": {
+    "config": "../components/simulation/sensors/gnss/nominal_pos_vel.json"
+  },
+  "pva_initialization": {
+    "config": "../components/gnc/navigation/initialization/pva/pva_random_error_default.json"
+  },
+  "propagation": {
+    "process_noise": {
+      "config": "../components/gnc/navigation/propagation/imu_process_noise_default.json"
+    },
+    "imu_bias_dynamics": {
+      "config": "../components/gnc/navigation/propagation/imu_bias_dynamics_gauss_markov_default.json"
+    }
+  },
+  "filter_initialization": {
+    "initial_covariance": {
+      "config": "../components/gnc/filters/initialization/ins_gyro_accel_bias_initial_covariance_hg1700_matched.json"
+    },
+    "covariance_floor": {
+      "config": "../components/gnc/filters/initialization/ins_gyro_accel_bias_covariance_floor_default.json"
+    }
+  },
+  "logging": {
+    "console": {
+      "enabled": false
+    },
+    "truth": {
+      "enabled": true,
+      "rate_hz": 5.0
+    },
+    "nav_estimate": {
+      "enabled": true,
+      "rate_hz": 5.0,
+      "covariance": "triangular"
+    },
+    "imu": {
+      "enabled": true,
+      "rate_hz": 5.0
+    },
+    "imu_debug": {
+      "enabled": false
+    },
+    "filter_correction": {
+      "enabled": false,
+      "covariance": "diagonal"
+    },
+    "measurement_statistics": {
+      "enabled": true,
+      "rate_hz": 1.0
+    }
+  }
+}

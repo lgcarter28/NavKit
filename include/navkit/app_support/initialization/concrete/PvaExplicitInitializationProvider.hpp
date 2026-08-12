@@ -24,11 +24,11 @@ struct PvaExplicitInitializationProvider
     }
 
     [[nodiscard]] static PvaInitialization initialize(const nlohmann::json& cfg,
-                                                      const TrajectoryRun& trajectory)
+                                                      const SimulationRun& simulation)
     {
         const nlohmann::json& initialization = cfg.at("pva_initialization");
 
-        PvaInitialization pva_init = detail::base_pva_initialization(trajectory);
+        PvaInitialization pva_init = detail::base_pva_initialization(simulation);
         const core::Vec3 reference_p_e_m = core::estimation::pos_e_m(pva_init.pva);
         detail::apply_pva_error(pva_init,
                                 detail::pva_error_from_json(initialization, reference_p_e_m));

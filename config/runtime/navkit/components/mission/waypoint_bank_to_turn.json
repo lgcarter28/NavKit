@@ -1,0 +1,161 @@
+{
+  "duration_s": 120.0,
+  "termination": {
+    "type": "configured_duration"
+  },
+  "gnc": {
+    "guidance": {
+      "config": "../gnc/guidance/point_mass_default.json"
+    },
+    "autopilot": {
+      "config": "../gnc/autopilot/first_order_default.json"
+    }
+  },
+  "initial_phase_id": "waypoint_path_acquisition",
+  "cycle_policy": "reject",
+  "phases": [
+    {
+      "id": "waypoint_path_acquisition",
+      "navigation": {
+        "config": "../gnc/navigation/acquisition.json"
+      },
+      "guidance": {
+        "enabled": true,
+        "translation": {
+          "reference": {
+            "type": "waypoint_path",
+            "speed": {
+              "type": "constant",
+              "value_mps": 100.0
+            },
+            "acceptance_radius_m": 250.0,
+            "heading_error_gain_mps2_per_deg": 0.0872664626,
+            "waypoints_lla_deg_m": [
+              [
+                35.018,
+                -106.0,
+                1500.0
+              ],
+              [
+                35.018,
+                -105.978,
+                1500.0
+              ],
+              [
+                35.0,
+                -105.978,
+                1500.0
+              ]
+            ]
+          },
+          "acceleration": [
+            {
+              "type": "path_feedforward"
+            },
+            {
+              "type": "velocity_hold",
+              "gain_n_1ps": [
+                0.5,
+                0.5,
+                0.75
+              ]
+            },
+            {
+              "type": "altitude_hold_pd",
+              "target": {
+                "type": "initial_altitude"
+              },
+              "proportional_gain_1ps2": 0.1,
+              "derivative_gain_1ps": 0.1
+            }
+          ]
+        },
+        "bank": {
+          "type": "coordinated_bank_to_turn"
+        },
+        "body_y_specific_force_enabled": false
+      },
+      "autopilot": {
+        "enabled": true
+      },
+      "transitions": [
+        {
+          "to": "waypoint_path",
+          "priority": 0,
+          "when": {
+            "type": "elapsed_in_state",
+            "greater_equal_s": 10.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "waypoint_path",
+      "navigation": {
+        "config": "../gnc/navigation/operational.json"
+      },
+      "guidance": {
+        "enabled": true,
+        "translation": {
+          "reference": {
+            "type": "waypoint_path",
+            "speed": {
+              "type": "constant",
+              "value_mps": 100.0
+            },
+            "acceptance_radius_m": 250.0,
+            "heading_error_gain_mps2_per_deg": 0.0872664626,
+            "waypoints_lla_deg_m": [
+              [
+                35.018,
+                -106.0,
+                1500.0
+              ],
+              [
+                35.018,
+                -105.978,
+                1500.0
+              ],
+              [
+                35.0,
+                -105.978,
+                1500.0
+              ]
+            ]
+          },
+          "acceleration": [
+            {
+              "type": "path_feedforward"
+            },
+            {
+              "type": "velocity_hold",
+              "gain_n_1ps": [
+                0.5,
+                0.5,
+                0.75
+              ]
+            },
+            {
+              "type": "altitude_hold_pd",
+              "target": {
+                "type": "initial_altitude"
+              },
+              "proportional_gain_1ps2": 0.1,
+              "derivative_gain_1ps": 0.1
+            }
+          ]
+        },
+        "bank": {
+          "type": "coordinated_bank_to_turn"
+        },
+        "body_y_specific_force_enabled": false
+      },
+      "autopilot": {
+        "enabled": true
+      },
+      "terminal": {
+        "behavior": "run_until_mission_termination"
+      }
+    }
+  ]
+}

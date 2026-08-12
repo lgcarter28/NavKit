@@ -1,7 +1,0 @@
-{
-  "application": {
-    "clock": "simulated",
-    "control_state_source": "navigation_estimate",
-    "rate_hz": 1000.0
-  }
-}

@@ -1,0 +1,14 @@
+{
+  "config": "../models/stationary_1000hz.json",
+  "overrides": {
+    "initial_truth": {
+      "config": "../initial_truth/stationary_ecef.json"
+    },
+    "control_state_source": "navigation_estimate",
+    "phase_behavior": {
+      "stationary": {
+        "constraint": "hold_initial_ecef"
+      }
+    }
+  }
+}

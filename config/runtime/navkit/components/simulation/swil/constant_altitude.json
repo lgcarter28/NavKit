@@ -1,0 +1,17 @@
+{
+  "config": "../models/generated_first_order_1000hz.json",
+  "overrides": {
+    "initial_truth": {
+      "config": "../initial_truth/constant_altitude_northeast.json"
+    },
+    "control_state_source": "navigation_estimate",
+    "phase_behavior": {
+      "constant_altitude_acquisition": {
+        "constraint": "none"
+      },
+      "constant_altitude": {
+        "constraint": "none"
+      }
+    }
+  }
+}

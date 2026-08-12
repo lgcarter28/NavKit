@@ -45,6 +45,38 @@ TEST_CASE("Disabled innovation gate accepts finite nonnegative statistics only")
     CHECK_FALSE(gate.accepts(-std::numeric_limits<Scalar_t>::infinity()));
 }
 
+TEST_CASE("Configured innovation gate can be disabled and re-enabled without losing configuration")
+{
+    InnovationGate<3> gate{};
+    REQUIRE(gate.configure_probability(0.95));
+    const Scalar_t configured_probability = gate.probability();
+    const Scalar_t configured_threshold = gate.threshold();
+
+    REQUIRE(gate.set_enabled(false));
+    CHECK_FALSE(gate.enabled());
+    CHECK(gate.probability() == configured_probability);
+    CHECK(gate.threshold() == configured_threshold);
+    CHECK(gate.accepts(
+        std::nextafter(configured_threshold, std::numeric_limits<Scalar_t>::infinity())));
+
+    REQUIRE(gate.set_enabled(true));
+    CHECK(gate.enabled());
+    CHECK(gate.probability() == configured_probability);
+    CHECK(gate.threshold() == configured_threshold);
+    CHECK_FALSE(gate.accepts(
+        std::nextafter(configured_threshold, std::numeric_limits<Scalar_t>::infinity())));
+}
+
+TEST_CASE("Unconfigured innovation gate cannot be enabled")
+{
+    InnovationGate<3> gate{};
+
+    CHECK_FALSE(gate.set_enabled(true));
+    CHECK_FALSE(gate.enabled());
+    CHECK(gate.probability() == doctest::Approx(1.0));
+    CHECK(std::isinf(gate.threshold()));
+}
+
 TEST_CASE("Enabled innovation gate includes its threshold and rejects values above it")
 {
     InnovationGate<3> gate{};

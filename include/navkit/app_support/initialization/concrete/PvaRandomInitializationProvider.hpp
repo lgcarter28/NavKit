@@ -32,10 +32,10 @@ struct PvaRandomInitializationProvider
     }
 
     [[nodiscard]] static PvaInitialization initialize(const nlohmann::json& cfg,
-                                                      const TrajectoryRun& trajectory)
+                                                      const SimulationRun& simulation)
     {
         const nlohmann::json& initialization = cfg.at("pva_initialization");
-        PvaInitialization pva_init = detail::base_pva_initialization(trajectory);
+        PvaInitialization pva_init = detail::base_pva_initialization(simulation);
         const core::Vec3 reference_p_e_m = core::estimation::pos_e_m(pva_init.pva);
         const core::estimation::PvaCovariance covariance =
             detail::pva_error_covariance_from_json(initialization, reference_p_e_m);

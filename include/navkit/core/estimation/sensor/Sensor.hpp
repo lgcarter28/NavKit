@@ -70,6 +70,11 @@ public:
         return m_innovation_gate.configure_probability(probability);
     }
 
+    [[nodiscard]] bool set_innovation_gate_enabled(const bool enabled)
+    {
+        return m_innovation_gate.set_enabled(enabled);
+    }
+
     void disable_innovation_gate()
     {
         m_innovation_gate.disable();

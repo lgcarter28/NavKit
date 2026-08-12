@@ -1,0 +1,8 @@
+{
+  "specific_force_time_constant_b_s": [
+    0.2,
+    0.2,
+    0.2
+  ],
+  "bank_time_constant_s": 0.2
+}

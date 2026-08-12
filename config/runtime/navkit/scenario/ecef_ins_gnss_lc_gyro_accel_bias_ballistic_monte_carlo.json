@@ -1,0 +1,51 @@
+{
+  "run_name": "ecef_ins_gnss_lc_gyro_accel_bias_ballistic_monte_carlo",
+  "output_dir": "output/logs/ecef_ins_gnss_lc_gyro_accel_bias_ballistic_monte_carlo",
+  "mission": {
+    "config": "../components/mission/ballistic_launch_pad.json"
+  },
+  "execution_target": {
+    "config": "../components/execution/swil_simulated_1000hz.json"
+  },
+  "simulation": {
+    "config": "../components/simulation/swil/ballistic_launch_pad.json"
+  },
+  "imu": {
+    "config": "../components/simulation/sensors/imu/specs/hg1700_tactical.json"
+  },
+  "gnss": {
+    "config": "../components/simulation/sensors/gnss/nominal_pos_vel.json"
+  },
+  "pva_initialization": {
+    "config": "../components/gnc/navigation/initialization/pva/pva_random_error_default.json"
+  },
+  "logging": {
+    "console": {
+      "enabled": false
+    },
+    "truth": {
+      "enabled": true,
+      "rate_hz": 5.0
+    },
+    "nav_estimate": {
+      "enabled": true,
+      "rate_hz": 5.0,
+      "covariance": "triangular"
+    },
+    "imu": {
+      "enabled": true,
+      "rate_hz": 5.0
+    },
+    "imu_debug": {
+      "enabled": false
+    },
+    "filter_correction": {
+      "enabled": false,
+      "covariance": "diagonal"
+    },
+    "measurement_statistics": {
+      "enabled": true,
+      "rate_hz": 1.0
+    }
+  }
+}

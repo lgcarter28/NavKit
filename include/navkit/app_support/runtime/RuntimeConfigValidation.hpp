@@ -6,14 +6,18 @@
 #include "navkit/app_support/config/SimulationAppConfigPolicy.hpp"
 #include "navkit/app_support/emulation/EmulatorRuntimeKeys.hpp"
 #include "navkit/app_support/emulation/concrete/ImuRuntimeConfig.hpp"
+#include "navkit/app_support/execution/ExecutionTargetJson.hpp"
 #include "navkit/app_support/initialization/CovarianceFloorJson.hpp"
 #include "navkit/app_support/initialization/InitialCovarianceJson.hpp"
 #include "navkit/app_support/initialization/InitialEstimateErrorJson.hpp"
 #include "navkit/app_support/initialization/NominalStateOverrideJson.hpp"
+#include "navkit/app_support/navigation/NavigationPhaseJson.hpp"
 #include "navkit/app_support/runtime/PropagationRuntimeConfigJson.hpp"
 #include "navkit/app_support/runtime/RunSettings.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
 #include "navkit/app_support/runtime/RuntimeRate.hpp"
+#include "navkit/app_support/simulation/SwilMissionAdapter.hpp"
+#include "navkit/app_support/trajectory/ControlStateSourceMode.hpp"
 #include "navkit/app_support/trajectory/TrajectoryAttitudeJson.hpp"
 
 #include <cmath>
@@ -87,7 +91,7 @@ inline void validate_generated_trajectory_common(const nlohmann::json& trajector
     detail::require_optional_positive_number(trajectory, "dynamics_dt_s");
     if (trajectory.contains("dynamics_rate_hz") == trajectory.contains("dynamics_dt_s")) {
         detail::throw_runtime_config_error(
-            "trajectory must specify exactly one of 'dynamics_rate_hz' or 'dynamics_dt_s'");
+            "simulation.dynamics must specify exactly one of 'rate_hz' or 'dt_s'");
     }
     detail::require_optional_vec3(trajectory, "p_e_m");
     detail::require_optional_vec3(trajectory, "p_lla_deg_m");
@@ -102,11 +106,11 @@ inline void validate_generated_trajectory_common(const nlohmann::json& trajector
         (trajectory.contains("p_e_m") ? 1 : 0) + (trajectory.contains("p_lla_deg_m") ? 1 : 0);
     if (position_count != 1) {
         detail::throw_runtime_config_error(
-            "trajectory must specify exactly one of 'p_e_m' or 'p_lla_deg_m'");
+            "simulation.initial_truth must specify exactly one of 'p_e_m' or 'p_lla_deg_m'");
     }
     if (trajectory.contains("v_e_mps") && trajectory.contains("v_n_mps")) {
         detail::throw_runtime_config_error(
-            "trajectory must specify only one of 'v_e_mps' or 'v_n_mps'");
+            "simulation.initial_truth must specify only one of 'v_e_mps' or 'v_n_mps'");
     }
     if (!allow_initial_velocity &&
         (trajectory.contains("v_e_mps") || trajectory.contains("v_n_mps"))) {
@@ -119,7 +123,7 @@ inline void validate_generated_trajectory_common(const nlohmann::json& trajector
                                    (trajectory.contains("w_nb_b_degps") ? 1 : 0);
     if (angular_rate_count > 1) {
         detail::throw_runtime_config_error(
-            "trajectory must specify at most one angular-rate convention");
+            "simulation.initial_truth must specify at most one angular-rate convention");
     }
     if (!allow_angular_rate && angular_rate_count != 0) {
         detail::throw_runtime_config_error(
@@ -134,12 +138,12 @@ inline void validate_trajectory_vec3_bounds(const nlohmann::json& object,
 {
     require_optional_vec3(object, key);
     if (!object.contains(std::string{key})) {
-        throw_runtime_config_error("missing required trajectory vector '" + std::string{key} + "'");
+        throw_runtime_config_error("missing required runtime vector '" + std::string{key} + "'");
     }
     for (const nlohmann::json& value : object.at(std::string{key})) {
         if (!value.is_number() || !std::isfinite(value.get<double>()) ||
             (strictly_positive ? value.get<double>() <= 0.0 : value.get<double>() < 0.0)) {
-            throw_runtime_config_error("trajectory vector '" + std::string{key} +
+            throw_runtime_config_error("runtime vector '" + std::string{key} +
                                        (strictly_positive
                                             ? "' entries must be finite and positive"
                                             : "' entries must be finite and nonnegative"));
@@ -155,8 +159,8 @@ inline void validate_trajectory_subsystem_rate(const nlohmann::json& trajectory,
     detail::require_optional_positive_number(trajectory, rate_key);
     detail::require_optional_positive_number(trajectory, period_key);
     if (trajectory.contains(rate_key) == trajectory.contains(period_key)) {
-        throw_runtime_config_error("trajectory must specify exactly one of '" + rate_key +
-                                   "' or '" + period_key + "'");
+        throw_runtime_config_error("gnc." + std::string{subsystem} +
+                                   " must specify exactly one of 'rate_hz' or 'dt_s'");
     }
 }
 
@@ -166,7 +170,7 @@ inline void validate_trajectory_dynamics_config(const nlohmann::json& trajectory
     const std::string integration = trajectory.at("translational_integration").get<std::string>();
     if (integration != "semi_implicit_euler" && integration != "trapezoidal_predictor_corrector") {
         throw_runtime_config_error(
-            "trajectory.translational_integration must be 'semi_implicit_euler' or "
+            "simulation.dynamics.translational_integration must be 'semi_implicit_euler' or "
             "'trapezoidal_predictor_corrector'");
     }
 
@@ -183,7 +187,7 @@ inline void validate_trajectory_dynamics_config(const nlohmann::json& trajectory
     require_optional_nonnegative_number(guidance_filter, "bank_time_constant_s");
     if (!guidance_filter.contains("bank_time_constant_s")) {
         throw_runtime_config_error(
-            "missing required trajectory.guidance_command_filter.bank_time_constant_s");
+            "missing required gnc.guidance.command_filter.bank_time_constant_s");
     }
     const nlohmann::json& autopilot = require_object(trajectory, "autopilot");
     reject_unknown_top_level_keys(
@@ -198,7 +202,7 @@ inline void validate_trajectory_dynamics_config(const nlohmann::json& trajectory
                                       "gyro_moving_average_window_samples"});
     require_string(autopilot, "type");
     if (autopilot.at("type").get<std::string>() != "first_order") {
-        throw_runtime_config_error("trajectory.autopilot.type must be 'first_order'");
+        throw_runtime_config_error("gnc.autopilot.model.type must be 'first_order'");
     }
     validate_trajectory_vec3_bounds(autopilot, "controller_rate_time_constant_pqr_s", false);
     require_optional_nonnegative_number(autopilot, "attitude_command_time_constant_s");
@@ -208,12 +212,12 @@ inline void validate_trajectory_dynamics_config(const nlohmann::json& trajectory
     require_optional_nonnegative_number(autopilot, "initial_velocity_alignment_tolerance_deg");
     if (!autopilot.contains("initial_velocity_alignment_tolerance_deg")) {
         throw_runtime_config_error(
-            "missing required trajectory.autopilot.initial_velocity_alignment_tolerance_deg");
+            "missing required gnc.autopilot.model.initial_velocity_alignment_tolerance_deg");
     }
     require_unsigned_integer(autopilot, "gyro_moving_average_window_samples");
     if (autopilot.at("gyro_moving_average_window_samples").get<std::size_t>() == 0U) {
         throw_runtime_config_error(
-            "trajectory.autopilot.gyro_moving_average_window_samples must be positive");
+            "gnc.autopilot.model.gyro_moving_average_window_samples must be positive");
     }
 
     const nlohmann::json& vehicle_response = require_object(trajectory, "vehicle_response");
@@ -227,7 +231,7 @@ inline void validate_trajectory_dynamics_config(const nlohmann::json& trajectory
                                       "specific_force_limit_b_mps2"});
     require_string(vehicle_response, "type");
     if (vehicle_response.at("type").get<std::string>() != "first_order") {
-        throw_runtime_config_error("trajectory.vehicle_response.type must be 'first_order'");
+        throw_runtime_config_error("simulation.vehicle_response.type must be 'first_order'");
     }
     validate_trajectory_vec3_bounds(vehicle_response, "vehicle_rate_time_constant_pqr_s", false);
     validate_trajectory_vec3_bounds(
@@ -243,7 +247,8 @@ inline void validate_trajectory_dynamics_config(const nlohmann::json& trajectory
 
     require_positive_number(trajectory, "maximum_bank_angle_deg");
     if (trajectory.at("maximum_bank_angle_deg").get<core::Scalar_t>() > 60.0) {
-        throw_runtime_config_error("trajectory.maximum_bank_angle_deg must not exceed 60 degrees");
+        throw_runtime_config_error(
+            "gnc.guidance.maximum_bank_angle_deg must not exceed 60 degrees");
     }
 }
 
@@ -439,7 +444,7 @@ inline void validate_guidance_state(const nlohmann::json& state)
                                    "terminal"});
     require_string(state, "id");
     if (state.at("id").get<std::string>().empty()) {
-        throw_runtime_config_error("Guidance state id must not be empty");
+        throw_runtime_config_error("mission phase id must not be empty");
     }
     const nlohmann::json& plant = require_object(state, "plant");
     reject_unknown_top_level_keys(plant, {"constraint"});
@@ -447,7 +452,7 @@ inline void validate_guidance_state(const nlohmann::json& state)
     const std::string constraint = plant.at("constraint").get<std::string>();
     if (constraint != "none" && constraint != "hold_initial_ecef") {
         throw_runtime_config_error(
-            "Guidance state plant.constraint must be 'none' or 'hold_initial_ecef'");
+            "simulation.phase_behavior constraint must be 'none' or 'hold_initial_ecef'");
     }
 
     const nlohmann::json& guidance = require_object(state, "guidance");
@@ -471,6 +476,7 @@ inline void validate_guidance_state(const nlohmann::json& state)
     const nlohmann::json& autopilot = require_object(state, "autopilot");
     reject_unknown_top_level_keys(autopilot, {"enabled"});
     require_bool(autopilot, "enabled");
+
     if (state.contains("guidance_command_filter")) {
         validate_guidance_filter_object(state.at("guidance_command_filter"), false);
     }
@@ -484,23 +490,22 @@ inline void validate_guidance_state(const nlohmann::json& state)
     const bool terminal = state.contains("terminal");
     if (has_transitions == terminal) {
         throw_runtime_config_error(
-            "each Guidance state must specify exactly one of transitions or terminal");
+            "each mission phase must specify exactly one of transitions or terminal");
     }
     if (terminal) {
         const nlohmann::json& terminal_config = require_object(state, "terminal");
         reject_unknown_top_level_keys(terminal_config, {"behavior"});
         require_string(terminal_config, "behavior");
-        if (terminal_config.at("behavior").get<std::string>() !=
-            "run_until_trajectory_termination") {
+        if (terminal_config.at("behavior").get<std::string>() != "run_until_mission_termination") {
             throw_runtime_config_error(
-                "Guidance terminal.behavior must be 'run_until_trajectory_termination'");
+                "mission terminal.behavior must be 'run_until_mission_termination'");
         }
         return;
     }
 
     const nlohmann::json& transitions = state.at("transitions");
     if (!transitions.is_array() || transitions.empty()) {
-        throw_runtime_config_error("Guidance transitions must be a nonempty array");
+        throw_runtime_config_error("mission phase transitions must be a nonempty array");
     }
     std::unordered_set<std::size_t> priorities{};
     for (const nlohmann::json& transition : transitions) {
@@ -510,13 +515,13 @@ inline void validate_guidance_state(const nlohmann::json& state)
         const std::size_t priority = transition.at("priority").get<std::size_t>();
         if (!priorities.insert(priority).second) {
             throw_runtime_config_error(
-                "Guidance transition priorities must be unique within a state");
+                "mission transition priorities must be unique within a phase");
         }
         const nlohmann::json& when = require_object(transition, "when");
         reject_unknown_top_level_keys(when, {"type", "greater_equal_s"});
         require_string(when, "type");
         if (when.at("type").get<std::string>() != "elapsed_in_state") {
-            throw_runtime_config_error("Guidance transition when.type must be 'elapsed_in_state'");
+            throw_runtime_config_error("mission transition when.type must be 'elapsed_in_state'");
         }
         require_positive_number(when, "greater_equal_s");
     }
@@ -559,7 +564,7 @@ inline void validate_guidance_state_machine(const nlohmann::json& trajectory)
     const std::string termination_type = termination.at("type").get<std::string>();
     if (termination_type != "configured_duration" && termination_type != "ground_impact") {
         throw_runtime_config_error(
-            "trajectory.termination.type must be 'configured_duration' or 'ground_impact'");
+            "mission.termination.type must be 'configured_duration' or 'ground_impact'");
     }
 
     const nlohmann::json& machine = require_object(trajectory, "state_machine");
@@ -568,28 +573,29 @@ inline void validate_guidance_state_machine(const nlohmann::json& trajectory)
     require_string(machine, "cycle_policy");
     const std::string cycle_policy = machine.at("cycle_policy").get<std::string>();
     if (cycle_policy != "reject" && cycle_policy != "allow") {
-        throw_runtime_config_error("Guidance cycle_policy must be 'reject' or 'allow'");
+        throw_runtime_config_error("mission.cycle_policy must be 'reject' or 'allow'");
     }
     const nlohmann::json& states = machine.at("states");
     if (!states.is_array() || states.empty()) {
-        throw_runtime_config_error("Guidance state_machine.states must be a nonempty array");
+        throw_runtime_config_error("mission.phases must be a nonempty array");
     }
 
     std::unordered_map<std::string, std::size_t> state_indices{};
     for (std::size_t index = 0U; index < states.size(); ++index) {
         const nlohmann::json& state = states.at(index);
         if (!state.is_object()) {
-            throw_runtime_config_error("Guidance states must be objects");
+            throw_runtime_config_error("mission phases must be objects");
         }
         validate_guidance_state(state);
         const std::string id = state.at("id").get<std::string>();
         if (!state_indices.emplace(id, index).second) {
-            throw_runtime_config_error("Guidance state IDs must be unique");
+            throw_runtime_config_error("mission phase IDs must be unique");
         }
     }
     const std::string initial_state_id = machine.at("initial_state_id").get<std::string>();
     if (!state_indices.contains(initial_state_id)) {
-        throw_runtime_config_error("Guidance initial_state_id does not name a configured state");
+        throw_runtime_config_error(
+            "mission.initial_phase_id does not name a configured mission phase");
     }
 
     std::vector<std::vector<std::size_t>> edges(states.size());
@@ -603,7 +609,7 @@ inline void validate_guidance_state_machine(const nlohmann::json& trajectory)
             const std::unordered_map<std::string, std::size_t>::const_iterator iter =
                 state_indices.find(target);
             if (iter == state_indices.end()) {
-                throw_runtime_config_error("Guidance transition target '" + target +
+                throw_runtime_config_error("mission transition target '" + target +
                                            "' does not exist");
             }
             edges.at(index).push_back(iter->second);
@@ -627,12 +633,12 @@ inline void validate_guidance_state_machine(const nlohmann::json& trajectory)
     visit(state_indices.at(initial_state_id));
     for (const int state_color : color) {
         if (state_color == 0) {
-            throw_runtime_config_error("Guidance state graph contains an unreachable state");
+            throw_runtime_config_error("mission phase graph contains an unreachable phase");
         }
     }
     if (cycle_detected && cycle_policy == "reject") {
         throw_runtime_config_error(
-            "Guidance state graph contains a cycle while cycle_policy is 'reject'");
+            "mission phase graph contains a cycle while cycle_policy is 'reject'");
     }
 }
 
@@ -653,8 +659,9 @@ void validate_runtime_config(const nlohmann::json& cfg)
     allowed_keys.push_back("run_name");
     allowed_keys.push_back("output_dir");
     allowed_keys.push_back("logging");
-    allowed_keys.push_back("application");
-    allowed_keys.push_back("trajectory");
+    allowed_keys.push_back("execution_target");
+    allowed_keys.push_back("mission");
+    allowed_keys.push_back("simulation");
     allowed_keys.push_back("imu");
     allowed_keys.push_back("pva_initialization");
     allowed_keys.push_back("filter_initialization");
@@ -665,31 +672,23 @@ void validate_runtime_config(const nlohmann::json& cfg)
     detail::require_string(cfg, "run_name");
     detail::require_string(cfg, "output_dir");
     validate_logging_runtime_config(cfg);
-    const nlohmann::json& application = detail::require_object(cfg, "application");
-    detail::reject_unknown_top_level_keys(
-        application,
-        std::vector<std::string_view>{"clock", "control_state_source", "dt_s", "rate_hz"});
-    validate_runtime_rate(application, "application");
-    if (!application.contains("dt_s") && !application.contains("rate_hz")) {
-        detail::throw_runtime_config_error("application must specify one of 'dt_s' or 'rate_hz'");
-    }
-    const core::RationalRate application_rate =
-        rational_rate_from_required_runtime_rate(application, "application");
-    detail::require_string(application, "clock");
-    ClockMode clock_mode{};
-    if (!detail::clock_mode_from_json(application, "clock", clock_mode)) {
-        detail::throw_runtime_config_error("application.clock must be 'simulated' or 'realtime'");
-    }
-    detail::require_string(application, "control_state_source");
+    const ExecutionTargetSettings execution_target = execution_target_settings_from_json(cfg);
+    const core::RationalRate application_rate = execution_target.application_rate;
+
+    const nlohmann::json& simulation = detail::require_object(cfg, "simulation");
+    detail::require_string(simulation, "control_state_source");
     ControlStateSourceMode control_state_source{};
     if (!control_state_source_mode_from_string(
-            application.at("control_state_source").get<std::string>(), control_state_source)) {
+            simulation.at("control_state_source").get<std::string>(), control_state_source)) {
         detail::throw_runtime_config_error(
-            "application.control_state_source must be 'navigation_estimate' or "
+            "simulation.control_state_source must be 'navigation_estimate' or "
             "'truth_passthrough'");
     }
+    static_cast<void>(control_state_source);
+    const std::vector<NavigationPhase> navigation_phases = navigation_phases_from_mission_json(cfg);
+    static_cast<void>(navigation_phases);
 
-    const nlohmann::json& trajectory = detail::require_object(cfg, "trajectory");
+    const nlohmann::json trajectory = detail::swil_trajectory_config_from_json(cfg);
     detail::require_optional_string(trajectory, "type");
     const std::string trajectory_type = trajectory.value("type", "stationary");
     if (trajectory_type == "csv") {
@@ -703,32 +702,32 @@ void validate_runtime_config(const nlohmann::json& cfg)
             detail::validate_guidance_state_machine(trajectory);
             if (!trajectory.contains("v_e_mps") && !trajectory.contains("v_n_mps")) {
                 detail::throw_runtime_config_error(
-                    "state-machine trajectory must explicitly configure initial velocity");
+                    "generated simulation initial truth must explicitly configure velocity");
             }
         }
     }
     else {
         detail::throw_runtime_config_error(
-            "trajectory.type must be 'stationary', 'csv', or 'state_machine'");
+            "simulation.source.type must be 'stationary', 'csv', or 'generated'");
     }
     if (trajectory_type != "csv") {
         const core::RationalRate trajectory_rate = rational_rate_from_required_named_runtime_rate(
-            trajectory, "dynamics_rate_hz", "dynamics_dt_s", "trajectory.dynamics");
+            trajectory, "dynamics_rate_hz", "dynamics_dt_s", "simulation.dynamics");
         if (!core::rational_rate_is_integer_multiple(application_rate, trajectory_rate)) {
             detail::throw_runtime_config_error(
-                "application rate must be an integer multiple of the generated trajectory "
-                "physics rate");
+                "execution-target rate must be an integer multiple of the simulation dynamics "
+                "rate");
         }
         if (trajectory_type != "stationary") {
             const core::RationalRate guidance_rate = rational_rate_from_required_named_runtime_rate(
-                trajectory, "guidance_rate_hz", "guidance_dt_s", "trajectory.guidance");
+                trajectory, "guidance_rate_hz", "guidance_dt_s", "gnc.guidance");
             const core::RationalRate autopilot_rate =
                 rational_rate_from_required_named_runtime_rate(
-                    trajectory, "autopilot_rate_hz", "autopilot_dt_s", "trajectory.autopilot");
+                    trajectory, "autopilot_rate_hz", "autopilot_dt_s", "gnc.autopilot");
             if (!core::rational_rate_is_integer_multiple(trajectory_rate, autopilot_rate) ||
                 !core::rational_rate_is_integer_multiple(autopilot_rate, guidance_rate)) {
                 detail::throw_runtime_config_error(
-                    "generated trajectory rates must satisfy physics >= autopilot >= "
+                    "SWIL rates must satisfy dynamics >= autopilot >= "
                     "guidance as integer multiples");
             }
         }
@@ -741,7 +740,7 @@ void validate_runtime_config(const nlohmann::json& cfg)
         rational_rate_from_required_runtime_rate(cfg.at("imu"), "imu");
     if (!core::rational_rate_is_integer_multiple(application_rate, imu_rate)) {
         detail::throw_runtime_config_error(
-            "application rate must be an integer multiple of the IMU rate");
+            "execution-target rate must be an integer multiple of the IMU rate");
     }
     detail::validate_application_rate_for_emulators<EmulatorBindings>(
         application_rate, cfg, std::make_index_sequence<std::tuple_size_v<EmulatorBindings>>{});

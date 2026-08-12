@@ -384,8 +384,29 @@ TEST_CASE("CSV trajectory source uses the shared truth trajectory contract")
     }
 
     const nlohmann::json cfg{
-        {"trajectory", {{"type", "csv"}, {"csv_path", path.filename().string()}}}};
-    app_support::TrajectoryRun run = app_support::trajectory_run_from_json(cfg, path.parent_path());
+        {"mission",
+         {{"initial_phase_id", "playback"},
+          {"cycle_policy", "reject"},
+          {"phases",
+           nlohmann::json::array(
+               {{{"id", "playback"},
+                 {"navigation",
+                  {{"sensors",
+                    {{"primary_gnss_position", {{"chi_square_acceptance", {{"enabled", true}}}}},
+                     {"primary_gnss_velocity",
+                      {{"chi_square_acceptance", {{"enabled", true}}}}}}}}},
+                 {"guidance", nlohmann::json::object()},
+                 {"autopilot", nlohmann::json::object()},
+                 {"terminal", {{"behavior", "run_until_mission_termination"}}}}})}}},
+        {"gnss",
+         {{"chi_square_acceptance",
+           {{"position", {{"probability", 0.99}}}, {"velocity", {{"probability", 0.99}}}}}}},
+        {"simulation",
+         {{"source", {{"type", "csv"}, {"csv_path", path.filename().string()}}},
+          {"phase_behavior", {{"playback", {{"constraint", "none"}}}}},
+          {"control_state_source", "truth_passthrough"}}},
+    };
+    app_support::SimulationRun run = app_support::simulation_run_from_json(cfg, path.parent_path());
     REQUIRE(run.source);
     REQUIRE(run.source->advance_to(Timestamp{.s = 1U}));
     TruthSample midpoint{};

@@ -1,0 +1,20 @@
+{
+  "config": "../models/generated_first_order_1000hz.json",
+  "overrides": {
+    "initial_truth": {
+      "config": "../initial_truth/ballistic_launch_pad.json"
+    },
+    "control_state_source": "navigation_estimate",
+    "phase_behavior": {
+      "launch_pad": {
+        "constraint": "hold_initial_ecef"
+      },
+      "boost": {
+        "constraint": "none"
+      },
+      "gravity_turn": {
+        "constraint": "none"
+      }
+    }
+  }
+}

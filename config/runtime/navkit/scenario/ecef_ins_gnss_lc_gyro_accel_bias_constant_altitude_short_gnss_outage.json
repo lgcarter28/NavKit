@@ -1,0 +1,89 @@
+{
+  "run_name": "ecef_ins_gnss_lc_gyro_accel_bias_constant_altitude_short_gnss_outage",
+  "output_dir": "output/logs/ecef_ins_gnss_lc_gyro_accel_bias_constant_altitude_short_gnss_outage",
+  "mission": {
+    "config": "../components/mission/constant_altitude.json"
+  },
+  "execution_target": {
+    "config": "../components/execution/swil_simulated_1000hz.json"
+  },
+  "simulation": {
+    "config": "../components/simulation/swil/constant_altitude.json"
+  },
+  "imu": {
+    "config": "../components/simulation/sensors/imu/specs/hg1700_tactical.json"
+  },
+  "gnss": {
+    "config": "../components/simulation/sensors/gnss/nominal_pos_vel.json",
+    "overrides": {
+      "active_windows": [
+        {
+          "start_s": 0.0,
+          "end_s": 40.0
+        },
+        {
+          "start_s": 50.0,
+          "end_s": 120.001
+        }
+      ]
+    }
+  },
+  "pva_initialization": {
+    "config": "../components/gnc/navigation/initialization/pva/pva_random_error_default.json"
+  },
+  "logging": {
+    "console": {
+      "enabled": true,
+      "rate_hz": 1.0
+    },
+    "truth": {
+      "enabled": true,
+      "rate_hz": 10.0
+    },
+    "trajectory_kinematics_ecef": {
+      "enabled": true,
+      "rate_hz": 20.0
+    },
+    "trajectory_kinematics_eci": {
+      "enabled": true,
+      "rate_hz": 20.0
+    },
+    "trajectory_kinematics_ned": {
+      "enabled": true,
+      "rate_hz": 20.0
+    },
+    "trajectory_kinematics_body": {
+      "enabled": true,
+      "rate_hz": 20.0
+    },
+    "trajectory_guidance": {
+      "enabled": true,
+      "rate_hz": 20.0
+    },
+    "trajectory_autopilot_vehicle": {
+      "enabled": true,
+      "rate_hz": 20.0
+    },
+    "nav_estimate": {
+      "enabled": true,
+      "rate_hz": 10.0,
+      "covariance": "triangular"
+    },
+    "imu": {
+      "enabled": true,
+      "rate_hz": 100.0
+    },
+    "imu_debug": {
+      "enabled": false
+    },
+    "filter_correction": {
+      "enabled": true,
+      "rate_hz": 10.0,
+      "covariance": "diagonal"
+    },
+    "measurement_statistics": {
+      "enabled": true,
+      "rate_hz": 1.0
+    }
+  }
+}

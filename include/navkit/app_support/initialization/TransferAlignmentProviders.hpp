@@ -23,11 +23,11 @@ struct NoTransferAlignmentProvider
 
     template<typename Navigator>
     static void
-    transfer_align(Navigator& navigator, const nlohmann::json& cfg, const TrajectoryRun& trajectory)
+    transfer_align(Navigator& navigator, const nlohmann::json& cfg, const SimulationRun& simulation)
     {
         static_cast<void>(navigator);
         static_cast<void>(cfg);
-        static_cast<void>(trajectory);
+        static_cast<void>(simulation);
     }
 };
 

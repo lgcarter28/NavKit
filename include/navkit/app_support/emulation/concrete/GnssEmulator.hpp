@@ -130,14 +130,16 @@ inline void configure_gnss_innovation_gate(const nlohmann::json& cfg,
                                            Sensor& sensor)
 {
     const nlohmann::json& gate = cfg.at("gnss").at("chi_square_acceptance").at(observation_family);
+    if (gate.contains("probability")) {
+        const core::Scalar_t probability = gate.at("probability").get<core::Scalar_t>();
+        if (!sensor.configure_innovation_gate_probability(probability)) {
+            throw_runtime_config_error("failed to configure GNSS " +
+                                       std::string(observation_family) +
+                                       " innovation-acceptance probability");
+        }
+    }
     if (!gate.at("enabled").get<bool>()) {
         sensor.disable_innovation_gate();
-        return;
-    }
-    const core::Scalar_t probability = gate.at("probability").get<core::Scalar_t>();
-    if (!sensor.configure_innovation_gate_probability(probability)) {
-        throw_runtime_config_error("failed to configure GNSS " + std::string(observation_family) +
-                                   " innovation-acceptance probability");
     }
 }
 

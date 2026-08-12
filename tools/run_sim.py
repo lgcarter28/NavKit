@@ -29,6 +29,7 @@ from profile.profile_report import (
 from internal.runtime_config import (
     apply_runtime_overrides,
     load_runtime_config,
+    resolve_runtime_asset_paths,
     runtime_output_dir,
     runtime_run_name,
     write_effective_runtime_config,
@@ -100,7 +101,7 @@ def main() -> int:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path("config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json"),
+        default=Path("config/runtime/navkit/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json"),
     )
     parser.add_argument(
         "--output-dir",
@@ -143,8 +144,9 @@ def main() -> int:
     build_manifest = load_build_manifest(build_dir)
     navkit_config = str(build_manifest.get("navkit_config", "unknown"))
 
+    runtime_config = resolve_runtime_asset_paths(load_runtime_config(args.config), args.config)
     runtime_config = apply_runtime_overrides(
-        load_runtime_config(args.config), output_dir=args.output_dir, run_name=args.run_name
+        runtime_config, output_dir=args.output_dir, run_name=args.run_name
     )
     run_name = runtime_run_name(runtime_config)
     output_dir = runtime_output_dir(runtime_config)
@@ -153,7 +155,7 @@ def main() -> int:
     data_dir.mkdir(parents=True, exist_ok=True)
 
     # The simulation executable consumes the fully resolved JSON object. This keeps
-    # component linking a Python/tooling concern and makes every run replayable.
+    # recursive reference resolution a Python/tooling concern and makes every run replayable.
     runtime_config_path = write_effective_runtime_config(runtime_config, output_dir)
 
     if not remove_stale_profile_artifacts(data_dir):

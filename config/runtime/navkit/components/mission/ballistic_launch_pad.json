@@ -1,0 +1,166 @@
+{
+  "duration_s": 180.0,
+  "termination": {
+    "type": "ground_impact"
+  },
+  "gnc": {
+    "guidance": {
+      "config": "../gnc/guidance/point_mass_default.json",
+      "overrides": {
+        "command_filter": {
+          "specific_force_time_constant_b_s": [
+            0.05,
+            0.05,
+            0.05
+          ],
+          "bank_time_constant_s": 0.05
+        }
+      }
+    },
+    "autopilot": {
+      "config": "../gnc/autopilot/first_order_default.json",
+      "overrides": {
+        "model": {
+          "velocity_alignment_speed_threshold_mps": 50.0
+        }
+      }
+    }
+  },
+  "initial_phase_id": "launch_pad",
+  "cycle_policy": "reject",
+  "phases": [
+    {
+      "id": "launch_pad",
+      "navigation": {
+        "config": "../gnc/navigation/acquisition.json"
+      },
+      "guidance": {
+        "enabled": false,
+        "translation": {
+          "reference": {
+            "type": "current_state"
+          },
+          "acceleration": [
+            {
+              "type": "body_specific_force",
+              "specific_force_ib_b_mps2": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          ]
+        },
+        "bank": {
+          "type": "zero"
+        },
+        "body_y_specific_force_enabled": true
+      },
+      "autopilot": {
+        "enabled": false
+      },
+      "transitions": [
+        {
+          "to": "boost",
+          "priority": 0,
+          "when": {
+            "type": "elapsed_in_state",
+            "greater_equal_s": 5.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "boost",
+      "navigation": {
+        "config": "../gnc/navigation/acquisition.json"
+      },
+      "guidance": {
+        "enabled": true,
+        "translation": {
+          "reference": {
+            "type": "current_state"
+          },
+          "acceleration": [
+            {
+              "type": "body_specific_force",
+              "specific_force_ib_b_mps2": [
+                49.03325,
+                0.0,
+                0.0
+              ]
+            }
+          ]
+        },
+        "bank": {
+          "type": "zero"
+        },
+        "body_y_specific_force_enabled": true,
+        "on_entry": {
+          "guidance_command_filter": {
+            "specific_force_time_constant_b_s": [
+              0.75,
+              0.75,
+              0.75
+            ],
+            "bank_time_constant_s": 0.75,
+            "duration_s": 2.0
+          }
+        }
+      },
+      "autopilot": {
+        "enabled": true
+      },
+      "transitions": [
+        {
+          "to": "gravity_turn",
+          "priority": 0,
+          "when": {
+            "type": "elapsed_in_state",
+            "greater_equal_s": 18.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "gravity_turn",
+      "navigation": {
+        "config": "../gnc/navigation/operational.json"
+      },
+      "guidance": {
+        "enabled": true,
+        "translation": {
+          "reference": {
+            "type": "current_state"
+          },
+          "acceleration": [
+            {
+              "type": "free_fall"
+            }
+          ]
+        },
+        "bank": {
+          "type": "zero"
+        },
+        "body_y_specific_force_enabled": true,
+        "on_entry": {
+          "guidance_command_filter": {
+            "specific_force_time_constant_b_s": [
+              0.35,
+              0.35,
+              0.35
+            ],
+            "bank_time_constant_s": 0.35,
+            "duration_s": 1.0
+          }
+        }
+      },
+      "autopilot": {
+        "enabled": true
+      },
+      "terminal": {
+        "behavior": "run_until_mission_termination"
+      }
+    }
+  ]
+}
