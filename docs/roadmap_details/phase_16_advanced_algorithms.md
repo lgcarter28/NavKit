@@ -2,7 +2,9 @@
 
 **Status:** future backlog detail. Current active ownership is `docs/ROADMAP.md`.
 
-This phase collects advanced algorithms that should not block the nearer-term Monte Carlo, validation, sensor cleanup, tightly coupled GNSS, latency, transfer-alignment, profiling, or embedded-hardening phases.
+This phase collects advanced algorithms that should not block validation,
+flight-relevant sensor cleanup, latency/replay, the hardware/flight MVP,
+alignment, tightly coupled GNSS, or remaining embedded hardening.
 
 ## Pass 16.1: advanced GNSS techniques
 

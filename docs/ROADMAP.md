@@ -165,18 +165,66 @@ Phase 8 detail file.
 
 Future backlog and completed-phase detail outside the current Phase 8 scope lives in dedicated detail files:
 
+The prioritized path after Phase 8 is deliberately hardware-facing:
+
+```text
+Phase 8  estimator validation and managed evidence
+Phase 9  robust status/error handling
+Phase 10 flight-relevant sensor models and legacy-hardware characterization
+Phase 11 latency, ordered measurements, bounded history, and replay
+Phase 12 replay/mixed-HWIL/external-flight-computer HWIL and flight MVP
+Phase 13 alignment, transfer alignment, and stationary aiding
+Phase 14 tightly coupled GNSS
+Phase 15 remaining profiling, resource, embedded, telemetry, and release hardening
+```
+
+This order uses the existing loosely coupled GNSS-aided INS to expose real
+timing, calibration, transport, resource, and operational problems before raw
+GNSS observables expand estimator complexity. Phase 10 prioritizes the
+now-reconciled 2018-2019 capstone inventory: an MPU9250-family
+IMU/magnetometer, BNO055, BMP280-class barometer, MPXV7002DP-class
+pitot/differential-pressure assembly, u-blox NEO-6M, microSD logging, and legacy
+Arduino/STM32 sensor bridges. Phase 12 first establishes WSL/Linux/container
+parity and performs the budget prototype trade only after that hardware reveals
+which upgrades matter. The incremental hardware budget targets a few hundred
+dollars and requires an explicit review before crossing approximately $500;
+workstation replacement remains a separate priority. The first airborne
+demonstration uses a proven ArduPilot/PX4-compatible multicopter with NavKit in
+replay/shadow or companion mode, not a custom flight-critical controller or a
+revived capstone airframe.
+
+The immediate hardware path deliberately reuses the Mega/Blue Pills as
+sensor bridges and cross-toolchain targets while NavKit executes on the host.
+The first milestone is timestamped raw capture, identical live/replay adapter
+paths, and synchronized legacy-sensor operation—not forcing the full Navigator
+onto undersized boards. Initial purchases are limited to bench visibility and
+electrical-safety tools plus one STM32H7-class development board (roughly
+$100-$150 total before legacy bring-up evidence). Timing/power infrastructure,
+a proven ArduPilot/PX4 flight platform, and modern raw-observation/PPS GNSS are
+subsequent evidence-gated steps; a better IMU is not the default first buy.
+
+Phase 12 also establishes a reusable hardware-qualification evidence tier for
+all later work. Every hardware-relevant capability added after that milestone
+must define and execute recorded-data replay and HWIL acceptance when the owned
+or selected hardware can exercise it, followed by field or flight evidence when
+that is safe and proportionate. If available hardware, receiver observables,
+stimulus equipment, environment, or safety constraints make HWIL infeasible,
+the pass must document the exact limitation, complete the highest feasible
+evidence tier, and retain an explicit deferred hardware-acceptance item. A
+simulation result must never be presented as HWIL or flight qualification.
+
 - [`phase_6_monte_carlo.md`](roadmap_details/phase_6_monte_carlo.md): completed Monte Carlo campaign, analysis-bundle, and consistency-diagnostic history.
 - [`phase_7_trajectory_provider.md`](roadmap_details/phase_7_trajectory_provider.md): completed trajectory-provider, timebase, planned-time orchestration, scenario, runtime Guidance-state-machine, and reusable navigation-math history.
 - [`phase_8_estimator_validation.md`](roadmap_details/phase_8_estimator_validation.md): estimator validation, consistency metrics, and repeatable reports.
 - [`phase_9_status_error_handling.md`](roadmap_details/phase_9_status_error_handling.md): robust status/error handling before the later high-complexity phases.
-- [`phase_10_sensor_model_cleanup.md`](roadmap_details/phase_10_sensor_model_cleanup.md): loosely coupled GNSS cleanup, altimeter/pressure models, pitot tube, magnetometer aiding, and sensor scheduling.
-- [`phase_11_tightly_coupled_gnss.md`](roadmap_details/phase_11_tightly_coupled_gnss.md): tightly coupled GNSS, raw observables, constellations, receiver adapters, and integrity seams.
-- [`phase_12_latent_measurement_handling.md`](roadmap_details/phase_12_latent_measurement_handling.md): latent measurement context, buffering, replay, and smoothing foundations.
+- [`phase_10_sensor_model_cleanup.md`](roadmap_details/phase_10_sensor_model_cleanup.md): flight-relevant loosely coupled GNSS, IMU/magnetometer, barometer, pitot/air-data, legacy-hardware characterization, and Allan-deviation V&V.
+- [`phase_11_latent_measurement_handling.md`](roadmap_details/phase_11_latent_measurement_handling.md): timestamped measurement events, latency, ordered buffering, bounded state history, replay, and smoothing foundations.
+- [`phase_12_hardware_flight_mvp.md`](roadmap_details/phase_12_hardware_flight_mvp.md): Linux/WSL/container parity, embedded smoke target, replay, mixed in-process HWIL, external-flight-computer HWIL orchestration, a budget prototype trade study, and a graduated flight demonstration.
 - [`phase_13_transfer_alignment_stationary_modes.md`](roadmap_details/phase_13_transfer_alignment_stationary_modes.md): transfer alignment, coarse/fine alignment, and ZUPTs after buffering support.
-- [`phase_14_profiling_resource_validation.md`](roadmap_details/phase_14_profiling_resource_validation.md): profiling, resource, allocation, and target evidence.
-- [`phase_15_embedded_hardening.md`](roadmap_details/phase_15_embedded_hardening.md): remaining embedded readiness, type/API hygiene, documentation, and CI/release workflow.
+- [`phase_14_tightly_coupled_gnss.md`](roadmap_details/phase_14_tightly_coupled_gnss.md): tightly coupled raw GNSS observables, clock states, constellation/receiver adapters, and integrity seams after latency and hardware foundations exist.
+- [`phase_15_embedded_hardening.md`](roadmap_details/phase_15_embedded_hardening.md): remaining profiling, resource qualification, embedded readiness, type/API hygiene, binary telemetry, documentation, and CI/release workflow.
 - [`phase_16_advanced_algorithms.md`](roadmap_details/phase_16_advanced_algorithms.md): advanced GNSS techniques, vision/LiDAR/SLAM, celestial/radar/external aiding, GPS-denied demonstrations, and robust/multi-hypothesis algorithms.
 - [`phase_17_additional_mechanizations_environments.md`](roadmap_details/phase_17_additional_mechanizations_environments.md): additional mechanizations, environments, and physical models.
 - [`phase_18_guidance_control_vehicle_dynamics.md`](roadmap_details/phase_18_guidance_control_vehicle_dynamics.md): guidance/control signal flow, controlled-attitude point-mass models, and future rigid-body vehicle dynamics.
 - [`phase_19_alternative_estimators.md`](roadmap_details/phase_19_alternative_estimators.md): sliding-window, factor-graph, and smoothing backends.
-- [`phase_20_simulation_platform.md`](roadmap_details/phase_20_simulation_platform.md): HIL, multi-vehicle simulation, production scenario management, trajectory analysis, and qualification reports.
+- [`phase_20_simulation_platform.md`](roadmap_details/phase_20_simulation_platform.md): advanced multi-target HWIL, multi-vehicle simulation, production scenario management, trajectory analysis, and qualification reports beyond the Phase 12 MVP.

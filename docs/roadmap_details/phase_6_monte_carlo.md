@@ -92,11 +92,11 @@ Monte Carlo support comes immediately after Phase 5 because it is the gold-stand
 
 ## Pass 6.8: scenario taxonomy and Monte Carlo initialization support
 
-- [x] Moved runnable `navkit_sim` compositions into `config/runtime/navkit_sim/scenario/`, retaining reusable physical, estimator, and initialization fragments under role-keyed `components/`.
-- [x] Standardized scenario names as `<product>_<trajectory>_<purpose>.json`, with matching `run_name`, default `output/logs/<run_name>`, and component links relative to the scenario file.
+- [x] Moved runnable compositions into the runtime scenario tree (now `config/runtime/navkit/scenario/`), retaining reusable physical, estimator, and initialization inputs under owned component directories.
+- [x] Standardized scenario names as `<product>_<mission>_<purpose>.json`, with matching `run_name`, default `output/logs/<run_name>`, and component links relative to the scenario file.
 - [x] Renamed Monte Carlo campaigns to the matching scenario stem plus `_mc`, updated tools/docs/examples/defaults, and removed stale flat scenario paths.
 - [x] Documented the runtime/compile-time config taxonomy in `docs/CONFIGURATION.md` and added a concise normative pointer from `docs/NAMING_CONVENTIONS.md`.
-- [x] Made single-scenario execution resolve component links into an explicit replayable `effective_runtime_config.json`; direct `navkit_sim` invocation now clearly requires that resolved input.
+- [x] Made single-scenario execution resolve runtime links into an explicit replayable `effective_runtime_config.json`; direct `navkit_sim` invocation now clearly requires that resolved input.
 - [x] Added a simulation/analysis-only `InitialTruthReference` carrying initial truth PVA plus realized sensor calibration/error truth, keeping simulator truth/error context out of `navkit::core`.
 - [x] Added `filter_initialization.initial_estimate_error` support for explicit vectors and deterministic covariance-colored `random_error` draws in the selected `StateDef::Error` ordering; JSON covariance is validated as symmetric positive semidefinite.
 - [x] Applied estimate errors with `estimated_state = true_state + sampled_estimate_error`, including persistent IMU bias estimates, and rejected this truth-relative feature from startup paths without an explicit simulation reference.

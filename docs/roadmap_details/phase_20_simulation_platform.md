@@ -9,21 +9,22 @@ This phase turns the simulator and analysis tooling into a broader platform afte
 - [ ] Add multi-vehicle simulation support when scenario management, logging, and analysis outputs can represent multiple truth and estimate streams clearly.
 - [ ] Define inter-vehicle timing, relative measurements, shared environment assumptions, and output naming conventions before implementation.
 
-## Pass 20.2: mixed-HWIL and external-flight-computer orchestration
+## Pass 20.2: advanced multi-target HWIL and external-framework integration
 
-- [ ] Extend the Pass 8.8 composition seam into a dedicated mixed-HWIL
-  application whose channel graph assigns exactly one producer to every input:
-  emulator, real transport, or external stimulus equipment. Keep reusable
-  simulator models under `navkit::sim` and hardware transports outside the
-  target-neutral mission host.
-- [ ] Add a separate long-range HWIL orchestrator for production flight-computer
-  hardware running its real flight binary. The orchestrator owns simulated
-  truth/plant state, clocks, networking and buses, RF/analog/digital stimulus,
-  faults, telemetry, and actuator feedback; the flight binary remains unaware
-  of the test environment.
-- [ ] Define transport timing, startup/shutdown, failure modes, per-channel
-  ownership, synchronization, and retained qualification evidence before the
-  first concrete hardware adapter is accepted.
+- [ ] Extend the Phase 12 mixed-HWIL and external-flight-computer orchestrator
+  MVPs to synchronized multi-computer,
+  multi-vehicle, bus-level, environmental-stimulus, and production test-rack
+  configurations only when concrete programs require them.
+- [ ] Support multiple flight computers running their production
+  `navkit_flight` or vehicle-owned binaries while a dedicated
+  `navkit_hwil_orchestrator` coordinates simulated truth/plant state, real
+  devices, RF/analog/digital stimulus equipment, transports, clocks, faults,
+  telemetry, and actuator feedback without moving those concerns into NavKit.
+- [ ] Add deeper ArduPilot, PX4, or other host-framework integration without
+  moving host lifecycle, transport, mission, or control ownership into
+  `navkit::core`.
+- [ ] Define production transport, clock-distribution, fault-injection,
+  automation, and qualification evidence beyond the minimum flightable slice.
 
 ## Pass 20.3: production scenario management and qualification reports
 

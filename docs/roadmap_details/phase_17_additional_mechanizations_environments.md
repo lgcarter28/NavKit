@@ -12,7 +12,10 @@ This phase captures long-range navigation/environment expansion after the defaul
 
 ## Pass 17.2: expanded environment models
 
-- [ ] Add atmosphere, magnetic-field, Earth-orientation, geoid, terrain, and aero/vehicle-dynamics policies driven by concrete use cases.
+- [ ] Extend the Phase 10 atmosphere and magnetic-field foundations into reusable
+  environment policies where the implemented sensor models reveal a stable
+  boundary; add Earth-orientation, geoid, terrain, and aero/vehicle-dynamics
+  policies only from concrete use cases.
 - [ ] Reuse existing planet, gravity, frames, and units infrastructure where it remains clear and zero-overhead.
 - [ ] Add validation scenarios for each environment model before treating it as a supported product capability.
 

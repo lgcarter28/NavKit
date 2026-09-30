@@ -2,7 +2,9 @@
 
 **Status:** future backlog detail. Current active ownership is `docs/ROADMAP.md`.
 
-Transfer alignment and stationary aiding are scheduled after latent measurement handling because these algorithms benefit from history windows, batch processing, and explicit timing/context ownership.
+Transfer alignment and stationary aiding are scheduled after latency/replay and
+the hardware MVP because these algorithms benefit from history windows, batch
+processing, explicit timing/context ownership, and real stationary/vehicle data.
 
 ## Pass 13.1: transfer alignment runtime model
 
@@ -12,6 +14,11 @@ Transfer alignment and stationary aiding are scheduled after latent measurement 
 - [ ] Add runtime scheduling windows for emulators and startup-aiding producers so a source can be active only over selected trajectory intervals, such as transfer alignment during the first 10 seconds.
 - [ ] Define the app-loop behavior for transfer-alignment windows explicitly, such as `if transfer_alignment_valid(time) { generate/process transfer-alignment aiding } else { run the normal emulator and Navigator update loop }`, without baking that scenario timing into embedded product-core code.
 - [ ] Add transfer-alignment runtime examples and tests that show construction, required PVA initialization, optional alignment aiding, and normal update processing remain distinct.
+- [ ] Qualify transfer alignment through recorded-source replay and HWIL when a
+  suitable reference navigation source and target IMU are available. Measure
+  timing sensitivity, convergence, residual misalignment, and transition into
+  normal navigation; otherwise document the missing reference/stimulus hardware
+  and retain the deferred HWIL acceptance case.
 
 ## Pass 13.2: alignment and stationary aiding modes
 
@@ -20,3 +27,10 @@ Transfer alignment and stationary aiding are scheduled after latent measurement 
 - [ ] Add zero-velocity updates (ZUPTs) to constrain velocity error/covariance growth during stationary intervals and improve IMU bias observability during initialization.
 - [ ] Define how startup/alignment/ZUPT event sequencing is configured. Prefer runtime sequencing for scenario timing and mode activation, while keeping the compiled algorithm set and embedded policy graph compile-time selected.
 - [ ] Add stationary startup scenarios that exercise PVA initialization, optional transfer alignment, coarse alignment, fine alignment, ZUPTs, and transition into normal ECEF INS/GNSS operation.
+- [ ] Reuse the Phase 12 capture/replay/HWIL harness with real stationary sensor
+  data. Qualify coarse-alignment tilt, ZUPT detection/false-update behavior,
+  bias convergence, repeatability, time-to-align, and transition behavior. Test
+  gyrocompassing only where latitude, duration, mounting stability, and IMU
+  grade make Earth rate observable; otherwise record that hardware limitation
+  explicitly rather than treating it as an algorithm failure or claiming HWIL
+  validation.
