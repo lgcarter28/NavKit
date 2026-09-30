@@ -33,6 +33,16 @@ This project follows
   dependencies now expose `navkit::app_support_common` over core/IO separately
   from the `navkit::swil_support` composition boundary over common
   support/simulation.
+- Runtime composition is now one explicit inline-or-reference object graph
+  rooted at `config/runtime/navkit`: references resolve relative to their
+  containing file, support explicit deep overrides, and reject cycles,
+  ambiguous mixed objects, and the legacy generic `components` merge table.
+  One `mission.phases` array owns Navigation, Guidance, and Autopilot actions;
+  simulation owns exact plant behavior mapped by stable phase ID; and the thin
+  scenario root selects mission, `swil` execution target, simulation, sensors,
+  initialization, logging, and local overrides. This keeps synthetic truth out
+  of mission and embedded NavKit contracts while preparing fail-closed HWIL,
+  flight, ArduPilot, and other host adapters.
 - Runtime mission states can coordinate application-level GNSS position and
   velocity innovation-gate enforcement without moving mission timing into
   embedded NavKit. Gate probabilities remain sensor configuration, temporary
@@ -173,8 +183,8 @@ This project follows
 - Reusable `EcefInsGnssLc<...>` product composition with explicit concrete
   `GyroAccelBias` default/profiled selections, plus state-contract-aware
   compile-time and runtime configuration naming.
-- Runtime scenario taxonomy under `config/runtime/navkit_sim/scenario`, with
-  role-keyed component compositions, resolved replayable run inputs, and
+- Runtime scenario taxonomy under `config/runtime/navkit/scenario`, with
+  explicit named-role compositions, resolved replayable run inputs, and
   Monte Carlo restart-initialization scenarios supporting deterministic
   explicit or covariance-colored full error-state estimate errors.
 - Matched and deliberately conservative HG1700 Monte Carlo covariance scenarios
@@ -237,6 +247,12 @@ This project follows
   runtime suites, debugger paths, and evidence provenance now identify the
   SWIL executable consistently; provenance uses target-neutral
   `application_executable` artifact fields.
+- Renamed the broad runtime `trajectory` component boundary to `mission`.
+  Scenario files now compose reusable mission inputs from `components/mission`,
+  while internal trajectory-source, truth-log, and trajectory-analysis names
+  remain scoped to the trajectory data they actually represent. Mission phase
+  objects use a consistent Navigation, Guidance, Autopilot, and transition
+  ordering; simulation owns plant behavior keyed by stable phase ID.
 - Moved applied-correction cycle ownership from `KalmanFilter` to `Navigator`:
   filter injection now returns a filter-domain correction value, Navigator
   composes sequential sensor corrections in injection order, and correction
@@ -283,7 +299,7 @@ This project follows
 - Added a dedicated configuration guide covering domain config concepts, concrete config slices, example config contracts, static-assert wiring, runtime-input separation, and the `NAVKIT_CONFIG` selection model.
 - Aligned public namespaces with the product-core folder structure through the stable domain level: `navkit::core::estimation`, `navkit::core::environment`, `navkit::core::frames`, `navkit::core::models`, `navkit::core::units`, and `navkit::core::containers`.
 - Elevated compile-time configuration cleanup, Release/Debug compiler-flag hardening, static-analysis posture, runtime profiling/resource evidence, and intentional coverage strategy into the next immediate roadmap phase.
-- Clarified the roadmap distinction between product-core compile-time configuration and runtime app input bundles such as `config/runtime/navkit_sim/...` scenario files.
+- Clarified the roadmap distinction between product-core compile-time configuration and runtime app input bundles such as `config/runtime/navkit/...` scenario files.
 - Replaced vague `core/common` configuration with explicit `core/config` headers for foundational types, narrow configuration capability concepts, and default configuration slices.
 - Moved estimator-specific configuration concepts for sensor buffer capacity and measurement-statistics availability beside the estimation domain while keeping `core/config` focused on shared scalar/time configuration vocabulary.
 - Moved concrete app/product compile-time configuration examples out of public NavKit headers and into `config/compiletime`.
@@ -296,9 +312,9 @@ This project follows
 - Default-enabled timing artifact updates for build and test wrappers, with opt-out flags for quiet or artifact-free commands.
 - Made build, test, simulation, and analysis wrappers print concise timing summaries by default after updating `timing.json`.
 - Made build and resource-report wrappers display coarse executable/library size summaries by default after writing resource artifacts.
-- Moved `navkit_sim` runtime JSON inputs from `apps/navkit_sim/configs` to `config/runtime/navkit_sim`.
+- Moved runtime JSON inputs out of `apps/navkit_sim/configs` and into the application-independent `config/runtime/navkit` graph.
 - Removed stale root example placeholder directories and documented that future architecture domains should not be represented by empty folders.
-- Split compile-time configs into reusable NavKit library configs under `config/compiletime/navkit` and app composition configs under `config/compiletime/apps`, with a generic selected-app launcher for `navkit_sim`.
+- Split compile-time configs into reusable NavKit library configs under `config/compiletime/navkit` and app composition configs under `config/compiletime/apps`, with the selected SWIL application launched through `navkit_swil`.
 - Moved reusable NavKit product configs under `config/compiletime/navkit/products` with product-local namespaces and role-based internal type names.
 - Expanded `ConfigApi.hpp` into the shared product-config include for common core graph machinery.
 - Clarified that same-named NavKit and app compile-time config files are expected when separated by ownership directories, and documented how runtime JSON links to the selected app/NavKit composition.
