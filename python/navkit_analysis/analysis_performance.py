@@ -28,6 +28,42 @@ def file_digest(path: Path, block_bytes: int = 1024 * 1024) -> str:
     return digest.hexdigest()
 
 
+def content_set_provenance(paths: Mapping[str, Path]) -> dict[str, object]:
+    """Fingerprint one explicitly named set of implementation files.
+
+    The combined identity deliberately excludes host-specific absolute paths. The
+    returned entries retain those paths for auditability, while the stable digest
+    depends only on each logical name, content digest, and byte size.
+    """
+    entries: list[dict[str, object]] = []
+    identity_entries: list[dict[str, object]] = []
+    for name, path in sorted(paths.items()):
+        resolved_path = path.resolve()
+        if not resolved_path.is_file():
+            raise FileNotFoundError(f"missing provenance input '{name}': {resolved_path}")
+        size_bytes = resolved_path.stat().st_size
+        sha256 = file_digest(resolved_path)
+        entries.append(
+            {
+                "name": name,
+                "path": str(resolved_path),
+                "sha256": sha256,
+                "size_bytes": size_bytes,
+            }
+        )
+        identity_entries.append(
+            {
+                "name": name,
+                "sha256": sha256,
+                "size_bytes": size_bytes,
+            }
+        )
+    return {
+        "sha256": canonical_json_digest({"files": identity_entries}),
+        "files": entries,
+    }
+
+
 def input_manifest_digest(source: Path, excluded_paths: Iterable[Path] = ()) -> dict[str, object]:
     """Describe and hash analysis inputs beneath ``source`` deterministically."""
     excluded = {path.resolve() for path in excluded_paths}

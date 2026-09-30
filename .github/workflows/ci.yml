@@ -35,6 +35,16 @@ jobs:
       - name: Bootstrap development environment
         run: python tools/bootstrap.py
 
+      - name: Validate managed qualification baseline when present
+        shell: bash
+        run: |
+          baseline="config/runtime/qualification/baselines/ecef_ins_gnss_lc_gyro_accel_bias_qualification.json"
+          if [[ -f "${baseline}" ]]; then
+            .venv/bin/python tools/run_qualification.py config/runtime/qualification/ecef_ins_gnss_lc_gyro_accel_bias.json --validate-baseline
+          else
+            echo "No accepted managed qualification baseline is checked in."
+          fi
+
       - name: Check copyright headers
         run: .venv/bin/python tools/quality/copyright.py --check
 
@@ -92,6 +102,9 @@ jobs:
       - name: Run unit tests
         run: ${{ matrix.python }} tools/run_tests.py --build-type Debug --timing-output output/logs/stationary_gnss_demo/timing.json
 
+      - name: Run Python tests
+        run: ${{ matrix.python }} -m unittest discover -s python/tests -p "test_*.py"
+
       - name: Run stationary simulation
         run: ${{ matrix.python }} tools/run_scenario.py --build-type Debug --output-dir output/logs/stationary_gnss_demo --run-name stationary_gnss_demo --no-plot
 
@@ -106,12 +119,28 @@ jobs:
       - name: Record Release artifact sizes
         run: ${{ matrix.python }} tools/profile/resource_report.py --build-type Release --output output/logs/stationary_gnss_demo/resources-release-${{ runner.os }}.json
 
+      - name: Run Release deterministic regression
+        run: ${{ matrix.python }} tools/run_regression.py config/runtime/regression/ecef_ins_truth_reconstruction.json
+
+      - name: Upload failed deterministic regression evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deterministic-regression-failure-${{ runner.os }}
+          path: output/regression/ecef_ins_truth_reconstruction
+          if-no-files-found: ignore
+
       - name: Upload timing and resource artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: stationary-gnss-runtime-${{ runner.os }}
-          path: output/logs/stationary_gnss_demo
+          path: |
+            output/logs/stationary_gnss_demo/timing.json
+            output/logs/stationary_gnss_demo/data/timing.json
+            output/logs/stationary_gnss_demo/resources-debug-${{ runner.os }}.json
+            output/logs/stationary_gnss_demo/resources-release-${{ runner.os }}.json
+          if-no-files-found: warn
 
   coverage:
     name: Coverage report

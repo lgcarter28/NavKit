@@ -30,6 +30,26 @@ This project follows
   dependencies now expose `navkit::app_support_common` over core/IO separately
   from the `navkit::swil_support` composition boundary over common
   support/simulation.
+- Runtime mission states can coordinate application-level GNSS position and
+  velocity innovation-gate enforcement without moving mission timing into
+  embedded NavKit. Gate probabilities remain sensor configuration, temporary
+  acquisition-phase disablement preserves those thresholds, and state entry
+  restores nominal chi-square rejection before qualification analysis. All
+  thirteen previously pathological seeds recovered, the 100-run diagnostic
+  passed every required criterion, and a fresh 3,500-run matrix passed all 39
+  required stochastic checks using a strictly post-gate ballistic window. The
+  qualification remains fail-closed only because its managed baseline has not
+  yet been created.
+- Phase 8.3/8.4 defines named stochastic estimator qualification criteria and
+  compact versioned qualification/baseline evidence, fingerprints campaign
+  generation and HDF5 consistency caches, recomputes serialized pass claims,
+  updates CI to exercise the current Python test, scenario-analysis, and
+  Release deterministic regression workflows, retains complete regression
+  artifacts only on failure, and adds explicit no-render Monte Carlo overrides
+  for focused qualification runs that still package full HDF5 evidence. The
+  first current-config matrix completed 3,500/3,500 stochastic runs and 4/4
+  deterministic cases; nine required statistical checks failed, so managed
+  baseline promotion remains correctly blocked.
 - Runtime-configured chi-square innovation acceptance for separate GNSS
   position and velocity observations, with measurement-model-derived degrees
   of freedom and thresholds, rejection before persistent filter mutation, and
@@ -211,8 +231,9 @@ This project follows
 - Renamed the selected desktop application and its compile-time config/build
   tree from `navkit_sim` to `navkit_swil`, while retaining `navkit_sim` and
   `navkit::sim` for the reusable simulation library. Developer tools, presets,
-  runtime suites, and debugger paths now identify the SWIL executable
-  consistently.
+  runtime suites, debugger paths, and evidence provenance now identify the
+  SWIL executable consistently; provenance uses target-neutral
+  `application_executable` artifact fields.
 - Moved applied-correction cycle ownership from `KalmanFilter` to `Navigator`:
   filter injection now returns a filter-domain correction value, Navigator
   composes sequential sensor corrections in injection order, and correction

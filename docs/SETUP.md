@@ -268,6 +268,7 @@ These scripts provide a consistent cross-platform workflow and abstract away pla
 | `plot_trajectory.py` | Generate interactive ECEF/ECI/NED/body trajectory and command/response plots |
 | `run_scenario.py` | Run a scenario, optionally override output location, and generate plots |
 | `run_regression.py` | Execute a versioned deterministic regression suite and emit compact pass/fail evidence |
+| `run_qualification.py` | Execute the declared deterministic/stochastic qualification matrix and compare compact evidence with its managed baseline |
 | `run_monte_carlo.py` | Run a seeded Monte Carlo campaign, package HDF5, and generate interactive aggregate plots/reports |
 | `plot_monte_carlo.py` | Regenerate selected Monte Carlo aggregate plots from existing campaign logs |
 | `plot_consistency.py` | Generate or refresh joint NEES/NIS dashboards and reports from a campaign HDF5 bundle |
@@ -574,6 +575,29 @@ only for failed cases unless `--retain-artifacts` is specified. See
 [`ANALYSIS.md`](ANALYSIS.md) for suite fields, metric semantics, case selection,
 provenance, and artifact-retention details.
 
+Run the estimator qualification matrix with:
+
+```bash
+python tools/run_qualification.py config/runtime/qualification/ecef_ins_gnss_lc_gyro_accel_bias.json --tier smoke
+```
+
+The qualification runner combines deterministic and seeded stochastic
+criteria into compact JSON/Markdown reports plus their campaign evidence.
+Select `smoke`, `diagnostic`, or `qualification`; only an accepted 500-run
+`qualification` result may create or compare with a managed baseline. Baseline
+replacement is an explicit review action rather than normal runner behavior.
+The current post-acquisition qualification matrix passes all 39 required
+stochastic checks, but no managed baseline is checked in yet because promotion
+is a separate explicit review action. See [`ANALYSIS.md`](ANALYSIS.md) for
+reuse options, schemas, evidence semantics, and the detailed workflow.
+
+Once one is accepted, validate the checked baseline's schema and linked-input
+contract without running simulations:
+
+```bash
+python tools/run_qualification.py config/runtime/qualification/ecef_ins_gnss_lc_gyro_accel_bias.json --validate-baseline
+```
+
 Single-run logs normally live under `output/logs/<run_name>/`; Monte Carlo
 campaigns normally live under `output/monte_carlo/<campaign_name>/`.
 
@@ -760,11 +784,13 @@ CI also generates a Linux coverage artifact with `tools/quality/coverage.py`. Lo
 development does not require coverage reporting; use it only when reviewing
 coverage gaps or debugging the coverage lane.
 
-Build, test, simulation, and analysis wrappers write a lightweight
-`timing.json` artifact under `output/logs/<run_name>/` during normal use. CI
-uploads those logs along with Debug and Release resource-size reports produced by
-`tools/profile/resource_report.py`. These artifacts are trend evidence only; wall-clock
-timing and hosted-runner binary sizes are intentionally not pass/fail gates.
+Build, test, simulation, and analysis wrappers write lightweight `timing.json`
+artifacts under `output/logs/<run_name>/` during normal use. CI uploads only
+those timing JSON files and the Debug and Release resource-size JSON reports
+produced by `tools/profile/resource_report.py`; it does not upload the complete
+successful stationary simulation output. These artifacts are trend evidence
+only; wall-clock timing and hosted-runner binary sizes are intentionally not
+pass/fail gates.
 
 ---
 
@@ -904,10 +930,14 @@ The GitHub Actions workflow in `.github/workflows/ci.yml` enforces this order:
 1. Copyright and formatting checks on Linux.
 2. C++23 Debug builds with warnings-as-errors on Linux and Windows.
 3. `clang-tidy` static analysis on the Linux Debug compilation database.
-4. Unit tests on both platforms.
+4. C++ unit tests and Python `unittest` discovery on both platforms.
 5. Stationary simulation and headless analysis smoke tests on both platforms.
 6. Release compile checks with warnings-as-errors on both platforms.
-7. Linux coverage report generation as an uploaded artifact.
+7. The complete Release deterministic truth-reconstruction regression matrix
+   on both platforms, with full evidence uploaded only when the lane fails.
+8. Timing/resource JSON evidence upload without the successful simulation's
+   complete CSV and figure outputs.
+9. Linux coverage report generation as an uploaded artifact.
 
 The build/test jobs wait for source checks, ensuring CI never tests code that would subsequently be changed by formatting.
 

@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import copy
-import hashlib
 import json
 import subprocess
 import sys
@@ -15,9 +14,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from internal.navkit_build_dirs import DEFAULT_GENERATOR
+from internal.navkit_build_dirs import DEFAULT_GENERATOR, resolve_build_dir
+from internal.evidence_provenance import build_artifact_provenance, git_provenance
+from internal.monte_carlo_seeds import derive_seed
 from internal.perf_artifacts import DEFAULT_NAVKIT_CONFIG
-from internal.runtime_config import JsonObject, load_runtime_config
+from internal.runtime_config import JsonObject, load_runtime_config, resolve_runtime_asset_paths
+from navkit_analysis.analysis_performance import (
+    canonical_json_digest,
+    content_set_provenance,
+    file_digest,
+)
 from navkit_analysis.schema import (
     MONTE_CARLO_CAMPAIGN_SCHEMA,
     MONTE_CARLO_RUN_SCHEMA,
@@ -28,7 +34,6 @@ from navkit_analysis.schema import (
 CAMPAIGN_SCHEMA = MONTE_CARLO_CAMPAIGN_SCHEMA
 RUN_SCHEMA = MONTE_CARLO_RUN_SCHEMA
 SUPPORTED_SEED_POLICY = "derive_all"
-UINT32_MASK = (1 << 32) - 1
 
 
 @dataclass(frozen=True)
@@ -82,6 +87,91 @@ class RunResult:
     return_code: int
     elapsed_s: float
     status: str
+
+
+def _execution_provenance(root: Path, config: CampaignConfig) -> dict[str, object]:
+    """Resolve and fingerprint the selected application artifact used by the campaign."""
+    resolved_build_dir = resolve_build_dir(
+        root,
+        config.build_type,
+        config.navkit_config,
+        config.build_dir,
+        generator=config.generator,
+    )
+    build_manifest_path = resolved_build_dir / "navkit_build_manifest.json"
+    if not build_manifest_path.is_file():
+        raise FileNotFoundError(
+            f"missing build manifest in {resolved_build_dir}; build the selected product first"
+        )
+    loaded_manifest = json.loads(build_manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(loaded_manifest, dict):
+        raise ValueError(f"build manifest root must be an object: {build_manifest_path}")
+    if loaded_manifest.get("build_type") != config.build_type:
+        raise ValueError(
+            f"build directory contains '{loaded_manifest.get('build_type')}', "
+            f"not '{config.build_type}'"
+        )
+    if loaded_manifest.get("navkit_config") != config.navkit_config:
+        raise ValueError(
+            f"build directory selects '{loaded_manifest.get('navkit_config')}', "
+            f"not '{config.navkit_config}'"
+        )
+    if loaded_manifest.get("generator") != config.generator:
+        raise ValueError(
+            f"build directory uses generator '{loaded_manifest.get('generator')}', "
+            f"not '{config.generator}'"
+        )
+    return {
+        "git": git_provenance(root),
+        "build": build_artifact_provenance(resolved_build_dir, config.build_type),
+        "tooling": _generation_tooling_provenance(),
+    }
+
+
+def _generation_tooling_provenance() -> dict[str, object]:
+    """Fingerprint the narrow tool set that constructs campaign evidence."""
+    tools_dir = Path(__file__).resolve().parent
+    repository_root = tools_dir.parent
+    return content_set_provenance(
+        {
+            "navkit_analysis.bundle": repository_root
+            / "python"
+            / "navkit_analysis"
+            / "bundle.py",
+            "navkit_analysis.schema": repository_root
+            / "python"
+            / "navkit_analysis"
+            / "schema.py",
+            "tools.internal.monte_carlo_seeds": tools_dir
+            / "internal"
+            / "monte_carlo_seeds.py",
+            "tools.internal.runtime_config": tools_dir / "internal" / "runtime_config.py",
+            "tools.run_monte_carlo": Path(__file__),
+            "tools.run_sim": tools_dir / "run_sim.py",
+        }
+    )
+
+
+def _completed_execution_provenance(
+    start: dict[str, object],
+    completion: dict[str, object],
+) -> dict[str, object]:
+    """Validate and record that campaign-generation inputs remained stable."""
+    if start.get("build") != completion.get("build"):
+        raise RuntimeError(
+            "Monte Carlo application artifact or build manifest changed while the campaign ran"
+        )
+    start_tooling = start.get("tooling")
+    completion_tooling = completion.get("tooling")
+    if not isinstance(start_tooling, dict) or not isinstance(completion_tooling, dict):
+        raise RuntimeError("Monte Carlo generation-tooling provenance is missing")
+    if start_tooling.get("sha256") != completion_tooling.get("sha256"):
+        raise RuntimeError("Monte Carlo generation tooling changed while the campaign ran")
+    return {
+        **start,
+        "completion": completion,
+        "generation_stable": True,
+    }
 
 
 def require_object(value: Any, path: str) -> dict[str, Any]:
@@ -172,6 +262,8 @@ def load_campaign_config(
     start_index_override: int | None,
     parallel_jobs_override: int | None,
     max_plot_points_override: int | None,
+    aggregate_plots_override: bool | None,
+    consistency_dashboards_override: bool | None,
     plot_start_time_s_override: float | None,
     plot_end_time_s_override: float | None,
     navkit_config: str,
@@ -273,7 +365,11 @@ def load_campaign_config(
     bundle_compression = optional_string(analysis, "bundle_compression", "lzf", "analysis")
     if bundle_compression not in {"lzf", "gzip", "none"}:
         raise ValueError("analysis.bundle_compression must be 'lzf', 'gzip', or 'none'")
-    aggregate_plots = optional_plot_selection(analysis, "aggregate_plots", "analysis")
+    aggregate_plots = (
+        ()
+        if aggregate_plots_override is False
+        else optional_plot_selection(analysis, "aggregate_plots", "analysis")
+    )
     if aggregate_plots:
         from navkit_analysis.monte_carlo import monte_carlo_plot_names
 
@@ -282,7 +378,11 @@ def load_campaign_config(
             raise ValueError(
                 f"analysis.aggregate_plots contains unsupported names: {sorted(unsupported_plots)}"
             )
-    consistency_dashboards = optional_bool(analysis, "consistency_dashboards", True, "analysis")
+    consistency_dashboards = (
+        consistency_dashboards_override
+        if consistency_dashboards_override is not None
+        else optional_bool(analysis, "consistency_dashboards", True, "analysis")
+    )
     consistency_heatmap_modes = optional_string_selection(
         analysis, "consistency_heatmap_modes", "analysis"
     )
@@ -364,13 +464,6 @@ def set_json_pointer(root: JsonObject, pointer: str, value: int) -> None:
         current[int(final_token)] = value
     else:
         current[final_token] = value
-
-
-def derive_seed(master_seed: int, run_index: int, json_pointer: str) -> int:
-    message = f"{master_seed}:{run_index}:{json_pointer}".encode("utf-8")
-    digest = hashlib.blake2b(message, digest_size=8).digest()
-    seed = int.from_bytes(digest, byteorder="little", signed=False) & UINT32_MASK
-    return 1 if seed == 0 else seed
 
 
 def campaign_dir(config: CampaignConfig) -> Path:
@@ -480,7 +573,12 @@ def write_run_manifest(result: RunResult) -> None:
     )
 
 
-def write_campaign_config(config: CampaignConfig, seed_paths: list[str]) -> None:
+def write_campaign_config(
+    config: CampaignConfig,
+    seed_paths: list[str],
+    nominal_config: JsonObject,
+    execution_provenance: dict[str, object],
+) -> None:
     root_dir = campaign_dir(config)
     write_json(
         root_dir / "campaign_config.effective.json",
@@ -488,6 +586,10 @@ def write_campaign_config(config: CampaignConfig, seed_paths: list[str]) -> None
             "schema": CAMPAIGN_SCHEMA,
             "campaign_name": config.campaign_name,
             "nominal_config": str(config.nominal_config),
+            "provenance": {
+                "nominal_config_sha256": canonical_json_digest(nominal_config),
+                **execution_provenance,
+            },
             "runs": {
                 "count": config.run_count,
                 "start_index": config.start_index,
@@ -534,6 +636,7 @@ def write_campaign_manifest(
     config: CampaignConfig,
     results: list[RunResult],
     output_summary: dict[str, Any] | None,
+    execution_provenance: dict[str, object],
 ) -> None:
     root_dir = campaign_dir(config)
     output_summary = output_summary or {}
@@ -543,6 +646,7 @@ def write_campaign_manifest(
             "schema": CAMPAIGN_SCHEMA,
             "campaign_name": config.campaign_name,
             "nominal_config": str(config.nominal_config),
+            "provenance": execution_provenance,
             "master_seed": config.master_seed,
             "seed_policy": config.seed_policy,
             "run_count": len(results),
@@ -667,6 +771,16 @@ def main() -> int:
         help="Override analysis.max_plot_points from the Monte Carlo JSON.",
     )
     parser.add_argument(
+        "--no-aggregate-plots",
+        action="store_true",
+        help="Skip aggregate figure rendering while retaining reports and packaged data.",
+    )
+    parser.add_argument(
+        "--no-consistency-dashboards",
+        action="store_true",
+        help="Skip interactive consistency dashboards; caches may be generated separately.",
+    )
+    parser.add_argument(
         "--start-time",
         type=float,
         default=None,
@@ -701,6 +815,10 @@ def main() -> int:
         start_index_override=args.start_index,
         parallel_jobs_override=args.parallel_jobs,
         max_plot_points_override=args.max_plot_points,
+        aggregate_plots_override=False if args.no_aggregate_plots else None,
+        consistency_dashboards_override=(
+            False if args.no_consistency_dashboards else None
+        ),
         plot_start_time_s_override=args.start_time,
         plot_end_time_s_override=args.end_time,
         navkit_config=args.navkit_config,
@@ -708,9 +826,14 @@ def main() -> int:
         build_dir=args.build_dir,
     )
     nominal_config = load_runtime_config(config.nominal_config)
+    execution_nominal_config = resolve_runtime_asset_paths(
+        nominal_config, config.nominal_config
+    )
     seed_paths = discover_seed_paths(nominal_config)
     root_dir = campaign_dir(config)
-    write_campaign_config(config, seed_paths)
+    root = Path(__file__).resolve().parents[1]
+    execution_provenance = _execution_provenance(root, config)
+    write_campaign_config(config, seed_paths, nominal_config, execution_provenance)
 
     print(f"Monte Carlo campaign: {config.campaign_name}")
     print(f"Nominal config: {config.nominal_config}")
@@ -724,12 +847,17 @@ def main() -> int:
     print(f"Package analysis bundle: {config.package_analysis}")
     print(f"Bundle mode: {config.bundle_mode}")
     print(f"Bundle compression: {config.bundle_compression}")
-    print(f"Aggregate plots: {config.aggregate_plots or 'all'}")
+    if config.aggregate_plots == ():
+        print("Aggregate plots: disabled")
+    elif config.aggregate_plots is None:
+        print("Aggregate plots: all")
+    else:
+        print(f"Aggregate plots: {config.aggregate_plots}")
     print(f"Consistency dashboards: {config.consistency_dashboards}")
     print(f"Analysis parallel jobs: {config.analysis_parallel_jobs}")
     print(f"Seed paths: {seed_paths}")
 
-    plans = build_run_plans(config, nominal_config)
+    plans = build_run_plans(config, execution_nominal_config)
     results: list[RunResult] = []
     simulation_started_s = time.perf_counter()
     with concurrent.futures.ThreadPoolExecutor(max_workers=config.parallel_jobs) as executor:
@@ -742,6 +870,12 @@ def main() -> int:
                 f"({result.elapsed_s:.3f} s, return {result.return_code})"
             )
     simulation_elapsed_s = time.perf_counter() - simulation_started_s
+    completion_provenance = _execution_provenance(root, config)
+    execution_provenance = _completed_execution_provenance(
+        execution_provenance,
+        completion_provenance,
+    )
+    write_campaign_config(config, seed_paths, nominal_config, execution_provenance)
 
     if config.plot_individual_runs:
         for result in results:
@@ -766,7 +900,19 @@ def main() -> int:
     }
     plot_return_code = 1
     output_summary: dict[str, Any] | None = None
-    if successful_run_dirs:
+    if successful_run_dirs and config.aggregate_plots == ():
+        plot_return_code = 0
+        output_summary = {
+            "load_elapsed_s": 0.0,
+            "aggregate_elapsed_s": 0.0,
+            "plot_elapsed_s": 0.0,
+            "report_elapsed_s": 0.0,
+            "analysis_elapsed_s": 0.0,
+            "report_paths": {},
+            "figure_count": 0,
+            "rendering_skipped": True,
+        }
+    elif successful_run_dirs:
         plot_return_code, output_summary = generate_campaign_outputs(
             successful_run_dirs,
             root_dir / "summary",
@@ -778,7 +924,7 @@ def main() -> int:
         )
     # The packager discovers campaign members through this manifest. Write the
     # initial version before packaging, then rewrite it with bundle evidence.
-    write_campaign_manifest(config, results, output_summary)
+    write_campaign_manifest(config, results, output_summary, execution_provenance)
     bundle_elapsed_s: float | None = None
     bundle_path: Path | None = None
     consistency_summary: dict[str, object] | None = None
@@ -873,7 +1019,7 @@ def main() -> int:
         output_summary["bundle_path"] = str(bundle_path) if bundle_path is not None else None
         output_summary["consistency"] = consistency_summary
         output_summary["analysis_performance_path"] = str(performance_path)
-    write_campaign_manifest(config, results, output_summary)
+    write_campaign_manifest(config, results, output_summary, execution_provenance)
 
     if failed_count > 0:
         return 1

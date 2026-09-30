@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from internal.evidence_provenance import build_artifact_provenance, git_provenance
 from internal.navkit_build_dirs import DEFAULT_GENERATOR, resolve_build_dir
 from internal.runtime_config import load_runtime_config
 from navkit_analysis.analysis_performance import canonical_json_digest, file_digest
@@ -27,6 +28,19 @@ from navkit_analysis.regression import (
     load_truth_reconstruction_metrics,
 )
 from navkit_analysis.schema import DETERMINISTIC_REGRESSION_REPORT_SCHEMA
+
+
+def _artifact_provenance(
+    root: Path,
+    resolved_build_dir: Path,
+    build_type: str,
+    build_manifest_path: Path,
+    build_manifest: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "git": git_provenance(root),
+        "build": build_artifact_provenance(resolved_build_dir, build_type),
+    }
 
 
 def _write_json(path: Path, value: object) -> None:
@@ -240,6 +254,13 @@ def main() -> int:
         raise ValueError(
             f"build directory contains '{manifest_build_type}', not '{build_type}'"
         )
+    execution_provenance = _artifact_provenance(
+        root,
+        resolved_build_dir,
+        build_type,
+        build_manifest_path,
+        build_manifest,
+    )
 
     started = datetime.now(timezone.utc)
     print(f"Regression suite: {suite.name}")
@@ -272,6 +293,9 @@ def main() -> int:
         "suite": {
             "path": str(suite.source),
             "sha256": file_digest(suite.source),
+            "canonical_sha256": canonical_json_digest(
+                json.loads(suite.source.read_text(encoding="utf-8"))
+            ),
         },
         "execution": {
             "started_utc": started.isoformat(),
@@ -283,6 +307,7 @@ def main() -> int:
             "generator": args.generator,
             "build_directory": str(resolved_build_dir),
             "build_manifest": build_manifest,
+            "provenance": execution_provenance,
         },
         "case_count": len(results),
         "passed_count": sum(bool(result["passed"]) for result in results),

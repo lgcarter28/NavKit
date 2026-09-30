@@ -16,6 +16,9 @@ MONTE_CARLO_CAMPAIGN_SCHEMA = "navkit.monte_carlo_campaign.v2"
 MONTE_CARLO_REPORT_SCHEMA = "navkit.monte_carlo_report.v1"
 MONTE_CARLO_RUN_SCHEMA = "navkit.monte_carlo_run.v1"
 PLOT_SPEC_SCHEMA = "navkit.plot_spec.v1"
+QUALIFICATION_BASELINE_SCHEMA = "navkit.qualification_baseline.v1"
+QUALIFICATION_REPORT_SCHEMA = "navkit.qualification_report.v1"
+QUALIFICATION_SUITE_SCHEMA = "navkit.qualification_suite.v1"
 
 
 class SchemaCompatibilityError(ValueError):

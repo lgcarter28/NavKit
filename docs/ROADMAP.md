@@ -92,22 +92,37 @@ These are preserved at high level so the roadmap stays readable. Detailed pass-b
   separate GNSS position and velocity observations, deterministic pre-mutation
   rejection diagnostics, and exact composed same-epoch correction logging
   completed.
-- [x] Phase 8.7: target-neutral `MissionRuntime`, `MissionAdapter`, planned-time
-  execution ownership, stable mission-phase identity, and the concrete SWIL
-  lifecycle adapter completed.
-- [x] Phase 8.8: the thin `navkit_swil` application, fixed SWIL factory,
-  common/SWIL validation and dependency boundaries, debugger workflow, and
-  fail-closed mixed-HWIL composition seam completed.
 
 ## Current phase
 
-Phase 8 turns the existing single-run, Monte Carlo, HDF5, and interactive
+Phase 8 has turned the existing single-run, Monte Carlo, HDF5, and interactive
 consistency evidence into deterministic estimator regressions, runtime
-measurement acceptance, explicit qualification criteria, and diagnosis of the
-remaining dynamic-profile consistency findings. Phase 7.1 through 7.14 provide
-the repeatable static and dynamic truth sources required for this work.
+measurement acceptance, and a fail-closed qualification/reporting framework.
+The initial seven-profile current-config campaign exposed nine required
+failures caused by startup innovation-gate lockout. Runtime state-entry actions
+now keep GNSS position/velocity chi-square rejection disabled during each
+declared acquisition phase and restore the configured thresholds afterward. A
+fresh 3,500-run qualification matrix passes all 39 required stochastic checks;
+the ballistic gate/PVA tail and narrow bank/skid confidence misses are gone.
+Constant-altitude and waypoint full-state cross-covariance findings remain
+explicitly declared, and managed-baseline creation is still deliberately
+pending. Phase 7.1 through 7.14 provide the repeatable static and dynamic truth
+sources required for this work.
 
-## Pass 8.3: observability analysis and interactive visualization
+Pass 8.4 qualification/reporting, Pass 8.5 mission/subsystem/target
+configuration boundaries, Pass 8.6 explicit runtime-graph migration, Pass 8.7
+target-agnostic mission runtime/execution ownership, and Pass 8.8
+target-specific SWIL application composition are complete and archived in the
+Phase 8 detail file.
+
+## Pass 8.9: managed qualification baseline promotion
+
+- [ ] Generate and check in a current-config 500-run managed baseline, validate
+  it through the read-only baseline command, and verify an ordinary
+  qualification run reports a compatible current-schema/current-input
+  comparison.
+
+## Pass 8.10: observability analysis and interactive visualization
 
 - [ ] Define a versioned, state-definition-aware observability data contract
   for Python analysis. Preserve state labels/order, frames, units, reference
@@ -145,30 +160,6 @@ the repeatable static and dynamic truth sources required for this work.
   policy, interpretation limits, required logs, and interactive workflow in
   the analysis documentation, with a future standalone LaTeX treatment if the
   reference grows beyond a concise implementation contract.
-
-## Pass 8.4: stochastic qualification and dynamic-profile diagnosis
-
-- [ ] Define named Monte Carlo campaign sizes, analysis windows, and
-  statistically justified pass/fail criteria. Existing NEES/NIS, coverage,
-  CDF/PIT, QQ, and interactive products are the evidence surface; do not
-  duplicate them with another plotting stack.
-- [ ] Diagnose elevated full-state NEES in the constant-altitude and waypoint
-  profiles, beginning with accelerometer-bias cross-covariance, reset,
-  linearization, process-noise, and numerical covariance effects while
-  preserving the credible PVA-family and GNSS-NIS evidence.
-- [ ] Use the Pass 8.3 observability products alongside covariance and
-  consistency evidence to explain maneuver-dependent attitude and modeled
-  IMU-bias behavior rather than treating covariance contraction alone as
-  observability proof.
-
-## Pass 8.5: qualification reports and CI baseline management
-
-- [ ] Produce a compact qualification report from deterministic and stochastic
-  results: threshold outcomes, configuration/build/schema provenance, baseline
-  deltas, diagnostic-artifact links, and explicit disposition of known
-  consistency findings.
-- [ ] Integrate the deterministic regression matrix into CI and retain only
-  failure artifacts plus explicitly requested qualification bundles.
 
 ## Future phase details
 

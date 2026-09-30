@@ -1,0 +1,176 @@
+{
+  "schema": "navkit.qualification_suite.v1",
+  "suite_name": "ecef_ins_gnss_lc_gyro_accel_bias",
+  "deterministic_suite": "../regression/ecef_ins_truth_reconstruction.json",
+  "campaign_sizes": {
+    "smoke": 20,
+    "diagnostic": 100,
+    "qualification": 500
+  },
+  "output": {
+    "root": "output/qualification/ecef_ins_gnss_lc_gyro_accel_bias"
+  },
+  "baseline": {
+    "path": "baselines/ecef_ins_gnss_lc_gyro_accel_bias_qualification.json"
+  },
+  "windows": {
+    "dynamic_steady_state": {
+      "start_fraction": 0.2,
+      "end_fraction": 1.0
+    },
+    "ballistic_flight": {
+      "start_s": 25.0,
+      "end_s": 140.0
+    }
+  },
+  "campaigns": [
+    {
+      "name": "ballistic",
+      "config": "../monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_ballistic_mc.json",
+      "window": "ballistic_flight"
+    },
+    {
+      "name": "dutch_roll_bank_to_turn",
+      "config": "../monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_calibration_dutch_roll_bank_to_turn_mc.json",
+      "window": "dynamic_steady_state"
+    },
+    {
+      "name": "horizontal_s_turn_bank_to_turn",
+      "config": "../monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_calibration_horizontal_s_turn_bank_to_turn_mc.json",
+      "window": "dynamic_steady_state"
+    },
+    {
+      "name": "horizontal_s_turn_skid_to_turn",
+      "config": "../monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_calibration_horizontal_s_turn_skid_to_turn_mc.json",
+      "window": "dynamic_steady_state"
+    },
+    {
+      "name": "vertical_s_turn",
+      "config": "../monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_calibration_vertical_s_turn_mc.json",
+      "window": "dynamic_steady_state"
+    },
+    {
+      "name": "constant_altitude",
+      "config": "../monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_constant_altitude_mc.json",
+      "window": "dynamic_steady_state"
+    },
+    {
+      "name": "waypoint_bank_to_turn",
+      "config": "../monte_carlo/ecef_ins_gnss_lc_gyro_accel_bias_waypoint_bank_to_turn_mc.json",
+      "window": "dynamic_steady_state"
+    }
+  ],
+  "criteria": [
+    {
+      "name": "pva_nees_equivalence",
+      "campaigns": ["*"],
+      "kind": "nees",
+      "group": "pva",
+      "metric": "normalized_window_mean",
+      "test": "equivalence",
+      "minimum": 0.7,
+      "maximum": 1.3,
+      "confidence": 0.95,
+      "disposition": "required",
+      "rationale": "PVA joint consistency must remain credible on every declared dynamic profile."
+    },
+    {
+      "name": "gnss_position_nis_equivalence",
+      "campaigns": ["*"],
+      "kind": "nis",
+      "group": "gnss_position",
+      "metric": "normalized_window_mean",
+      "test": "equivalence",
+      "minimum": 0.9,
+      "maximum": 1.1,
+      "confidence": 0.95,
+      "disposition": "required",
+      "rationale": "Position innovation statistics must agree with the modeled observation covariance."
+    },
+    {
+      "name": "gnss_velocity_nis_equivalence",
+      "campaigns": ["*"],
+      "kind": "nis",
+      "group": "gnss_velocity",
+      "metric": "normalized_window_mean",
+      "test": "equivalence",
+      "minimum": 0.9,
+      "maximum": 1.1,
+      "confidence": 0.95,
+      "disposition": "required",
+      "rationale": "Velocity innovation statistics must agree with the modeled observation covariance."
+    },
+    {
+      "name": "gnss_position_acceptance",
+      "campaigns": ["*"],
+      "kind": "nis",
+      "group": "gnss_position",
+      "metric": "acceptance_rate",
+      "test": "minimum",
+      "minimum": 0.99,
+      "confidence": 0.95,
+      "disposition": "required",
+      "rationale": "Nominal campaigns should not be dominated by innovation-gate rejection."
+    },
+    {
+      "name": "gnss_velocity_acceptance",
+      "campaigns": ["*"],
+      "kind": "nis",
+      "group": "gnss_velocity",
+      "metric": "acceptance_rate",
+      "test": "minimum",
+      "minimum": 0.99,
+      "confidence": 0.95,
+      "disposition": "required",
+      "rationale": "Nominal campaigns should not be dominated by innovation-gate rejection."
+    },
+    {
+      "name": "full_ins_nees_equivalence",
+      "campaigns": [
+        "dutch_roll_bank_to_turn",
+        "horizontal_s_turn_bank_to_turn",
+        "horizontal_s_turn_skid_to_turn",
+        "vertical_s_turn"
+      ],
+      "kind": "nees",
+      "group": "full_ins",
+      "metric": "normalized_window_mean",
+      "test": "equivalence",
+      "minimum": 0.7,
+      "maximum": 1.3,
+      "confidence": 0.95,
+      "disposition": "required",
+      "rationale": "The accepted calibration profiles are the current full-state consistency regression guard."
+    },
+    {
+      "name": "full_ins_cross_covariance_finding",
+      "campaigns": [
+        "ballistic",
+        "constant_altitude",
+        "waypoint_bank_to_turn"
+      ],
+      "kind": "nees",
+      "group": "full_ins",
+      "metric": "normalized_window_mean",
+      "test": "equivalence",
+      "minimum": 0.7,
+      "maximum": 1.3,
+      "confidence": 0.95,
+      "disposition": "known_finding",
+      "rationale": "Track maneuver-dependent bias/cross-covariance inconsistency independently of the required PVA and GNSS checks; this known-finding disposition does not override their results."
+    },
+    {
+      "name": "accelerometer_bias_diagnostic",
+      "campaigns": ["*"],
+      "kind": "nees",
+      "group": "accel_bias",
+      "metric": "normalized_window_mean",
+      "test": "equivalence",
+      "minimum": 0.7,
+      "maximum": 1.3,
+      "confidence": 0.95,
+      "disposition": "informational",
+      "rationale": "This isolates the accelerometer-bias marginal while the full-state statistic retains cross-covariance effects."
+    }
+  ]
+}

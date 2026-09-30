@@ -15,10 +15,14 @@ deliberate error rather than a best-effort parse.
 | --- | --- |
 | Deterministic regression suite | `navkit.deterministic_regression_suite.v1` |
 | Deterministic regression report | `navkit.deterministic_regression_report.v1` |
+| Qualification suite | `navkit.qualification_suite.v1` |
+| Qualification report | `navkit.qualification_report.v1` |
+| Qualification baseline | `navkit.qualification_baseline.v1` |
 | Monte Carlo campaign config/manifest | `navkit.monte_carlo_campaign.v2` |
 | Per-run Monte Carlo manifest | `navkit.monte_carlo_run.v1` |
 | Aggregate Monte Carlo report | `navkit.monte_carlo_report.v1` |
 | HDF5 analysis bundle | `navkit.analysis_bundle.v1` |
+| HDF5 consistency cache contract | `navkit.consistency_cache.v1` |
 | Renderer-neutral plot specification | `navkit.plot_spec.v1` |
 
 Existing raw CSV logs intentionally remain unversioned legacy inputs. They can
@@ -75,6 +79,7 @@ job:
 | `run_scenario.py` | Run one scenario and immediately generate its standard analysis |
 | `run_sim.py` | Run only the C++ simulation |
 | `run_regression.py` | Execute a versioned deterministic regression suite and emit compact pass/fail evidence |
+| `run_qualification.py` | Execute the declared deterministic/stochastic qualification matrix and compare compact evidence with its managed baseline |
 | `plot_run.py` | Render the standard domain-aware suite for an existing single run |
 | `plot_trajectory.py` | Render available frame-explicit truth, Guidance, Autopilot/Vehicle, tracking-error, and 3-D trajectory dashboards |
 | `run_monte_carlo.py` | Execute, package, report, and plot a seeded campaign |
@@ -85,9 +90,10 @@ job:
 | `plot_field.py` | Quickly inspect arbitrary named CSV/HDF5 fields |
 | `profile/benchmark_analysis_scaling.py` | Measure identical HDF5-backed plotting workloads at multiple Plotly worker counts |
 
-`run_scenario.py`, `run_regression.py`, and `run_monte_carlo.py` are the normal
-entry points. Lower-level tools are useful when simulation is already complete
-or when iterating on analysis without paying simulation cost again.
+`run_scenario.py`, `run_regression.py`, `run_qualification.py`, and
+`run_monte_carlo.py` are the normal entry points. Lower-level tools are useful
+when simulation is already complete or when iterating on analysis without
+paying simulation cost again.
 
 ## Single-run workflow
 
@@ -360,8 +366,138 @@ Once a valid suite and output root are resolved, the runner removes an older
 report before validating the selected cases/build and executing the suite, so a
 later infrastructure failure cannot leave stale passing evidence at that
 output path. The report is intentionally compact provenance, not a complete
-archival reproduction bundle; Phase 8.4 owns qualification-baseline and CI
-artifact policy.
+archival reproduction bundle; the qualification workflow below owns baseline
+comparison and broader evidence policy.
+
+## Qualification workflow
+
+Phase 8 qualification composes the deterministic regression contract with
+named, seeded Monte Carlo campaigns and their existing NEES/NIS, coverage,
+CDF/PIT, QQ, and HDF5 evidence. The normal entry point and suite are:
+
+```powershell
+python tools/run_qualification.py `
+  config/runtime/qualification/ecef_ins_gnss_lc_gyro_accel_bias.json `
+  --tier smoke
+```
+
+The suite produces a compact `navkit.qualification_report.v1` document with
+threshold outcomes, build/configuration/schema provenance, diagnostic-artifact
+links, and deltas against an explicitly selected
+`navkit.qualification_baseline.v1`. `--tier` is required and selects the suite's
+`smoke` (20 runs), `diagnostic` (100 runs), or `qualification` (500 runs)
+campaign size. Only the 500-run qualification tier may own a managed baseline;
+smaller tiers exercise all contracts but report baseline comparison as not
+applicable rather than emitting a misleading delta. A smoke run is an
+execution and early-diagnosis tier, not a substitute for the declared
+qualification sample size: its wider confidence interval can legitimately miss
+an equivalence margin even when its point estimate is credible.
+
+Each execution writes `qualification_report.json`, a concise companion
+`qualification_report.md`, deterministic evidence, command logs, and campaign
+bundles beneath the selected output directory. Use `--reuse-campaign-root` and
+`--reuse-deterministic-report` to evaluate existing evidence without rerunning
+it. Baseline updates are explicit review operations: `--update-baseline`
+creates an accepted baseline, while replacing one additionally requires
+`--replace-baseline`. Ordinary execution never rewrites the checked-in
+baseline. Reused deterministic reports and campaign bundles must match the
+selected suite, compile-time product, build type, campaign seed contract, and
+canonical effective runtime configuration. Every packaged run is checked for
+the exact deterministic seed derivation, complete finite evidence, and the
+expected run identity. Generation records also fingerprint the Git source
+state, build manifest, selected application executable, and generation tooling at the
+start and end of each campaign. Consistency caches carry a separate fingerprint
+bound to the HDF5 package, evaluator implementation, selected statistic
+families, and sampling options. Reuse requires the selected compiled artifact
+and cache contract to match exactly. Qualification rejects stale evidence
+instead of attributing it to a current file that happens to retain the same
+path.
+
+When an accepted managed baseline is checked in, CI validates its contract
+without executing the expensive campaign:
+
+```powershell
+python tools/run_qualification.py `
+  config/runtime/qualification/ecef_ins_gnss_lc_gyro_accel_bias.json `
+  --validate-baseline
+```
+
+This read-only check validates the baseline schema, linked suite and campaign
+inputs, deterministic-report identity, qualification run count, package/cache
+fingerprints, stable-generation declaration, exact criterion contracts and
+sample counts, finite and ordered confidence intervals, recomputed pass status,
+required-pass disposition, and aggregate status. It does not claim to
+regenerate the stochastic evidence.
+
+No managed baseline is currently accepted. The first current-config 500-run
+qualification completed all 3,500 stochastic simulations and all four
+deterministic cases, but nine required stochastic checks exposed an
+initial-acquisition gating problem. After application-owned phase actions were
+added, a fresh 3,500-run matrix passed all 39 required stochastic checks.
+Baseline promotion remains a separate explicit review action. CI skips the
+static baseline command until a statistically accepted baseline exists; the
+command itself remains fail-closed when invoked against a missing or
+incompatible baseline.
+
+After reviewing an accepted 500-run qualification report, replace the managed
+baseline explicitly and then verify the ordinary read-only comparison path:
+
+```powershell
+python tools/run_qualification.py `
+  config/runtime/qualification/ecef_ins_gnss_lc_gyro_accel_bias.json `
+  --tier qualification `
+  --reuse-campaign-root <campaign-root> `
+  --reuse-deterministic-report <deterministic-report.json> `
+  --output-dir <baseline-update-report-dir> `
+  --update-baseline --replace-baseline
+
+python tools/run_qualification.py `
+  config/runtime/qualification/ecef_ins_gnss_lc_gyro_accel_bias.json `
+  --tier qualification `
+  --reuse-campaign-root <campaign-root> `
+  --reuse-deterministic-report <deterministic-report.json> `
+  --output-dir <baseline-comparison-report-dir>
+```
+
+The qualification tier is a fail-closed workflow: its final report passes only
+when required deterministic/stochastic criteria pass and the baseline was
+either updated explicitly or compared successfully with compatible current
+inputs. Smoke and diagnostic tiers never own or gate on the managed baseline.
+
+Qualification execution skips aggregate and interactive rendering while it
+builds the full HDF5 bundles and consistency caches required by the declared
+checks. This keeps an automated qualification run focused and does not change
+normal Monte Carlo behavior. Run the standard Monte Carlo/plot tools against a
+campaign directory when interactive diagnosis is needed.
+
+Each stochastic criterion first reduces its declared time window to one scalar
+per Monte Carlo run. If `z_rk` is the normalized NEES, normalized NIS, or
+acceptance indicator for run `r` at selected epoch `k`, the independent sample
+used for inference is:
+
+`y_r = mean_k(z_rk)`
+
+The report then forms the ensemble mean and a two-sided Student-t confidence
+interval from the `N` independent run values `y_r`, using `N - 1` degrees of
+freedom. An equivalence criterion passes only when the complete confidence
+interval lies inside its declared lower and upper margins. This avoids treating
+the many temporally correlated epochs within one run as independent evidence.
+
+For the PVA/IMU-bias diagnosis, partition the full covariance and error into
+PVA (`p`) and bias (`b`) blocks. The exact conditional bias covariance and
+error are:
+
+`P_b|p = P_bb - P_bp inv(P_pp) P_pb`
+
+`e_b|p = e_b - P_bp inv(P_pp) e_p`
+
+The full-state NEES decomposes into the PVA marginal term plus the conditional
+bias term formed from these quantities. The implementation uses linear solves,
+not explicit matrix inversion. Every sampled full covariance must be usable;
+skipped or non-finite samples invalidate qualification evidence rather than
+silently reducing its size. Comparing this exact conditional term with the two
+marginal NEES values distinguishes a cross-covariance inconsistency from a
+simple PVA or bias marginal mismatch.
 
 ## Monte Carlo workflow
 

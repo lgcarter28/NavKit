@@ -17,7 +17,11 @@ import numpy as np
 import pandas as pd
 from scipy.stats import chi2
 
-from navkit_analysis.analysis_performance import StageTimer
+from navkit_analysis.analysis_performance import (
+    StageTimer,
+    canonical_json_digest,
+    content_set_provenance,
+)
 from navkit_analysis.schema import ANALYSIS_BUNDLE_SCHEMA, validate_schema
 
 
@@ -28,6 +32,110 @@ SIGMA_COVERAGE_LEVELS = (
     ("3sigma", 0.997300203936740),
 )
 CONSISTENCY_SERIES_KINDS = ("nees", "nis", "marginal")
+CONSISTENCY_CACHE_SCHEMA = "navkit.consistency_cache.v1"
+_UNSPECIFIED_CACHE_OPTION = object()
+
+
+def _normalized_consistency_kinds(selected_kinds: Sequence[str]) -> tuple[str, ...]:
+    selected = tuple(sorted(set(selected_kinds)))
+    invalid_kinds = set(selected).difference(CONSISTENCY_SERIES_KINDS)
+    if invalid_kinds:
+        raise ValueError(f"unsupported consistency series kinds: {sorted(invalid_kinds)}")
+    return selected
+
+
+def _consistency_evaluator_content_sha256() -> str:
+    package_dir = Path(__file__).resolve().parent
+    provenance = content_set_provenance(
+        {
+            "navkit_analysis.consistency": Path(__file__),
+            "navkit_analysis.schema": package_dir / "schema.py",
+        }
+    )
+    return str(provenance["sha256"])
+
+
+def _bundle_package_fingerprint(bundle: h5py.File) -> str:
+    encoded_metadata = bundle.attrs.get("metadata")
+    if isinstance(encoded_metadata, bytes):
+        encoded_metadata = encoded_metadata.decode("utf-8")
+    if not isinstance(encoded_metadata, str):
+        raise ValueError("analysis bundle is missing package metadata")
+    try:
+        metadata = json.loads(encoded_metadata)
+    except json.JSONDecodeError as error:
+        raise ValueError("analysis bundle package metadata is invalid JSON") from error
+    fingerprint = metadata.get("package_fingerprint") if isinstance(metadata, dict) else None
+    if not isinstance(fingerprint, str) or not fingerprint:
+        raise ValueError("analysis bundle is missing its package fingerprint")
+    return fingerprint
+
+
+def _consistency_cache_contract(
+    bundle: h5py.File,
+    max_points: int | None,
+    selected_kinds: Sequence[str],
+) -> dict[str, object]:
+    return {
+        "schema": CONSISTENCY_CACHE_SCHEMA,
+        "analysis_bundle_schema": ANALYSIS_BUNDLE_SCHEMA,
+        "bundle_package_fingerprint": _bundle_package_fingerprint(bundle),
+        "max_points": max_points,
+        "selected_kinds": list(_normalized_consistency_kinds(selected_kinds)),
+        "evaluator_content_sha256": _consistency_evaluator_content_sha256(),
+    }
+
+
+def _validated_consistency_cache_provenance(
+    bundle: h5py.File,
+    max_points: int | None | object,
+    selected_kinds: Sequence[str],
+) -> dict[str, object]:
+    consistency_group = bundle.get("aggregate/consistency")
+    if not isinstance(consistency_group, h5py.Group):
+        raise ValueError("analysis bundle has no consistency cache")
+    encoded_contract = consistency_group.attrs.get("cache_contract")
+    if isinstance(encoded_contract, bytes):
+        encoded_contract = encoded_contract.decode("utf-8")
+    fingerprint = consistency_group.attrs.get("cache_fingerprint")
+    if isinstance(fingerprint, bytes):
+        fingerprint = fingerprint.decode("utf-8")
+    if not isinstance(encoded_contract, str) or not isinstance(fingerprint, str):
+        raise ValueError("consistency cache has no provenance contract; refresh it first")
+    try:
+        contract = json.loads(encoded_contract)
+    except json.JSONDecodeError as error:
+        raise ValueError("consistency cache provenance contract is invalid JSON") from error
+    if not isinstance(contract, dict) or canonical_json_digest(contract) != fingerprint:
+        raise ValueError("consistency cache provenance fingerprint is invalid")
+    stored_max_points = contract.get("max_points")
+    expected_max_points = stored_max_points if max_points is _UNSPECIFIED_CACHE_OPTION else max_points
+    expected_contract = _consistency_cache_contract(
+        bundle,
+        expected_max_points if isinstance(expected_max_points, int) else None,
+        selected_kinds,
+    )
+    if contract != expected_contract:
+        raise ValueError("consistency cache provenance does not match the requested evidence")
+    return {
+        "fingerprint": fingerprint,
+        "contract": contract,
+    }
+
+
+def consistency_cache_provenance(
+    bundle_path: Path,
+    *,
+    max_points: int | None | object = _UNSPECIFIED_CACHE_OPTION,
+    selected_kinds: Sequence[str] = CONSISTENCY_SERIES_KINDS,
+) -> dict[str, object]:
+    """Return validated provenance for one reusable consistency cache."""
+    with h5py.File(bundle_path, "r") as bundle:
+        schema = bundle.attrs.get("schema")
+        if isinstance(schema, bytes):
+            schema = schema.decode("utf-8")
+        validate_schema({"schema": schema}, ANALYSIS_BUNDLE_SCHEMA, str(bundle_path))
+        return _validated_consistency_cache_provenance(bundle, max_points, selected_kinds)
 
 
 @dataclass(frozen=True)
@@ -634,19 +742,19 @@ def refresh_consistency_cache(
     selected_kinds: Sequence[str] = CONSISTENCY_SERIES_KINDS,
 ) -> tuple[list[ConsistencySeries], list[ConsistencySeries], list[ConsistencySeries]]:
     """Build requested time-indexed consistency families in one owner process."""
-    invalid_kinds = set(selected_kinds).difference(CONSISTENCY_SERIES_KINDS)
-    if invalid_kinds:
-        raise ValueError(f"unsupported consistency series kinds: {sorted(invalid_kinds)}")
-    selected = set(selected_kinds)
+    normalized_kinds = _normalized_consistency_kinds(selected_kinds)
+    selected = set(normalized_kinds)
     timer = StageTimer()
     nees_series: list[ConsistencySeries] = []
     nis_series: list[ConsistencySeries] = []
     marginal_series: list[ConsistencySeries] = []
+    cache_contract: dict[str, object]
     with h5py.File(bundle_path, "r") as bundle:
         schema = bundle.attrs.get("schema")
         if isinstance(schema, bytes):
             schema = schema.decode("utf-8")
         validate_schema({"schema": schema}, ANALYSIS_BUNDLE_SCHEMA, str(bundle_path))
+        cache_contract = _consistency_cache_contract(bundle, max_points, normalized_kinds)
         if {"nees", "marginal"}.intersection(selected):
             truth_error_frames = list(_iter_bundle_truth_error_frames(bundle))
             timer.mark("truth_error_frame_load")
@@ -680,11 +788,17 @@ def refresh_consistency_cache(
             nees_series,
             nis_series,
             marginal_series,
-            selected_kinds=selected_kinds,
+            selected_kinds=normalized_kinds,
             compression=compression,
         )
         timer.mark("hdf5_cache_write")
         consistency_group = aggregate_group.require_group("consistency")
+        consistency_group.attrs["cache_contract"] = json.dumps(
+            cache_contract,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        consistency_group.attrs["cache_fingerprint"] = canonical_json_digest(cache_contract)
         consistency_group.attrs["cache_performance"] = json.dumps(
             {
                 "selected_kinds": sorted(selected),
@@ -715,6 +829,9 @@ def consistency_cache_performance(bundle_path: Path) -> dict[str, object]:
 
 def load_consistency_cache(
     bundle_path: Path,
+    *,
+    max_points: int | None | object = _UNSPECIFIED_CACHE_OPTION,
+    selected_kinds: Sequence[str] = CONSISTENCY_SERIES_KINDS,
 ) -> tuple[list[ConsistencySeries], list[ConsistencySeries], list[ConsistencySeries]]:
     """Load time-indexed NEES/NIS consistency samples from a packaged campaign."""
     nees_series: list[ConsistencySeries] = []
@@ -725,16 +842,20 @@ def load_consistency_cache(
         if isinstance(schema, bytes):
             schema = schema.decode("utf-8")
         validate_schema({"schema": schema}, ANALYSIS_BUNDLE_SCHEMA, str(bundle_path))
+        _validated_consistency_cache_provenance(bundle, max_points, selected_kinds)
         root = bundle.get("aggregate/consistency/series")
         if not isinstance(root, h5py.Group):
             raise ValueError(
                 f"bundle '{bundle_path}' has no time-indexed consistency cache; refresh it first"
             )
+        requested_kinds = set(_normalized_consistency_kinds(selected_kinds))
         for kind, destination in (
             ("nees", nees_series),
             ("nis", nis_series),
             ("marginal", marginal_series),
         ):
+            if kind not in requested_kinds:
+                continue
             parent = root.get(kind)
             if not isinstance(parent, h5py.Group):
                 continue
@@ -924,19 +1045,26 @@ def generate_consistency_outputs(
         else cached_output_paths(artifact_marker, artifact_fingerprint)
     )
     if cached_paths is not None:
-        nees_series, nis_series, marginal_series = load_consistency_cache(bundle_path)
-        return {
-            "cache_elapsed_s": 0.0,
-            "plot_elapsed_s": 0.0,
-            "report_elapsed_s": 0.0,
-            "total_elapsed_s": time.perf_counter() - started_s,
-            "figure_paths": {path.stem: str(path) for path in cached_paths},
-            "report_paths": {},
-            "nees_group_count": len(nees_series),
-            "nis_group_count": len(nis_series),
-            "marginal_group_count": len(marginal_series),
-            "reused": True,
-        }
+        try:
+            nees_series, nis_series, marginal_series = load_consistency_cache(
+                bundle_path,
+                max_points=max_plot_points,
+            )
+        except ValueError:
+            cached_paths = None
+        else:
+            return {
+                "cache_elapsed_s": 0.0,
+                "plot_elapsed_s": 0.0,
+                "report_elapsed_s": 0.0,
+                "total_elapsed_s": time.perf_counter() - started_s,
+                "figure_paths": {path.stem: str(path) for path in cached_paths},
+                "report_paths": {},
+                "nees_group_count": len(nees_series),
+                "nis_group_count": len(nis_series),
+                "marginal_group_count": len(marginal_series),
+                "reused": True,
+            }
     cache_started_s = time.perf_counter()
     if refresh_cache:
         nees_series, nis_series, marginal_series = refresh_consistency_cache(
@@ -945,7 +1073,10 @@ def generate_consistency_outputs(
         )
     else:
         try:
-            nees_series, nis_series, marginal_series = load_consistency_cache(bundle_path)
+            nees_series, nis_series, marginal_series = load_consistency_cache(
+                bundle_path,
+                max_points=max_plot_points,
+            )
             if not marginal_series:
                 nees_series, nis_series, marginal_series = refresh_consistency_cache(
                     bundle_path,
