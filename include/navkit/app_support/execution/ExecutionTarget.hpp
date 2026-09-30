@@ -12,14 +12,16 @@ namespace navkit::app_support
 /**
  * \brief Identifies the application adapter that owns execution of a runtime scenario.
  *
- * \details A target selects one cohesive authority and interface arrangement. Only the
- * NavKit-owned software-in-the-loop adapter is currently implemented; future HWIL,
- * flight, or external-GNC adapters should add concrete target values when their actual
- * lifecycle and transport contracts exist.
+ * \details A target selects one cohesive authority and interface arrangement. The
+ * software-in-the-loop adapter is implemented. HWIL is a recognized,
+ * fail-closed selection until an application build supplies its concrete transport/runtime
+ * adapter; future flight or external-GNC adapters should add concrete target values only
+ * when their actual lifecycle and transport contracts exist.
  */
 enum class ExecutionTargetType
 {
-    NavKitSwil,
+    Swil,
+    Hwil,
 };
 
 /**
@@ -31,7 +33,7 @@ enum class ExecutionTargetType
  */
 struct ExecutionTargetSettings
 {
-    ExecutionTargetType type{ExecutionTargetType::NavKitSwil};
+    ExecutionTargetType type{ExecutionTargetType::Swil};
     ClockMode clock_mode{ClockMode::Simulated};
     core::RationalRate application_rate{};
 };

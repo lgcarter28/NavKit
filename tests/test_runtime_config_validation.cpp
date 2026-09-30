@@ -1,8 +1,8 @@
 // Copyright (c) 2026 William Gordon Carter.
 // All Rights Reserved.
 
-#include "apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
-#include "navkit/app_support/SimulationApp.hpp"
+#include "apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
+#include "navkit/app_support/MissionApp.hpp"
 #include "navkit/app_support/emulation/EmulatorBinding.hpp"
 #include "navkit/app_support/emulation/EmulatorBindingPolicy.hpp"
 #include "navkit/app_support/emulation/EmulatorBindingTuplePolicy.hpp"
@@ -14,11 +14,13 @@
 #include "navkit/app_support/initialization/TransferAlignmentProviderPolicy.hpp"
 #include "navkit/app_support/logging/RuntimeLogger.hpp"
 #include "navkit/app_support/runtime/JsonInput.hpp"
-#include "navkit/app_support/runtime/RuntimeConfigValidation.hpp"
 #include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
 #include "navkit/core/math/Quaternion.hpp"
 #include "navkit/io/RunLogger.hpp"
 #include "navkit/sim/sensors/ImuSimulatorPolicy.hpp"
+#include "navkit/swil/SwilMissionAdapter.hpp"
+#include "navkit/swil/SwilMissionAdapterFactory.hpp"
+#include "navkit/swil/SwilRuntimeConfigValidation.hpp"
 #include "test_main.hpp"
 
 #include <array>
@@ -28,6 +30,7 @@
 #include <nlohmann/json.hpp>
 #include <numbers>
 #include <stdexcept>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <vector>
@@ -39,13 +42,19 @@ namespace
 {
 
 using EcefInsGnssAppConfig =
-    navkit::config::apps::navkit_sim::EcefInsGnssLcGyroAccelBiasDefaultConfig;
+    navkit::config::apps::navkit_swil::EcefInsGnssLcGyroAccelBiasDefaultConfig;
 using AppRuntimeLogger = RuntimeLogger<EcefInsGnssAppConfig::NavKit>;
+using navkit::swil::swil_runtime_from_json;
+using navkit::swil::SwilMissionAdapter;
+using navkit::swil::SwilRuntime;
+using navkit::swil::validate_runtime_config;
 
 struct DuplicateSensorIdConfig
 {
     using NavKit = EcefInsGnssAppConfig::NavKit;
     using ImuSimulator = EcefInsGnssAppConfig::ImuSimulator;
+    using NavInitializationProvider = EcefInsGnssAppConfig::NavInitializationProvider;
+    using TransferAlignmentProvider = EcefInsGnssAppConfig::TransferAlignmentProvider;
     using EmulatorBindings =
         std::tuple<navkit::app_support::EmulatorBinding<navkit::app_support::GnssEmulator<0U>,
                                                         NavKit::PrimaryGnssPositionSensor>,
@@ -62,9 +71,20 @@ struct MissingTargetSensorConfig
 {
     using NavKit = EcefInsGnssAppConfig::NavKit;
     using ImuSimulator = EcefInsGnssAppConfig::ImuSimulator;
+    using NavInitializationProvider = EcefInsGnssAppConfig::NavInitializationProvider;
+    using TransferAlignmentProvider = EcefInsGnssAppConfig::TransferAlignmentProvider;
     using EmulatorBindings =
         std::tuple<navkit::app_support::EmulatorBinding<navkit::app_support::GnssEmulator<99U>,
                                                         UnknownSensor>>;
+};
+
+struct IncompleteSensorBindingsConfig
+{
+    using NavKit = EcefInsGnssAppConfig::NavKit;
+    using ImuSimulator = EcefInsGnssAppConfig::ImuSimulator;
+    using NavInitializationProvider = EcefInsGnssAppConfig::NavInitializationProvider;
+    using TransferAlignmentProvider = EcefInsGnssAppConfig::TransferAlignmentProvider;
+    using EmulatorBindings = std::tuple<EcefInsGnssAppConfig::PrimaryGnssPositionBinding>;
 };
 
 struct NotAnEmulator
@@ -142,6 +162,57 @@ struct NotABinding
               0.030461741978670857}}}}}}};
 }
 
+class ScopedTemporaryDirectory
+{
+public:
+    explicit ScopedTemporaryDirectory(const std::string_view name)
+        : m_path{std::filesystem::temp_directory_path() / name}
+    {
+        std::error_code error{};
+        std::filesystem::remove_all(m_path, error);
+        error.clear();
+        std::filesystem::create_directories(m_path, error);
+        if (error) {
+            throw std::runtime_error("failed to create temporary test directory: " +
+                                     m_path.string());
+        }
+    }
+
+    ~ScopedTemporaryDirectory()
+    {
+        std::error_code error{};
+        std::filesystem::remove_all(m_path, error);
+    }
+
+    ScopedTemporaryDirectory(const ScopedTemporaryDirectory&) = delete;
+    ScopedTemporaryDirectory& operator=(const ScopedTemporaryDirectory&) = delete;
+
+    [[nodiscard]] const std::filesystem::path& path() const
+    {
+        return m_path;
+    }
+
+private:
+    std::filesystem::path m_path{};
+};
+
+[[nodiscard]] nlohmann::json
+short_terminal_stationary_config(const std::filesystem::path& output_dir)
+{
+    nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
+    cfg["run_name"] = "swil_unaligned_source_end_test";
+    cfg["output_dir"] = output_dir.string();
+    cfg["mission"]["duration_s"] = 0.0015;
+    cfg["simulation"]["control_state_source"] = "truth_passthrough";
+    cfg["gnss"]["noise_enabled"] = false;
+
+    nlohmann::json& logging = cfg["logging"];
+    for (nlohmann::json::iterator iter = logging.begin(); iter != logging.end(); ++iter) {
+        iter.value()["enabled"] = false;
+    }
+    return cfg;
+}
+
 TEST_CASE("Runtime JSON clock parser accepts only supported app-support modes")
 {
     const nlohmann::json simulated{{"clock", "simulated"}};
@@ -157,20 +228,51 @@ TEST_CASE("Runtime JSON clock parser accepts only supported app-support modes")
     CHECK_FALSE(detail::clock_mode_from_json(simulated, "missing", mode));
 }
 
-TEST_CASE("Runtime execution-target parser fails closed beyond SWIL")
+TEST_CASE("Runtime execution-target parser recognizes HWIL and rejects unknown targets")
 {
     const nlohmann::json swil{
         {"execution_target", {{"type", "swil"}, {"clock", "simulated"}, {"rate_hz", 1000.0}}},
     };
-    CHECK(execution_target_settings_from_json(swil).type == ExecutionTargetType::NavKitSwil);
+    const ExecutionTargetSettings swil_settings = execution_target_settings_from_json(swil);
+    CHECK(swil_settings.type == ExecutionTargetType::Swil);
+    CHECK_NOTHROW(
+        require_execution_target_type(swil_settings, ExecutionTargetType::Swil, "navkit_swil"));
 
-    nlohmann::json unsupported = swil;
-    unsupported.at("execution_target").at("type") = "hwil";
-    CHECK_THROWS_AS(static_cast<void>(execution_target_settings_from_json(unsupported)),
+    nlohmann::json selected = swil;
+    selected.at("execution_target").at("type") = "hwil";
+    const ExecutionTargetSettings hwil = execution_target_settings_from_json(selected);
+    CHECK(hwil.type == ExecutionTargetType::Hwil);
+    CHECK_THROWS_WITH_AS(
+        require_execution_target_type(hwil, ExecutionTargetType::Swil, "navkit_swil"),
+        doctest::Contains("navkit_swil requires execution_target.type 'swil'; "
+                          "received 'hwil'"),
+        std::runtime_error);
+
+    selected.at("execution_target").at("type") = "flight";
+    CHECK_THROWS_AS(static_cast<void>(execution_target_settings_from_json(selected)),
                     std::runtime_error);
-    unsupported.at("execution_target").at("type") = "flight";
-    CHECK_THROWS_AS(static_cast<void>(execution_target_settings_from_json(unsupported)),
-                    std::runtime_error);
+}
+
+TEST_CASE("Runtime validation rejects HWIL before parsing SWIL-only schema")
+{
+    const ScopedTemporaryDirectory temporary_directory{"navkit_hwil_target_mismatch_test"};
+    const std::filesystem::path config_path = temporary_directory.path() / "scenario.json";
+    const nlohmann::json cfg{
+        {"execution_target", {{"type", "hwil"}, {"clock", "realtime"}, {"rate_hz", 1000.0}}},
+    };
+    {
+        std::ofstream config_stream{config_path};
+        REQUIRE(config_stream);
+        config_stream << cfg;
+    }
+
+    CHECK_THROWS_WITH_AS(
+        static_cast<void>(
+            MissionApp<EcefInsGnssAppConfig>::run<navkit::swil::SwilMissionAdapterFactory>(
+                config_path)),
+        doctest::Contains("navkit_swil requires execution_target.type 'swil'; "
+                          "received 'hwil'"),
+        std::runtime_error);
 }
 
 TEST_CASE("Runtime control-state source parser accepts only explicit source selections")
@@ -333,10 +435,13 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts the documented input shape")
 {
     const nlohmann::json cfg = valid_ecef_ins_gnss_runtime_config();
 
-    static_assert(SimulationAppConfigPolicy<EcefInsGnssAppConfig>);
+    static_assert(MissionAppConfigPolicy<EcefInsGnssAppConfig>);
+    static_assert(navkit::swil::SwilAppConfigPolicy<EcefInsGnssAppConfig>);
+    static_assert(MissionAppConfigPolicy<IncompleteSensorBindingsConfig>);
+    static_assert(!navkit::swil::SwilAppConfigPolicy<IncompleteSensorBindingsConfig>);
     static_assert(navkit::sim::ImuSimulatorPolicy<EcefInsGnssAppConfig::ImuSimulator>);
-    static_assert(!SimulationAppConfigPolicy<DuplicateSensorIdConfig>);
-    static_assert(!SimulationAppConfigPolicy<MissingTargetSensorConfig>);
+    static_assert(!navkit::swil::SwilAppConfigPolicy<DuplicateSensorIdConfig>);
+    static_assert(!navkit::swil::SwilAppConfigPolicy<MissingTargetSensorConfig>);
     static_assert(EmulatorPolicy<EcefInsGnssAppConfig::PrimaryGnssPositionEmulator,
                                  EcefInsGnssAppConfig::PrimaryGnssPositionSensor,
                                  AppRuntimeLogger>);
@@ -409,6 +514,84 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts the documented input shape")
     CHECK(velocity_sensor.innovation_gate().threshold() > 0.0);
 }
 
+TEST_CASE("SWIL adapter publishes a finite unaligned source end exactly once")
+{
+    const ScopedTemporaryDirectory temporary_directory{"navkit_sw_il_unaligned_end_adapter_test"};
+    const nlohmann::json cfg =
+        short_terminal_stationary_config(temporary_directory.path() / "output");
+    REQUIRE_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
+
+    const RunSettings run_settings = run_settings_from_json(cfg);
+    AppRuntimeLogger logger{run_settings.data_dir, run_settings.run_name, cfg};
+    SwilMissionAdapter<EcefInsGnssAppConfig> adapter{cfg, {}, run_settings};
+    std::unique_ptr<EcefInsGnssAppConfig::NavKit::Navigator> navigator =
+        std::make_unique<EcefInsGnssAppConfig::NavKit::Navigator>();
+    MissionRuntime mission_runtime = mission_runtime_from_json(cfg);
+
+    REQUIRE(adapter.initialize(*navigator, logger));
+    std::string phase_id{};
+    REQUIRE(adapter.active_mission_phase_id(phase_id));
+    REQUIRE(mission_runtime.initialize<EcefInsGnssAppConfig::NavKit>(phase_id, *navigator));
+    CHECK(mission_runtime.active_phase_is_terminal());
+
+    const core::Timestamp t_start = adapter.t_start();
+    core::Timestamp prepared_t{};
+    REQUIRE(adapter.prepare_before_deadline(t_start, prepared_t));
+    CHECK(prepared_t == t_start);
+    CHECK_FALSE(adapter.is_complete());
+    REQUIRE(adapter.publish_at_deadline(prepared_t, *navigator, logger));
+    CHECK_FALSE(adapter.is_complete());
+    REQUIRE(navigator->update());
+    REQUIRE(adapter.after_navigation_update(prepared_t, *navigator));
+
+    core::Timestamp first_application_epoch{};
+    REQUIRE(
+        core::timestamp_from_seconds(0.001, core::TimeScale::Monotonic, first_application_epoch));
+    REQUIRE(adapter.prepare_before_deadline(first_application_epoch, prepared_t));
+    CHECK(prepared_t == first_application_epoch);
+    CHECK_FALSE(adapter.is_complete());
+    REQUIRE(adapter.publish_at_deadline(prepared_t, *navigator, logger));
+    CHECK_FALSE(adapter.is_complete());
+    REQUIRE(navigator->update());
+    REQUIRE(adapter.after_navigation_update(prepared_t, *navigator));
+
+    core::Timestamp second_application_epoch{};
+    core::Timestamp source_end{};
+    REQUIRE(
+        core::timestamp_from_seconds(0.002, core::TimeScale::Monotonic, second_application_epoch));
+    REQUIRE(core::timestamp_from_seconds(0.0015, core::TimeScale::Monotonic, source_end));
+    REQUIRE(adapter.prepare_before_deadline(second_application_epoch, prepared_t));
+    CHECK(prepared_t == source_end);
+    CHECK_FALSE(adapter.is_complete());
+    REQUIRE(adapter.publish_at_deadline(prepared_t, *navigator, logger));
+    CHECK(adapter.is_complete());
+    REQUIRE(navigator->finalize());
+    REQUIRE(adapter.after_navigation_update(prepared_t, *navigator));
+
+    core::Timestamp repeated_prepared_t{};
+    CHECK_FALSE(adapter.prepare_before_deadline(second_application_epoch, repeated_prepared_t));
+    CHECK(std::string{adapter.last_error()} == "SWIL prepare called outside the valid lifecycle");
+    REQUIRE(adapter.finalize());
+    logger.close();
+}
+
+TEST_CASE("Mission app completes at a finite source end between application epochs")
+{
+    const ScopedTemporaryDirectory temporary_directory{"navkit_sw_il_unaligned_end_app_test"};
+    const std::filesystem::path output_dir = temporary_directory.path() / "output";
+    const nlohmann::json cfg = short_terminal_stationary_config(output_dir);
+    const std::filesystem::path config_path = temporary_directory.path() / "scenario.json";
+    {
+        std::ofstream config_stream{config_path};
+        REQUIRE(config_stream);
+        config_stream << cfg;
+    }
+
+    CHECK(MissionApp<EcefInsGnssAppConfig>::run<navkit::swil::SwilMissionAdapterFactory>(
+              config_path) == 0);
+    CHECK(std::filesystem::exists(output_dir / "data" / "run_manifest.json"));
+}
+
 TEST_CASE("Default compile-time attitude covariance is symmetric in ECEF")
 {
     using NavKit = EcefInsGnssAppConfig::NavKit;
@@ -439,7 +622,8 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts a Guidance state-machine traj
 {
     nlohmann::json cfg = valid_state_machine_runtime_config();
     const sim::StateMachineTrajectoryConfig inherited_filter_trajectory =
-        state_machine_trajectory_config_from_json(cfg);
+        state_machine_trajectory_config_from_compiled_json(
+            navkit::swil::detail::swil_trajectory_config_from_json(cfg));
     REQUIRE(inherited_filter_trajectory.state_machine.states.size() == 1U);
     CHECK(inherited_filter_trajectory.state_machine.states.front()
               .guidance_command_filter.specific_force_time_constant_b_s.isApprox(
@@ -461,7 +645,8 @@ TEST_CASE("ECEF INS GNSS runtime validator accepts a Guidance state-machine traj
 
     CHECK_NOTHROW(validate_runtime_config<EcefInsGnssAppConfig>(cfg));
     const sim::StateMachineTrajectoryConfig trajectory =
-        state_machine_trajectory_config_from_json(cfg);
+        state_machine_trajectory_config_from_compiled_json(
+            navkit::swil::detail::swil_trajectory_config_from_json(cfg));
     REQUIRE(trajectory.state_machine.states.size() == 1U);
     CHECK(trajectory.state_machine.initial_state_id == "active");
     CHECK(trajectory.state_machine.states.front().id == "active");
@@ -703,11 +888,13 @@ TEST_CASE("Generated trajectory common validation accepts initial velocity and r
                          {"rpy_b2n_deg", {0.0, 0.0, 28.64788975654116}},
                          {"speed_mps", 120.0},
                          {"v_n_mps", {120.0, 0.0, 0.0}}};
-    CHECK_NOTHROW(detail::validate_generated_trajectory_common(cfg.at("mission"), true, false));
+    CHECK_NOTHROW(
+        navkit::swil::detail::validate_generated_trajectory_common(cfg.at("mission"), true, false));
 
     cfg.at("mission").emplace("w_ib_b_degps", nlohmann::json{0.0, 0.0, 0.0});
-    CHECK_THROWS_AS(detail::validate_generated_trajectory_common(cfg.at("mission"), true, false),
-                    std::runtime_error);
+    CHECK_THROWS_AS(
+        navkit::swil::detail::validate_generated_trajectory_common(cfg.at("mission"), true, false),
+        std::runtime_error);
 }
 
 TEST_CASE("ECEF INS GNSS runtime validator accepts GNSS full covariance")
@@ -1454,7 +1641,7 @@ TEST_CASE("Trajectory w_nb_b initialization includes Earth and local transport r
                                                 {"rpy_b2n_deg", {0.0, 0.0, 0.0}},
                                                 {"w_nb_b_degps", {0.0, 0.0, 0.0}}};
 
-    const SimulationRun trajectory = simulation_run_from_json(cfg);
+    const SwilRuntime trajectory = swil_runtime_from_json(cfg);
     const core::Scalar_t expected_x_radps =
         core::environment::Wgs84::omega_rad_s + (100.0 / core::environment::Wgs84::a_m);
     CHECK(trajectory.initial_truth.w_ib_b_radps.x() == doctest::Approx(expected_x_radps));
@@ -1465,13 +1652,13 @@ TEST_CASE("Trajectory w_nb_b initialization includes Earth and local transport r
 TEST_CASE("Explicit PVA initialization provider applies configured errors")
 {
     const nlohmann::json cfg = explicit_pva_runtime_config();
-    const SimulationRun trajectory = simulation_run_from_json(cfg);
+    const SwilRuntime trajectory = swil_runtime_from_json(cfg);
 
     static_assert(NavInitializationProviderPolicy<PvaExplicitInitializationProvider>);
     CHECK_NOTHROW(PvaExplicitInitializationProvider::validate_runtime_config(cfg));
 
     const PvaInitialization pva_init =
-        PvaExplicitInitializationProvider::initialize(cfg, trajectory);
+        PvaExplicitInitializationProvider::initialize(cfg, trajectory.initial_truth);
 
     CHECK(core::timestamp_seconds(pva_init.t) == doctest::Approx(0.0));
     CHECK(core::estimation::pos_e_m(pva_init.pva)(0) == doctest::Approx(6378137.0 - 10.0));
@@ -1492,12 +1679,13 @@ TEST_CASE("Direct PVA initialization provider uses configured values")
           {"p_e_m", {1.0, 2.0, 3.0}},
           {"v_e_mps", {4.0, 5.0, 6.0}},
           {"rpy_b2e_deg", {5.729577951308233, 11.459155902616466, 17.188733853924695}}}}};
-    const SimulationRun trajectory = simulation_run_from_json(cfg);
+    const SwilRuntime trajectory = swil_runtime_from_json(cfg);
 
     static_assert(NavInitializationProviderPolicy<PvaDirectInitializationProvider>);
     CHECK_NOTHROW(PvaDirectInitializationProvider::validate_runtime_config(cfg));
 
-    const PvaInitialization pva_init = PvaDirectInitializationProvider::initialize(cfg, trajectory);
+    const PvaInitialization pva_init =
+        PvaDirectInitializationProvider::initialize(cfg, trajectory.initial_truth);
 
     CHECK(core::timestamp_seconds(pva_init.t) == doctest::Approx(12.5));
     CHECK(core::estimation::pos_e_m(pva_init.pva).isApprox(core::Vec3{1.0, 2.0, 3.0}));
@@ -1518,8 +1706,9 @@ TEST_CASE("Full row-major filter initial covariance populates the Kalman filter"
     cfg.emplace("filter_initialization",
                 nlohmann::json{{"initial_covariance", {{"full", full_cov}}}});
 
-    const SimulationRun trajectory = simulation_run_from_json(cfg);
-    const PvaInitialization pva_init = PvaRandomInitializationProvider::initialize(cfg, trajectory);
+    const SwilRuntime trajectory = swil_runtime_from_json(cfg);
+    const PvaInitialization pva_init =
+        PvaRandomInitializationProvider::initialize(cfg, trajectory.initial_truth);
 
     std::unique_ptr<NavKit::Navigator> navigator = std::make_unique<NavKit::Navigator>();
     initialize_navigator<NavKit>(pva_init, cfg, *navigator);
@@ -1543,8 +1732,9 @@ TEST_CASE("Frame-aware PVA initial covariance populates the full filter covarian
                            {"vel_m2ps2", {4.0, 5.0, 6.0}},
                            {"att_rotvec_rad2", {7.0, 8.0, 9.0}}}},
                          {"remaining_error_state_diag", {10.0, 11.0, 12.0, 13.0, 14.0, 15.0}}}}});
-    const SimulationRun trajectory = simulation_run_from_json(cfg);
-    const PvaInitialization pva_init = PvaRandomInitializationProvider::initialize(cfg, trajectory);
+    const SwilRuntime trajectory = swil_runtime_from_json(cfg);
+    const PvaInitialization pva_init =
+        PvaRandomInitializationProvider::initialize(cfg, trajectory.initial_truth);
 
     std::unique_ptr<NavKit::Navigator> navigator = std::make_unique<NavKit::Navigator>();
     initialize_navigator<NavKit>(pva_init, cfg, *navigator);
@@ -1583,8 +1773,9 @@ TEST_CASE("Runtime covariance floor populates and clamps the Navigator filter co
                            {"vel_m2ps2", {4.0, 5.0, 6.0}},
                            {"att_rotvec_rad2", {7.0, 8.0, 9.0}}}},
                          {"remaining_error_state_diag", {10.0, 11.0, 12.0, 13.0, 14.0, 15.0}}}}});
-    const SimulationRun trajectory = simulation_run_from_json(cfg);
-    const PvaInitialization pva_init = PvaRandomInitializationProvider::initialize(cfg, trajectory);
+    const SwilRuntime trajectory = swil_runtime_from_json(cfg);
+    const PvaInitialization pva_init =
+        PvaRandomInitializationProvider::initialize(cfg, trajectory.initial_truth);
 
     std::unique_ptr<NavKit::Navigator> navigator = std::make_unique<NavKit::Navigator>();
     NavKit::Filter::P_t covariance = NavKit::Filter::P_t::Zero();
@@ -1627,13 +1818,15 @@ TEST_CASE("Runtime propagation override populates the Navigator propagation poli
 TEST_CASE("Random PVA initialization provider produces deterministic colored draws")
 {
     const nlohmann::json cfg = random_pva_runtime_config();
-    const SimulationRun trajectory = simulation_run_from_json(cfg);
+    const SwilRuntime trajectory = swil_runtime_from_json(cfg);
 
     static_assert(NavInitializationProviderPolicy<PvaRandomInitializationProvider>);
     CHECK_NOTHROW(PvaRandomInitializationProvider::validate_runtime_config(cfg));
 
-    const PvaInitialization first = PvaRandomInitializationProvider::initialize(cfg, trajectory);
-    const PvaInitialization second = PvaRandomInitializationProvider::initialize(cfg, trajectory);
+    const PvaInitialization first =
+        PvaRandomInitializationProvider::initialize(cfg, trajectory.initial_truth);
+    const PvaInitialization second =
+        PvaRandomInitializationProvider::initialize(cfg, trajectory.initial_truth);
 
     CHECK(core::estimation::pos_e_m(first.pva).isApprox(core::estimation::pos_e_m(second.pva)));
     CHECK(core::estimation::vel_e_mps(first.pva).isApprox(core::estimation::vel_e_mps(second.pva)));
@@ -1648,10 +1841,11 @@ TEST_CASE("Random PVA initialization provider accepts NED covariance frame")
     cfg.at("pva_initialization").at("pva_error_frame") = "ned";
     cfg.at("pva_initialization").at("pva_error_cov") = {
         {"diag", {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0}}};
-    const SimulationRun trajectory = simulation_run_from_json(cfg);
+    const SwilRuntime trajectory = swil_runtime_from_json(cfg);
 
     CHECK_NOTHROW(PvaRandomInitializationProvider::validate_runtime_config(cfg));
-    const PvaInitialization pva_init = PvaRandomInitializationProvider::initialize(cfg, trajectory);
+    const PvaInitialization pva_init =
+        PvaRandomInitializationProvider::initialize(cfg, trajectory.initial_truth);
 
     CHECK_FALSE((core::estimation::pos_e_m(pva_init.pva) - trajectory.initial_truth.p_e).isZero());
 }
@@ -1690,9 +1884,9 @@ TEST_CASE("NavInitialization maps into the configured Navigator filter state")
         .emplace(
             "nominal_state",
             nlohmann::json{{"non_pva_values", {1.0e-4, 2.0e-4, 3.0e-4, 1.0e-3, 2.0e-3, 3.0e-3}}});
-    const SimulationRun trajectory = simulation_run_from_json(cfg);
+    const SwilRuntime trajectory = swil_runtime_from_json(cfg);
     const PvaInitialization nav_init =
-        PvaExplicitInitializationProvider::initialize(cfg, trajectory);
+        PvaExplicitInitializationProvider::initialize(cfg, trajectory.initial_truth);
     const Eigen::Quaternion<core::Scalar_t> expected_q_b2e =
         trajectory.initial_truth.q_b2e.normalized();
 
@@ -1757,9 +1951,9 @@ TEST_CASE("Initial estimate error applies against the simulation truth reference
                                    1.0e-3,
                                    2.0e-3,
                                    3.0e-3}}}}});
-    const SimulationRun trajectory = simulation_run_from_json(cfg);
+    const SwilRuntime trajectory = swil_runtime_from_json(cfg);
     const PvaInitialization pva_init =
-        PvaExplicitInitializationProvider::initialize(cfg, trajectory);
+        PvaExplicitInitializationProvider::initialize(cfg, trajectory.initial_truth);
     InitialTruthReference<StateDef> reference{};
     populate_initial_pva_from_truth<StateDef>(trajectory.initial_truth, reference);
     core::estimation::segment<Nominal::GyroB>(reference.truth_state) = core::Vec3{0.01, 0.02, 0.03};

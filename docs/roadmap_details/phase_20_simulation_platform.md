@@ -9,10 +9,21 @@ This phase turns the simulator and analysis tooling into a broader platform afte
 - [ ] Add multi-vehicle simulation support when scenario management, logging, and analysis outputs can represent multiple truth and estimate streams clearly.
 - [ ] Define inter-vehicle timing, relative measurements, shared environment assumptions, and output naming conventions before implementation.
 
-## Pass 20.2: hardware-in-the-loop integration
+## Pass 20.2: mixed-HWIL and external-flight-computer orchestration
 
-- [ ] Add hardware-in-the-loop interfaces only after embedded status/error handling, timing, allocation, and packaging expectations are mature.
-- [ ] Define transport, clocking, data contracts, failure modes, and qualification evidence required for HIL runs.
+- [ ] Extend the Pass 8.8 composition seam into a dedicated mixed-HWIL
+  application whose channel graph assigns exactly one producer to every input:
+  emulator, real transport, or external stimulus equipment. Keep reusable
+  simulator models under `navkit::sim` and hardware transports outside the
+  target-neutral mission host.
+- [ ] Add a separate long-range HWIL orchestrator for production flight-computer
+  hardware running its real flight binary. The orchestrator owns simulated
+  truth/plant state, clocks, networking and buses, RF/analog/digital stimulus,
+  faults, telemetry, and actuator feedback; the flight binary remains unaware
+  of the test environment.
+- [ ] Define transport timing, startup/shutdown, failure modes, per-channel
+  ownership, synchronization, and retained qualification evidence before the
+  first concrete hardware adapter is accepted.
 
 ## Pass 20.3: production scenario management and qualification reports
 

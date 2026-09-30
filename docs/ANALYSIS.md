@@ -102,23 +102,23 @@ input and output location explicitly:
 
 ```powershell
 python tools/run_scenario.py --build-type Release `
-  --config config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_covariance_override.json `
+  --config config/runtime/navkit/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_covariance_override.json `
   --output-dir output/logs/my_case
 ```
 
-`run_scenario.py` resolves a component-linked scenario into a self-contained
-`effective_runtime_config.json`, executes the ordinary simulator, then invokes
+`run_scenario.py` resolves an explicitly linked runtime graph into a self-contained
+`effective_runtime_config.json`, executes the SWIL application, then invokes
 `plot_run.py` and `plot_trajectory.py`. The trajectory tool exits cleanly when
 the scenario did not enable any trajectory-inspection products. The resolved
 file makes every run replayable and is the input required when invoking the
-simulator executable directly. Add `--no-plot` to retain the one-command
+SWIL executable directly. Add `--no-plot` to retain the one-command
 scenario setup while skipping post-processing.
 
 Use the lower-level runner when no analysis should run:
 
 ```powershell
 python tools/run_sim.py --build-type Release `
-  --config config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json
+  --config config/runtime/navkit/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json
 ```
 
 Analyze existing logs without rerunning the simulation:
@@ -265,7 +265,7 @@ has this shape:
   "suite_name": "ecef_ins_truth_reconstruction",
   "execution": {
     "build_type": "Release",
-    "navkit_config": "apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
+    "navkit_config": "apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
   },
   "output": {
     "root": "output/regression/ecef_ins_truth_reconstruction"
@@ -273,7 +273,7 @@ has this shape:
   "cases": [
     {
       "name": "stationary_free_inertial",
-      "scenario": "../navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_free_inertial_truth_reconstruction.json",
+      "scenario": "../navkit/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_free_inertial_truth_reconstruction.json",
       "minimum_duration_s": 59.9,
       "minimum_sample_count": 2500,
       "thresholds": {

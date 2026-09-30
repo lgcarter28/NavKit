@@ -5,7 +5,7 @@ This index identifies each document's role and authority.
 ## Start here
 
 - [`SETUP.md`](SETUP.md): prerequisites, environment setup, build/test commands, simulation, analysis, and the intended developer workflow.
-- [`ARCHITECTURE.md`](ARCHITECTURE.md): current source layout, CMake target boundaries, namespaces, and data flow.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md): current source layout, common-versus-SWIL CMake boundaries, target-neutral mission/adapter lifecycle, namespaces, and data flow.
 - [`CONFIGURATION.md`](CONFIGURATION.md): compile-time configuration mental model, domain config concepts, example config contracts, and selected-config workflow.
 - [`TESTING.md`](TESTING.md): testing layers, design-intent standards, expected-failure coverage, coverage posture, and runtime timing/resource artifacts.
 - [`PROFILING.md`](PROFILING.md): embedded profiling policies, fixed-capacity sinks, CSV export, and trace visualization workflow.

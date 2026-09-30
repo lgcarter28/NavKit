@@ -59,7 +59,7 @@ public:
                     "guidance_reference_position_e_z_m",
                     "guidance_reference_index",
                     "guidance_reference_position_valid",
-                    "guidance_state_index",
+                    "mission_phase_index",
                     "guidance_active",
                     "pad_constraint_active"});
     }
@@ -103,7 +103,7 @@ public:
                         data.guidance_reference_position_e_m.z(),
                         data.guidance_reference_index,
                         data.guidance_reference_position_valid,
-                        data.guidance_state_index,
+                        data.mission_phase_index,
                         data.guidance_active,
                         data.pad_constraint_active);
     }

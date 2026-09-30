@@ -55,6 +55,47 @@ and the design intent behind the active phase.
   quaternion composition for attitude, and added CSV replay coverage for the
   composed result.
 
+### Pass 8.7: target-agnostic mission runtime and execution adapters
+
+- [x] Replaced the SWIL-specific host loop with target-neutral `MissionApp`
+  ownership of planned-time sequencing, mission synchronization, Navigator
+  updates, cleanup, and logging.
+- [x] Added `MissionRuntime` ownership of stable phase IDs, validated graph
+  topology, checked transitions, active-phase state, and Navigation-phase
+  application at the planned deadline.
+- [x] Added a shallow `MissionAdapter` lifecycle separating pre-deadline
+  preparation, at-deadline publication/acquisition, and post-navigation
+  feedback. Synthetic truth and emulator state remain SWIL-owned.
+- [x] Added exact terminal-sample, unaligned finite-source, cleanup, lifecycle,
+  graph, transition, and fail-closed target tests. Renamed the remaining
+  trajectory diagnostic identity to `mission_phase_index`.
+
+### Pass 8.8: target-specific applications and mixed-HWIL composition seam
+
+- [x] Renamed the in-process executable from `navkit_sim` to `navkit_swil`,
+  retained `navkit::sim` as reusable simulation infrastructure, and removed
+  the empty replay executable.
+- [x] Made the thin executable supply a fixed `SwilMissionAdapterFactory` to
+  the common `MissionApp`. The factory creates the concrete adapter behind
+  `std::unique_ptr<MissionAdapter<Navigator, Logger>>`; product configs no
+  longer duplicate application or target selection.
+- [x] Split common mission, Navigation, filter, initialization, and propagation
+  validation from SWIL-owned truth, plant, emulator, and rate validation.
+  Executable/runtime target mismatches fail before target-specific schema
+  parsing.
+- [x] Established `navkit::app_support_common` over core/IO and
+  `navkit::swil_support` over common/simulation. Concrete SWIL composition
+  lives under `navkit::swil`; reusable simulators remain under `navkit::sim`.
+- [x] Strengthened pure-SWIL composition so every configured Navigator aiding
+  sensor has exactly one emulator binding. Mixed emulator/hardware ownership
+  remains a deliberate seam until the first real transport exists.
+- [x] Kept `hwil` recognized but unavailable rather than inventing a fake
+  adapter. Updated config paths, build roots, presets, tools, install/export
+  names, tests, and VS Code launch preparation for `navkit_swil`.
+- [x] Verified copyright/format checks, all 83 Python tests, clean Default and
+  Profiled Debug builds and tests, an installed-package smoke, a clean Release
+  build, and all four deterministic truth-reconstruction regressions.
+
 ## Earlier completed validation foundation
 
 - [x] Basic plots, innovation histories, NIS/p-value plots, histograms, ECEF/NED covariance/error plots, and dashboard plots exist.

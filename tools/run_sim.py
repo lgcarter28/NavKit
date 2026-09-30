@@ -36,14 +36,14 @@ from internal.runtime_config import (
 )
 
 
-def default_exe(build_dir: Path, build_type: str) -> Path:
-    base = build_dir / "apps" / "navkit_sim"
+def default_swil_executable(build_dir: Path, build_type: str) -> Path:
+    base = build_dir / "apps" / "navkit_swil"
     if platform.system() == "Windows":
-        candidate = base / build_type / "navkit_sim.exe"
+        candidate = base / build_type / "navkit_swil.exe"
         if candidate.exists():
             return candidate
-        return base / "navkit_sim.exe"
-    return base / "navkit_sim"
+        return base / "navkit_swil.exe"
+    return base / "navkit_swil"
 
 
 def load_build_manifest(build_dir: Path) -> dict[str, object]:
@@ -78,7 +78,7 @@ def remove_stale_profile_artifacts(output_dir: Path) -> bool:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run the configured NavKit simulation app.")
+    parser = argparse.ArgumentParser(description="Run the configured NavKit SWIL application.")
     parser.add_argument("--build-type", choices=["Release", "Debug"], default="Release")
     parser.add_argument(
         "--build-dir",
@@ -121,6 +121,14 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--prepare-only",
+        action="store_true",
+        help=(
+            "Resolve the linked runtime graph and write effective_runtime_config.json "
+            "without launching navkit_swil."
+        ),
+    )
+    parser.add_argument(
         "--no-timing-report",
         action="store_true",
         help="Update timing.json without printing the simulation timing summary.",
@@ -137,13 +145,6 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    root = Path(__file__).resolve().parents[1]
-    build_dir = resolve_build_dir(
-        root, args.build_type, args.navkit_config, args.build_dir, generator=args.generator
-    )
-    build_manifest = load_build_manifest(build_dir)
-    navkit_config = str(build_manifest.get("navkit_config", "unknown"))
-
     runtime_config = resolve_runtime_asset_paths(load_runtime_config(args.config), args.config)
     runtime_config = apply_runtime_overrides(
         runtime_config, output_dir=args.output_dir, run_name=args.run_name
@@ -154,14 +155,25 @@ def main() -> int:
     timing_path = data_dir / "timing.json"
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    # The simulation executable consumes the fully resolved JSON object. This keeps
+    # The SWIL executable consumes the fully resolved JSON object. This keeps
     # recursive reference resolution a Python/tooling concern and makes every run replayable.
     runtime_config_path = write_effective_runtime_config(runtime_config, output_dir)
+
+    if args.prepare_only:
+        print(f"Wrote effective runtime config: {runtime_config_path}")
+        return 0
+
+    root = Path(__file__).resolve().parents[1]
+    build_dir = resolve_build_dir(
+        root, args.build_type, args.navkit_config, args.build_dir, generator=args.generator
+    )
+    build_manifest = load_build_manifest(build_dir)
+    navkit_config = str(build_manifest.get("navkit_config", "unknown"))
 
     if not remove_stale_profile_artifacts(data_dir):
         return 1
 
-    exe = default_exe(build_dir, args.build_type)
+    exe = default_swil_executable(build_dir, args.build_type)
     command = [str(exe), str(runtime_config_path)]
     print(f"Build config: {navkit_config}")
     print(f"Running {' '.join(command)}")

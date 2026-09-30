@@ -63,13 +63,14 @@ include/navkit/io/    Desktop logging/file/JSON public headers, including log
                        products and payload boundaries
 include/navkit/app_support/
                        Header-only executable support helpers organized by app
-                       config, emulation, runtime input, logging, profiling,
-                       trajectory, and initialization boundaries
+                       config, mission/execution, emulation, runtime input,
+                       logging, profiling, trajectory, and initialization
+                       boundaries
 config/               Compile-time configurations and runtime input bundles
 cmake/targets/        Header-only/interface CMake target definitions
 src/sim/              Compiled simulator implementation with matching domain
                        subdirectories
-apps/                 Simulation and replay applications
+apps/                 SWIL and future target-specific applications
 tests/                Doctest unit and compile-time tests
 python/               Offline analysis package
 tools/                Cross-platform developer commands
@@ -97,7 +98,8 @@ through `navkit::io`.
 | `navkit::core` | `navkit::api::config` | Public compile-time config contracts for product graph authors |
 | `navkit::sim` | `navkit::sim` | Simulation support |
 | `navkit::io` | `navkit::io` | Desktop logging, file, CSV, and JSON support |
-| `navkit::app_support` | `navkit::app_support` | Selected-config app runner, JSON input, config description, and profile export helpers |
+| `navkit::app_support_common` | `navkit::app_support` | Target-neutral mission runtime, adapter lifecycle, clocks, IO, and runtime-input helpers |
+| `navkit::swil_support` | `navkit::swil` and `navkit::app_support` | Selected-config SWIL composition layered on reusable simulation and target-neutral application support |
 
 Public namespaces mirror the folder structure through the stable domain level.
 Deeper leaf folders may organize implementation and policy families without

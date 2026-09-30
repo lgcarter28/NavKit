@@ -236,7 +236,7 @@ class TrajectoryPlotTests(unittest.TestCase):
                 guidance[column] = guidance_body[column]
         guidance["guidance_bank_command_n_rad"] = [0.0]
         guidance["guidance_bank_response_n_rad"] = [0.0]
-        guidance["guidance_state_index"] = [0]
+        guidance["mission_phase_index"] = [0]
         autopilot = frame_with_vectors(
             (
                 ("autopilot_angular_rate_command_b", "radps"),
@@ -385,7 +385,7 @@ class TrajectoryPlotTests(unittest.TestCase):
         self.assertNotIn("vehicle_response_body", plot_names)
         self.assertNotIn("nested_loop_response_body", plot_names)
 
-    def test_guidance_markers_follow_logged_state_indices(self) -> None:
+    def test_guidance_markers_follow_logged_mission_phase_indices(self) -> None:
         ned = pd.DataFrame(
             {
                 "time_s": [0.0, 1.0, 2.0],
@@ -397,7 +397,7 @@ class TrajectoryPlotTests(unittest.TestCase):
         guidance = pd.DataFrame(
             {
                 "time_s": [0.0, 1.0, 2.0],
-                "guidance_state_index": [5, 5, 1],
+                "mission_phase_index": [5, 5, 1],
             }
         )
 
@@ -409,9 +409,9 @@ class TrajectoryPlotTests(unittest.TestCase):
         assert spec is not None
         self.assertEqual(
             spec.traces[1].label,
-            "Guidance state 5 entered",
+            "Mission phase 5 entered",
         )
-        self.assertEqual(spec.traces[2].label, "Guidance state 1 entered")
+        self.assertEqual(spec.traces[2].label, "Mission phase 1 entered")
 
 
 if __name__ == "__main__":

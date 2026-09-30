@@ -13,6 +13,8 @@ add_executable(navkit_tests
     test_log_product_policy.cpp
     test_measurement_model_policy.cpp
     test_measurement_statistics.cpp
+    test_mission_adapter.cpp
+    test_mission_runtime.cpp
     test_noise_policy.cpp
     test_navigation_phase.cpp
     test_profile_csv_writer.cpp
@@ -49,3 +51,8 @@ target_include_directories(navkit_tests
 
 add_test(NAME navkit_tests COMMAND navkit_tests)
 navkit_configure_target(navkit_tests)
+
+add_executable(navkit_app_support_common_compile_test test_app_support_common_compile.cpp)
+target_link_libraries(navkit_app_support_common_compile_test PRIVATE navkit::app_support_common)
+add_test(NAME navkit_app_support_common_compile_test COMMAND navkit_app_support_common_compile_test)
+navkit_configure_target(navkit_app_support_common_compile_test)

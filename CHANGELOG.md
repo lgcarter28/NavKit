@@ -14,6 +14,22 @@ This project follows
 
 ### Added
 
+- Split target selection out of compile-time product configuration: the renamed
+  `navkit_swil` executable now supplies a fixed `SwilMissionAdapterFactory` to
+  the shared `MissionApp` host, validates target identity before SWIL schema,
+  constructs a type-erased `MissionAdapter`, and keeps SWIL composition under
+  `navkit::swil` / `navkit::swil_support`. The reusable `navkit::sim` library is
+  unchanged, the empty replay application is removed, and HWIL remains
+  intentionally fail closed pending a concrete mixed-bench transport.
+- Added a target-neutral `MissionRuntime` and shallow `MissionAdapter` lifecycle
+  so the common planned-time application loop owns legal phase transitions and
+  Navigation-phase application without reaching into SWIL trajectory internals.
+  The implemented SWIL adapter owns synthetic preparation, publication, and
+  closed-loop feedback; `hwil` is a recognized fail-closed selection until a
+  real transport/runtime adapter is supplied. Application-support CMake
+  dependencies now expose `navkit::app_support_common` over core/IO separately
+  from the `navkit::swil_support` composition boundary over common
+  support/simulation.
 - Runtime-configured chi-square innovation acceptance for separate GNSS
   position and velocity observations, with measurement-model-derived degrees
   of freedom and thresholds, rejection before persistent filter mutation, and
@@ -39,7 +55,7 @@ This project follows
   runtime JSON state graph composed from typed reference, acceleration, bank,
   transition, plant-constraint, and filter blocks. Guidance, Autopilot, and
   Vehicle/plant ownership now have distinct simulation domains, and trajectory
-  diagnostics expose a generic `guidance_state_index` instead of a fixed mode
+  diagnostics expose a generic `mission_phase_index` instead of a fixed mode
   enumeration. The Guidance-to-Autopilot command now contains only filtered
   body-specific force and bank, while focused execution, diagnostics, and
   Autopilot-state payloads prevent downstream consumers from depending on the
@@ -192,6 +208,11 @@ This project follows
 
 ### Changed
 
+- Renamed the selected desktop application and its compile-time config/build
+  tree from `navkit_sim` to `navkit_swil`, while retaining `navkit_sim` and
+  `navkit::sim` for the reusable simulation library. Developer tools, presets,
+  runtime suites, and debugger paths now identify the SWIL executable
+  consistently.
 - Moved applied-correction cycle ownership from `KalmanFilter` to `Navigator`:
   filter injection now returns a filter-domain correction value, Navigator
   composes sequential sensor corrections in injection order, and correction

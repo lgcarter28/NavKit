@@ -36,7 +36,7 @@ struct TrajectoryDiagnostics
     core::Scalar_t guidance_bank_filtered_n_rad{};
     core::Scalar_t guidance_bank_response_n_rad{};
     std::size_t guidance_reference_index{};
-    std::size_t guidance_state_index{};
+    std::size_t mission_phase_index{};
     bool guidance_reference_position_valid{false};
     bool guidance_active{false};
     bool pad_constraint_active{false};

@@ -263,7 +263,7 @@ These scripts provide a consistent cross-platform workflow and abstract away pla
 |---------|---------|
 | `build.py` | Configure, build, and rebuild NavKit using Conan and CMake |
 | `run_tests.py` | Execute the complete unit test suite |
-| `run_sim.py` | Run a selected runtime scenario with the built simulation executable |
+| `run_sim.py` | Run a selected runtime scenario with the built SWIL executable |
 | `plot_run.py` | Generate the standard domain-aware plots from existing single-run logs |
 | `plot_trajectory.py` | Generate interactive ECEF/ECI/NED/body trajectory and command/response plots |
 | `run_scenario.py` | Run a scenario, optionally override output location, and generate plots |
@@ -324,16 +324,16 @@ In day-to-day development, `--build-only` is typically sufficient unless CMake c
 
 Select a compile-time configuration with `--navkit-config`. The value is
 relative to `config/compiletime`, and defaults to
-`apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp`:
+`apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp`:
 
 ```bash
-python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
+python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
 That app-level selection composes:
 
 ```text
-config/compiletime/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
+config/compiletime/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
     -> config/compiletime/navkit/products/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
@@ -346,8 +346,8 @@ To run the same stationary GNSS scenario with the embedded-style profiling
 configuration:
 
 ```bash
-python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp
-python tools/run_sim.py --build-type Debug --navkit-config apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp
+python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp
+python tools/run_sim.py --build-type Debug --navkit-config apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp
 ```
 
 That writes `profile.csv` and `profile.trace.json` under
@@ -359,15 +359,15 @@ you want only the compact CSV profile export.
 Use a separate build directory for each selected compile-time configuration:
 
 ```bash
-python tools/build.py --build-type Debug --build-dir build/custom/ecef-ins-gnss --navkit-config apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
+python tools/build.py --build-type Debug --build-dir build/custom/ecef-ins-gnss --navkit-config apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
 The wrapper requires Ninja for its official default layout and derives build
 directories from build type and selected config, for example:
 
 ```text
-build/debug/apps/navkit_sim/EcefInsGnss
-build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled
+build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault
+build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled
 ```
 
 This keeps each generated `navkit/SelectedConfig.hpp` isolated. Debug/Release
@@ -409,16 +409,17 @@ The root `CMakeLists.txt` is intentionally an orchestration layer. Header-only/i
 cmake/targets/NavKitCore.cmake   navkit_core / navkit::core
 cmake/targets/NavKitIo.cmake     navkit_io / navkit::io
 src/sim/CMakeLists.txt           navkit_sim / navkit::sim
-src/app_support/CMakeLists.txt   navkit_app_support / navkit::app_support
+src/app_support/CMakeLists.txt   navkit_app_support_common / navkit::app_support_common
+                                 navkit_swil_support / navkit::swil_support
 ```
 
 Applications should link only the product-boundary targets they need. For
-example, `apps/navkit_sim` links `navkit::app_support` for selected-config
-description, JSON-input, runtime-validation, estimator-alias, and profile-export
-helpers, while its `main.cpp` remains a thin selected-config entry point. The
-generic `SimulationApp<Config>` loop lives in app support and is selected by the
-app compile-time config.
-`apps/navkit_replay` currently links only `navkit::core`.
+example, `apps/navkit_swil` links `navkit::swil_support` for selected-config SWIL
+composition, while its `main.cpp` remains a thin selected-config entry point.
+Target-neutral mission/runtime and adapter headers can instead link
+`navkit::app_support_common`, whose exported dependency boundary is limited to
+core and IO. The generic `MissionApp<Config>` host loop lives in app support and
+is paired with the fixed SWIL adapter factory by the executable.
 
 For target boundaries, namespaces, and the header-only versus compiled-library
 rationale, see [`ARCHITECTURE.md`](ARCHITECTURE.md).
@@ -436,13 +437,13 @@ The Python wrapper is preferred, but the raw commands are useful for debugging.
 From the repository root, install dependencies with Conan:
 
 ```bash
-conan install . --output-folder build/debug/apps/navkit_sim/EcefInsGnss --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Debug
+conan install . --output-folder build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Debug
 ```
 
 Conan 2 usually writes the generated CMake toolchain file to:
 
 ```text
-build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/build/Debug/generators/conan_toolchain.cmake
+build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/build/Debug/generators/conan_toolchain.cmake
 ```
 
 On Windows with Ninja/MSVC, run the manual CMake configure and build commands
@@ -450,27 +451,27 @@ from a Visual Studio Developer Prompt or first activate Conan's generated build
 environment:
 
 ```powershell
-build\\debug\\apps\\navkit_sim\\EcefInsGnssLcGyroAccelBiasDefault\build\Debug\generators\conanbuild.bat
+build\\debug\\apps\\navkit_swil\\variants\\ecef_ins_gnss_lc\\EcefInsGnssLcGyroAccelBiasDefault\build\Debug\generators\conanbuild.bat
 ```
 
 Configure CMake manually:
 
 ```bash
-cmake -S . -B build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
+cmake -S . -B build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
 To select a different compile-time config manually, use a matching build
 directory and `-DNAVKIT_CONFIG=...`:
 
 ```bash
-conan install . --output-folder build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Debug
-cmake -S . -B build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp
+conan install . --output-folder build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Debug
+cmake -S . -B build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled/build/Debug/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug -DNAVKIT_CONFIG=apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp
 ```
 
 Build manually:
 
 ```bash
-cmake --build build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault --config Debug
+cmake --build build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault --config Debug
 ```
 
 Install a staged local build when validating the deployable layout:
@@ -482,7 +483,7 @@ python tools/build.py --build-type Debug --build-only --install
 The default install prefix mirrors the selected build:
 
 ```text
-install/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault
+install/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault
 ```
 
 The install tree contains public headers, exported CMake package files,
@@ -493,9 +494,9 @@ default.
 For Release, replace `Debug` with `Release`:
 
 ```bash
-conan install . --output-folder build/release/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Release
-cmake -S . -B build/release/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/release/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/build/Release/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DNAVKIT_CONFIG=apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
-cmake --build build/release/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault --config Release
+conan install . --output-folder build/release/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault --build=missing -c tools.cmake.cmaketoolchain:generator=Ninja -s build_type=Release
+cmake -S . -B build/release/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault -G Ninja -DCMAKE_TOOLCHAIN_FILE=build/release/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/build/Release/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DNAVKIT_CONFIG=apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
+cmake --build build/release/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault --config Release
 ```
 
 Notes:
@@ -519,13 +520,13 @@ If the project has already been built, this runs CTest against the selected buil
 Equivalent raw CTest command:
 
 ```bash
-ctest --test-dir build/debug/apps/navkit_sim/EcefInsGnss --output-on-failure -C Debug
+ctest --test-dir build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault --output-on-failure -C Debug
 ```
 
 For Release:
 
 ```bash
-ctest --test-dir build/release/apps/navkit_sim/EcefInsGnss --output-on-failure -C Release
+ctest --test-dir build/release/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault --output-on-failure -C Release
 ```
 
 ---
@@ -542,18 +543,18 @@ For numerically intensive simulation and plotting, prefer a Release build. A
 single command can select the runtime input and output directory:
 
 ```bash
-python tools/run_scenario.py --build-type Release --config config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_covariance_override.json --output-dir output/logs/my_case
+python tools/run_scenario.py --build-type Release --config config/runtime/navkit/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_covariance_override.json --output-dir output/logs/my_case
 ```
 
 Use `run_sim.py` when only the C++ simulation should run:
 
 ```bash
-python tools/run_sim.py --build-type Debug --config config/runtime/navkit_sim/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json
+python tools/run_sim.py --build-type Debug --config config/runtime/navkit/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json
 ```
 
-Both scenario tools resolve role-keyed component links and write a
+Both scenario tools resolve explicit, recursively linked runtime objects and write a
 `data/effective_runtime_config.json` beside the run output. Invoke
-`navkit_sim.exe` directly only with that resolved file.
+`navkit_swil.exe` directly only with that resolved file.
 
 Run a Monte Carlo campaign with:
 
@@ -776,7 +777,7 @@ and accelerometer bias states. Its clangd and C/C++ IntelliSense configuration
 uses:
 
 ```text
-build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/
+build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/
     EcefInsGnssLcGyroAccelBiasDefault/compile_commands.json
 ```
 
@@ -805,19 +806,26 @@ python tools/build.py --build-type Debug --clean
 
 3. Press **F5** and select one of the launch configurations:
 
-- **Windows Debug navkit_sim (default)**
-- **Windows Debug navkit_sim (profiled)**
+- **Windows Debug navkit_swil (default)**
+- **Windows Debug navkit_swil (profiled)**
 - **Windows Debug navkit_tests (default)**
-- **Linux Debug navkit_sim (default)**
-- **Linux Debug navkit_sim (profiled)**
+- **Linux Debug navkit_swil (default)**
+- **Linux Debug navkit_swil (profiled)**
 - **Linux Debug navkit_tests (default)**
 
-The launch configurations intentionally assume a Debug build already exists and do not invoke the build system automatically. This keeps debugger startup fast and avoids issues related to Python virtual environments, Conan, and shell activation.
+The launch configurations intentionally assume a Debug build already exists and
+do not invoke the build system automatically. Before each SWIL debugging
+session, a lightweight pre-launch task resolves the component-linked scenario
+into
+`output/logs/vscode_navkit_swil_debug/effective_runtime_config.json`; the
+debugger passes that replayable document directly to `navkit_swil`. This keeps
+debugger startup fast while preserving the same runtime-config resolution used
+by `tools/run_sim.py`. Test launch entries do not run the preparation task.
 
 Useful first breakpoints:
 
 ```text
-apps/navkit_sim/main.cpp
+apps/navkit_swil/main.cpp
 
 include/navkit/core/estimation/navigator/Navigator.hpp
 include/navkit/core/estimation/filter/KalmanFilter.hpp

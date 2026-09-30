@@ -76,7 +76,7 @@ TEST_CASE("trajectory log builder resolves stationary truth into all inspection 
     diagnostics.specific_force_ib_b_mps2 = core::Vec3{0.5, 1.0, 1.5};
     diagnostics.guidance_acceleration_command_b_mps2 = core::Vec3{1.0, 2.0, 3.0};
     diagnostics.guidance_acceleration_response_b_mps2 = core::Vec3{0.75, 1.5, 2.25};
-    diagnostics.guidance_state_index = 4U;
+    diagnostics.mission_phase_index = 4U;
     diagnostics.autopilot_q_command_b2i = truth.q_b2e;
     diagnostics.autopilot_q_response_b2i = truth.q_b2e;
     diagnostics.autopilot_angular_rate_feedforward_b_radps = core::Vec3{0.1, 0.2, 0.3};
@@ -103,7 +103,7 @@ TEST_CASE("trajectory log builder resolves stationary truth into all inspection 
     CHECK(data.v_eb_b_mps.isZero());
     CHECK(data.guidance_acceleration_command_b_mps2 ==
           diagnostics.guidance_acceleration_command_b_mps2);
-    CHECK(data.guidance_state_index == diagnostics.guidance_state_index);
+    CHECK(data.mission_phase_index == diagnostics.mission_phase_index);
     CHECK(data.autopilot_angular_rate_feedforward_b_radps ==
           diagnostics.autopilot_angular_rate_feedforward_b_radps);
     CHECK(data.velocity_tracking_error_b_mps == diagnostics.velocity_tracking_error_b_mps);
@@ -231,7 +231,7 @@ TEST_CASE("trajectory logger writes frame-specific CSV and manifest products")
         CHECK(header.find("guidance_bank_response_n_rad") != std::string::npos);
         CHECK(header.find("guidance_reference_index") != std::string::npos);
         CHECK(header.find("guidance_reference_position_valid") != std::string::npos);
-        CHECK(header.find("guidance_state_index") != std::string::npos);
+        CHECK(header.find("mission_phase_index") != std::string::npos);
         CHECK(header.find("guidance_mode") == std::string::npos);
     }
     {

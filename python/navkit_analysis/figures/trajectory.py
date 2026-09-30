@@ -329,26 +329,28 @@ def _guidance_event_marker_traces(
     y: np.ndarray,
     z: np.ndarray,
 ) -> tuple[Plot3DTrace, ...]:
-    """Create markers for logged Guidance-state and waypoint transitions."""
+    """Create markers for logged mission-phase and waypoint transitions."""
     guidance = run.guidance
-    if guidance is None or "guidance_state_index" not in guidance:
+    if guidance is None or "mission_phase_index" not in guidance:
         return ()
-    state_index = guidance["guidance_state_index"].to_numpy(dtype=int)
-    if len(state_index) == 0:
+    mission_phase_index = guidance["mission_phase_index"].to_numpy(dtype=int)
+    if len(mission_phase_index) == 0:
         return ()
     transition_indices = np.flatnonzero(
-        np.concatenate(([True], state_index[1:] != state_index[:-1]))
+        np.concatenate(
+            ([True], mission_phase_index[1:] != mission_phase_index[:-1])
+        )
     )
     traces: list[Plot3DTrace] = []
     for index in transition_indices:
         transition_time_s = float(guidance["time_s"].iloc[index])
-        entered_state_index = int(state_index[index])
+        entered_phase_index = int(mission_phase_index[index])
         traces.append(
             Plot3DTrace(
                 x=np.array([np.interp(transition_time_s, trajectory_time_s, x)]),
                 y=np.array([np.interp(transition_time_s, trajectory_time_s, y)]),
                 z=np.array([np.interp(transition_time_s, trajectory_time_s, z)]),
-                label=f"Guidance state {entered_state_index} entered",
+                label=f"Mission phase {entered_phase_index} entered",
                 color="black",
                 mode="markers",
                 marker_size=6.0,

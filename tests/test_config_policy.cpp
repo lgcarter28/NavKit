@@ -99,7 +99,6 @@ TEST_CASE("Concrete config slices satisfy narrow configuration concepts")
                                      SimConfig::Sensors>,
                                  SimConfig::PrimaryGnssVelocitySensor>);
     static_assert(!HasLoggerAlias<SelectedAppConfig>);
-    static_assert(std::is_same_v<SelectedAppConfig::App::Logger, RuntimeLogger>);
     static_assert(navkit::io::LoggerPolicy<RuntimeLogger>);
     static_assert(
         navkit::io::LoggerPayloadPolicy<RuntimeLogger, navkit::io::TrajectoryEcefLogPayload>);

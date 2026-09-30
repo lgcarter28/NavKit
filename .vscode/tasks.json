@@ -1,0 +1,37 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Prepare navkit_swil debug runtime config",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "linux": {
+                "command": "${workspaceFolder}/.venv/bin/python"
+            },
+            "osx": {
+                "command": "${workspaceFolder}/.venv/bin/python"
+            },
+            "args": [
+                "${workspaceFolder}/tools/run_sim.py",
+                "--build-type",
+                "Debug",
+                "--config",
+                "${workspaceFolder}/config/runtime/navkit/scenario/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal.json",
+                "--output-dir",
+                "output/logs/vscode_navkit_swil_debug",
+                "--run-name",
+                "vscode_navkit_swil_debug",
+                "--prepare-only"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared",
+                "clear": false
+            }
+        }
+    ]
+}

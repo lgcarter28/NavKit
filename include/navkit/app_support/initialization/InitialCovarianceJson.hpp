@@ -4,9 +4,9 @@
 #pragma once
 
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
-#include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
 #include "navkit/core/estimation/filter/InitialCovariance.hpp"
 #include "navkit/core/estimation/state/StateDefPolicy.hpp"
+#include "navkit/core/frames/LocalLevel.hpp"
 
 #include <Eigen/Core>
 #include <cstddef>

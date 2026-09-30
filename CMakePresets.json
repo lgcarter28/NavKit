@@ -4,45 +4,45 @@
     {
       "name": "debug-ecef-ins-gnss-lc-gyro-accel-bias-default",
       "displayName": "Debug - ECEF INS/GNSS LC gyro/accel bias default",
-      "binaryDir": "${sourceDir}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault",
+      "binaryDir": "${sourceDir}/build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/build/Debug/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/build/Debug/generators/conan_toolchain.cmake",
+        "NAVKIT_CONFIG": "apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
       }
     },
     {
       "name": "debug-ecef-ins-gnss-lc-gyro-accel-bias-profiled",
       "displayName": "Debug - ECEF INS/GNSS LC gyro/accel bias profiled",
-      "binaryDir": "${sourceDir}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled",
+      "binaryDir": "${sourceDir}/build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled/build/Debug/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp"
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled/build/Debug/generators/conan_toolchain.cmake",
+        "NAVKIT_CONFIG": "apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp"
       }
     },
     {
       "name": "release-ecef-ins-gnss-lc-gyro-accel-bias-default",
       "displayName": "Release - ECEF INS/GNSS LC gyro/accel bias default",
-      "binaryDir": "${sourceDir}/build/release/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault",
+      "binaryDir": "${sourceDir}/build/release/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/release/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/build/Release/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/release/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault/build/Release/generators/conan_toolchain.cmake",
+        "NAVKIT_CONFIG": "apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
       }
     },
     {
       "name": "release-ecef-ins-gnss-lc-gyro-accel-bias-profiled",
       "displayName": "Release - ECEF INS/GNSS LC gyro/accel bias profiled",
-      "binaryDir": "${sourceDir}/build/release/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled",
+      "binaryDir": "${sourceDir}/build/release/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/release/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled/build/Release/generators/conan_toolchain.cmake",
-        "NAVKIT_CONFIG": "apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp"
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/release/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled/build/Release/generators/conan_toolchain.cmake",
+        "NAVKIT_CONFIG": "apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp"
       }
     }
   ],

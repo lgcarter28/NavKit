@@ -5,7 +5,7 @@
 
 #include "navkit/app_support/initialization/NavInitialization.hpp"
 #include "navkit/app_support/initialization/PvaInitializationJson.hpp"
-#include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
+#include "navkit/sim/trajectory/TruthSample.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -24,7 +24,7 @@ struct PvaDirectInitializationProvider
     }
 
     [[nodiscard]] static PvaInitialization initialize(const nlohmann::json& cfg,
-                                                      const SimulationRun&)
+                                                      const sim::TruthSample&)
     {
         return detail::pva_direct_from_json(cfg.at("pva_initialization"));
     }

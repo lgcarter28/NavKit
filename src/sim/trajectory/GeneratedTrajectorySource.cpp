@@ -213,7 +213,7 @@ diagnostics_from(const TrajectoryDynamicState& state,
     diagnostics.guidance_bank_filtered_n_rad = guidance_filter.bank_filtered_n_rad;
     static_cast<void>(
         bank_angle_from(state, environment, diagnostics.guidance_bank_response_n_rad));
-    diagnostics.guidance_state_index = guidance.execution.state_index;
+    diagnostics.mission_phase_index = guidance.execution.state_index;
     diagnostics.guidance_reference_index = guidance.diagnostics.reference_index;
     diagnostics.guidance_reference_position_valid = guidance.diagnostics.reference_position_valid;
     diagnostics.guidance_active = guidance.execution.guidance_active;

@@ -5,7 +5,7 @@
 
 #include "navkit/app_support/initialization/NavInitialization.hpp"
 #include "navkit/app_support/initialization/PvaInitializationJson.hpp"
-#include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
+#include "navkit/sim/trajectory/TruthSample.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -24,11 +24,11 @@ struct PvaExplicitInitializationProvider
     }
 
     [[nodiscard]] static PvaInitialization initialize(const nlohmann::json& cfg,
-                                                      const SimulationRun& simulation)
+                                                      const sim::TruthSample& initial_truth)
     {
         const nlohmann::json& initialization = cfg.at("pva_initialization");
 
-        PvaInitialization pva_init = detail::base_pva_initialization(simulation);
+        PvaInitialization pva_init = detail::base_pva_initialization(initial_truth);
         const core::Vec3 reference_p_e_m = core::estimation::pos_e_m(pva_init.pva);
         detail::apply_pva_error(pva_init,
                                 detail::pva_error_from_json(initialization, reference_p_e_m));

@@ -6,9 +6,10 @@
 #include "navkit/app_support/initialization/NavInitialization.hpp"
 #include "navkit/app_support/runtime/JsonInput.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
-#include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
 #include "navkit/core/estimation/navigator/PvaStateDef.hpp"
+#include "navkit/core/frames/LocalLevel.hpp"
 #include "navkit/core/math/Quaternion.hpp"
+#include "navkit/sim/trajectory/TruthSample.hpp"
 
 #include <Eigen/Eigenvalues>
 #include <Eigen/Geometry>
@@ -51,10 +52,9 @@ pva_initialization_type_from_json(const nlohmann::json& initialization)
     return type_iter->get<std::string>();
 }
 
-[[nodiscard]] inline PvaInitialization base_pva_initialization(const SimulationRun& simulation)
+[[nodiscard]] inline PvaInitialization base_pva_initialization(const sim::TruthSample& truth)
 {
     PvaInitialization pva_init;
-    const navkit::sim::TruthSample& truth = simulation.initial_truth;
     pva_init.t = truth.t;
     core::estimation::pos_e_m(pva_init.pva) = truth.p_e;
     core::estimation::vel_e_mps(pva_init.pva) = truth.v_e;
@@ -73,7 +73,12 @@ inline void require_exactly_one_pva_error_key(const nlohmann::json& pva_error,
                                               const std::vector<std::string>& keys,
                                               const std::string& group_name)
 {
-    const int count = count_present(pva_error, keys);
+    int count = 0;
+    for (const std::string& key : keys) {
+        if (pva_error.contains(key)) {
+            ++count;
+        }
+    }
     if (count != 1) {
         throw_runtime_config_error("pva_initialization.pva_error must specify exactly one " +
                                    group_name + " convention");

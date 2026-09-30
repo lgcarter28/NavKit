@@ -8,7 +8,7 @@
 #include "navkit/app_support/initialization/concrete/PvaDirectInitializationProvider.hpp"
 #include "navkit/app_support/initialization/concrete/PvaExplicitInitializationProvider.hpp"
 #include "navkit/app_support/initialization/concrete/PvaRandomInitializationProvider.hpp"
-#include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
+#include "navkit/sim/trajectory/TruthSample.hpp"
 
 #include <nlohmann/json.hpp>
 #include <string>
@@ -40,19 +40,19 @@ struct PvaRuntimeInitializationProvider
     }
 
     [[nodiscard]] static PvaInitialization initialize(const nlohmann::json& cfg,
-                                                      const SimulationRun& simulation)
+                                                      const sim::TruthSample& initial_truth)
     {
         const nlohmann::json& initialization = cfg.at("pva_initialization");
         const std::string type = detail::pva_initialization_type_from_json(initialization);
 
         if (type == PvaRandomInitializationProvider::runtime_type) {
-            return PvaRandomInitializationProvider::initialize(cfg, simulation);
+            return PvaRandomInitializationProvider::initialize(cfg, initial_truth);
         }
         if (type == PvaExplicitInitializationProvider::runtime_type) {
-            return PvaExplicitInitializationProvider::initialize(cfg, simulation);
+            return PvaExplicitInitializationProvider::initialize(cfg, initial_truth);
         }
         if (type == PvaDirectInitializationProvider::runtime_type) {
-            return PvaDirectInitializationProvider::initialize(cfg, simulation);
+            return PvaDirectInitializationProvider::initialize(cfg, initial_truth);
         }
 
         detail::throw_runtime_config_error("unsupported pva_initialization.type '" + type + "'");

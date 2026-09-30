@@ -4,7 +4,7 @@
 #pragma once
 
 #include "navkit/app_support/config/ConfigTraits.hpp"
-#include "navkit/app_support/config/SimulationAppConfigPolicy.hpp"
+#include "navkit/app_support/config/MissionAppConfigPolicy.hpp"
 #include "navkit/app_support/emulation/concrete/ImuRuntime.hpp"
 #include "navkit/app_support/logging/MeasurementStatisticsLogger.hpp"
 #include "navkit/app_support/logging/TrajectoryLogDataBuilder.hpp"
@@ -29,7 +29,7 @@
 namespace navkit::app_support
 {
 
-template<SimulationAppConfigPolicy Config>
+template<MissionAppConfigPolicy Config>
 class SimulationRunLogger
 {
 public:

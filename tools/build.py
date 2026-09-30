@@ -157,18 +157,18 @@ def selected_navkit_config(build_dir: Path, navkit_config_arg: str | None) -> st
     return DEFAULT_NAVKIT_CONFIG
 
 
-def navkit_sim_executable(build_dir: Path, build_type: str) -> Path:
-    base = build_dir / "apps" / "navkit_sim"
+def navkit_swil_executable(build_dir: Path, build_type: str) -> Path:
+    base = build_dir / "apps" / "navkit_swil"
     if platform.system() == "Windows":
-        candidate = base / build_type / "navkit_sim.exe"
+        candidate = base / build_type / "navkit_swil.exe"
         if candidate.exists():
             return candidate
-        return base / "navkit_sim.exe"
-    return base / "navkit_sim"
+        return base / "navkit_swil.exe"
+    return base / "navkit_swil"
 
 
 def query_compiletime_config_metadata(build_dir: Path, build_type: str) -> dict[str, object]:
-    executable = navkit_sim_executable(build_dir, build_type)
+    executable = navkit_swil_executable(build_dir, build_type)
     if not executable.exists():
         return {}
 

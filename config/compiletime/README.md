@@ -18,10 +18,10 @@ links a NavKit config to an app runner.
 
 Provided `NAVKIT_CONFIG` selections:
 
-- `apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp`: default
-  scenario-agnostic simulation app using the unprofiled NavKit GNSS library
+- `apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp`: default
+  scenario-agnostic SWIL app using the unprofiled NavKit GNSS library
   config.
-- `apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp`: same app shape, but consumes a
+- `apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp`: same app shape, but consumes a
   profiled NavKit GNSS library config with a host microsecond clock,
   fixed-capacity profiling ring-buffer sink, and scoped profiler so the app
   emits `profile.csv`.
@@ -56,22 +56,24 @@ struct ExampleAppConfig
         navkit::app_support::EmulatorBinding<PrimaryEmulator, PrimarySensor>;
 
     using EmulatorBindings = std::tuple<PrimaryBinding>;
-
-    using App = navkit::app_support::SimulationApp<ExampleAppConfig>;
 };
 ```
 
-`SimulationApp` uses `navkit::app_support::RuntimeLogger<NavKit>` to expose the
-simulation log-product catalog. Runtime scenario logging settings select which
-non-embedded products are enabled and at what rates; the compile-time NavKit
-product config remains focused on the embedded-facing estimator graph.
+The thin executable, rather than the config, selects its fixed mission-adapter
+factory. For example, `navkit_swil` invokes `MissionApp<Config>` with
+`navkit::swil::SwilMissionAdapterFactory`. `MissionApp` uses
+`navkit::app_support::RuntimeLogger<NavKit>` to
+expose the simulation log-product catalog. Runtime scenario logging settings
+select which non-embedded products are enabled and at what rates; the
+compile-time NavKit product config remains focused on the embedded-facing
+estimator graph.
 
 Applications should include the generated `navkit/SelectedConfig.hpp` header and
 use `navkit::selected_config::Config` rather than including concrete config
 headers directly.
 
 When an app consumes runtime JSON, validate that input against the selected
-compile-time composition before running. `SimulationApp<Config>` uses
+compile-time composition before running. The SWIL adapter factory uses
 `EmulatorBindings` to decide which runtime sections are required. Stable
 unsigned `SensorId` values identify app/runtime streams. Configured emulator
 types carry the stream ID, explicit NavKit sensor aliases document which

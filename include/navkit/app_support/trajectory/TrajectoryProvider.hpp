@@ -3,13 +3,9 @@
 
 #pragma once
 
-#include "navkit/app_support/navigation/NavigationPhase.hpp"
-#include "navkit/app_support/navigation/NavigationPhaseJson.hpp"
 #include "navkit/app_support/runtime/JsonInput.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
 #include "navkit/app_support/runtime/RuntimeRate.hpp"
-#include "navkit/app_support/simulation/SwilMissionAdapter.hpp"
-#include "navkit/app_support/trajectory/ControlStateSourceMode.hpp"
 #include "navkit/app_support/trajectory/GuidanceStateMachineJson.hpp"
 #include "navkit/app_support/trajectory/TrajectoryAttitudeJson.hpp"
 #include "navkit/core/config/Types.hpp"
@@ -44,21 +40,6 @@
 
 namespace navkit::app_support
 {
-
-/**
- * \brief SWIL-owned trajectory source and runtime phase selections for one simulation run.
- *
- * \details This object is deliberately simulation-specific. Mission and Navigation phase
- * contracts remain independent of synthetic truth so future HWIL, flight, and third-party
- * adapters can consume them without constructing a trajectory source.
- */
-struct SimulationRun
-{
-    std::unique_ptr<sim::TrajectorySource> source{};
-    sim::TruthSample initial_truth{};
-    std::vector<NavigationPhase> navigation_phases{};
-    ControlStateSourceMode control_state_source{ControlStateSourceMode::NavigationEstimate};
-};
 
 namespace detail
 {
@@ -298,9 +279,8 @@ truth_trajectory_from_csv(const std::filesystem::path& path)
 } // namespace detail
 
 inline sim::StationaryTrajectoryConfig
-stationary_trajectory_config_from_json(const nlohmann::json& cfg)
+stationary_trajectory_config_from_compiled_json(const nlohmann::json& trajectory_config)
 {
-    const nlohmann::json trajectory_config = detail::swil_trajectory_config_from_json(cfg);
     sim::StationaryTrajectoryConfig traj_cfg;
     traj_cfg.duration_s = trajectory_config.at("duration_s").get<core::Time_t>();
     traj_cfg.rate = rational_rate_from_required_named_runtime_rate(
@@ -467,17 +447,9 @@ trajectory_profile_config_from_compiled_json(const nlohmann::json& trajectory_co
     return profile;
 }
 
-[[nodiscard]] inline sim::TrajectoryProfileConfig
-trajectory_profile_config_from_json(const nlohmann::json& cfg)
-{
-    return trajectory_profile_config_from_compiled_json(
-        detail::swil_trajectory_config_from_json(cfg));
-}
-
 [[nodiscard]] inline sim::StateMachineTrajectoryConfig
-state_machine_trajectory_config_from_json(const nlohmann::json& cfg)
+state_machine_trajectory_config_from_compiled_json(const nlohmann::json& trajectory_config)
 {
-    const nlohmann::json trajectory_config = detail::swil_trajectory_config_from_json(cfg);
     sim::StateMachineTrajectoryConfig result{};
     result.profile = trajectory_profile_config_from_compiled_json(trajectory_config);
     result.state_machine =
@@ -490,81 +462,6 @@ state_machine_trajectory_config_from_json(const nlohmann::json& cfg)
                                   ? sim::TrajectoryTerminationMode::GroundImpact
                                   : sim::TrajectoryTerminationMode::ConfiguredDuration;
     return result;
-}
-
-[[nodiscard]] inline ControlStateSourceMode
-simulation_control_state_source_from_json(const nlohmann::json& cfg)
-{
-    const nlohmann::json& simulation = detail::require_object(cfg, "simulation");
-    detail::require_string(simulation, "control_state_source");
-    ControlStateSourceMode mode{};
-    if (!control_state_source_mode_from_string(
-            simulation.at("control_state_source").get<std::string>(), mode)) {
-        detail::throw_runtime_config_error(
-            "simulation.control_state_source must be 'navigation_estimate' or "
-            "'truth_passthrough'");
-    }
-    return mode;
-}
-
-inline SimulationRun simulation_run_from_json(const nlohmann::json& cfg,
-                                              const std::filesystem::path& source_base_dir = {})
-{
-    const nlohmann::json trajectory_config = detail::swil_trajectory_config_from_json(cfg);
-    const std::string type = trajectory_config.value("type", "stationary");
-    std::vector<NavigationPhase> navigation_phases = navigation_phases_from_mission_json(cfg);
-    const ControlStateSourceMode control_state_source =
-        simulation_control_state_source_from_json(cfg);
-    if (type == "csv") {
-        const std::filesystem::path csv_path =
-            source_base_dir / trajectory_config.at("csv_path").get<std::string>();
-        sim::TruthTrajectory truth = detail::truth_trajectory_from_csv(csv_path);
-        const sim::TruthSample initial_truth = truth.first();
-        return {.source = std::make_unique<sim::TabulatedTrajectorySource>(std::move(truth)),
-                .initial_truth = initial_truth,
-                .navigation_phases = std::move(navigation_phases),
-                .control_state_source = control_state_source};
-    }
-
-    if (type == "stationary") {
-        const sim::StationaryTrajectoryConfig trajectory =
-            stationary_trajectory_config_from_json(cfg);
-        const sim::TruthSample initial_truth{
-            .t = trajectory.t_epoch,
-            .p_e = trajectory.p_e,
-            .v_e = trajectory.v_e,
-            .q_b2e = trajectory.q_b2e,
-            .w_ib_b_radps = trajectory.w_ib_b_radps,
-        };
-        return {.source = std::make_unique<sim::StationaryTrajectorySource>(trajectory),
-                .initial_truth = initial_truth,
-                .navigation_phases = std::move(navigation_phases),
-                .control_state_source = control_state_source};
-    }
-
-    std::unique_ptr<sim::TrajectorySource> source{};
-    if (type == "state_machine") {
-        source =
-            sim::state_machine_trajectory_source(state_machine_trajectory_config_from_json(cfg));
-    }
-    else {
-        detail::throw_runtime_config_error(
-            "simulation.source.type must be 'stationary', 'csv', or 'generated'");
-    }
-
-    if (!source || !source->advance_to(source->t_start())) {
-        detail::throw_runtime_config_error(
-            "trajectory generation failed for the configured profile");
-    }
-    sim::TruthSample initial_truth{};
-    if (!source->query(source->t_start(), initial_truth)) {
-        detail::throw_runtime_config_error(
-            "trajectory generation did not provide its initial truth sample");
-    }
-    return {.source = std::move(source),
-            .initial_truth = initial_truth,
-            .navigation_phases = std::move(navigation_phases),
-            .control_state_source = control_state_source};
 }
 
 } // namespace navkit::app_support

@@ -61,7 +61,7 @@ struct TrajectoryLogData
     core::Scalar_t guidance_bank_response_n_rad{};
     core::Vec3 guidance_reference_position_e_m{core::Vec3::Zero()};
     std::size_t guidance_reference_index{};
-    std::size_t guidance_state_index{};
+    std::size_t mission_phase_index{};
     bool guidance_active{false};
     bool pad_constraint_active{false};
     bool guidance_reference_position_valid{false};

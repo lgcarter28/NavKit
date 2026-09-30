@@ -15,7 +15,7 @@ RESOURCE_SCHEMA = "navkit.resources.v1"
 DEFAULT_TIMING_PATH = Path("output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal/data/timing.json")
 DEFAULT_RESOURCE_DIR = Path("output/logs/ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal")
 DEFAULT_RUN_NAME = "ecef_ins_gnss_lc_gyro_accel_bias_stationary_nominal"
-DEFAULT_NAVKIT_CONFIG = "apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
+DEFAULT_NAVKIT_CONFIG = "apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
 
 
 def utc_now() -> str:
@@ -214,10 +214,8 @@ def write_resource_report(
 
     artifacts = []
     artifact_names = {
-        "navkit_sim",
-        "navkit_sim.exe",
-        "navkit_replay",
-        "navkit_replay.exe",
+        "navkit_swil",
+        "navkit_swil.exe",
         "navkit_tests",
         "navkit_tests.exe",
         "libnavkit_sim.a",

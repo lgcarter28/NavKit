@@ -26,7 +26,7 @@ The central data flow is
 \end{aligned}
 \label{eq:trajectory_pipeline}
 \end{equation}
-SimulationApp alone selects whether the controller-facing state is a truth
+The SWIL mission adapter alone selects whether the controller-facing state is a truth
 passthrough or a timestamped Navigator estimate. Guidance consumes that typed
 state contract; the trajectory runtime extracts the narrower attitude, rate,
 velocity, and frame data required by Autopilot. Neither branch inspects the

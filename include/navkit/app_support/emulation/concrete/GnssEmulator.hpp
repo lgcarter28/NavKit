@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "navkit/app_support/runtime/JsonInput.hpp"
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
 #include "navkit/app_support/runtime/RuntimeRate.hpp"
 #include "navkit/core/environment/RotatingPlanetKinematics.hpp"

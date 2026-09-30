@@ -70,7 +70,7 @@ inline void apply_initial_truth_reference_contribution(const Runtime& runtime,
 /// Apply configured runtime truth-state contributions to an initial truth reference.
 ///
 /// A runtime contributes only the nominal-state terms it owns, such as realized IMU
-/// bias truth. Nested runtime tuples are intentionally traversed so SimulationApp does
+/// bias truth. Nested runtime tuples are intentionally traversed so the SWIL adapter does
 /// not need sensor-specific initialization knowledge.
 template<navkit::core::estimation::StateSpaceDefPolicy StateDef, typename RuntimeTuple>
 inline void apply_initial_truth_reference_from_runtimes(const RuntimeTuple& runtimes,

@@ -26,7 +26,7 @@ struct TrajectoryDynamicState
 /**
  * Source-agnostic state supplied to Guidance and Autopilot.
  *
- * SimulationApp may populate this from truth, a Navigator estimate, or a future
+ * A mission adapter may populate this from truth, a Navigator estimate, or a future
  * hardware adapter without changing either controller implementation.
  */
 struct TrajectoryControlState

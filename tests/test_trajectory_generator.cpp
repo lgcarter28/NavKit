@@ -10,6 +10,7 @@
 #include "navkit/sim/trajectory/GeneratedTrajectorySource.hpp"
 #include "navkit/sim/trajectory/StationaryTrajectorySource.hpp"
 #include "navkit/sim/trajectory/TrajectoryProfiles.hpp"
+#include "navkit/swil/SwilRuntime.hpp"
 #include "test_main.hpp"
 
 #include <algorithm>
@@ -229,7 +230,7 @@ TEST_CASE("Truth trajectory uses previous-value hold for commands and interpolat
     TrajectoryDiagnostics first_diagnostics{};
     first_diagnostics.guidance_acceleration_command_i_mps2 = Vec3::Constant(1.0);
     first_diagnostics.guidance_reference_index = 3U;
-    first_diagnostics.guidance_state_index = 4U;
+    first_diagnostics.mission_phase_index = 4U;
     first_diagnostics.autopilot_angular_rate_command_b_radps = Vec3::Constant(2.0);
     first_diagnostics.vehicle_specific_force_command_b_mps2 = Vec3::Constant(3.0);
     first_diagnostics.guidance_acceleration_response_i_mps2 = Vec3::Constant(4.0);
@@ -238,7 +239,7 @@ TEST_CASE("Truth trajectory uses previous-value hold for commands and interpolat
     TrajectoryDiagnostics second_diagnostics{};
     second_diagnostics.guidance_acceleration_command_i_mps2 = Vec3::Constant(11.0);
     second_diagnostics.guidance_reference_index = 7U;
-    second_diagnostics.guidance_state_index = 8U;
+    second_diagnostics.mission_phase_index = 8U;
     second_diagnostics.autopilot_angular_rate_command_b_radps = Vec3::Constant(12.0);
     second_diagnostics.vehicle_specific_force_command_b_mps2 = Vec3::Constant(13.0);
     second_diagnostics.guidance_acceleration_response_i_mps2 = Vec3::Constant(14.0);
@@ -251,7 +252,7 @@ TEST_CASE("Truth trajectory uses previous-value hold for commands and interpolat
     REQUIRE(trajectory.diagnostics_at(Timestamp{.s = 1U}, midpoint));
     CHECK(midpoint.guidance_acceleration_command_i_mps2.isApprox(Vec3::Constant(1.0)));
     CHECK(midpoint.guidance_reference_index == 3U);
-    CHECK(midpoint.guidance_state_index == 4U);
+    CHECK(midpoint.mission_phase_index == 4U);
     CHECK(midpoint.autopilot_angular_rate_command_b_radps.isApprox(Vec3::Constant(2.0)));
     CHECK(midpoint.vehicle_specific_force_command_b_mps2.isApprox(Vec3::Constant(3.0)));
     CHECK(midpoint.guidance_acceleration_response_i_mps2.isApprox(Vec3::Constant(9.0)));
@@ -406,7 +407,7 @@ TEST_CASE("CSV trajectory source uses the shared truth trajectory contract")
           {"phase_behavior", {{"playback", {{"constraint", "none"}}}}},
           {"control_state_source", "truth_passthrough"}}},
     };
-    app_support::SimulationRun run = app_support::simulation_run_from_json(cfg, path.parent_path());
+    navkit::swil::SwilRuntime run = navkit::swil::swil_runtime_from_json(cfg, path.parent_path());
     REQUIRE(run.source);
     REQUIRE(run.source->advance_to(Timestamp{.s = 1U}));
     TruthSample midpoint{};

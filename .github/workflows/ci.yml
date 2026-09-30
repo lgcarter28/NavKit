@@ -93,12 +93,12 @@ jobs:
         run: ${{ matrix.python }} tools/run_tests.py --build-type Debug --timing-output output/logs/stationary_gnss_demo/timing.json
 
       - name: Run stationary simulation
-        run: ${{ matrix.python }} tools/run_first_sim.py --build-type Debug
+        run: ${{ matrix.python }} tools/run_scenario.py --build-type Debug --output-dir output/logs/stationary_gnss_demo --run-name stationary_gnss_demo --no-plot
 
       - name: Run headless analysis
         env:
           MPLBACKEND: Agg
-        run: ${{ matrix.python }} tools/run_analysis.py output/logs/stationary_gnss_demo
+        run: ${{ matrix.python }} tools/plot_run.py output/logs/stationary_gnss_demo
 
       - name: Build Release
         run: ${{ matrix.python }} tools/build.py --build-type Release --clean --without-tests --warnings-as-errors --timing-output output/logs/stationary_gnss_demo/timing.json

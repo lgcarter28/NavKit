@@ -283,7 +283,7 @@ class DeterministicRegressionContractTests(unittest.TestCase):
                 "suite_name": "synthetic_suite",
                 "execution": {
                     "build_type": "Release",
-                    "navkit_config": "apps/navkit_sim/Synthetic.hpp",
+                    "navkit_config": "apps/navkit_swil/Synthetic.hpp",
                 },
                 "output": {"root": "output/regressions/synthetic"},
                 "cases": [

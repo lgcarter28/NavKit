@@ -4,7 +4,7 @@
 #pragma once
 
 #include "navkit/app_support/initialization/NavInitialization.hpp"
-#include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
+#include "navkit/sim/trajectory/TruthSample.hpp"
 
 #include <concepts>
 #include <nlohmann/json.hpp>
@@ -14,9 +14,9 @@ namespace navkit::app_support
 
 template<typename Candidate>
 concept NavInitializationProviderPolicy =
-    requires(const nlohmann::json& cfg, const SimulationRun& simulation) {
+    requires(const nlohmann::json& cfg, const sim::TruthSample& initial_truth) {
         { Candidate::validate_runtime_config(cfg) } -> std::same_as<void>;
-        { Candidate::initialize(cfg, simulation) } -> std::same_as<PvaInitialization>;
+        { Candidate::initialize(cfg, initial_truth) } -> std::same_as<PvaInitialization>;
     };
 
 } // namespace navkit::app_support

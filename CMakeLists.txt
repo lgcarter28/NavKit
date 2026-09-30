@@ -13,7 +13,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(NAVKIT_BUILD_TESTS "Build NavKit tests" ON)
-set(NAVKIT_CONFIG "apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
+set(NAVKIT_CONFIG "apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp"
     CACHE STRING "Compile-time NavKit config header relative to config/compiletime")
 
 set(NAVKIT_CONFIG_ROOT "${PROJECT_SOURCE_DIR}/config/compiletime")
@@ -22,7 +22,7 @@ if(IS_ABSOLUTE "${NAVKIT_CONFIG}")
 endif()
 
 if(NAVKIT_CONFIG MATCHES "\\\\")
-    message(FATAL_ERROR "NAVKIT_CONFIG must use forward slashes, for example apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp")
+    message(FATAL_ERROR "NAVKIT_CONFIG must use forward slashes, for example apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp")
 endif()
 
 if(NAVKIT_CONFIG MATCHES "(^|/)\\.\\.($|/)")
@@ -51,8 +51,7 @@ include(cmake/targets/NavKitIo.cmake)
 add_subdirectory(src/sim)
 add_subdirectory(src/app_support)
 
-add_subdirectory(apps/navkit_sim)
-add_subdirectory(apps/navkit_replay)
+add_subdirectory(apps/navkit_swil)
 
 if(NAVKIT_BUILD_TESTS)
     enable_testing()
@@ -62,9 +61,9 @@ endif()
 set_target_properties(navkit_core PROPERTIES EXPORT_NAME core)
 set_target_properties(navkit_io PROPERTIES EXPORT_NAME io)
 set_target_properties(navkit_sim PROPERTIES EXPORT_NAME sim)
-set_target_properties(navkit_app_support PROPERTIES EXPORT_NAME app_support)
-set_target_properties(navkit_sim_app PROPERTIES EXPORT_NAME sim_app)
-set_target_properties(navkit_replay PROPERTIES EXPORT_NAME replay)
+set_target_properties(navkit_app_support_common PROPERTIES EXPORT_NAME app_support_common)
+set_target_properties(navkit_swil_support PROPERTIES EXPORT_NAME swil_support)
+set_target_properties(navkit_swil PROPERTIES EXPORT_NAME swil_app)
 
 install(
     DIRECTORY "${PROJECT_SOURCE_DIR}/include/navkit"
@@ -76,9 +75,9 @@ install(
         navkit_core
         navkit_io
         navkit_sim
-        navkit_app_support
-        navkit_sim_app
-        navkit_replay
+        navkit_app_support_common
+        navkit_swil_support
+        navkit_swil
     EXPORT NavKitTargets
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"

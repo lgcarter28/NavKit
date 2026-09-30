@@ -22,21 +22,21 @@ Detailed historical phase notes are preserved under `docs/roadmap_details/`. Thi
 - [x] The repository uses C++23.
 - [x] Python wrappers support bootstrap, build, test, simulation, scenario execution, analysis, formatting, copyright checks, and selected compile-time configs.
 - [x] Ninja is the default local build generator through the Python tooling.
-- [x] Debug and Release build folders are config-rooted under `build/<type>/apps/navkit_sim/<ConfigName>`.
+- [x] Debug and Release build folders are config-rooted under `build/<type>/apps/navkit_swil/<ConfigName>`.
 - [x] Fixed-capacity `RingBuffer`, fixed-size state/covariance aliases, and named state segments exist.
-- [x] Product boundaries are split into `navkit::core`, `navkit::sim`, `navkit::io`, `navkit::app_support`, and app executables.
+- [x] Product boundaries are split into `navkit::core`, `navkit::sim`, `navkit::io`, target-neutral `navkit::app_support_common`, SWIL `navkit::swil_support`, and thin app executables.
 - [x] Public headers are organized by product boundary and engineering domain.
 - [x] Planet, gravity, frame, local-level, quaternion, triad-calibration, and basic unit/frame infrastructure exists.
 - [x] Environment policy concepts and WGS-84/Moon/Mars/spherical/J2 concrete policies exist.
 - [x] State, segment, filter, sensor, measurement-model, update, propagation, logging, initialization, and app-config policy concepts exist where currently useful.
 - [x] `KalmanFilter` owns Joseph-form covariance update, covariance propagation, injection/reset hooks, measurement statistics, and optional per-sensor diagnostics.
 - [x] `Navigator` owns app-facing orchestration for IMU increments, covariance propagation accumulation, GNSS position/velocity updates, and selected logging hooks.
-- [x] The selected simulation app runs ECEF strapdown INS propagation from generated IMU increments before GNSS aiding updates.
+- [x] The selected SWIL app runs ECEF strapdown INS propagation from generated IMU increments before GNSS aiding updates.
 - [x] Nominal attitude is quaternion-based with documented body-to-ECEF convention and multiplicative error injection.
 - [x] GNSS position and velocity aiding are wired through simulation, emulation, measurement models, update products, and plots.
 - [x] GNSS antenna lever-arm support exists in simulator truth generation and measurement-model Jacobians.
 - [x] IMU simulation generates deterministic increments from consecutive ECEF truth samples, including Earth rate, specific force, bias, bias random walk, white noise, scale factor, misalignment, non-orthogonality, quantization, and compile-time coning/sculling compensation compatibility.
-- [x] Runtime JSON configs are decomposed into explicit role-keyed components for trajectory, IMU, GNSS, PVA initialization, filter initialization, and propagation overrides, while run-level logging stays inline in each scenario.
+- [x] Runtime JSON configs are decomposed into explicit role-keyed components for mission, IMU, GNSS, PVA initialization, filter initialization, and propagation overrides, while run-level logging stays inline in each scenario.
 - [x] Runtime initialization is split into `pva_initialization` and `filter_initialization`.
 - [x] PVA initialization supports random error, explicit error, no-error, and direct-value component examples.
 - [x] Filter initial covariance supports compile-time defaults and runtime overrides with diagonal, full, and PVA-plus-remaining-error-state forms.
@@ -92,6 +92,12 @@ These are preserved at high level so the roadmap stays readable. Detailed pass-b
   separate GNSS position and velocity observations, deterministic pre-mutation
   rejection diagnostics, and exact composed same-epoch correction logging
   completed.
+- [x] Phase 8.7: target-neutral `MissionRuntime`, `MissionAdapter`, planned-time
+  execution ownership, stable mission-phase identity, and the concrete SWIL
+  lifecycle adapter completed.
+- [x] Phase 8.8: the thin `navkit_swil` application, fixed SWIL factory,
+  common/SWIL validation and dependency boundaries, debugger workflow, and
+  fail-closed mixed-HWIL composition seam completed.
 
 ## Current phase
 

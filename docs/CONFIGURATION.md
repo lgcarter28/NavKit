@@ -169,8 +169,8 @@ tuple-wide `NavigatorUpdatePolicy` concept proves that the selected
 ### 4. App configs compose a NavKit config with an executable
 
 An application-level config is the usual `NAVKIT_CONFIG` selection for runnable
-executables. It consumes a reusable NavKit config and names the app composition
-being built:
+executables. It consumes a reusable NavKit config and supplies the target-specific
+component aliases required by the application being built:
 
 ```cpp
 struct EcefInsGnssAppConfig
@@ -188,13 +188,13 @@ struct EcefInsGnssAppConfig
     using NavInitializationProvider =
         navkit::app_support::PvaExplicitInitializationProvider;
     using TransferAlignmentProvider = navkit::app_support::NoTransferAlignmentProvider;
-
-    using App = navkit::app_support::SimulationApp<EcefInsGnssAppConfig>;
 };
 ```
 
 This keeps the NavKit library config reusable across apps while still allowing
-one build tree to select one concrete executable composition.
+one build tree to select one concrete executable composition. The thin
+executable selects its fixed adapter factory; that target choice is not
+duplicated as an alias in the product config.
 App sensor/emulator links use configured emulator types with stable unsigned
 `SensorId` values for runtime identity and explicit NavKit sensor aliases for
 compile-time wiring. The app does not reconstruct NavKit sensors, maintain a
@@ -244,7 +244,7 @@ The built-in PVA initialization providers currently support deterministic
 `"type": "pva_error"` inputs, seeded random `"type": "pva_random_error"` draws
 from a configured `pva_error_cov`, and direct `"type": "pva_direct"` startup
 values. Selecting which provider is valid is a compile-time app-config
-decision; the default simulation app selects a runtime-dispatching provider
+decision; the default SWIL app config selects a runtime-dispatching provider
 that accepts all three PVA initializer forms. For deterministic PVA errors,
 vector keys encode the frame and units.
 ECEF-resolved errors use `p_e_m`, `v_e_mps`, and `rotvec_b2e_deg`. Local-level
@@ -261,12 +261,12 @@ The app and NavKit config trees are deliberately separate:
 
 ```text
 config/compiletime/navkit/products/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
-config/compiletime/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
+config/compiletime/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
 Using the same descriptive file name in both places is fine because the
 directories communicate ownership. The `navkit/` header is reusable library
-configuration. The `apps/navkit_sim/` header is the selected executable
+configuration. The `apps/navkit_swil/` header is the selected SWIL executable
 composition that links a library config to an app runner.
 
 ### 5. Consumers validate only the slices they need
@@ -300,7 +300,7 @@ config/
   compiletime/
     navkit/
     apps/
-      navkit_sim/
+      navkit_swil/
     targets/          # planned
   runtime/
     navkit/
@@ -352,9 +352,10 @@ example, a target that serves both a 1000 Hz IMU and a 600 Hz sensor must run at
 3000 Hz or another common integer multiple, not merely at the numerically faster
 1000 Hz rate. Use `"clock": "simulated"` for deterministic SWIL, which
 immediately adopts every planned timestamp. Use `"clock": "realtime"` to map
-the same NavKit-owned loop to steady-clock deadlines. No HWIL, flight, or
-external-framework target type is accepted until its real adapter and transport
-contract exist.
+the same NavKit-owned loop to steady-clock deadlines. `hwil` is recognized as
+an execution-target type but fails closed because the current application build
+does not supply a concrete HWIL transport/runtime adapter. Flight and external
+framework target types remain unsupported until their real contracts exist.
 
 The simulation component separately owns controller-feedback wiring. Its
 `control_state_source` is `"navigation_estimate"` for the closed-loop default or
@@ -436,6 +437,19 @@ Navigation actions remain legal there because the mission phase is the central
 runtime orchestration point; embedded NavKit sees only the resolved action, not
 the mission graph.
 
+`MissionApp` hosts the common planned-time loop through the narrow
+`MissionAdapter` lifecycle: initialize, prepare before a deadline, publish at
+the deadline, report the active mission phase, supply post-navigation feedback,
+and finalize. The thin executable supplies one fixed-target adapter factory;
+runtime `execution_target.type` must match before that factory parses any
+target-specific fields. Compile-time product configuration therefore selects
+the estimator and producer graph without also selecting an application target.
+`MissionRuntime` validates each reported transition and applies
+the destination Navigation action before committing the active phase. The SWIL
+adapter owns synthetic truth, emulator preparation/publication, and selected
+truth-versus-estimate feedback; the common host does not reach into those
+implementation details.
+
 Synthetic plant implementation does not belong to mission intent. `simulation`
 owns source type, Dynamics cadence and integration, initial truth, Vehicle/plant
 models, feedback wiring, and a phase-behavior mapping keyed by the stable mission
@@ -455,15 +469,17 @@ before any source-specific adaptation. Current source types are `stationary`,
 ```
 
 `execution_target` owns only adapter selection, clock, and planned cadence.
-`swil` is the sole implemented adapter. Unsupported target types, including
-future `hwil` and `flight` targets, fail closed until their transport and
-lifecycle contracts exist.
+`swil` is implemented by `navkit_swil` and `navkit::swil`. `hwil` remains a
+recognized vocabulary value but `navkit_swil` rejects it immediately; a future
+`navkit_hwil` executable will supply its concrete transport/runtime factory;
+future flight targets remain unsupported until their contracts exist.
 
-The current SWIL adapter executes multi-phase missions only with the
-`generated` source, whose trajectory state machine supplies the phase events.
-Stationary and CSV sources support one-phase missions and reject multi-phase
-graphs explicitly. A future target-independent mission runtime will own phase
-advancement for stationary alignment sequences and HWIL/flight adapters.
+Target-neutral `MissionRuntime` owns stable phase IDs, checked transition
+indices, and the active phase independently of the selected adapter. The current
+SWIL adapter reports phase events from a `generated` source for multi-phase
+missions. Stationary and CSV sources support one-phase missions and reject
+multi-phase graphs explicitly. Future HWIL/flight adapters can report phase
+changes through the same runtime without importing synthetic trajectory state.
 
 Future HWIL, flight, or external-framework adapters reuse the same mission and
 Navigation phase contracts without importing synthetic truth into NavKit. An
@@ -821,14 +837,14 @@ contract. Do not hide fallback scenario behavior in app-support helpers.
 The CMake model is one compile-time configuration per build tree:
 
 ```text
-cmake -S . -B build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault -G Ninja -DNAVKIT_CONFIG=apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
+cmake -S . -B build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault -G Ninja -DNAVKIT_CONFIG=apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
 `NAVKIT_CONFIG` is a CMake cache variable relative to `config/compiletime`. It
 has a useful default:
 
 ```text
-apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
+apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
 Debug/Release and `NAVKIT_CONFIG` are separate axes:
@@ -843,11 +859,11 @@ default, repository Python tools derive the build directory from the selected
 config header:
 
 ```text
-apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
-    -> build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault
+apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
+    -> build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault
 
-apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp
-    -> build/debug/apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled
+apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled.hpp
+    -> build/debug/apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasProfiled
 ```
 
 Runtime JSON is still checked against the compiled app composition. For example,
@@ -1259,7 +1275,7 @@ the application loop.
 Monte Carlo campaigns are analysis-layer inputs that wrap an ordinary runtime
 scenario config. They do not create a second C++ simulation path; each campaign
 run writes a normal effective runtime JSON file and executes the selected
-simulation application.
+SWIL application.
 
 Example:
 
@@ -1365,14 +1381,14 @@ tables from existing campaign report folders without re-running simulations.
 The Python build wrapper forwards the same selection:
 
 ```text
-python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
+python tools/build.py --build-type Debug --skip-conan --navkit-config apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
 The default build directory is already config-rooted. Use `--build-dir` only
 when an explicit custom location is needed:
 
 ```text
-python tools/build.py --build-type Debug --build-dir build/custom/stationary --navkit-config apps/navkit_sim/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
+python tools/build.py --build-type Debug --build-dir build/custom/stationary --navkit-config apps/navkit_swil/variants/ecef_ins_gnss_lc/EcefInsGnssLcGyroAccelBiasDefault.hpp
 ```
 
 Each build directory has its own generated `navkit/SelectedConfig.hpp`, so two
@@ -1394,7 +1410,10 @@ The expected workflow is:
    checks in teaching examples or focused tests unless they materially improve
    diagnostics for a real consumed alias.
 5. For executables, add or update an app config under `config/compiletime/apps`
-   that names `using NavKit = ...` and `using App = ...`.
+   that names `using NavKit = ...` plus only the target-specific composition
+   pieces required by that executable. The thin executable selects its
+   `MissionApp` adapter factory; do not duplicate that target choice in the
+   product config.
 6. Expose the selected app or library type as `navkit::config::SelectedConfig`.
 7. Add or update app-support runtime validation when the executable consumes
    JSON or other runtime inputs whose shape depends on the compiled app/NavKit

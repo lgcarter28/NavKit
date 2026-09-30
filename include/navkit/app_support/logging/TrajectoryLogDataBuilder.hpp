@@ -114,7 +114,7 @@ template<core::environment::EllipsoidPlanetPolicy Planet>
     output.guidance_bank_response_n_rad = diagnostics.guidance_bank_response_n_rad;
     output.guidance_reference_position_e_m = diagnostics.guidance_reference_position_e_m;
     output.guidance_reference_index = diagnostics.guidance_reference_index;
-    output.guidance_state_index = diagnostics.guidance_state_index;
+    output.mission_phase_index = diagnostics.mission_phase_index;
     output.guidance_active = diagnostics.guidance_active;
     output.pad_constraint_active = diagnostics.pad_constraint_active;
     output.guidance_reference_position_valid = diagnostics.guidance_reference_position_valid;

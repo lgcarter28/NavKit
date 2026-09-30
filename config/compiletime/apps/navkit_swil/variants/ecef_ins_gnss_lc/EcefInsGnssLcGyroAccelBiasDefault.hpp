@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "navkit/app_support/SimulationApp.hpp"
 #include "navkit/app_support/emulation/EmulatorBinding.hpp"
 #include "navkit/app_support/emulation/concrete/GnssEmulator.hpp"
 #include "navkit/app_support/initialization/NavInitializationProviders.hpp"
@@ -13,7 +12,7 @@
 
 #include <tuple>
 
-namespace navkit::config::apps::navkit_sim
+namespace navkit::config::apps::navkit_swil
 {
 
 struct EcefInsGnssLcGyroAccelBiasDefaultConfig
@@ -37,15 +36,13 @@ struct EcefInsGnssLcGyroAccelBiasDefaultConfig
         ::navkit::sim::ImuSimulator<!NavKit::Propagation::apply_coning_sculling_compensation>;
     using NavInitializationProvider = ::navkit::app_support::PvaRuntimeInitializationProvider;
     using TransferAlignmentProvider = ::navkit::app_support::NoTransferAlignmentProvider;
-
-    using App = ::navkit::app_support::SimulationApp<EcefInsGnssLcGyroAccelBiasDefaultConfig>;
 };
 
-} // namespace navkit::config::apps::navkit_sim
+} // namespace navkit::config::apps::navkit_swil
 
 namespace navkit::config
 {
 
-using SelectedConfig = apps::navkit_sim::EcefInsGnssLcGyroAccelBiasDefaultConfig;
+using SelectedConfig = apps::navkit_swil::EcefInsGnssLcGyroAccelBiasDefaultConfig;
 
 } // namespace navkit::config

@@ -4,7 +4,6 @@
 #pragma once
 
 #include "navkit/app_support/runtime/RuntimeConfigJson.hpp"
-#include "navkit/app_support/trajectory/TrajectoryProvider.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -22,13 +21,8 @@ struct NoTransferAlignmentProvider
     }
 
     template<typename Navigator>
-    static void
-    transfer_align(Navigator& navigator, const nlohmann::json& cfg, const SimulationRun& simulation)
-    {
-        static_cast<void>(navigator);
-        static_cast<void>(cfg);
-        static_cast<void>(simulation);
-    }
+    static void transfer_align(Navigator&, const nlohmann::json&)
+    {}
 };
 
 } // namespace navkit::app_support

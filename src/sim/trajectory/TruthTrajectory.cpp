@@ -352,7 +352,7 @@ bool TruthTrajectory::diagnostics_at(const core::Timestamp& t,
         diagnostics.vehicle_specific_force_command_b_mps2 - diagnostics.specific_force_ib_b_mps2;
     diagnostics.angular_rate_limited = previous.angular_rate_limited;
     diagnostics.specific_force_limited = previous.specific_force_limited;
-    diagnostics.guidance_state_index = previous.guidance_state_index;
+    diagnostics.mission_phase_index = previous.mission_phase_index;
     diagnostics.guidance_reference_index = previous.guidance_reference_index;
     diagnostics.guidance_reference_position_valid = previous.guidance_reference_position_valid;
     diagnostics.guidance_active = previous.guidance_active;

@@ -13,7 +13,8 @@ NavKit is split by product boundary first, then by engineering domain.
 | Product core | `navkit::core` | `include/navkit/core` | Reusable estimation/navigation framework and domain models |
 | Simulation support | `navkit::sim` | `include/navkit/sim` | Desktop simulation infrastructure and generated measurements |
 | IO support | `navkit::io` | `include/navkit/io` | Desktop logging, files, CSV, JSON, and run manifests |
-| Application support | `navkit::app_support` | `include/navkit/app_support` | Header-only executable support helpers for selected-config app composition, runtime JSON input/validation, emulator binding, trajectory, logging, initialization, and profile export |
+| Target-neutral application support | `navkit::app_support_common` | Target-neutral headers under `include/navkit/app_support` | Header-only mission graph/runtime, adapter lifecycle, clocks, and runtime-input helpers that do not depend on simulation |
+| SWIL application support | `navkit::swil_support` | `include/navkit/swil` | Header-only selected-config SWIL composition; depends on `navkit::app_support_common` and `navkit::sim` while reusing app-support emulation, initialization, and logging components |
 | Applications | app targets under `apps/` | `apps/` | Executable entry points that compose the libraries they need |
 | Analysis | Python package under `python/` | `python/navkit_analysis` | Offline CSV/HDF5 analysis, plots, and validation |
 
@@ -25,7 +26,8 @@ targets live next to the source files they build:
 cmake/targets/NavKitCore.cmake   navkit_core / navkit::core
 cmake/targets/NavKitIo.cmake     navkit_io / navkit::io
 src/sim/CMakeLists.txt           navkit_sim / navkit::sim
-src/app_support/CMakeLists.txt   navkit_app_support / navkit::app_support
+src/app_support/CMakeLists.txt   navkit_app_support_common / navkit::app_support_common
+                                 navkit_swil_support / navkit::swil_support
 ```
 
 ## Header and source layout
@@ -71,6 +73,7 @@ include/navkit/
     emulation/
       concrete/
     execution/
+    mission/
     navigation/
     runtime/
     simulation/
@@ -84,7 +87,7 @@ config/
   compiletime/
     navkit/
     apps/
-      navkit_sim/
+      navkit_swil/
   runtime/
     navkit/
       components/
@@ -129,7 +132,8 @@ currently contributes `navkit::core::environment::J2`, not
 | `navkit::core` | `navkit::core::units` | Unit and frame helper types |
 | `navkit::sim` | `navkit::sim` | Simulation support |
 | `navkit::io` | `navkit::io` | Logging, CSV, JSON, and run manifests |
-| `navkit::app_support` | `navkit::app_support` | Shared executable support templates that are not product-core API |
+| `navkit::app_support_common` | `navkit::app_support` | Target-neutral mission/runtime and adapter-boundary templates that are not product-core API |
+| `navkit::swil_support` | `navkit::swil` and `navkit::app_support` | SWIL-selected executable support layered on common application support and simulation |
 
 Shared compile-time product-core configuration vocabulary lives under
 `navkit::core::config`. Domain-specific configuration concepts live beside the
@@ -194,7 +198,7 @@ attitude, body inertial rate, NED velocity, and the ECI-to-NED DCM. Separate
 `AutopilotExecutionState` flags state whether tracking is active or the launch
 attitude must be held. The Autopilot does not receive plant position,
 acceleration, gravity, or other trajectory-environment fields it does not use.
-`SimulationApp` selects the state source at runtime:
+The SWIL mission adapter selects the controller state source at runtime:
 `"navigation_estimate"` is the closed-loop default, while
 `"truth_passthrough"` is an explicit analysis/reference override. The choice is
 translated at the application boundary; controller implementations never
@@ -204,8 +208,9 @@ applicable controller tick. Current semantics deliberately use the latest
 available estimate without delayed-state replay.
 
 The generated source uses exact independent Physics, Autopilot, and Guidance
-schedules. The target-independent mission graph owns one authoritative ordered
-phase array. Each phase owns its Navigation, Guidance, and Autopilot selection
+schedules. Target-neutral `MissionRuntime` owns one authoritative ordered phase
+array, stable phase IDs, checked transition indices, and the active phase. Each
+phase owns its Navigation, Guidance, and Autopilot selection
 inline or through an explicit reference; app support does not join parallel
 subsystem phase catalogs. Phase-owned Guidance payloads compose typed reference,
 acceleration, and bank blocks, while mission-level GNC configuration and the
@@ -229,9 +234,9 @@ outside the statically composed embedded product core.
 Sensor-specific Navigation actions live directly in each mission phase, either
 inline or through a reference into `components/gnc/navigation`. Those actions do
 not enter `GuidanceCommand`, the Autopilot, the Vehicle, or embedded NavKit
-policy configuration. App support observes the active mission phase and applies
-its resolved Navigation action atomically before publishing measurements at that
-planned epoch. Current actions control per-sensor innovation gates and optional
+policy configuration. `MissionRuntime` validates each adapter-reported phase
+transition and applies the destination Navigation action before committing its
+active phase. Current actions control per-sensor innovation gates and optional
 chi-square acceptance-probability overrides; phase timing remains application
 orchestration.
 
@@ -249,16 +254,25 @@ epochs. Runtime diagnostics sampled at Physics or logging cadence repeat the
 held values until the next producer update rather than interpolating commands
 or implying extra controller executions.
 
-`SimulationApp` owns the planned master cadence selected by the runtime
-`execution_target` component and a matching app-support `Clock`. Its configured
-execution rate must be an integer multiple of every synthetic producer rate, so each
-consumer deadline is visited exactly. At each planned timestamp, the app
-advances the source and prepares synthetic emulator updates before the deadline,
-then calls `wait_until(t)`, publishes those prepared updates to Navigator-visible
-queues, and invokes `Navigator::update()`. The simulated clock adopts planned
-time immediately; the real-time clock maps the same API to a steady-clock
-deadline for future HWIL use. Synthetic preparation may run ahead of the wall
-clock, but publication—and all real hardware acquisition—remains post-deadline.
+`MissionApp` is the target-agnostic host loop. It owns the planned master cadence
+selected by the runtime `execution_target` component and a matching app-support
+`Clock`, while a shallow runtime-polymorphic `MissionAdapter` owns target-specific
+pre-deadline preparation, at-deadline publication, and post-navigation feedback.
+The `navkit_swil` executable remains a thin selected-config launcher and selects
+the fixed `navkit::swil::SwilMissionAdapterFactory` for that host boundary. The
+factory's target identity is checked against runtime JSON before SWIL-specific
+configuration is parsed, and the compile-time product config does not repeat that
+choice. Its configured
+execution rate must be an integer multiple of every synthetic producer rate, so
+each consumer deadline is visited exactly. At each planned timestamp, the SWIL
+adapter advances the source and prepares synthetic emulator updates before the
+deadline. The host then calls `wait_until(t)`, synchronizes the adapter-reported
+stable mission-phase ID, publishes prepared updates to Navigator-visible queues,
+and invokes `Navigator::update()`. The simulated clock adopts planned time
+immediately; the real-time clock maps the same API to a steady-clock deadline for
+future HWIL use. Synthetic preparation may run ahead of the wall clock, but
+phase application, publication, and all real hardware acquisition remain
+post-deadline.
 
 `Clock` is intentionally virtual only in app support: `SimulatedClock` adopts
 planned time immediately, while `RealtimeClock` waits against a steady-clock
@@ -318,7 +332,8 @@ Ownership is deliberately narrow:
   feedback wiring. Its `phase_behavior` mapping is keyed by stable mission phase IDs and
   must match the mission exactly; missing and orphaned mappings are errors.
 - `execution_target` owns the application adapter, clock, and planned cadence.
-  The only implemented target is currently the NavKit-owned `swil` adapter.
+  The NavKit-owned `swil` adapter is implemented. `hwil` is recognized but
+  fails closed until an application build supplies its real transport/runtime adapter.
 - `scenario` is the thin final composition root selecting mission, target,
   simulation, sensor models, estimator initialization, logging, and explicit
   local overrides.
@@ -329,14 +344,21 @@ Internal trajectory-source, truth-trajectory, and trajectory-analysis types keep
 their domain names; `mission` is an application-level phase plan, not a replacement
 for trajectory mathematics.
 
-Future HWIL, flight, or external-framework integrations should be separate
-application adapters rather than conditionals embedded throughout
-`SimulationApp`. For example, an ArduPilot adapter can map externally owned
+Future mixed HWIL, external-flight-computer orchestration, flight, or
+external-framework integrations should be separate thin executables and
+`MissionAdapter` implementations rather than conditionals embedded throughout
+`MissionApp`. Shared mission, Navigation, filter, initialization, sensor-semantic,
+and logging components remain reusable; each scenario root adds only its target's
+simulation/emulator or hardware/transport/stimulus graph. A mixed-HWIL adapter may
+reuse selected `navkit::sim` models, but it must not depend on `navkit::swil` or the
+`navkit_swil` executable. For example, an ArduPilot adapter can map externally owned
 mission/mode events to the same Navigation phase contract, feed hardware or
 transport-provided measurements to `Navigator`, and return the navigation
 solution without constructing synthetic truth or a `TrajectorySource`.
-External target names remain unsupported runtime values until their transport
-and lifecycle contracts are implemented; this keeps target selection fail-closed.
+Other external target names remain unsupported runtime values until their
+transport and lifecycle contracts are implemented. `hwil` is the one recognized
+but unavailable value: validation and adapter construction fail closed until an
+application build supplies its concrete transport/runtime implementation.
 
 ## Target kinds
 
@@ -352,11 +374,15 @@ Use CMake target kinds honestly:
   runtime Guidance and Autopilot own top-level `guidance/` and `autopilot/`
   domains. Trajectory truth integration and Vehicle/plant response stay under
   `trajectory/`; shared simulation math lives under `math/`.
-- `navkit::app_support` is currently an `INTERFACE` target because its reusable
-  support is template-heavy and selected-config dependent. It provides C++
-  helpers for JSON runtime inputs, compiled configuration description, selected
-  simulation app composition, repeated estimator aliases, and profile export.
-  Concrete application entry points remain thin selected-config dispatchers.
+- `navkit::app_support_common` is an `INTERFACE` target for target-neutral
+  mission/runtime and adapter support. Its exported link interface is limited to
+  `navkit::core` and `navkit::io`; a focused common-header compile smoke protects
+  that selected neutral boundary from a `navkit::sim` dependency.
+- `navkit::swil_support` is an `INTERFACE` SWIL umbrella layered on
+  `navkit::app_support_common` and `navkit::sim`. It provides selected-config
+  synthetic emulation, trajectory, initialization, logging, and profile-export
+  composition. Concrete application entry points remain thin selected-config
+  dispatchers.
 
 Do not add dummy `.cpp` files merely to force a static archive. Convert an
 `INTERFACE` target to a compiled/static library when the component owns
@@ -380,9 +406,10 @@ application manifests and log metadata are written by C++ application/IO code.
 Application entry points should stay selected-config generic where practical.
 The selected app config composes a reusable NavKit library config with app-side
 sensor bindings, emulator policies, navigation initialization providers, and
-optional transfer-alignment providers. `navkit::app_support` owns reusable
-selected-app runner and simulation-loop plumbing at the top level, with focused
-subdirectories for app compile-time config vocabulary, generic emulator binding
+optional transfer-alignment providers. `navkit::app_support_common` owns the
+target-neutral mission graph/runtime and adapter lifecycle, while
+`navkit::swil` owns the selected SWIL composition layered over it. Focused
+subdirectories retain app compile-time config vocabulary, generic emulator binding
 and runtime dispatch, concrete emulators, JSON/runtime validation, PVA startup
 initialization and transfer-alignment seams, app-side logging adapters, profile
 export, and trajectory providers. IO log products and typed payload wrappers live under
@@ -470,7 +497,7 @@ tightly coupled observables, and higher-fidelity vehicle dynamics.
   and specific-force increments, then applies deterministic gyro/accelerometer
   error-model parameters such as bias, bias random walk, white noise, scale
   factor, misalignment, non-orthogonality, and quantization. The selected
-  simulation app validates IMU runtime config, generates these increments, and
+  SWIL application validates IMU runtime config, generates these increments, and
   feeds them into the Navigator before GNSS measurement processing.
 - Simulation currently contains desktop-oriented support and may use runtime
   polymorphism where practical.
@@ -506,8 +533,6 @@ already exists and improves readability or diagnostics.
 
 ## Explicitly not implemented yet
 
-- GNSS velocity aiding and configured non-IMU sensor lever-arm observations in
-  the selected simulation app.
 - IMU history/replay, delayed-measurement handling, and latency compensation.
 - General coordinate conversions and local-vertical altitude modeling.
 - Barometer simulator behavior beyond current shells/placeholders.
