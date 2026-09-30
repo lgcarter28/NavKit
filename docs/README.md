@@ -31,6 +31,8 @@ All three are currently marked **Proposed**. They guide discussion but do not ov
 - [`algorithms/`](algorithms/) contains focused implementation-oriented
   specifications for the ECEF navigator, IMU emulator, and trajectory
   generation contracts.
+- [`euler_rotations/`](euler_rotations/) is a controlled TikZ-versus-Asymptote
+  publication-figure workflow study for three-dimensional attitude geometry.
 
 ## Source-of-truth rule
 

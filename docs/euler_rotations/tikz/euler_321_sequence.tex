@@ -1,0 +1,509 @@
+% Copyright (c) 2026 William Gordon Carter.
+% All Rights Reserved.
+
+% A publication-scale, code-native illustration of the successive 3-2-1
+% frame construction behind NavKit's passive component transform.  The three
+% parameters below are the intended edit points.
+\documentclass[tikz,border=7pt,multi=tikzpicture]{standalone}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,bm}
+\usepackage{tikz-3dplot}
+\usetikzlibrary{arrows.meta,calc,positioning}
+
+% ---------------------------------------------------------------------------
+% Mathematical parameters (degrees)
+% ---------------------------------------------------------------------------
+\def\YawAngle{38}     % psi: rotation about z_n
+\def\PitchAngle{27}  % theta: rotation about y_1
+\def\RollAngle{32}   % phi: rotation about x_2
+
+% Orthographic camera matched to Asymptote's view direction (8,16,9).
+% tikz-3dplot uses polar angle from +z followed by azimuth from +x.
+\tdplotsetmaincoords{63.282}{153.435}
+
+% ---------------------------------------------------------------------------
+% Visual vocabulary
+% ---------------------------------------------------------------------------
+\definecolor{blue}{HTML}{187EA8}
+\definecolor{teal}{HTML}{15967D}
+\definecolor{amber}{HTML}{D08B25}
+\definecolor{vermillion}{HTML}{C94C3A}
+\definecolor{ink}{HTML}{202830}
+\definecolor{ghost}{HTML}{8D99A3}
+
+\tikzset{
+  axis/.style={-{Latex[length=2.2mm,width=1.55mm]}, line width=0.82pt,
+    line cap=round},
+  frame n axis/.style={axis, blue, line width=0.92pt},
+  frame one axis/.style={axis, teal, line width=1.08pt},
+  frame two axis/.style={axis, amber, line width=1.08pt},
+  frame b axis/.style={axis, vermillion, line width=1.08pt},
+  rotation arc/.style={-{Latex[length=2.0mm,width=1.45mm]},
+    line width=1.15pt, line cap=round},
+  construction/.style={line width=0.48pt, ghost, dashed, opacity=0.60},
+  axis label/.style={font=\small, inner sep=1.1pt, text=ink},
+  fixed label/.style={axis label, font=\small\bfseries},
+  angle label/.style={font=\normalsize,
+    fill=white, fill opacity=0.91, text opacity=1, inner sep=1.2pt,
+    rounded corners=0.6pt},
+  panel title/.style={font=\small\bfseries, text=ink, align=center},
+  note/.style={font=\scriptsize, text=ghost!80!black, align=center},
+  combined n axis/.style={axis, blue, line width=0.92pt},
+  combined one axis/.style={axis, teal, densely dashed, line width=0.74pt,
+    opacity=0.88},
+  combined two axis/.style={axis, amber, densely dashed, line width=0.74pt,
+    opacity=0.88},
+  combined b axis/.style={axis, vermillion, line width=1.08pt},
+  combined psi/.style={rotation arc, blue!82!black},
+  combined theta/.style={rotation arc, teal!82!black},
+  combined phi/.style={rotation arc, amber!85!black},
+}
+
+\begin{document}
+\begin{tikzpicture}[tdplot_main_coords, scale=1.12]
+
+  % Trigonometric values used to construct the sequential frame axes.
+  % Deliberately verbose names avoid TeX primitives such as \cr and \sp.
+  \pgfmathsetmacro{\cYaw}{cos(\YawAngle)}
+  \pgfmathsetmacro{\sYaw}{sin(\YawAngle)}
+  \pgfmathsetmacro{\cPitch}{cos(\PitchAngle)}
+  \pgfmathsetmacro{\sPitch}{sin(\PitchAngle)}
+  \pgfmathsetmacro{\cRoll}{cos(\RollAngle)}
+  \pgfmathsetmacro{\sRoll}{sin(\RollAngle)}
+
+  % ========================================================================
+  % (a) Yaw: F^n -> F^1, positive rotation about z_n
+  % ========================================================================
+  \begin{scope}[xshift=-5.35cm,yshift=0.35cm]
+    % Rotation disk in the x_n-y_n plane.
+    \path[fill=blue!12, draw=blue!48, line width=0.52pt]
+      plot[domain=0:360,samples=72,variable=\a]
+      ({1.12*cos(\a)},{1.12*sin(\a)},0) -- cycle;
+    \draw[construction] (0,0,0) --
+      ({1.12*\cYaw},{1.12*\sYaw},0);
+
+    % Before and after triads.  The common axis is emphasized once.
+    \draw[frame n axis] (0,0,0)--(1.48,0,0)
+      node[axis label,below left,text=blue!82!black] {$\bm{x}_{n}$};
+    \draw[frame n axis] (0,0,0)--(0,1.48,0)
+      node[axis label,below right,text=blue!82!black] {$\bm{y}_{n}$};
+    \draw[frame one axis] (0,0,0)--({1.48*\cYaw},{1.48*\sYaw},0)
+      node[axis label,below right,text=teal!75!black] {$\bm{x}_{1}$};
+    \draw[frame one axis] (0,0,0)--({-1.48*\sYaw},{1.48*\cYaw},0)
+      node[axis label,above left,text=teal!75!black] {$\bm{y}_{1}$};
+    \draw[frame one axis] (0,0,0)--(0,0,1.58)
+      node[fixed label,above,text=teal!75!black]
+      {$\bm{z}_{n}=\bm{z}_{1}$};
+
+    % Arc follows cos(a)x_n + sin(a)y_n, hence x_n -> x_1.
+    \draw[combined psi]
+      plot[domain=4:{\YawAngle-3},samples=28,variable=\a]
+      ({0.73*cos(\a)},{0.73*sin(\a)},0);
+    \path ({0.88*cos(1.03*\YawAngle)},{0.88*sin(1.03*\YawAngle)},0)
+      node[angle label,text=blue!82!black] {$\psi$};
+    % The same yaw also maps y_n to y_1.
+    \draw[combined psi]
+      plot[domain=4:{\YawAngle-3},samples=28,variable=\a]
+      ({-0.60*sin(\a)},{0.60*cos(\a)},0);
+    \path ({-0.74*sin(1.03*\YawAngle)},{0.74*cos(1.03*\YawAngle)},0)
+      node[angle label,text=blue!82!black] {$\psi$};
+    % Curved indicator about the invariant z_n rotation axis.
+    \draw[combined psi]
+      plot[domain=20:320,samples=52,variable=\a]
+      ({0.22*cos(\a)},{0.22*sin(\a)},1.10);
+    \path ({0.30*cos(325)},{0.30*sin(325)},1.10)
+      node[angle label,text=blue!82!black] {$\psi$};
+
+  \end{scope}
+
+  % ========================================================================
+  % (b) Pitch: F^1 -> F^2, positive rotation about y_1
+  % ========================================================================
+  \begin{scope}[yshift=0.35cm]
+    % Disk perpendicular to y_1, spanned by x_1 and z_1.
+    \path[fill=teal!11, draw=teal!50, line width=0.52pt]
+      plot[domain=0:360,samples=72,variable=\a]
+      ({1.12*\cYaw*cos(\a)},
+       {1.12*\sYaw*cos(\a)},
+       {1.12*sin(\a)}) -- cycle;
+    \draw[construction] (0,0,0) --
+      ({1.12*\cYaw*\cPitch},
+       {1.12*\sYaw*\cPitch},
+       {-1.12*\sPitch});
+
+    \draw[frame one axis] (0,0,0)--({1.48*\cYaw},{1.48*\sYaw},0)
+      node[axis label,below right,text=teal!75!black] {$\bm{x}_{1}$};
+    \draw[frame one axis] (0,0,0)--(0,0,1.48)
+      node[axis label,above,text=teal!75!black] {$\bm{z}_{1}$};
+    \draw[frame two axis] (0,0,0)--
+      ({1.48*\cYaw*\cPitch},
+       {1.48*\sYaw*\cPitch},
+       {-1.48*\sPitch})
+      node[axis label,below right,text=amber!70!black] {$\bm{x}_{2}$};
+    \draw[frame two axis] (0,0,0)--
+      ({1.48*\cYaw*\sPitch},
+       {1.48*\sYaw*\sPitch},
+       {1.48*\cPitch})
+      node[axis label,above right,text=amber!70!black] {$\bm{z}_{2}$};
+    \draw[frame two axis] (0,0,0)--({-1.58*\sYaw},{1.58*\cYaw},0)
+      node[fixed label,above left,text=amber!70!black]
+      {$\bm{y}_{1}=\bm{y}_{2}$};
+
+    % Positive pitch: cos(a)x_1 - sin(a)z_1, hence x_1 -> x_2.
+    \draw[combined theta]
+      plot[domain=4:{\PitchAngle-3},samples=28,variable=\a]
+      ({0.73*\cYaw*cos(\a)},
+       {0.73*\sYaw*cos(\a)},
+       {-0.73*sin(\a)});
+    \path ({0.91*\cYaw*cos(1.03*\PitchAngle)},
+           {0.91*\sYaw*cos(1.03*\PitchAngle)},
+           {-0.91*sin(1.03*\PitchAngle)})
+      node[angle label,text=teal!78!black] {$\theta$};
+    % The same pitch also maps z_1 to z_2.
+    \draw[combined theta]
+      plot[domain=4:{\PitchAngle-3},samples=28,variable=\a]
+      ({0.60*\cYaw*sin(\a)},
+       {0.60*\sYaw*sin(\a)},
+       {0.60*cos(\a)});
+    \path ({0.75*\cYaw*sin(1.03*\PitchAngle)},
+           {0.75*\sYaw*sin(1.03*\PitchAngle)},
+           {0.75*cos(1.03*\PitchAngle)})
+      node[angle label,text=teal!78!black] {$\theta$};
+    % Curved indicator about the invariant y_1 rotation axis.
+    \draw[combined theta]
+      plot[domain=20:320,samples=52,variable=\a]
+      ({1.10*(-\sYaw)+0.22*\cYaw*cos(\a)},
+       {1.10*( \cYaw)+0.22*\sYaw*cos(\a)},
+       {-0.22*sin(\a)});
+    \path ({1.10*(-\sYaw)+0.30*\cYaw*cos(325)},
+           {1.10*( \cYaw)+0.30*\sYaw*cos(325)},
+           {-0.30*sin(325)})
+      node[angle label,text=teal!78!black] {$\theta$};
+
+  \end{scope}
+
+  % ========================================================================
+  % (c) Roll: F^2 -> F^b, positive rotation about x_2
+  % ========================================================================
+  \begin{scope}[xshift=5.35cm,yshift=0.35cm]
+    % Disk perpendicular to x_2, spanned by y_2 and z_2.
+    \path[fill=amber!12, draw=amber!55, line width=0.52pt]
+      plot[domain=0:360,samples=72,variable=\a]
+      ({1.12*(-\sYaw*cos(\a)+\cYaw*\sPitch*sin(\a))},
+       {1.12*( \cYaw*cos(\a)+\sYaw*\sPitch*sin(\a))},
+       {1.12*\cPitch*sin(\a)}) -- cycle;
+    \draw[construction] (0,0,0) --
+      ({1.12*(-\sYaw*\cRoll+\cYaw*\sPitch*\sRoll)},
+       {1.12*( \cYaw*\cRoll+\sYaw*\sPitch*\sRoll)},
+       {1.12*\cPitch*\sRoll});
+
+    \draw[frame two axis] (0,0,0)--({-1.48*\sYaw},{1.48*\cYaw},0)
+      node[axis label,right,xshift=1.2mm,yshift=-0.8mm,
+      text=amber!70!black] {$\bm{y}_{2}$};
+    \draw[frame two axis] (0,0,0)--
+      ({1.48*\cYaw*\sPitch},
+       {1.48*\sYaw*\sPitch},
+       {1.48*\cPitch})
+      node[axis label,above right,text=amber!70!black] {$\bm{z}_{2}$};
+    \draw[frame b axis] (0,0,0)--
+      ({1.48*(-\sYaw*\cRoll+\cYaw*\sPitch*\sRoll)},
+       {1.48*( \cYaw*\cRoll+\sYaw*\sPitch*\sRoll)},
+       {1.48*\cPitch*\sRoll})
+      node[axis label,above right,xshift=0.8mm,yshift=0.7mm,
+      text=vermillion] {$\bm{y}_{b}$};
+    \draw[frame b axis] (0,0,0)--
+      ({1.48*( \sYaw*\sRoll+\cYaw*\sPitch*\cRoll)},
+       {1.48*(-\cYaw*\sRoll+\sYaw*\sPitch*\cRoll)},
+       {1.48*\cPitch*\cRoll})
+      node[axis label,above right,text=vermillion] {$\bm{z}_{b}$};
+    \draw[frame b axis] (0,0,0)--
+      ({1.58*\cYaw*\cPitch},
+       {1.58*\sYaw*\cPitch},
+       {-1.58*\sPitch})
+      node[fixed label,below right,text=vermillion]
+      {$\bm{x}_{2}=\bm{x}_{b}$};
+
+    % Positive roll: cos(a)y_2 + sin(a)z_2, hence y_2 -> y_b.
+    \draw[combined phi]
+      plot[domain=4:{\RollAngle-3},samples=28,variable=\a]
+      ({0.73*(-\sYaw*cos(\a)+\cYaw*\sPitch*sin(\a))},
+       {0.73*( \cYaw*cos(\a)+\sYaw*\sPitch*sin(\a))},
+       {0.73*\cPitch*sin(\a)});
+    \path
+      ({0.91*(-\sYaw*cos(1.03*\RollAngle)
+               +\cYaw*\sPitch*sin(1.03*\RollAngle))},
+       {0.91*( \cYaw*cos(1.03*\RollAngle)
+               +\sYaw*\sPitch*sin(1.03*\RollAngle))},
+       {0.91*\cPitch*sin(1.03*\RollAngle)})
+      node[angle label,text=amber!75!black,
+        xshift=-2.0mm,yshift=-1.2mm] {$\phi$};
+    % The same roll also maps z_2 to z_b.
+    \draw[combined phi]
+      plot[domain=4:{\RollAngle-3},samples=28,variable=\a]
+      ({0.60*( \sYaw*sin(\a)+\cYaw*\sPitch*cos(\a))},
+       {0.60*(-\cYaw*sin(\a)+\sYaw*\sPitch*cos(\a))},
+       {0.60*\cPitch*cos(\a)});
+    \path
+      ({0.75*( \sYaw*sin(1.03*\RollAngle)
+               +\cYaw*\sPitch*cos(1.03*\RollAngle))},
+       {0.75*(-\cYaw*sin(1.03*\RollAngle)
+               +\sYaw*\sPitch*cos(1.03*\RollAngle))},
+       {0.75*\cPitch*cos(1.03*\RollAngle)})
+      node[angle label,text=amber!75!black,
+        xshift=1.2mm,yshift=0.7mm] {$\phi$};
+    % Curved indicator about the invariant x_2 rotation axis.
+    \draw[combined phi]
+      plot[domain=20:320,samples=52,variable=\a]
+      ({1.10*\cYaw*\cPitch
+         +0.22*(-\sYaw*cos(\a)+\cYaw*\sPitch*sin(\a))},
+       {1.10*\sYaw*\cPitch
+         +0.22*( \cYaw*cos(\a)+\sYaw*\sPitch*sin(\a))},
+       {-1.10*\sPitch+0.22*\cPitch*sin(\a)});
+    \path
+      ({1.10*\cYaw*\cPitch
+         +0.30*(-\sYaw*cos(325)+\cYaw*\sPitch*sin(325))},
+       {1.10*\sYaw*\cPitch
+         +0.30*( \cYaw*cos(325)+\sYaw*\sPitch*sin(325))},
+       {-1.10*\sPitch+0.30*\cPitch*sin(325)})
+      node[angle label,text=amber!75!black] {$\phi$};
+
+  \end{scope}
+
+  % The source and target frames are intentionally written out: this keeps
+  % the convention visible when the figure is reused independently of prose.
+  \begin{scope}[tdplot_screen_coords]
+    \node[panel title,anchor=north] at (-5.35,3.05)
+      {(a) Yaw about $\bm{z}_{n}$};
+    \node[note,anchor=north] at (-5.35,2.76)
+      {$\mathcal F^{n}\rightarrow\mathcal F^{1}$};
+    \node[panel title,anchor=north] at (0,3.05)
+      {(b) Pitch about $\bm{y}_{1}$};
+    \node[note,anchor=north] at (0,2.76)
+      {$\mathcal F^{1}\rightarrow\mathcal F^{2}$};
+    \node[panel title,anchor=north] at (5.35,3.05)
+      {(c) Roll about $\bm{x}_{2}$};
+    \node[note,anchor=north] at (5.35,2.76)
+      {$\mathcal F^{2}\rightarrow\mathcal F^{b}$};
+
+    \draw[ghost!42, line width=0.45pt]
+      (-7.65,-2.45) -- (7.65,-2.45);
+    \node[font=\small, text=ink, align=center, anchor=north]
+      at (0,-2.70) {%
+      Solid axes show successive frame-basis images:\quad
+      $\mathcal F^{n}\xrightarrow[\bm z_n]{\,\psi\,}\mathcal F^{1}
+       \xrightarrow[\bm y_1]{\,\theta\,}\mathcal F^{2}
+       \xrightarrow[\bm x_2]{\,\phi\,}\mathcal F^{b}$\\[1pt]
+      NavKit passive component mapping:\quad$\displaystyle
+        \bm v^{b}=\bm C_{n}^{b}\bm v^{n},\qquad
+        \bm C_{n}^{b}=\bm R_{3}(\psi)\,\bm R_{2}(\theta)\,\bm R_{1}(\phi)$
+    };
+  \end{scope}
+
+\end{tikzpicture}
+
+% ===========================================================================
+% Combined view: all three successive rotations in a single construction.
+% This page intentionally reuses the exact parameterization and basis-vector
+% formulas from the decomposed view above.
+% ===========================================================================
+\begin{tikzpicture}[tdplot_main_coords, scale=1.52]
+
+  \pgfmathsetmacro{\cYaw}{cos(\YawAngle)}
+  \pgfmathsetmacro{\sYaw}{sin(\YawAngle)}
+  \pgfmathsetmacro{\cPitch}{cos(\PitchAngle)}
+  \pgfmathsetmacro{\sPitch}{sin(\PitchAngle)}
+  \pgfmathsetmacro{\cRoll}{cos(\RollAngle)}
+  \pgfmathsetmacro{\sRoll}{sin(\RollAngle)}
+
+  % Rotation planes are deliberately translucent so their intersections show
+  % the successive intrinsic axes without hiding any final-frame vector.
+  \path[fill=blue!15, fill opacity=0.24, draw=blue!62,
+    line width=0.58pt]
+    plot[domain=0:360,samples=96,variable=\a]
+    ({1.64*cos(\a)},{1.64*sin(\a)},0) -- cycle;
+  \path[fill=teal!14, fill opacity=0.22, draw=teal!65,
+    line width=0.58pt]
+    plot[domain=0:360,samples=96,variable=\a]
+    ({1.48*\cYaw*cos(\a)},
+     {1.48*\sYaw*cos(\a)},
+     {1.48*sin(\a)}) -- cycle;
+  \path[fill=amber!17, fill opacity=0.20, draw=amber!72,
+    line width=0.58pt]
+    plot[domain=0:360,samples=96,variable=\a]
+    ({1.34*(-\sYaw*cos(\a)+\cYaw*\sPitch*sin(\a))},
+     {1.34*( \cYaw*cos(\a)+\sYaw*\sPitch*sin(\a))},
+     {1.34*\cPitch*sin(\a)}) -- cycle;
+
+  % Initial navigation frame F^n.
+  \draw[combined n axis] (0,0,0)--(1.92,0,0)
+    node[axis label,below left,text=blue!82!black] {$\bm{x}_{n}$};
+  \draw[combined n axis] (0,0,0)--(0,1.92,0)
+    node[axis label,below right,text=blue!82!black] {$\bm{y}_{n}$};
+  \draw[combined n axis] (0,0,0)--(0,0,1.92)
+    node[axis label,above,text=blue!82!black] {$\bm{z}_{n}$};
+
+  % Useful intermediate axes.  Only the axes needed to make the composition
+  % readable are retained; dashed strokes keep them subordinate to F^n/F^b.
+  \draw[combined one axis] (0,0,0)--({1.70*\cYaw},{1.70*\sYaw},0)
+    node[axis label,below right,text=teal!75!black] {$\bm{x}_{1}$};
+  \draw[combined one axis] (0,0,0)--({-1.70*\sYaw},{1.70*\cYaw},0)
+    node[axis label,above left,text=teal!75!black,
+      xshift=-8.5mm,yshift=4.0mm] {$\bm{y}_{1}=\bm{y}_{2}$};
+  \draw[combined b axis] (0,0,0)--
+    ({1.72*\cYaw*\cPitch},
+     {1.72*\sYaw*\cPitch},
+     {-1.72*\sPitch})
+    node[axis label,below right,text=vermillion]
+      {$\bm{x}_{2}=\bm{x}_{b}$};
+  \draw[combined two axis] (0,0,0)--
+    ({1.54*\cYaw*\sPitch},
+     {1.54*\sYaw*\sPitch},
+     {1.54*\cPitch})
+    node[axis label,above right,text=amber!70!black] {$\bm{z}_{2}$};
+
+  % Final body frame.  x_b is already the roll axis above, so y_b and z_b
+  % complete the triad without drawing a duplicate coincident vector.
+  \draw[combined b axis] (0,0,0)--
+    ({1.86*(-\sYaw*\cRoll+\cYaw*\sPitch*\sRoll)},
+     {1.86*( \cYaw*\cRoll+\sYaw*\sPitch*\sRoll)},
+     {1.86*\cPitch*\sRoll})
+    node[axis label,above right,text=vermillion] {$\bm{y}_{b}$};
+  \draw[combined b axis] (0,0,0)--
+    ({1.86*( \sYaw*\sRoll+\cYaw*\sPitch*\cRoll)},
+     {1.86*(-\cYaw*\sRoll+\sYaw*\sPitch*\cRoll)},
+     {1.86*\cPitch*\cRoll})
+    node[axis label,above right,text=vermillion] {$\bm{z}_{b}$};
+
+  % Rotation arcs use the same curves as their decomposed counterparts.
+  \draw[combined psi]
+    plot[domain=4:{\YawAngle-3},samples=32,variable=\a]
+    ({0.88*cos(\a)},{0.88*sin(\a)},0);
+  \path ({1.06*cos(1.03*\YawAngle)},{1.06*sin(1.03*\YawAngle)},0)
+    node[angle label,text=blue!82!black] {$\psi$};
+  \draw[combined psi]
+    plot[domain=4:{\YawAngle-3},samples=32,variable=\a]
+    ({-0.72*sin(\a)},{0.72*cos(\a)},0);
+  \path ({-0.88*sin(1.03*\YawAngle)},{0.88*cos(1.03*\YawAngle)},0)
+    node[angle label,text=blue!82!black] {$\psi$};
+
+  \draw[combined theta]
+    plot[domain=4:{\PitchAngle-3},samples=30,variable=\a]
+    ({1.02*\cYaw*cos(\a)},
+     {1.02*\sYaw*cos(\a)},
+     {-1.02*sin(\a)});
+  \path ({1.22*\cYaw*cos(1.03*\PitchAngle)},
+         {1.22*\sYaw*cos(1.03*\PitchAngle)},
+         {-1.22*sin(1.03*\PitchAngle)})
+    node[angle label,text=teal!78!black] {$\theta$};
+  \draw[combined theta]
+    plot[domain=4:{\PitchAngle-3},samples=30,variable=\a]
+    ({0.78*\cYaw*sin(\a)},
+     {0.78*\sYaw*sin(\a)},
+     {0.78*cos(\a)});
+  \path ({0.96*\cYaw*sin(1.03*\PitchAngle)},
+         {0.96*\sYaw*sin(1.03*\PitchAngle)},
+         {0.96*cos(1.03*\PitchAngle)})
+    node[angle label,text=teal!78!black,xshift=-1.8mm,yshift=1.4mm]
+      {$\theta$};
+
+  \draw[combined phi]
+    plot[domain=4:{\RollAngle-3},samples=30,variable=\a]
+    ({1.12*(-\sYaw*cos(\a)+\cYaw*\sPitch*sin(\a))},
+     {1.12*( \cYaw*cos(\a)+\sYaw*\sPitch*sin(\a))},
+     {1.12*\cPitch*sin(\a)});
+  \path
+    ({1.34*(-\sYaw*cos(1.03*\RollAngle)
+             +\cYaw*\sPitch*sin(1.03*\RollAngle))},
+     {1.34*( \cYaw*cos(1.03*\RollAngle)
+             +\sYaw*\sPitch*sin(1.03*\RollAngle))},
+     {1.34*\cPitch*sin(1.03*\RollAngle)})
+    node[angle label,text=amber!75!black,xshift=3.0mm,yshift=1.0mm]
+      {$\phi$};
+  \draw[combined phi]
+    plot[domain=4:{\RollAngle-3},samples=30,variable=\a]
+    ({0.88*( \sYaw*sin(\a)+\cYaw*\sPitch*cos(\a))},
+     {0.88*(-\cYaw*sin(\a)+\sYaw*\sPitch*cos(\a))},
+     {0.88*\cPitch*cos(\a)});
+  \path
+    ({1.06*( \sYaw*sin(1.03*\RollAngle)
+             +\cYaw*\sPitch*cos(1.03*\RollAngle))},
+     {1.06*(-\cYaw*sin(1.03*\RollAngle)
+             +\sYaw*\sPitch*cos(1.03*\RollAngle))},
+     {1.06*\cPitch*cos(1.03*\RollAngle)})
+    node[angle label,text=amber!75!black,xshift=-1.0mm,yshift=1.0mm]
+      {$\phi$};
+
+  % Curved indicators about the three invariant rotation axes.
+  \draw[combined psi]
+    plot[domain=20:320,samples=52,variable=\a]
+    ({0.23*cos(\a)},{0.23*sin(\a)},1.36);
+  \path ({0.31*cos(325)},{0.31*sin(325)},1.36)
+    node[angle label,text=blue!82!black] {$\psi$};
+
+  \draw[combined theta]
+    plot[domain=20:320,samples=52,variable=\a]
+    ({1.34*(-\sYaw)+0.23*\cYaw*cos(\a)},
+     {1.34*( \cYaw)+0.23*\sYaw*cos(\a)},
+     {-0.23*sin(\a)});
+  \path ({1.34*(-\sYaw)+0.31*\cYaw*cos(325)},
+         {1.34*( \cYaw)+0.31*\sYaw*cos(325)},
+         {-0.31*sin(325)})
+    node[angle label,text=teal!78!black] {$\theta$};
+
+  \draw[combined phi]
+    plot[domain=20:320,samples=52,variable=\a]
+    ({1.34*\cYaw*\cPitch
+       +0.23*(-\sYaw*cos(\a)+\cYaw*\sPitch*sin(\a))},
+     {1.34*\sYaw*\cPitch
+       +0.23*( \cYaw*cos(\a)+\sYaw*\sPitch*sin(\a))},
+     {-1.34*\sPitch+0.23*\cPitch*sin(\a)});
+  \path
+    ({1.34*\cYaw*\cPitch
+       +0.31*(-\sYaw*cos(325)+\cYaw*\sPitch*sin(325))},
+     {1.34*\sYaw*\cPitch
+       +0.31*( \cYaw*cos(325)+\sYaw*\sPitch*sin(325))},
+     {-1.34*\sPitch+0.31*\cPitch*sin(325)})
+    node[angle label,text=amber!75!black] {$\phi$};
+
+  \fill[ink] (0,0,0) circle[radius=0.025];
+
+  \begin{scope}[tdplot_screen_coords]
+    \node[font=\large\bfseries,text=ink,anchor=south] at (0,3.05)
+      {Combined intrinsic 3--2--1 Euler frame construction};
+    \node[note,anchor=north] at (0,2.98)
+      {The translucent disks are the successive yaw, pitch, and roll
+       rotation planes.\\
+       Dashed axes are intermediate frame bases; solid blue and red axes
+       identify the initial navigation and final body frames.};
+
+    \begin{scope}[shift={(2.80,2.28)}]
+      \draw[blue,line width=0.92pt] (0,0)--(0.52,0);
+      \node[anchor=west,font=\scriptsize,text=blue] at (0.62,0)
+        {$\mathcal F^n$ initial};
+      \draw[teal,densely dashed,line width=0.74pt] (0,-0.30)--(0.52,-0.30);
+      \node[anchor=west,font=\scriptsize,text=teal] at (0.62,-0.30)
+        {$\mathcal F^1$ intermediate};
+      \draw[amber,densely dashed,line width=0.74pt] (0,-0.60)--(0.52,-0.60);
+      \node[anchor=west,font=\scriptsize,text=amber!85!black]
+        at (0.62,-0.60) {$\mathcal F^2$ intermediate};
+      \draw[vermillion,line width=1.08pt] (0,-0.90)--(0.52,-0.90);
+      \node[anchor=west,font=\scriptsize,text=vermillion]
+        at (0.62,-0.90) {$\mathcal F^b$ final};
+    \end{scope}
+
+    \draw[ghost!42,line width=0.45pt] (-4.30,-2.45)--(4.30,-2.45);
+    \node[font=\small,text=ink,align=center,anchor=north]
+      at (0,-2.65) {%
+      $\mathcal F^{n}\xrightarrow[\bm z_n]{\,\psi\,}\mathcal F^{1}
+       \xrightarrow[\bm y_1]{\,\theta\,}\mathcal F^{2}
+       \xrightarrow[\bm x_2]{\,\phi\,}\mathcal F^{b}$\\[2pt]
+      NavKit passive component mapping:\quad$\displaystyle
+        \bm v^{b}=\bm C_{n}^{b}\bm v^{n},\qquad
+        \bm C_{n}^{b}=\bm R_{3}(\psi)\,\bm R_{2}(\theta)\,\bm R_{1}(\phi)$
+    };
+  \end{scope}
+
+\end{tikzpicture}
+\end{document}

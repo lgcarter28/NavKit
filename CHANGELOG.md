@@ -14,6 +14,9 @@ This project follows
 
 ### Added
 
+- Added a reproducible TikZ-versus-Asymptote Euler-rotation figure study with
+  inspected vector outputs, explicit NavKit frame/component conventions, and a
+  future publication-figure workflow in the documentation roadmap.
 - Split target selection out of compile-time product configuration: the renamed
   `navkit_swil` executable now supplies a fixed `SwilMissionAdapterFactory` to
   the shared `MissionApp` host, validates target identity before SWIL schema,
