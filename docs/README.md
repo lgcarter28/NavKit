@@ -33,6 +33,9 @@ All three are currently marked **Proposed**. They guide discussion but do not ov
   generation contracts.
 - [`euler_rotations/`](euler_rotations/) is a controlled TikZ-versus-Asymptote
   publication-figure workflow study for three-dimensional attitude geometry.
+- [`hardware_local_ai_trade_study/`](hardware_local_ai_trade_study/) contains a
+  dated purchasing and expansion trade study for the portable development
+  workstation and local Linux compute/AI server.
 
 ## Source-of-truth rule
 

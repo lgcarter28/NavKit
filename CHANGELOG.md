@@ -14,6 +14,10 @@ This project follows
 
 ### Added
 
+- Added a dated engineering-hardware and local-AI trade study covering portable
+  workstation selection, staged Linux-server acquisition, GPU/model-capacity
+  trades, storage/network/power infrastructure, and measured upgrade gates for
+  NavKit, local inference, future vision/factor-graph work, CI, SWIL, and HWIL.
 - Added a reproducible TikZ-versus-Asymptote Euler-rotation figure study with
   inspected vector outputs, explicit NavKit frame/component conventions, and a
   future publication-figure workflow in the documentation roadmap.

@@ -1,0 +1,4 @@
+- Code architecture design workflow in more block diagram format
+- Thorough pass on the entire codebase to provide complete DOXYGEN coverage
+    - Build external API doxygen docs, as well as internal dev doxygen docs
+- Create MUCH simpler "hard coded" compile time config tests that are completely separate from the rich complex flexible applications. The point would be to have some tests that clearly show/document the intended eventual embedded use case configuration and operation

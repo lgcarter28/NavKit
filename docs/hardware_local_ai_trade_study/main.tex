@@ -1,0 +1,563 @@
+\documentclass[11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=0.75in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,longtable,array,tabularx}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage[nameinlink,noabbrev]{cleveref}
+\usepackage[backend=biber,style=numeric,sorting=none,maxbibnames=10]{biblatex}
+\addbibresource{refs.bib}
+\usepackage[most]{tcolorbox}
+\usepackage{microtype}
+
+\setcounter{tocdepth}{2}
+\setcounter{secnumdepth}{2}
+\hypersetup{colorlinks=true,linkcolor=blue!60!black,citecolor=blue!60!black,urlcolor=blue!60!black}
+\setlist[itemize]{topsep=2pt,itemsep=1pt,parsep=1pt}
+\setlist[enumerate]{topsep=2pt,itemsep=1pt,parsep=1pt}
+\renewcommand{\arraystretch}{1.15}
+
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newtcolorbox{decisionbox}{colback=green!3!white,colframe=green!40!black,title=Recommended Decision,breakable}
+\newtcolorbox{warningbox}{colback=orange!5!white,colframe=orange!60!black,title=Important Constraint,breakable}
+\newtcolorbox{scopebox}{colback=blue!3!white,colframe=blue!50!black,title=Scope and Currency,breakable}
+
+\title{Engineering Hardware and Local AI Trade Study\\
+\large NavKit Development, Local Inference, Simulation, and Future Perception Workloads}
+\author{NavKit}
+\date{Planning baseline: 9 October 2026}
+
+\begin{document}
+\hypersetup{pageanchor=false}
+\maketitle
+\hypersetup{pageanchor=true}
+\tableofcontents
+\clearpage
+
+\section{Executive Guidance}
+
+\begin{scopebox}
+This document is written for a human purchasing decision, not as an autonomous
+agent handoff. Dollar figures are approximate United States planning bands as
+of the date on the title page. Manufacturer list prices, used-market estimates,
+and complete-system budgets are deliberately distinguished. Obtain current
+quotes before purchasing.
+\end{scopebox}
+
+The recommended architecture is two independent machines:
+
+\begin{enumerate}
+  \item a durable portable workstation for editing, compilation, debugging,
+        visualization, and field work; and
+  \item an expandable Linux server for local LLM inference first, followed by
+        Monte Carlo campaigns, continuous integration, data storage, vision
+        processing, and selected factor-graph workloads.
+\end{enumerate}
+
+\begin{decisionbox}
+Purchase the laptop first. Target a used ThinkPad P16 Gen 1 or Gen 2 with an HX
+processor, at least 64~GB of RAM, and two NVMe slots. Do not pay a large premium
+for its GPU.
+
+For the server, either buy a deliberately inexpensive 16~GB GPU as a learning
+device or wait until a 24--32~GB GPU fits the budget. Build the surrounding
+platform for the expected final server: sufficient slot spacing, power,
+cooling, memory, storage, and networking. Do not buy Threadripper until measured
+CPU scaling or a concrete PCIe/memory requirement justifies it.
+\end{decisionbox}
+
+The near-term sequence is:
+
+\begin{enumerate}
+  \item acquire and validate the laptop immediately;
+  \item capture baseline NavKit build, simulation, packaging, and plotting
+        measurements;
+  \item begin local inference in early 2027 with a 16~GB entry GPU if necessary;
+  \item upgrade to or add a 24--32~GB GPU when model capacity or vision work
+        demonstrates the need; and
+  \item consider 48~GB professional GPUs, multiple GPUs, or Threadripper only
+        after a measured workload crosses the relevant boundary.
+\end{enumerate}
+
+\section{Workload Model}
+
+\subsection{What uses which hardware}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{L{0.25\textwidth} L{0.23\textwidth} Y}
+\toprule
+Workload & Dominant resource & Hardware implication \\
+\midrule
+Interactive C++ development & Fast CPU cores, RAM, NVMe & Laptop responsiveness matters more than a laptop GPU. \\
+Clean parallel build & CPU cores, RAM, cooling & Sustained power and 64+~GB avoid contention. \\
+Single SWIL run & CPU latency & Favor modern per-core performance. \\
+Monte Carlo campaigns & CPU processes, RAM, storage & More cores help independent runs; benchmark scaling before buying HEDT. \\
+HDF5 packaging and analysis & NVMe, RAM, CPU & Fast local scratch storage matters; a GPU currently adds little. \\
+Plotly/Matplotlib rendering & CPU, RAM & Cached HDF5 already changes performance by an order of magnitude. \\
+Local LLM inference & GPU VRAM, memory bandwidth & Capacity determines which model and context fit; compute determines response rate. \\
+Vision navigation & GPU, NVMe, CPU & Dataset decoding, learned front ends, and bundle adjustment create mixed demand. \\
+Factor graphs & CPU first; GPU for large supported graphs & GPU benefit depends on graph size, solver, and retained GPU residency. \\
+HWIL orchestration & Deterministic CPU/network timing & Isolate from LLM inference and nondeterministic batch jobs. \\
+Artifact/data storage & Capacity, integrity, backup & Treat scratch, evidence, and backup as separate roles. \\
+\bottomrule
+\end{tabularx}
+\caption{Resource map for the intended engineering workloads.}
+\end{table}
+
+\subsection{Evidence from NavKit}
+
+NavKit's current implementation is CPU-oriented C++23 and Eigen estimation and
+simulation with Python/HDF5 analysis. Existing measurements show that:
+
+\begin{itemize}
+  \item a representative 1,000-run plot took 213.198~s from CSV, 10.275~s from
+        cached HDF5 with Matplotlib, and 16.868~s from HDF5 with Plotly;
+  \item the full 1,000-run analysis bundle was 2.32~GB and initially required
+        1,319.129~s to package;
+  \item four analysis workers improved complete 500- and 1,000-run workloads by
+        only 11.5\% and 16.8\% over serial execution; and
+  \item later cache work reduced 1,000-run cold preparation from 209.189~s to
+        75.145~s, after which HDF5 input became the primary remaining cost.
+\end{itemize}
+
+These measurements do not justify purchasing a GPU for present NavKit
+analysis. They favor strong single-core performance, enough CPU cores for
+independent simulations, 64--128~GB of RAM, and fast NVMe storage. GPU value
+arrives through local inference and future perception/smoothing work.
+
+\section{Portable Workstation}
+
+\subsection{Option matrix}
+
+\begin{longtable}{L{0.16\textwidth} L{0.14\textwidth} L{0.16\textwidth} L{0.17\textwidth} L{0.17\textwidth}}
+\toprule
+Option & Planning band & Advantages & Limitations & Guidance \\
+\midrule
+\endfirsthead
+\toprule
+Option & Planning band & Advantages & Limitations & Guidance \\
+\midrule
+\endhead
+Used P16 Gen 1 & \$900--\$1,350 & Four SODIMMs, up to 128~GB, two NVMe slots, HX CPU, serviceable & Heavy; older efficiency and battery life & Best value if condition, battery, thermals, and display are verified. \\
+Used P16 Gen 2 & \$1,300--\$2,000 & Newer HX CPUs; up to 192~GB non-ECC or 128~GB ECC; two NVMe slots & Higher cost; still a transportable workstation & Prefer when the premium over Gen 1 is modest. \\
+New mobile workstation & \$2,500+ & Warranty, modern efficiency, known history & Rapid depreciation; expensive GPU upgrades; soldered-memory risk on some models & Buy only for warranty, battery life, or employer-style support requirements. \\
+Thin performance laptop & \$1,500--\$2,500 & Better portability and battery life & Reduced sustained cooling, RAM, repairability, and storage expansion & Poorer match for this development workflow. \\
+\bottomrule
+\caption{Portable workstation alternatives. Price bands are planning estimates, not quotes.}
+\end{longtable}
+
+Lenovo specifies four memory slots and up to 128~GB for the P16 Gen 1
+\cite{lenovo_p16_gen1}. The P16 Gen 2 supports two NVMe drives and up to 192~GB
+non-ECC or 128~GB ECC depending on configuration \cite{lenovo_p16_gen2}.
+
+\subsection{Recommended laptop configuration}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{L{0.21\textwidth} L{0.27\textwidth} Y}
+\toprule
+Subsystem & Target & Rationale \\
+\midrule
+CPU & Intel HX, favoring condition and price over the final SKU step & Good interactive and parallel compile performance. \\
+RAM & 64~GB minimum; 128~GB preferred if the incremental cost is reasonable & Supports IDE, WSL/VMs, builds, analysis, and large HDF5 products concurrently. \\
+Storage & 2~TB primary NVMe; retain the second slot for expansion & Avoids immediate storage pressure while keeping datasets replaceable. \\
+GPU & Integrated or modest discrete GPU & The server owns serious inference and future vision compute. \\
+Display & Verify resolution, brightness, scaling, and panel defects in person & Affects every development hour. \\
+Condition & Battery health, hinges, keyboard, ports, fans, charger, BIOS access & More important than a small CPU-bin difference in a used workstation. \\
+Warranty & Remaining Lenovo coverage or priced replacement risk & A used workstation is still a field-development dependency. \\
+\bottomrule
+\end{tabularx}
+\caption{Recommended portable workstation priorities.}
+\end{table}
+
+\section{Server Platform}
+
+\subsection{CPU and platform matrix}
+
+Budgets in this section exclude the GPU but include a plausible motherboard,
+CPU, cooling, memory, chassis, PSU, and initial storage.
+
+\begin{longtable}{L{0.16\textwidth} L{0.14\textwidth} L{0.16\textwidth} L{0.20\textwidth} L{0.16\textwidth}}
+\toprule
+Platform & Base-system band & Strength & Constraint & Best use \\
+\midrule
+\endfirsthead
+\toprule
+Platform & Base-system band & Strength & Constraint & Best use \\
+\midrule
+\endhead
+Used AM4 / Ryzen 5950X & \$750--\$1,250 & Cheap 16-core throughput; mature DDR4; strong entry campaign runner & End-of-line platform; dual-channel memory; limited PCIe expansion & Intentional budget server with one primary GPU. \\
+Modern AM5 / Ryzen 9950X class & \$1,400--\$2,300 & 16 modern cores, strong single-thread performance, DDR5, long-lived mainstream platform & Consumer PCIe lanes and board layouts constrain serious dual-GPU builds & Recommended balanced single-GPU server. \\
+Used workstation platform & \$1,800--\$3,500 & More PCIe lanes, ECC capacity, remote-management options & Older per-core performance, power, noise, and uncertain history & Good when expansion is worth more than peak interactive speed. \\
+Threadripper 9960X class & \$3,500--\$6,000 & 24 cores, quad-channel RDIMM, ECC, 88 usable PCIe lanes & 350~W CPU; costly board, memory, and cooling & Multiple accelerators, high I/O, or proven CPU scaling. \\
+\bottomrule
+\caption{Server CPU/platform alternatives.}
+\end{longtable}
+
+AMD specifies 16 cores, 32 threads, and a 170~W TDP for the Ryzen 9 9950X
+class \cite{amd_9950x}. The Threadripper 9960X provides 24 cores, quad-channel
+RDIMM ECC memory, and 88 usable PCIe lanes at a 350~W default TDP
+\cite{amd_9960x}. Those extra lanes and memory channels are valuable only when
+the installed devices or measured workload use them.
+
+\begin{decisionbox}
+For a server expected to remain primarily single-GPU, use a modern 16-core AM5
+platform with 128~GB of RAM. If two large GPUs are a credible near-term plan,
+select the exact motherboard and chassis from a physical lane/slot drawing---or
+move directly to a workstation platform. Do not assume that two nominal x16
+slots are electrically suitable, correctly spaced, or simultaneously usable
+with the required NVMe and networking devices.
+\end{decisionbox}
+
+\subsection{Memory matrix}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{L{0.14\textwidth} L{0.20\textwidth} Y L{0.20\textwidth}}
+\toprule
+Capacity & Suitable for & Trade & Recommendation \\
+\midrule
+64~GB & Entry inference server, ordinary builds, modest campaigns & Can become constrained by VMs, HDF5, datasets, and concurrent services & Laptop minimum; server only under a hard budget. \\
+128~GB & NavKit campaigns, CI, analysis, local inference, containers & Best mainstream balance & Recommended server baseline. \\
+192--256~GB & Large CPU factor graphs, many services, RAM caching, large datasets & Higher DIMM/platform cost; possible memory-speed reduction & Buy only with a defined consumer. \\
+512~GB+ & Large in-memory graphs or shared laboratory infrastructure & Workstation/server platform required & Deferred until measurements require it. \\
+\bottomrule
+\end{tabularx}
+\caption{System-memory capacity trade.}
+\end{table}
+
+\section{GPU and Local Inference}
+
+\subsection{GPU option matrix}
+
+VRAM capacity is the first-order constraint for local inference. Compute and
+bandwidth affect response speed only after the desired model, context, and cache
+fit. The prices below distinguish manufacturer launch references from used or
+professional-market planning bands; actual 2026 street prices may be much
+higher.
+
+\begin{longtable}{L{0.15\textwidth} L{0.09\textwidth} L{0.13\textwidth} L{0.18\textwidth} L{0.25\textwidth}}
+\toprule
+GPU class & VRAM & Price reference & Strength & Limitation / decision \\
+\midrule
+\endfirsthead
+\toprule
+GPU class & VRAM & Price reference & Strength & Limitation / decision \\
+\midrule
+\endhead
+RTX 5060 Ti 16~GB & 16~GB & \$429 launch MSRP & Lowest sensible new NVIDIA entry; efficient; current CUDA stack & Limited model/context headroom. Buy only as an intentional starter. \\
+Used RTX 3090 & 24~GB & Roughly \$600--\$1,000 used planning band & Excellent capacity per used-market dollar; practical 30--32B quantized models & 350~W, heat, age, no warranty, and uncertain prior use. Inspect carefully. \\
+RTX 5080 & 16~GB & \$999 launch MSRP & Much more compute and bandwidth than entry cards & Poor LLM capacity value: still 16~GB. Favor only when vision throughput dominates. \\
+RTX 5090 & 32~GB & \$1,999 launch MSRP; street quote required & Strong single-card inference/vision tier; materially more context and model capacity & Very high board power, physical size, price, and availability premium. \\
+RTX PRO 5000 Blackwell & 48 or 72~GB & Professional quote & ECC, dual-slot form, 300~W, large contiguous memory, professional support & Several times consumer-GPU cost; defer until 32~GB is proven insufficient. \\
+Two consumer GPUs & Varies & Sum of cards plus platform & Excellent for separate jobs; some engines can shard a model & Not transparent unified VRAM; PCIe communication and software support matter. \\
+\bottomrule
+\caption{GPU alternatives for local inference and future engineering compute.}
+\end{longtable}
+
+NVIDIA launched the 16~GB RTX 5060 Ti at \$429 \cite{nvidia_5060ti}. The RTX
+5080 has 16~GB and a \$999 launch price \cite{nvidia_5080}; this makes it a
+compute upgrade, not a model-capacity upgrade. NVIDIA specifies 32~GB for the
+RTX 5090 \cite{nvidia_5090}. The professional RTX PRO 5000 Blackwell provides
+48 or 72~GB of ECC memory in a dual-slot, 300~W design
+\cite{nvidia_rtx_pro_5000}.
+
+\begin{warningbox}
+Two 16~GB GPUs are not universally equivalent to one 32~GB GPU. They provide
+32~GB aggregate capacity only when the inference engine explicitly shards the
+model and its runtime data. They are excellent for two independent model
+servers, two agents, or concurrent vision and analysis jobs. Tensor-parallel
+inference across consumer cards pays PCIe communication costs, and GeForce
+cards do not provide a general transparent shared-memory pool.
+\end{warningbox}
+
+\subsection{Approximate model-capacity matrix}
+
+For a model with $P$ parameters stored at $b$ bits per parameter, weights alone
+require approximately
+
+\begin{equation}
+  M_{\mathrm{weights}} \approx \frac{P b}{8}.
+\end{equation}
+
+Inference additionally needs quantization metadata, runtime workspaces, and a
+key/value cache that grows with context length, batch size, layer count, and
+hidden dimension. Consequently, weight-only arithmetic is a lower bound.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{L{0.13\textwidth} L{0.25\textwidth} Y L{0.23\textwidth}}
+\toprule
+VRAM & Comfortable target & Possible with compromise & Engineering interpretation \\
+\midrule
+16~GB & 7--14B quantized models; modest VLMs & Some 20--32B models with aggressive quantization, short context, or CPU offload & Good learning tier; expect capacity decisions. \\
+24~GB & 14B models with generous context; many 30--32B Q4 uses & Larger contexts may require tuning/offload & Strong used-market local-development tier. \\
+32~GB & 30--32B quantized models with useful headroom & Selected larger low-bit models & Recommended durable single-consumer-GPU tier. \\
+48~GB & Large 30--32B deployments; some 70B low-bit use & 70B context/batch still requires care & Professional capacity threshold. \\
+72--96~GB & Large models, contexts, VLMs, or multiple services & Cost, not basic fit, becomes dominant & Laboratory infrastructure, not an entry purchase. \\
+\bottomrule
+\end{tabularx}
+\caption{Conservative qualitative model-fit guidance. Exact fit depends on architecture and inference engine.}
+\end{table}
+
+\subsection{Recommended GPU path}
+
+\begin{enumerate}
+  \item If the early-2027 budget is constrained, buy a 16~GB RTX 5060 Ti only
+        if its current street price remains proportionate to its \$429 launch
+        reference. Use it to validate Linux, drivers, containers, serving,
+        quantization, remote access, and actual model quality.
+  \item If a reliable used RTX 3090 is available near the entry card's actual
+        street price, its 24~GB capacity may be more useful for LLM work. Accept
+        the energy, cooling, condition, and warranty risks explicitly.
+  \item Prefer a future 32~GB single GPU over two 16~GB GPUs when the primary
+        requirement is one larger model. Prefer two GPUs when independent jobs
+        and service isolation are the primary requirements.
+  \item Retain the starter GPU after an upgrade only if the platform can house
+        and power it without compromising the primary GPU. It can then serve a
+        small always-on model, vision preprocessing, or separate agent.
+\end{enumerate}
+
+\section{Storage, Network, Chassis, and Power}
+
+\subsection{Storage tiers}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{L{0.19\textwidth} L{0.22\textwidth} Y L{0.20\textwidth}}
+\toprule
+Role & Initial target & Contents & Policy \\
+\midrule
+OS/build/cache NVMe & 2~TB high-endurance TLC & Linux, source trees, containers, compiler cache, model runtime & Fast and replaceable; do not make it the only evidence store. \\
+Scratch/dataset NVMe & 4~TB TLC & Monte Carlo output, HDF5, vision datasets, model weights & Optimize capacity and sustained write behavior. \\
+Bulk artifact storage & 8--20~TB mirrored HDD or separate NAS & Retained campaigns, raw captures, releases, archived models & Capacity tier; not a substitute for backup. \\
+Backup & Separate physical system or encrypted off-site target & Source-independent datasets, configs, evidence, documents & Test restoration; RAID alone is not backup. \\
+\bottomrule
+\end{tabularx}
+\caption{Storage roles should be explicit rather than collapsed onto one disk.}
+\end{table}
+
+Avoid low-endurance QLC drives for the primary high-churn analysis scratch tier
+unless their measured sustained-write behavior is acceptable. Record datasets
+and qualification artifacts should be content-addressed or revision-labeled so
+that a model or analysis result remains traceable to source, configuration,
+seed, and tool version.
+
+\subsection{Network, chassis, cooling, and UPS}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{L{0.16\textwidth} L{0.23\textwidth} Y}
+\toprule
+Subsystem & Minimum / preferred & Guidance \\
+\midrule
+Network & 2.5~GbE / 10~GbE-ready & 2.5~GbE is adequate initially; 10~GbE becomes valuable for large vision and HDF5 datasets. \\
+Chassis & Full tower or 4U+ rack chassis & Verify GPU length, height, width, cable bend radius, intake area, and the second-slot layout from drawings. \\
+PSU & Quality ATX 3.x, sized with transient margin & A single 16~GB card may need 850--1,000~W; a 5090-class or dual-GPU plan commonly warrants 1,200--1,600~W after calculation. \\
+Cooling & Front-to-back airflow with replaceable filters & Favor sustained compute and acoustics over decorative density. \\
+UPS & USB/network-managed pure-sine unit & Size for controlled shutdown, not hours of full-load inference. \\
+Remote recovery & Auto power-on, smart PDU/plug, or server BMC & Consumer platforms lack full out-of-band management; plan recovery before running unattended jobs. \\
+\bottomrule
+\end{tabularx}
+\caption{Infrastructure choices that determine whether later GPU upgrades are practical.}
+\end{table}
+
+\section{Engineering Compute Beyond LLM Inference}
+
+\subsection{Factor graphs}
+
+Factor-graph optimization is a numerical workload, not an LLM workload. The
+same GPU can serve both at different times, but the software stacks and
+performance criteria are distinct.
+
+GTSAM 4.3 introduced experimental CUDA acceleration for general nonlinear
+optimization and structure from motion \cite{gtsam_43}. In the general path,
+factor linearization, nonlinear error evaluation, and retraction remain on the
+CPU while the sparse linear solve runs on the GPU. The project reports that
+small problems can remain faster on the CPU; larger A100 benchmarks achieved
+up to 3.64x for 2-D pose graphs, 4.70x for 3-D pose graphs, and 3.58x for stereo
+SLAM. Its specialized GPU-resident structure-from-motion path reported roughly
+8--10x acceleration on the tested BAL problems \cite{gtsam_cuda}.
+
+The purchasing implication is to begin factor-graph work on the available CPU,
+then benchmark representative graph sizes and solver choices. Do not purchase
+a GPU or HEDT platform solely from the existence of a CUDA backend.
+
+\subsection{Vision navigation}
+
+Vision makes the strongest future case for a large GPU. Candidate uses include
+learned features, optical flow, stereo/depth, image rectification pipelines,
+visual place recognition, bundle adjustment, visual-inertial smoothing, map
+construction, and multimodal inspection. It also increases storage and network
+demand: model weights are small relative to retained image sequences and
+derived datasets.
+
+A 16~GB GPU is adequate for learning and prototype inference. A 24--32~GB GPU
+is the more durable target for concurrent image batches, larger visual models,
+and optimization. The exact upgrade should follow a representative camera
+resolution, frame rate, model, and latency benchmark.
+
+\subsection{SWIL, CI, services, and HWIL}
+
+The server can grow into a useful private engineering platform:
+
+\begin{itemize}
+  \item scheduled NavKit builds, tests, and qualification campaigns;
+  \item Monte Carlo execution and cached analysis generation;
+  \item self-hosted development applications before cloud deployment;
+  \item Git mirrors, package caches, model registry, and artifact storage;
+  \item replay and mixed-HWIL orchestration; and
+  \item later external-flight-computer stimulus and evidence collection.
+\end{itemize}
+
+Real-time or timing-sensitive HWIL must be isolated from LLM inference. Use
+separate services and containers, explicit CPU affinity where necessary, resource
+limits, a GPU job queue, and measured latency/jitter. A convenient shared server
+must not silently turn model inference into a source of nondeterministic test
+timing.
+
+\section{Acquisition Paths}
+
+\subsection{Path A: minimum-cost learning}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{L{0.23\textwidth} L{0.20\textwidth} Y}
+\toprule
+Stage & Budgetary target & Outcome \\
+\midrule
+Laptop now & \$1,000--\$1,700 & P16 Gen 1/2, 64~GB, 2~TB; productive development immediately. \\
+Server base & \$900--\$1,500 & Used AM4/5950X or carefully priced modern platform, 64--128~GB, 2~TB. \\
+Starter GPU & Launch reference \$429; current quote required & 16~GB local inference and CUDA/vision experimentation. \\
+Later upgrade & Workload-dependent & Replace the starter card or retain it for a separate small service. \\
+\bottomrule
+\end{tabularx}
+\caption{Low-entry-cost path. It accepts a likely GPU replacement.}
+\end{table}
+
+\subsection{Path B: durable balanced server}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{L{0.23\textwidth} L{0.20\textwidth} Y}
+\toprule
+Stage & Budgetary target & Outcome \\
+\midrule
+Laptop now & \$1,000--\$1,700 & Same portable workstation; server timing does not block development. \\
+Server base & \$1,600--\$2,600 & Modern 16-core CPU, 128~GB, two NVMe drives, large chassis, upgrade-ready PSU. \\
+Primary GPU & Market-dependent 24--32~GB tier & Useful 30--32B local models, more context, serious vision headroom. \\
+Infrastructure & \$400--\$1,200 & UPS, networking, bulk storage, and backup according to existing equipment. \\
+\bottomrule
+\end{tabularx}
+\caption{Preferred long-lived single-GPU engineering server.}
+\end{table}
+
+\subsection{Path C: workstation infrastructure}
+
+Move to Threadripper or a workstation/server platform only after documenting at
+least one of the following:
+
+\begin{itemize}
+  \item representative simulation throughput continues scaling beyond 16 CPU cores;
+  \item required memory exceeds mainstream platform capacity or bandwidth;
+  \item two or more full-bandwidth GPUs are required;
+  \item storage, capture, and 10/25~Gb networking exhaust mainstream PCIe lanes; or
+  \item several users or persistent services make manageability and ECC capacity
+        more valuable than acquisition and operating cost.
+\end{itemize}
+
+\section{Benchmark and Purchase Gates}
+
+\subsection{Laptop acceptance}
+
+Before the return window closes:
+
+\begin{enumerate}
+  \item inspect battery health, thermals, fans, display, ports, keyboard, hinges,
+        charger, BIOS access, and both storage slots;
+  \item run memory and NVMe health tests;
+  \item perform clean Debug and Release builds and capture elapsed time;
+  \item run the complete test suite;
+  \item run representative single, 100-, 500-, and 1,000-run NavKit workloads;
+  \item record simulation, HDF5 packaging, and plotting time separately; and
+  \item record peak RAM, CPU utilization, temperature, throttling, and disk throughput.
+\end{enumerate}
+
+\subsection{Starter-GPU acceptance}
+
+Within the return window:
+
+\begin{enumerate}
+  \item validate the intended Linux distribution, NVIDIA driver, CUDA runtime,
+        container runtime, and inference server;
+  \item measure time to first token, sustained generation rate, VRAM use, power,
+        temperature, and acoustics for selected 7--14B and larger quantized models;
+  \item test the actual context length used for repository work rather than a
+        short synthetic prompt;
+  \item evaluate answer quality on a private NavKit task set; and
+  \item run a small CUDA vision and GTSAM experiment to validate the broader stack.
+\end{enumerate}
+
+\subsection{Upgrade gates}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{L{0.28\textwidth} Y}
+\toprule
+Observed limitation & Upgrade response \\
+\midrule
+Desired model or context does not fit 16~GB & Move to one 24--32~GB GPU; do not assume a second 16~GB card solves every case. \\
+Model fits but is too slow & Upgrade GPU compute/bandwidth after profiling prompt processing and generation separately. \\
+Independent services contend & Add a second GPU and assign services explicitly. \\
+Monte Carlo CPU remains saturated and scales with more workers & Consider more CPU cores after controlling for storage and memory. \\
+HDF5 or datasets dominate & Upgrade scratch NVMe, memory caching, or analysis format before CPU/GPU. \\
+PCIe devices cannot coexist at required bandwidth & Move to Threadripper/workstation rather than stacking adapters onto a consumer board. \\
+HWIL timing is perturbed & Isolate workloads or use a dedicated orchestration host; raw compute is not the remedy. \\
+\bottomrule
+\end{tabularx}
+\caption{Measurements should trigger upgrades, not product enthusiasm.}
+\end{table}
+
+\section{Final Recommendation}
+
+The preferred plan is:
+
+\begin{enumerate}
+  \item Buy a sound P16 Gen 1 or Gen 2 with 64~GB immediately, upgrading to
+        128~GB when the price is favorable. Use a 2~TB primary NVMe and preserve
+        the second slot.
+  \item In early 2027, build the server only after deciding whether its first
+        GPU is disposable. A 16~GB RTX 5060 Ti is a valid learning purchase near
+        its reference price, but not a durable large-model solution.
+  \item If budget permits, skip directly to a modern 16-core, 128~GB Linux
+        server with a 24--32~GB NVIDIA GPU, two NVMe tiers, an upgrade-ready
+        chassis/PSU, 2.5~GbE with a 10~GbE path, and a managed UPS.
+  \item Prefer one larger-memory GPU for one larger model. Add a second GPU for
+        separate services or measured sharding needs, not because aggregate
+        VRAM appears additive on paper.
+  \item Defer Threadripper and professional 48+~GB GPUs until NavKit campaigns,
+        factor graphs, vision data, or multi-user services produce a documented
+        requirement.
+\end{enumerate}
+
+This path delivers immediate development improvement, starts local inference
+without pretending an entry card is permanent, and preserves a clean evolution
+toward a balanced private engineering server.
+
+\printbibliography
+\end{document}
